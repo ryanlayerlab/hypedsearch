@@ -11,6 +11,7 @@ jobs:
   on_build_actions:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v2
       - name: Run Main
         run: main.py
         working-directory: src
