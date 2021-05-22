@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Run Main
-        run: main.py
+        run: python main.py
         working-directory: src
       #- name: Run Tests
       #  run: tests.py
