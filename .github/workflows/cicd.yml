@@ -13,8 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Run Main
-        run: python hypersearch.py
+        run: python hypedsearch.py
         working-directory: src/hypedsearch
-      #- name: Run Tests
-      #  run: tests.py
-      #  working-directory: src  
+      - name: Run Tests
+        run: python -m unittest test_hypedsearch
+        working-directory: src/test
