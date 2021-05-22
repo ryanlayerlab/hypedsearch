@@ -1,6 +1,6 @@
 import unittest
 
-class TestSum(unittest.TestCase):
+class TestSum():
 
     def test_add_pass():
         self.assertEqual(1+1, 2, "Should be 2")
