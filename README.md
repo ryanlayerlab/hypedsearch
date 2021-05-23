@@ -1,2 +1,3 @@
 # hypedsearch
-hybrid peptide searching tool
+## **hy**brid **pe**pti**d**e **search**ing tool
+
