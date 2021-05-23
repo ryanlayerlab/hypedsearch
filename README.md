@@ -6,7 +6,12 @@ For more information about hypedsearch, installation and usage instructions, ple
 ---
 
 Background
-T1D is an autoimmune disesase where the body's immune system attacks and destroy's the panceas's ability to produce insulin<sup>1</sup>.  
+T1D is a chronic autoimmune disesase where the human body no longer can produce insulin.  Without insulin, the body can no longer regulate its blood sugar and glucose levels, which can lead to immediate coma-induced death as well as long-term medical conditions like heart disease, kidney failure, blindness, and limb amputation.  The mental health toll on diabetics is equally as great - depression and suicide rates are much higher in diabetics than the overall population.  There is no know cure for diabetes  - most diabetes regulate their blood sugar via finges pricks, 
+
+with treatment in the United States costing over $10,000 a year for uninsured patients.  
+
+
+immune system attacks and destroys the panceas's ability to produce insulin<sup>1</sup>.  
 
 
 Dr. Delong from CU Anchutez has identified a possible cause of Type 1 Diabetes (T1D) - hybryd insuline peptdes (reference needed). 
