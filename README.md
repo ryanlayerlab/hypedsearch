@@ -6,7 +6,7 @@ For more information about hypedsearch, installation and usage instructions, ple
 ---
 
 Background
-T1D is an autoimmune disesase where the body's immune system attacks and destroy's the panceas's ability to produce insulin <sup>1</sup>.  
+T1D is an autoimmune disesase where the body's immune system attacks and destroy's the panceas's ability to produce insulin<sup>1</sup>.  
 
 
 Dr. Delong from CU Anchutez has identified a possible cause of Type 1 Diabetes (T1D) - hybryd insuline peptdes (reference needed). 
