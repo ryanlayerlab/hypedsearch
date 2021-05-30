@@ -1,7 +1,5 @@
 import unittest
 
-from src/hypedsearch import main
-
 class TestSum(unittest.TestCase):
 
     def test_add_pass(self):
