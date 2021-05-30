@@ -1,5 +1,5 @@
 import sys
-import dataclass
+import dataclasses
 
 from dataclasses import dataclass
 
