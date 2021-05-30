@@ -1,6 +1,6 @@
 import unittest
 
-from hypedsearch import main
+from src/hypedsearch import main
 
 class TestSum(unittest.TestCase):
 
