@@ -12,7 +12,7 @@ import sys
 class Test_Main(unittest.TestCase):
 
     def setUp(self):
-        sys.path.insert(0, "../project")
+        sys.path.insert(0, "../hypedsearch")
         import hypedsearch
         #from project import item
         # further setup using this import
