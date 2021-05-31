@@ -6,6 +6,7 @@ class Test_Main(unittest.TestCase):
     def setUp(self):
         sys.path.insert(0, "../hypedsearch")
         import hypedsearch
+        main_arguments = hypedsearch.Main_Arguments()
         print("setUp run")
         
     def test_add_pass(self):
