@@ -15,7 +15,7 @@ class Test_Main(unittest.TestCase):
 
     def test_main_pass(self):
         self.main_arguments.spectra_folder = 'C:\MyFolder'
-        self.assertEqual(self.main_arguments.spectra_folder, 'C:\MyFolder', 'spectra_folder is incorrect')      
+        self.assertEqual(self.main_arguments.spectra_folder, 'C:\MyFolder2', 'spectra_folder is incorrect')      
         
 if __name__ == "__main__":
     unittest.main()
