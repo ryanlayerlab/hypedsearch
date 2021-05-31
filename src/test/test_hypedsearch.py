@@ -1,4 +1,5 @@
 import unittest
+import hypedsearch
 
 class TestSum(unittest.TestCase):
 
