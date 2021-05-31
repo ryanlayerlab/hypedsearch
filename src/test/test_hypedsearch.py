@@ -1,6 +1,7 @@
 import unittest
-hypedsearch = __import__("hypedsearch.py")
-main = hypedsearch.main
+hypedsearch = __import__("src/hypedsearch/hypedsearch.py")
+#hypedsearch = __import__("hypedsearch.py")
+#main = hypedsearch.main
 
 class TestSum(unittest.TestCase):
 
