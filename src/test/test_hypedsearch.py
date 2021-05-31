@@ -1,11 +1,3 @@
-#import unittest
-
-#Fails
-#import hypedsearch
-#hypedsearch = __import__("../hypedsearch/hypedsearch.py")
-#hypedsearch = __import__("hypedsearch.py")
-
-
 import unittest
 import sys    
 
