@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Main_Arguments:
-    spectra_folder: str
+    spectra_folder: str = ''
     #database_file: str
     #output_dir: str
     #min_peptide_len: int
