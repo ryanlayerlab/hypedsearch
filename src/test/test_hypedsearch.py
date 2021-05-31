@@ -3,6 +3,8 @@ import sys
 
 class Test_Main(unittest.TestCase):
 
+    self.main_arguments = None
+    
     def setUp(self):
         sys.path.insert(0, "../hypedsearch")
         import hypedsearch
