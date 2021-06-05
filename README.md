@@ -51,7 +51,7 @@ $hypedsearch> ./setup.sh
 ## Usage
 There are two ways to use hypedsearch: command line arguments or the param file
 
-#command line arguments
+**command line arguments**
 In order to see the arguments, run
 ```bash
 $> python3 -m src.main --help
@@ -107,7 +107,7 @@ Just run the python3 -m src.main with your spectra folder, database file, output
 Note
 If you choose to use command line arguments, do not set the params flag to true. This will read from the params file. This is discussed in the next section.
 
-#param file
+**param file**
 
 If you open up the params.py file in the src directory, you will be presented with a many different variables and descriptions. Read the descriptions and fill in your own parameters. Once you have done this, save the params file. Finally, in order to run using this params file, run the following:
 ```bash
