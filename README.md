@@ -38,12 +38,12 @@ First clone the repository
 ```bash
 $> git clone https://github.com/zmcgrath96/hypedsearch.git
 ```
-```bash
 Then run the setup script that will install dependencies and build the C++ code.
+```bash
 $hypedsearch> ./setup.sh
 ```
-```bash
 If you get a permissions error, try the following:
+```bash
 $> cd hypedsearch
 $hypedsearch> chmod u+x setup.sh
 $hypedsearch> ./setup.sh
