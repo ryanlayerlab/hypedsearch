@@ -62,8 +62,8 @@ def set_args(args) -> dict:
         
 def main(args: Main_Arguments) -> None:
     print('Main Run')
-    #arguments = set_args(args)
-    #runner.run(arguments)
+    arguments = set_args(args)
+    runner.run(arguments)
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Tool for identifying proteins, both hybrid and non hybrid from MS/MS data')
