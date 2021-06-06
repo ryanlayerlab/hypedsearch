@@ -51,17 +51,16 @@ class Main_Arguments:
     Config_File_Arguments: Config_File_Arguments = None    
 
 def set_args(args) -> dict:
-    if typeof(args) is In_Memory_Arguments:
+    if args.In_Memory_Arguments is None:
         return None
-    elif typeof(args) is IO_Arguments:
+    elif args.IO_Arguments is None:
         return None
-    elif typeof(args) is Config_File_Arguments:
+    elif args.Config_File_Arguments is None:
         return None
     else:
         raise Exception('Invalid Arguments')
         
 def main(args: Main_Arguments) -> None:
-    print('Main Run')
     arguments = set_args(args)
     runner.run(arguments)
     
