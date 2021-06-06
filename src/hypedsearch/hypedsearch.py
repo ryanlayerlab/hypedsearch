@@ -42,7 +42,7 @@ class IO_Arguments:
         
 @dataclass
 class Config_File_Arguments:
-    config_file_path: string = ''
+    config_file_path: str = ''
         
 @dataclass
 class Main_Arguments:
