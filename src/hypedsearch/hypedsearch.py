@@ -6,9 +6,8 @@ from dataclasses import dataclass
 
 @dataclass
 class Main_Arguments:
-    spectra_folder: str = ''
-    database_file: str = ''
-    output_dir: str = ''
+    spectra_file: list = None
+    database_file: list = None      
     min_peptide_len: int = 0
     max_peptide_len: int = 0
     tolerance: float = 0.0
@@ -22,15 +21,21 @@ class Main_Arguments:
     n: int = 0
     truth_set: str = ''
 
+@dataclass
+class IO_Arguments:
+    spectra_folder_path: str = ''
+    database_file_path: str = ''
+    output_dir_path: str = ''
+        
 def main(args: Main_Arguments) -> None:
     print("Hello World!")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Tool for identifying proteins, both hybrid and non hybrid from MS/MS data')
-    parser.add_argument('--spectra-folder', dest='spectra_folder', type=str, default='./', help='Path to folder containing spectra files.')
-    parser.add_argument('--database-file', dest='database_file', type=str, default='./', help='Path to .fasta file containing proteins')
-    parser.add_argument('--output-dir', dest='output_dir', type=str, default='~/', help='Directory to save all figures. Default=~/')
-    parser.add_argument('--config', dest='config', type=bool, default=True, help='Use the config.yaml file adjacent to main.py instead of using command line arguments. Default=True')
+    parser.add_argument('--spectra-folder-path', dest='spectra_folder_path', type=str, default='./', help='Path to folder containing spectra files.')
+    parser.add_argument('--database-file-path', dest='database_file_path', type=str, default='./', help='Path to .fasta file containing proteins')
+    parser.add_argument('--output-dir-path', dest='output_dir_path', type=str, default='~/', help='Directory to save all figures. Default=~/')
+    parser.add_argument('--config-file-path', dest='config_file_path', type=bool, default=True, help='Use the config.yaml file adjacent to main.py instead of using command line arguments. Default=True')
     parser.add_argument('--min-peptide-len', dest='min_peptide_len', type=int, default=5, help='Minimum peptide length to consider. Default=5')
     parser.add_argument('--max-peptide-len', dest='max_peptide_len', type=int, default=20, help='Maximum peptide length to consider. Default=20')
     parser.add_argument('--tolerance', dest='tolerance', type=int, default=20, help='ppm tolerance to allow in search. Deafult=20')
