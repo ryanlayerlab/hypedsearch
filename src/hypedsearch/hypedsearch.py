@@ -54,9 +54,9 @@ def set_args(args) -> dict:
     return None
     if typeof(args) is In_Memory_Arguments:
         return None
-    else if typeof(args) is IO_Arguments:
+    elif typeof(args) is IO_Arguments:
         return None
-    else if typeof(args) is Config_File_Arguments:
+    elif typeof(args) is Config_File_Arguments:
         return None
     else:
         raise Exception('Invalid Arguments')
