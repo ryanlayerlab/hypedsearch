@@ -1,13 +1,19 @@
 import sys
 import argparse
 import dataclasses
-
+import utils, runner
 from dataclasses import dataclass
 
+#There are two ways to run hypedsearch:
+#1) command line
+#2) file system Config file
+
+#There are two ways to pass in dependencies: (spectra_file(s); database_file; output_location)
+#1) in-memory
+#2) file system       
+
 @dataclass
-class Main_Arguments:
-    spectra_file: list = None
-    database_file: list = None      
+class Hypedsearch_Arguments:
     min_peptide_len: int = 0
     max_peptide_len: int = 0
     tolerance: float = 0.0
@@ -22,14 +28,59 @@ class Main_Arguments:
     truth_set: str = ''
 
 @dataclass
-class IO_Arguments:
+class In_Memory_Arguments:
+    spectra_file: list = None
+    database_file: list = None
+    hypedsearch_arguments: Hypedsearch_Arguments = None        
+
+@dataclass
+class IO_Arguments:    
     spectra_folder_path: str = ''
     database_file_path: str = ''
     output_dir_path: str = ''
+    hypedsearch_arguments: Hypedsearch_Arguments = None        
+        
+@dataclass
+class Config_File_Arguments:
+    config_file_path: string = ''
+        
+@dataclass
+class Main_Arguments:
+    In_Memory_Arguments: In_Memory_Arguments = None
+    IO_Arguments: IO_Arguments = None
+    Config_File_Arguments: Config_File_Arguments = None    
+
+def set_args(args) -> dict:
+    final_args = {
+        'spectra_folder': spectra_folder,
+        'database_file': database_file,
+        'output_dir': output_dir,
+        'min_peptide_len': min_peptide_len,
+        'max_peptide_len': max_peptide_len,
+        'tolerance': ppm_tolerance,
+        'precursor_tolerance': precursor_tolerance,
+        'verbose': verbose, 
+        'peak_filter': peak_filter, 
+        'relative_abundance_filter': relative_abundance_filter,
+        'digest': digest, 
+        'DEBUG': debug, 
+        'cores': cores,
+        'n': n,
+        'truth_set': truth_set
+    }
+    if typeof(args) == In_Memory_Arguments:
+        return final_args
+    else if typeof(args) == IO_Arguments:
+        return final_args
+    else if typeof(args) == Config_File_Arguments:
+        return final_args
+    else:
+        raise Exception("Sorry, no numbers below zero")
         
 def main(args: Main_Arguments) -> None:
-    print("Hello World!")
-
+    arguments = set_args(args)
+    #runner.run(arguments)
+    
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Tool for identifying proteins, both hybrid and non hybrid from MS/MS data')
     parser.add_argument('--spectra-folder-path', dest='spectra_folder_path', type=str, default='./', help='Path to folder containing spectra files.')
