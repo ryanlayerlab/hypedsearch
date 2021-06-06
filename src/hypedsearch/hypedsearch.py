@@ -50,7 +50,7 @@ class Main_Arguments:
     IO_Arguments: IO_Arguments = None
     Config_File_Arguments: Config_File_Arguments = None    
 
-def set_args(args) -> dict:
+def set_args(args: Main_Arguments) -> dict:
     if args.In_Memory_Arguments is None:
         return None
     elif args.IO_Arguments is None:
