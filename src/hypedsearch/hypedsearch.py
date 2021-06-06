@@ -51,7 +51,6 @@ class Main_Arguments:
     Config_File_Arguments: Config_File_Arguments = None    
 
 def set_args(args) -> dict:
-    return None
     if typeof(args) is In_Memory_Arguments:
         return None
     elif typeof(args) is IO_Arguments:
