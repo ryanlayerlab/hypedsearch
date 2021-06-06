@@ -51,31 +51,14 @@ class Main_Arguments:
     Config_File_Arguments: Config_File_Arguments = None    
 
 def set_args(args) -> dict:
-    final_args = {
-        'spectra_folder': spectra_folder,
-        'database_file': database_file,
-        'output_dir': output_dir,
-        'min_peptide_len': min_peptide_len,
-        'max_peptide_len': max_peptide_len,
-        'tolerance': ppm_tolerance,
-        'precursor_tolerance': precursor_tolerance,
-        'verbose': verbose, 
-        'peak_filter': peak_filter, 
-        'relative_abundance_filter': relative_abundance_filter,
-        'digest': digest, 
-        'DEBUG': debug, 
-        'cores': cores,
-        'n': n,
-        'truth_set': truth_set
-    }
-    if typeof(args) == In_Memory_Arguments:
-        return final_args
-    else if typeof(args) == IO_Arguments:
-        return final_args
-    else if typeof(args) == Config_File_Arguments:
-        return final_args
+    if typeof(args) is In_Memory_Arguments:
+        return None
+    else if typeof(args) is IO_Arguments:
+        return None
+    else if typeof(args) is Config_File_Arguments:
+        return None
     else:
-        raise Exception("Sorry, no numbers below zero")
+        raise Exception('Invalid Arguments')
         
 def main(args: Main_Arguments) -> None:
     arguments = set_args(args)
