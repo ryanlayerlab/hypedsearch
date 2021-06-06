@@ -50,17 +50,19 @@ class Main_Arguments:
     IO_Arguments: IO_Arguments = None
     Config_File_Arguments: Config_File_Arguments = None    
 
-def set_args(args: Main_Arguments) -> dict:
-    if args.In_Memory_Arguments is None:
-        return None
-    elif args.IO_Arguments is None:
-        return None
-    elif args.Config_File_Arguments is None:
-        return None
-    else:
-        raise Exception('Invalid Arguments')
+def set_args(args) -> dict:
+    print(args)
+    #args to Main_Arguments
+    #if args.In_Memory_Arguments is None:
+    #    return None
+    #elif args.IO_Arguments is None:
+    #    return None
+    #elif args.Config_File_Arguments is None:
+    #    return None
+    #else:
+    #    raise Exception('Invalid Arguments')
         
-def main(args: Main_Arguments) -> None:
+def main(args) -> None:
     arguments = set_args(args)
     runner.run(arguments)
     
