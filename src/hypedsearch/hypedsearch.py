@@ -61,7 +61,8 @@ def set_args(args) -> dict:
         raise Exception('Invalid Arguments')
         
 def main(args: Main_Arguments) -> None:
-    arguments = set_args(args)
+    print('Main Run')
+    #arguments = set_args(args)
     #runner.run(arguments)
     
 if __name__ == "__main__":
