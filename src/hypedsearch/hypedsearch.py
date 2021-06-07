@@ -36,24 +36,28 @@ class IO_Arguments:
 class Config_File_Arguments:
     config_file_path: str = ''
         
-@dataclass
-class Main_Arguments:
-    In_Memory_Arguments: In_Memory_Arguments = None
-    IO_Arguments: IO_Arguments = None
-    Config_File_Arguments: Config_File_Arguments = None    
-
 def set_args(args) -> dict:
-    print(args)
+    min_peptide_len = args.min_peptide_len if not args.use_config_file else config['min_peptide_len']
+    max_peptide_len = args.max_peptide_len if not args.use_config_file else config['max_peptide_len']
+    ppm_tolerance = args.tolerance if not args.use_config_file else config['ppm_tolerance']
+    precursor_tolerance = args.precursor_tolerance if not args.use_config_file else config['precursor_tolerance']
+    verbose = stringtobool(args.verbose) if not args.use_config_file else config['verbose']
+    peak_filter = args.peak_filter if not args.use_config_file else config['num_peaks']
+    relative_abundance_filter = args.rel_abund_filter if not args.use_config_file else config['relative_abundance']
+    digest = args.digest if not args.use_config_file else config['digest']
+    cores = args.cores if not args.use_config_file else config['cores']
+    n = args.n if not args.use_config_file else config['top_results']
+    debug = args.cores if not args.use_config_file else config['cores']
+    truth_set = args.truth_set if not args.use_config_file else config['truth_set']
+    spectra_folder = args.spectra_folder if not args.use_config_file else config['spectra_dir']
+    database_file = args.database_file if not args.use_config_file else config['database_file']
+    output_dir = args.output_dir if not args.use_config_file else config['output_dir']
+
+    if args.use_io:
+        #get files from disk and load into args
+    else:
+        #already in args
     
-    #if args.In_Memory_Arguments is None:
-    #    return None
-    #elif args.IO_Arguments is None:
-    #    return None
-    #elif args.Config_File_Arguments is None:
-    #    return None
-    #else:
-    #    raise Exception('Invalid Arguments')
-        
 def main(args: object) -> None:
     arguments = set_args(args)
     runner.run(arguments)
