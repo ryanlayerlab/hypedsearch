@@ -2,6 +2,7 @@ import sys
 import argparse
 import dataclasses
 import utils, runner
+from config_loader import Config
         
 def set_args(args) -> dict:
     min_peptide_len = args.min_peptide_len if not args.use_config_file else config['min_peptide_len']
