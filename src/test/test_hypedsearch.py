@@ -8,7 +8,7 @@ class Test_Main(unittest.TestCase):
     def setUp(self):
         sys.path.insert(0, "../hypedsearch")
         import hypedsearch
-        args = "foo"
+        args = 'foo'
         hypedsearch.main(args)
         
     def test_main_arguments_specta_folder(self):
