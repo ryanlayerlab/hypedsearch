@@ -1,1 +1,9 @@
 
+import sys
+import utils, runner
+
+def main(arguments: object) -> None:
+    runner.run(arguments)
+
+if __name__ == '__main__':
+    main(arguments)
