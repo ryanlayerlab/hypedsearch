@@ -30,16 +30,16 @@ class Config(dict):
         :param str config_file: Path to the config file
             Defaults to './config.yaml'
         '''
-        config = pathlib.Path(config_file)
+        #config = pathlib.Path(config_file)
 
-        if config.name.split('.')[-1] != 'yaml':
-            raise InvalidConfigFile('Config file must be a yaml file')
+        #if config.name.split('.')[-1] != 'yaml':
+        #    raise InvalidConfigFile('Config file must be a yaml file')
 
-        if not config.is_file():
-            raise InvalidConfigFile(f'Config file {config_file} does not exist')
+        #if not config.is_file():
+        #    raise InvalidConfigFile(f'Config file {config_file} does not exist')
         
-        self.config = yaml.safe_load(open(config_file))
-        self._check_config()
+        #self.config = yaml.safe_load(open(config_file))
+        #self._check_config()
 
     def _check_config(self):
         '''Make sure certain fields are valid 
