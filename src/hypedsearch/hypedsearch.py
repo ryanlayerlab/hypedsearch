@@ -24,24 +24,11 @@ def set_args(args) -> dict:
     spectra_file = args.spectra_file is not args.use_io args.spectra_file else utils.load_spectra_file(spectra_file_path)
     database_file = args.database_file is not args.use_io args.database_file else utils.load_database_file(database_file_path)
     
-    return {
-        'min_peptide_len': min_peptide_len,
-        'max_peptide_len': max_peptide_len,
-        'tolerance': ppm_tolerance,
-        'precursor_tolerance': precursor_tolerance,
-        'verbose': verbose, 
-        'peak_filter': peak_filter, 
-        'relative_abundance_filter': relative_abundance_filter,
-        'digest': digest, 
-        'DEBUG': debug, 
-        'cores': cores,
-        'n': n,
-        'truth_set': truth_set,
-        'spectra_file': spectra_file,
-        'database_file' : database_file
-    }        
+    return {'min_peptide_len': min_peptide_len, 'max_peptide_len': max_peptide_len, 'tolerance': ppm_tolerance,
+        'precursor_tolerance': precursor_tolerance, 'verbose': verbose, 'peak_filter': peak_filter, 
+        'relative_abundance_filter': relative_abundance_filter,'digest': digest, 'DEBUG': debug, 
+        'cores': cores,'n': n,'truth_set': truth_set,'spectra_file': spectra_file,'database_file' : database_file}        
         
-    
 def main(args: object) -> None:
     arguments = set_args(args)
     runner.run(arguments)
