@@ -8,8 +8,7 @@ class Test_Main(unittest.TestCase):
     def setUp(self):
         sys.path.insert(0, "../hypedsearch")
         import hypedsearch
-        args = [--use_config_file False, --another_arg True]
-        hypedsearch.main(args)
+        hypedsearch.main(use_config_file=False)
         
     def test_main_arguments_specta_folder(self):
         self.assertEqual(1,1,'equality test')
