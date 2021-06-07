@@ -7,8 +7,8 @@ class Test_Main(unittest.TestCase):
     
     def setUp(self):
         sys.path.insert(0, "../hypedsearch")
-        import hypedsearch
-        hypedsearch.main(use_config_file=False, use_io=False, use_in_memory=True)
+        #import hypedsearch
+        #hypedsearch.main(use_config_file=False, use_io=False, use_in_memory=True)
         
     def test_main_arguments_specta_folder(self):
         self.assertEqual(1,1,'equality test')
