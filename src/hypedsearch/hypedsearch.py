@@ -4,14 +4,6 @@ import dataclasses
 import utils, runner
 from dataclasses import dataclass
 
-#There are two ways to run hypedsearch:
-#1) command line
-#2) file system Config file
-
-#There are two ways to pass in dependencies: (spectra_file(s); database_file; output_location)
-#1) in-memory
-#2) file system       
-
 @dataclass
 class Hypedsearch_Arguments:
     min_peptide_len: int = 0
@@ -68,7 +60,7 @@ def main(args: object) -> None:
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Tool for identifying proteins, both hybrid and non hybrid from MS/MS data')
-    #hypedsearch
+    #CLI hypedsearch
     parser.add_argument('--min-peptide-len', dest='min_peptide_len', type=int, default=5, help='Minimum peptide length to consider. Default=5')
     parser.add_argument('--max-peptide-len', dest='max_peptide_len', type=int, default=20, help='Maximum peptide length to consider. Default=20')
     parser.add_argument('--tolerance', dest='tolerance', type=int, default=20, help='ppm tolerance to allow in search. Deafult=20')
@@ -80,16 +72,16 @@ if __name__ == "__main__":
     parser.add_argument('--cores', dest='cores', type=int, default=1, help='The number of cores allowed to use when searching. Uses at least 1 and at most the number of available cores. Default=1')
     parser.add_argument('--n', dest='n', type=int, default=5, help='The number of alignments to keep per spectrum. Default=5')
     parser.add_argument('--truth_set', dest='truth_set', type=str, default='', help='Not sure what this does. Default=None')
-    #In Memory
+    #CLI In Memory
     parser.add_argument('--use_in_memory', dest='use_in_memory', type=bool, default=True, help='Use In Memory Datasets using file system. Default=True')
     parser.add_argument('--spectra_file', dest='spectra_file', type=list, default=None, help='In Memory Spectra File. Default=None')
     parser.add_argument('--database_file', dest='database_file', type=list, default=None, help='In Memory Database File. Default=None')
-    #I/O
+    #CLI I/O
     parser.add_argument('--use_io', dest='use_io', type=bool, default=False, help='Use file system datasets instead of in-memory. Default=False')
     parser.add_argument('--spectra-folder-path', dest='spectra_folder_path', type=str, default='./', help='Path to folder containing spectra files.')
     parser.add_argument('--database-file-path', dest='database_file_path', type=str, default='./', help='Path to .fasta file containing proteins')
     parser.add_argument('--output-dir-path', dest='output_dir_path', type=str, default='~/', help='Directory to save all figures. Default=~/')
-    #Config File
+    #Config File (always I/O)
     parser.add_argument('--use_config_file', dest='use_config_file', type=bool, default=False, help='Use .yaml config file instead of command line arguments. Default=False')
     parser.add_argument('--config-file-path', dest='config_file_path', type=bool, default=True, help='Use the config.yaml file adjacent to main.py instead of using command line arguments. Default=True')
     args = parser.parse_args()    
