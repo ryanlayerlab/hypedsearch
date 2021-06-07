@@ -52,6 +52,7 @@ class Main_Arguments:
 
 def set_args(args) -> dict:
     print(args)
+    
     #if args.In_Memory_Arguments is None:
     #    return None
     #elif args.IO_Arguments is None:
@@ -79,14 +80,17 @@ if __name__ == "__main__":
     parser.add_argument('--cores', dest='cores', type=int, default=1, help='The number of cores allowed to use when searching. Uses at least 1 and at most the number of available cores. Default=1')
     parser.add_argument('--n', dest='n', type=int, default=5, help='The number of alignments to keep per spectrum. Default=5')
     parser.add_argument('--truth_set', dest='truth_set', type=str, default='', help='Not sure what this does. Default=None')
-    #in memory
+    #In Memory
+    parser.add_argument('--use_in_memory', dest='use_in_memory', type=bool, default=True, help='Use In Memory Datasets using file system. Default=True')
     parser.add_argument('--spectra_file', dest='spectra_file', type=list, default=None, help='In Memory Spectra File. Default=None')
     parser.add_argument('--database_file', dest='database_file', type=list, default=None, help='In Memory Database File. Default=None')
     #I/O
+    parser.add_argument('--use_io', dest='use_io', type=bool, default=False, help='Use file system datasets instead of in-memory. Default=False')
     parser.add_argument('--spectra-folder-path', dest='spectra_folder_path', type=str, default='./', help='Path to folder containing spectra files.')
     parser.add_argument('--database-file-path', dest='database_file_path', type=str, default='./', help='Path to .fasta file containing proteins')
     parser.add_argument('--output-dir-path', dest='output_dir_path', type=str, default='~/', help='Directory to save all figures. Default=~/')
     #Config File
+    parser.add_argument('--use_config_file', dest='use_config_file', type=bool, default=False, help='Use .yaml config file instead of command line arguments. Default=False')
     parser.add_argument('--config-file-path', dest='config_file_path', type=bool, default=True, help='Use the config.yaml file adjacent to main.py instead of using command line arguments. Default=True')
     args = parser.parse_args()    
     main(args)
