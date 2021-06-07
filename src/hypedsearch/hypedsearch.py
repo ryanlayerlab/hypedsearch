@@ -21,8 +21,10 @@ def set_args(args) -> dict:
     output_dir = args.output_dir if not args.use_config_file else config['output_dir']
     spectra_file_path = args.spectra_file_path if not args.use_config_file else config['spectra_file_path']
     database_file_path = args.database_file_path if not args.database_file_path else config['database_file_path']
-    spectra_file = args.spectra_file is not args.use_io args.spectra_file else utils.load_spectra_file(spectra_file_path)
-    database_file = args.database_file is not args.use_io args.database_file else utils.load_database_file(database_file_path)
+    spectra_file = None
+    database_file = None
+    #spectra_file = args.spectra_file is not args.use_io args.spectra_file else utils.load_spectra_file(spectra_file_path)
+    #database_file = args.database_file is not args.use_io args.database_file else utils.load_database_file(database_file_path)
     
     return {'min_peptide_len': min_peptide_len, 'max_peptide_len': max_peptide_len, 'tolerance': ppm_tolerance,
         'precursor_tolerance': precursor_tolerance, 'verbose': verbose, 'peak_filter': peak_filter, 
