@@ -52,7 +52,6 @@ class Main_Arguments:
 
 def set_args(args) -> dict:
     print(args)
-    #args to Main_Arguments
     #if args.In_Memory_Arguments is None:
     #    return None
     #elif args.IO_Arguments is None:
