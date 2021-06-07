@@ -20,7 +20,7 @@ def set_args(args) -> dict:
     truth_set = args.truth_set if not args.use_config_file else config['truth_set']
     spectra_file_path = args.spectra_file_path if not args.use_config_file else config['spectra_file_path']
     database_file_path = args.database_file_path if not args.database_file_path else config['database_file_path']
-    output_dir = args.output_dir if not args.use_config_file else config['output_dir']
+    #output_dir = args.output_dir if not args.use_config_file else config['output_dir']
     #spectra_file = args.spectra_file is not args.use_io args.spectra_file else utils.load_spectra_file(spectra_file_path)
     spectra_file = None
     #database_file = args.database_file is not args.use_io args.database_file else utils.load_database_file(database_file_path)
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     parser.add_argument('--use_io', dest='use_io', type=bool, default=False, help='Use file system datasets instead of in-memory. Default=False')
     parser.add_argument('--spectra-folder-path', dest='spectra_file_path', type=str, default='./', help='Path to .mzml spectra file.')
     parser.add_argument('--database-file-path', dest='database_file_path', type=str, default='./', help='Path to .fasta file containing proteins')
-    parser.add_argument('--output-dir-path', dest='output_dir_path', type=str, default='~/', help='Directory to save all figures. Default=~/')
+    #parser.add_argument('--output-dir-path', dest='output_dir_path', type=str, default='~/', help='Directory to save all figures. Default=~/')
     #Config File (always I/O Datasets)
     parser.add_argument('--use_config_file', dest='use_config_file', type=bool, default=False, help='Use .yaml config file instead of command line arguments. Default=False')
     parser.add_argument('--config-file-path', dest='config_file_path', type=bool, default=True, help='Use the config.yaml file adjacent to main.py instead of using command line arguments. Default=True')
