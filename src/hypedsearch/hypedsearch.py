@@ -68,10 +68,6 @@ def main(args: object) -> None:
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Tool for identifying proteins, both hybrid and non hybrid from MS/MS data')
-    parser.add_argument('--spectra-folder-path', dest='spectra_folder_path', type=str, default='./', help='Path to folder containing spectra files.')
-    parser.add_argument('--database-file-path', dest='database_file_path', type=str, default='./', help='Path to .fasta file containing proteins')
-    parser.add_argument('--output-dir-path', dest='output_dir_path', type=str, default='~/', help='Directory to save all figures. Default=~/')
-    parser.add_argument('--config-file-path', dest='config_file_path', type=bool, default=True, help='Use the config.yaml file adjacent to main.py instead of using command line arguments. Default=True')
     parser.add_argument('--min-peptide-len', dest='min_peptide_len', type=int, default=5, help='Minimum peptide length to consider. Default=5')
     parser.add_argument('--max-peptide-len', dest='max_peptide_len', type=int, default=20, help='Maximum peptide length to consider. Default=20')
     parser.add_argument('--tolerance', dest='tolerance', type=int, default=20, help='ppm tolerance to allow in search. Deafult=20')
@@ -82,5 +78,11 @@ if __name__ == "__main__":
     parser.add_argument('--verbose', dest='verbose', type=bool, default=True, help='Extra printing to console during run. Default=True')
     parser.add_argument('--cores', dest='cores', type=int, default=1, help='The number of cores allowed to use when searching. Uses at least 1 and at most the number of available cores. Default=1')
     parser.add_argument('--n', dest='n', type=int, default=5, help='The number of alignments to keep per spectrum. Default=5')
+    
+    #parser.add_argument('--spectra-folder-path', dest='spectra_folder_path', type=str, default='./', help='Path to folder containing spectra files.')
+    #parser.add_argument('--database-file-path', dest='database_file_path', type=str, default='./', help='Path to .fasta file containing proteins')
+    #parser.add_argument('--output-dir-path', dest='output_dir_path', type=str, default='~/', help='Directory to save all figures. Default=~/')
+    #parser.add_argument('--config-file-path', dest='config_file_path', type=bool, default=True, help='Use the config.yaml file adjacent to main.py instead of using command line arguments. Default=True')
+
     args = parser.parse_args()    
     main(args)
