@@ -8,7 +8,7 @@ def set_args(args) -> dict:
     max_peptide_len = args.max_peptide_len if not args.use_config_file else config['max_peptide_len']
     ppm_tolerance = args.tolerance if not args.use_config_file else config['ppm_tolerance']
     precursor_tolerance = args.precursor_tolerance if not args.use_config_file else config['precursor_tolerance']
-    verbose = stringtobool(args.verbose) if not args.use_config_file else config['verbose']
+    verbose = args.verbose if not args.use_config_file else config['verbose']
     peak_filter = args.peak_filter if not args.use_config_file else config['num_peaks']
     relative_abundance_filter = args.rel_abund_filter if not args.use_config_file else config['relative_abundance']
     digest = args.digest if not args.use_config_file else config['digest']
