@@ -5,6 +5,7 @@ import utils, runner
 from config_loader import Config
         
 def set_args(args) -> dict:
+    config = Config()
     min_peptide_len = args.min_peptide_len if not args.use_config_file else config['min_peptide_len']
     max_peptide_len = args.max_peptide_len if not args.use_config_file else config['max_peptide_len']
     ppm_tolerance = args.tolerance if not args.use_config_file else config['ppm_tolerance']
