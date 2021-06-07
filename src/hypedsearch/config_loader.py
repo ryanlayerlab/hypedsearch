@@ -61,18 +61,20 @@ class Config(dict):
     def _finditem(self, obj, key):
         '''Recursivley search for a key
         '''
-        if key in obj: return obj[key]
+        #if key in obj: return obj[key]
 
-        for _, v in obj.items():
-            if isinstance(v,dict):
-                item = self._finditem(v, key)
-                if item is not None:
-                    return item
+        #for _, v in obj.items():
+        #    if isinstance(v,dict):
+        #        item = self._finditem(v, key)
+        #        if item is not None:
+        #            return item
+        return None
 
     def __getitem__(self, key): 
-        item = self._finditem(self.config, key)
+        #item = self._finditem(self.config, key)
 
-        if item is None:
-            raise ConfigParamNotFound(f'Did not find parameter {key} in the config file')
+        #if item is None:
+        #    raise ConfigParamNotFound(f'Did not find parameter {key} in the config file')
 
-        return item
+        #return item
+        return None
