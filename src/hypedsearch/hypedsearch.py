@@ -62,7 +62,7 @@ def set_args(args) -> dict:
     #else:
     #    raise Exception('Invalid Arguments')
         
-def main(args) -> None:
+def main(args: object) -> None:
     arguments = set_args(args)
     runner.run(arguments)
     
