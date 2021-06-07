@@ -2,39 +2,6 @@ import sys
 import argparse
 import dataclasses
 import utils, runner
-from dataclasses import dataclass
-
-@dataclass
-class Hypedsearch_Arguments:
-    min_peptide_len: int = 0
-    max_peptide_len: int = 0
-    tolerance: float = 0.0
-    precursor_tolerance: float = 0.0
-    verbose: str = ''
-    peak_filter: float = 0.0
-    relative_abundance_filter: float = 0.0
-    digest: str = ''
-    DEBUG: bool = True
-    cores: int = 0
-    n: int = 0
-    truth_set: str = ''
-
-@dataclass
-class In_Memory_Arguments:
-    spectra_file: list = None
-    database_file: list = None
-    hypedsearch_arguments: Hypedsearch_Arguments = None        
-
-@dataclass
-class IO_Arguments:    
-    spectra_folder_path: str = ''
-    database_file_path: str = ''
-    output_dir_path: str = ''
-    hypedsearch_arguments: Hypedsearch_Arguments = None        
-        
-@dataclass
-class Config_File_Arguments:
-    config_file_path: str = ''
         
 def set_args(args) -> dict:
     min_peptide_len = args.min_peptide_len if not args.use_config_file else config['min_peptide_len']
@@ -52,11 +19,28 @@ def set_args(args) -> dict:
     spectra_folder = args.spectra_folder if not args.use_config_file else config['spectra_dir']
     database_file = args.database_file if not args.use_config_file else config['database_file']
     output_dir = args.output_dir if not args.use_config_file else config['output_dir']
-
-    if args.use_io:
-        #get files from disk and load into args
-    else:
-        #already in args
+    spectra_file_path = args.spectra_file_path if not args.use_config_file else config['spectra_file_path']
+    database_file_path = args.database_file_path if not args.database_file_path else config['database_file_path']
+    spectra_file = args.spectra_file is not args.use_io args.spectra_file else utils.load_spectra_file(spectra_file_path)
+    database_file = args.database_file is not args.use_io args.database_file else utils.load_database_file(database_file_path)
+    
+    return {
+        'min_peptide_len': min_peptide_len,
+        'max_peptide_len': max_peptide_len,
+        'tolerance': ppm_tolerance,
+        'precursor_tolerance': precursor_tolerance,
+        'verbose': verbose, 
+        'peak_filter': peak_filter, 
+        'relative_abundance_filter': relative_abundance_filter,
+        'digest': digest, 
+        'DEBUG': debug, 
+        'cores': cores,
+        'n': n,
+        'truth_set': truth_set,
+        'spectra_file': spectra_file,
+        'database_file' : database_file
+    }        
+        
     
 def main(args: object) -> None:
     arguments = set_args(args)
@@ -82,7 +66,7 @@ if __name__ == "__main__":
     parser.add_argument('--database_file', dest='database_file', type=list, default=None, help='In Memory Database File. Default=None')
     #CLI I/O
     parser.add_argument('--use_io', dest='use_io', type=bool, default=False, help='Use file system datasets instead of in-memory. Default=False')
-    parser.add_argument('--spectra-folder-path', dest='spectra_folder_path', type=str, default='./', help='Path to folder containing spectra files.')
+    parser.add_argument('--spectra-folder-path', dest='spectra_file_path', type=str, default='./', help='Path to .mzml spectra file.')
     parser.add_argument('--database-file-path', dest='database_file_path', type=str, default='./', help='Path to .fasta file containing proteins')
     parser.add_argument('--output-dir-path', dest='output_dir_path', type=str, default='~/', help='Directory to save all figures. Default=~/')
     #Config File (always I/O)
