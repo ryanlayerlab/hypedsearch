@@ -30,16 +30,16 @@ class Config(dict):
         :param str config_file: Path to the config file
             Defaults to './config.yaml'
         '''
-        #config = pathlib.Path(config_file)
+        config = pathlib.Path(config_file)
 
-        #if config.name.split('.')[-1] != 'yaml':
-        #    raise InvalidConfigFile('Config file must be a yaml file')
+        if config.name.split('.')[-1] != 'yaml':
+            raise InvalidConfigFile('Config file must be a yaml file')
 
-        #if not config.is_file():
-        #    raise InvalidConfigFile(f'Config file {config_file} does not exist')
+        if not config.is_file():
+            raise InvalidConfigFile(f'Config file {config_file} does not exist')
         
-        #self.config = yaml.safe_load(open(config_file))
-        #self._check_config()
+        self.config = yaml.safe_load(open(config_file))
+        self._check_config()
 
     def _check_config(self):
         '''Make sure certain fields are valid 
@@ -61,20 +61,18 @@ class Config(dict):
     def _finditem(self, obj, key):
         '''Recursivley search for a key
         '''
-        #if key in obj: return obj[key]
+        if key in obj: return obj[key]
 
-        #for _, v in obj.items():
-        #    if isinstance(v,dict):
-        #        item = self._finditem(v, key)
-        #        if item is not None:
-        #            return item
-        return None
+        for _, v in obj.items():
+            if isinstance(v,dict):
+                item = self._finditem(v, key)
+                if item is not None:
+                    return item
 
     def __getitem__(self, key): 
-        #item = self._finditem(self.config, key)
+        item = self._finditem(self.config, key)
 
-        #if item is None:
-        #    raise ConfigParamNotFound(f'Did not find parameter {key} in the config file')
+        if item is None:
+            raise ConfigParamNotFound(f'Did not find parameter {key} in the config file')
 
-        #return item
-        return None
+        return item

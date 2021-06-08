@@ -10,6 +10,7 @@ In charge of the flow of the program
 import os
 import identification
 from postprocessing import summary, review
+
 import multiprocessing as mp
 
 def run(args: dict) -> None:
