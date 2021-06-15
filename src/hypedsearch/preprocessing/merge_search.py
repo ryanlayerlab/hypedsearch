@@ -1,5 +1,6 @@
 from utils import hashable_boundaries, predicted_len
 from objects import Database
+import gen_spectra
 #from cppModules import gen_spectra
 
 from collections import defaultdict

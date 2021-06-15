@@ -1,4 +1,4 @@
-from src.utils import make_valid_fasta_file, file_exists
+from utils import make_valid_fasta_file, file_exists
 
 '''write
 
