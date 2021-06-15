@@ -95,6 +95,18 @@ def build_load_database(database_file,verbose):
     verbose and print('Done')
     return db
 
+def load_all_spectra(spectra_files,ppm_tolerance,peak_filter,relative_abundance_filter,verbose):
+    verbose and print('Loading spectra...')
+    spectra, boundaries, mz_mapping = preprocessing_utils.load_spectra(
+        spectra_files, 
+        ppm_tolerance,
+        peak_filter=peak_filter, 
+        relative_abundance_filter=relative_abundance_filter
+    )
+    verbose and print('Done')
+    return spectra, boundaries, mz_mapping 
+
+
 def id_spectra(
     spectra_files: list, 
     database_file: str, 
@@ -112,36 +124,22 @@ def id_spectra(
     truth_set: str = '', 
     output_dir: str = ''
 ) -> dict:
-    DEV = False
+    is_dev = False
     truth = None
     if is_json(truth_set) and is_file(truth_set):
-        DEV = True
+        is_dev = True
         print(
         )
         # load in the truth set
         truth = json.load(open(truth_set, 'r'))
 
     fall_off = None
-
     db = build_load_database(database_file,verbose)
-
-    # load all of the spectra
-    verbose and print('Loading spectra...')
-    spectra, boundaries, mz_mapping = preprocessing_utils.load_spectra(
-        spectra_files, 
-        ppm_tolerance,
-        peak_filter=peak_filter, 
-        relative_abundance_filter=relative_abundance_filter
-    )
-    verbose and print('Done')
-
-    # get the boundary -> kmer mappings for b and y ions
+    spectra, boundaries, mz_mapping  = load_all_spectra(spectra_files,ppm_tolerance,peak_filter,relative_abundance_filter,verbose)
     matched_masses_b, matched_masses_y, db = merge_search.match_masses(boundaries, db, max_peptide_len)
-
-    # keep track of the alingment made for every spectrum
     results = {}
 
-    if DEV:
+    if is_dev:
         fall_off = {}
         fall_off = mp.Manager().dict()
         truth = mp.Manager().dict(truth)
@@ -190,7 +188,7 @@ def id_spectra(
         print('Initializing other processors...')
         results = mp.Manager().dict()
 
-        if DEV:
+        if is_dev:
             fall_off = mp.Manager().dict()
             truth = mp.Manager().dict(truth)
 
@@ -251,7 +249,7 @@ def id_spectra(
             p.join()
 
     # if we have set DEV, we need to dump this to a json
-    if DEV:
+    if is_dev:
         output_dir = output_dir + '/' if output_dir[-1] != '/' else output_dir
 
         safe_write_fall_off = {}
