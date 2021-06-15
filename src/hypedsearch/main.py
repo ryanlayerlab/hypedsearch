@@ -10,8 +10,8 @@ Main file for hypedsearch. Handles input parameters and flow of the program
 import argparse
 import sys
 
-from src import utils, runner
-from src.config_loader import Config
+import utils, runner
+from config_loader import Config
 
 def stringtobool(s: str) -> bool:
     s = str(s)

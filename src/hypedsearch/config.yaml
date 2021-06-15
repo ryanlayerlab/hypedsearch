@@ -1,10 +1,10 @@
 paths: 
   # full path to the spectra folder containing all spectra files
-  spectra_dir: '/Users/zacharymcgrath/Desktop/nod2 data/single/'
+  spectra_dir: '../data/spectra'
   # full path to the .fasta database file
-  database_file: '/Users/zacharymcgrath/Desktop/raw_inputs/NOD2_E3/filtered_mouse_database.fasta'
+  database_file: '../data/database/sample_database.fasta'
   # full path to the output directory
-  output_dir: '/Users/zacharymcgrath/Desktop/raw_inputs/BALB3_E3/output/'
+  output_dir: '../data/output'
 
 search_params:
   # minimum length peptide to look for

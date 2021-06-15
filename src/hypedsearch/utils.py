@@ -3,11 +3,8 @@ from typing import Iterable, Any
 from itertools import product
 import numpy as np
 from collections import namedtuple
-
-
 from objects import Spectrum
 import gen_spectra
-
 import math
 import re
 
