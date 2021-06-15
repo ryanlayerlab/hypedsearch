@@ -5,22 +5,16 @@ import numpy as np
 def b_ions(sequence: str, charge: int = None): 
     masses = []
     length = len(sequence)
-    
     if charge is None or charge == 1:
-        #b+
         total = SINGLY_CHARGED_B_BASE
         for i in range (0, length):
             total += AMINO_ACIDS[sequence[i]]
             masses.append(total)
-            #Since z (the charge) is equal to one, the total here is the m/z
-            
     if charge is None or charge == 2:
-        #b++
         total = DOUBLY_CHARGED_B_BASE
         for i in range (0, length):
             total += AMINO_ACIDS[sequence[i]]
             masses.append(total/2)
-            
     return masses
 
 def y_ions(sequence: str, charge: int = None): 
@@ -28,14 +22,12 @@ def y_ions(sequence: str, charge: int = None):
     length = len(sequence)
     
     if charge is None or charge == 1:
-        #y+
         total = SINGLY_CHARGED_Y_BASE
         for i in range (0,length):
             total += AMINO_ACIDS[sequence[length-i-1]]
             masses.append(total)
             
     if charge is None or charge == 2:
-        #y++
         total = DOUBLY_CHARGED_Y_BASE
         for i in range (0, length):
             total += AMINO_ACIDS[sequence[length-i-1]]
@@ -45,7 +37,6 @@ def y_ions(sequence: str, charge: int = None):
 
 def calc_masses(sequence: str, charge: int =None, ion: str = None) -> (list, float):
     masses = []
-
     length = len(sequence)
     total = WATER_MASS
     for i in range(length):
@@ -63,21 +54,14 @@ def calc_masses(sequence: str, charge: int =None, ion: str = None) -> (list, flo
     return masses, pre_mz
 
 def max_mass(seqeunce: str, ion: str, charge: int) -> float:
-    # all y ions
     if ion == 'y':
         total = SINGLY_CHARGED_Y_BASE if charge == 1 else DOUBLY_CHARGED_Y_BASE
         total += sum([AMINO_ACIDS[aa] for aa in seqeunce])
-
-        # divide by charge
         mz = total / charge
         return mz
-
-    # otherwise do the b
     if ion == 'b':
         total = SINGLY_CHARGED_B_BASE if charge == 1 else DOUBLY_CHARGED_B_BASE
         total += sum([AMINO_ACIDS[aa] for aa in seqeunce])
-
-    # divide by charge
     mz = total / charge
     return mz
 
@@ -85,7 +69,6 @@ def get_precursor(sequence: str, charge: int = 1) -> float:
     total = WATER_MASS
     for aa in sequence:
         total +=  AMINO_ACIDS[aa]
-    # proton mass is 1.00...
     return (total + charge * PROTON_MASS) / charge  
 
 
