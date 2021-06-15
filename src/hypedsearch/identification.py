@@ -106,6 +106,75 @@ def load_all_spectra(spectra_files,ppm_tolerance,peak_filter,relative_abundance_
     verbose and print('Done')
     return spectra, boundaries, mz_mapping 
 
+def run_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,is_debug,results,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off):
+    for i, spectrum in enumerate(spectra):
+        print(f'Creating alignment for spectrum {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='\r')
+        b_hits, y_hits = [], []
+        for mz in spectrum.spectrum:
+            mapped = mz_mapping[mz]
+            b = boundaries[mapped]
+            b = hashable_boundaries(b)
+            if b in matched_masses_b:
+                b_hits += matched_masses_b[b]
+            if b in matched_masses_y:
+                y_hits += matched_masses_y[b]
+        is_last = is_debug and i == len(spectra) - 1
+        results[spectrum.id] = id_spectrum(
+            spectrum, 
+            db, 
+            b_hits, 
+            y_hits, 
+            ppm_tolerance, 
+            precursor_tolerance,
+            n,
+            digest_type=digest,
+            truth=truth, 
+            fall_off=fall_off, 
+            is_last=is_last
+        )
+def run_multi_core(is_dev,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
+    print('Initializing other processors...')
+    results = mp.Manager().dict()
+    if is_dev:
+        fall_off = mp.Manager().dict()
+        truth = mp.Manager().dict(truth)
+    q = mp.Manager().Queue()
+    num_processes = cores
+    ps = [
+        mp.Process(
+            target=mp_id_spectrum, 
+            args=(q, copy.deepcopy(db), results, fall_off, truth)
+        ) for _ in range(num_processes) 
+    ]
+    for p in ps:
+        p.start()
+    print('Done.')
+    for i, spectrum in enumerate(spectra):
+        b_hits, y_hits = [], []
+        for mz in spectrum.spectrum:
+            mapped = mz_mapping[mz]
+            b = boundaries[mapped]
+            b = hashable_boundaries(b)
+            if b in matched_masses_b:
+                b_hits += matched_masses_b[b]
+            if b in matched_masses_y:
+                y_hits += matched_masses_y[b]
+        o = MPSpectrumID(
+            b_hits, 
+            y_hits, 
+            spectrum, 
+            ppm_tolerance, 
+            precursor_tolerance, 
+            n, 
+            digest
+        )
+        q.put(o)
+    while len(results) < len(spectra):
+        print(f'\rCreating an alignment for {len(results)}/{len(spectra)} [{to_percent(len(results), len(spectra))}%]', end='')
+        time.sleep(1)
+    [q.put('exit') for _ in range(num_processes)]
+    for p in ps:
+        p.join()
 
 def id_spectra(
     spectra_files: list, 
@@ -120,7 +189,7 @@ def id_spectra(
     digest: str = '',
     cores: int = 1,
     n: int = 5,
-    DEBUG: bool = False, 
+    is_debug: bool = False, 
     truth_set: str = '', 
     output_dir: str = ''
 ) -> dict:
@@ -144,111 +213,11 @@ def id_spectra(
         fall_off = mp.Manager().dict()
         truth = mp.Manager().dict(truth)
 
-    # if we only get 1 core, don't do the multiporcessing bit
     if cores == 1:
-        # go through and id all spectra
-        for i, spectrum in enumerate(spectra):
-
-            print(f'Creating alignment for spectrum {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='\r')
-
-            # get b and y hits
-            b_hits, y_hits = [], []
-            for mz in spectrum.spectrum:
-
-                # get the correct boundary
-                mapped = mz_mapping[mz]
-                b = boundaries[mapped]
-                b = hashable_boundaries(b)
-
-                if b in matched_masses_b:
-                    b_hits += matched_masses_b[b]
-
-                if b in matched_masses_y:
-                    y_hits += matched_masses_y[b]
-
-            is_last = DEBUG and i == len(spectra) - 1
-
-            # pass it into id_spectrum
-            results[spectrum.id] = id_spectrum(
-                spectrum, 
-                db, 
-                b_hits, 
-                y_hits, 
-                ppm_tolerance, 
-                precursor_tolerance,
-                n,
-                digest_type=digest,
-                truth=truth, 
-                fall_off=fall_off, 
-                is_last=is_last
-            )
-
+        run_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,is_debug,results,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off)
     else:
+        run_multi_core(is_dev,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest)
 
-        print('Initializing other processors...')
-        results = mp.Manager().dict()
-
-        if is_dev:
-            fall_off = mp.Manager().dict()
-            truth = mp.Manager().dict(truth)
-
-        # start up processes and queue for parallelizing things
-        q = mp.Manager().Queue()
-        num_processes = cores
-        ps = [
-            mp.Process(
-                target=mp_id_spectrum, 
-                args=(q, copy.deepcopy(db), results, fall_off, truth)
-            ) for _ in range(num_processes) 
-        ]
-
-        # start each of the process
-        for p in ps:
-            p.start()
-        print('Done.')
-
-        # go through and id all spectra
-        for i, spectrum in enumerate(spectra):
-            # get b and y hits
-            b_hits, y_hits = [], []
-            for mz in spectrum.spectrum:
-
-                # get the correct boundary
-                mapped = mz_mapping[mz]
-                b = boundaries[mapped]
-                b = hashable_boundaries(b)
-
-                if b in matched_masses_b:
-                    b_hits += matched_masses_b[b]
-
-                if b in matched_masses_y:
-                    y_hits += matched_masses_y[b]
-
-            # create a named tuple to put in the database
-            o = MPSpectrumID(
-                b_hits, 
-                y_hits, 
-                spectrum, 
-                ppm_tolerance, 
-                precursor_tolerance, 
-                n, 
-                digest
-            )
-            
-            q.put(o)
-
-        while len(results) < len(spectra):
-            print(f'\rCreating an alignment for {len(results)}/{len(spectra)} [{to_percent(len(results), len(spectra))}%]', end='')
-            time.sleep(1)
-
-        # now send 'exit' message to all our processes
-        [q.put('exit') for _ in range(num_processes)]
-
-        # join them
-        for p in ps:
-            p.join()
-
-    # if we have set DEV, we need to dump this to a json
     if is_dev:
         output_dir = output_dir + '/' if output_dir[-1] != '/' else output_dir
 
