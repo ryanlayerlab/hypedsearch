@@ -91,8 +91,10 @@ def make_database_set(
     def add_all(kmer, prot_name):
         for ion in 'by':
             for charge in [1, 2]:
-                spec = gen_spectra.gen_spectrum(kmer, ion=ion, charge=charge)
-
+                pre_spec = gen_spectra.gen_spectrum(kmer, ion=ion, charge=charge)
+                spec = pre_spec
+                if isinstance(pre_spec,dict):
+                    spec = pre_spec.get('spectrum')
                 for i, mz in enumerate(spec):
                     kmer_to_add = kmer[:i+1] if ion == 'b' else kmer[-i-1:]
                     r_d = db_dict_b if ion == 'b' else db_dict_y
