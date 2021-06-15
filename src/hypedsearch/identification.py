@@ -89,6 +89,11 @@ def id_spectrum(
         is_last=is_last
     )
 
+def build_load_database(database_file,verbose):
+    verbose and print('Loading database...')
+    db = database.build(database_file)
+    verbose and print('Done')
+    return db
 
 def id_spectra(
     spectra_files: list, 
@@ -118,12 +123,8 @@ def id_spectra(
 
     fall_off = None
 
-    # build/load the database
-    verbose and print('Loading database...')
-    db = database.build(database_file)
-    verbose and print('Done')
+    db = build_load_database(database_file,verbose)
 
-    
     # load all of the spectra
     verbose and print('Loading spectra...')
     spectra, boundaries, mz_mapping = preprocessing_utils.load_spectra(
