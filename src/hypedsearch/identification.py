@@ -176,59 +176,43 @@ def run_multi_core(is_dev,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,bound
     for p in ps:
         p.join()
 
-def id_spectra(
-    spectra_files: list, 
-    database_file: str, 
-    verbose: bool = True, 
-    min_peptide_len: int = 5, 
-    max_peptide_len: int = 20, 
-    peak_filter: int = 0, 
-    relative_abundance_filter: float = 0.0,
-    ppm_tolerance: int = 20, 
-    precursor_tolerance: int = 10, 
-    digest: str = '',
-    cores: int = 1,
-    n: int = 5,
-    is_debug: bool = False, 
-    truth_set: str = '', 
-    output_dir: str = ''
-) -> dict:
-    is_dev = False
-    truth = None
+def set_up_for_dev(truth_set):
     if is_json(truth_set) and is_file(truth_set):
-        is_dev = True
-        print(
-        )
-        # load in the truth set
-        truth = json.load(open(truth_set, 'r'))
+        truth= json.load(open(truth_set, 'r'))
+        return True, truth
+    else:       
+        return False, None
 
-    fall_off = None
-    db = build_load_database(database_file,verbose)
-    spectra, boundaries, mz_mapping  = load_all_spectra(spectra_files,ppm_tolerance,peak_filter,relative_abundance_filter,verbose)
-    matched_masses_b, matched_masses_y, db = merge_search.match_masses(boundaries, db, max_peptide_len)
-    results = {}
-
+def update_truth(is_dev,truth):
     if is_dev:
         fall_off = {}
         fall_off = mp.Manager().dict()
         truth = mp.Manager().dict(truth)
 
+def output_for_dev(is_dev,output_dir,fall_off):
+    if is_dev:
+        output_dir = output_dir + '/' if output_dir[-1] != '/' else output_dir
+        safe_write_fall_off = {}
+        for k, v in fall_off.items():
+            safe_write_fall_off[k] = v._asdict()
+        JSON.save_dict(output_dir + 'fall_off.json', safe_write_fall_off)
+
+def id_spectra(spectra_files: list, database_file: str, verbose: bool = True, min_peptide_len: int = 5, 
+    max_peptide_len: int = 20, peak_filter: int = 0, relative_abundance_filter: float = 0.0, ppm_tolerance: int = 20, 
+    precursor_tolerance: int = 10, digest: str = '',cores: int = 1,n: int = 5,is_debug: bool = False, 
+    truth_set: str = '', output_dir: str = '') -> dict:
+    is_dev, truth = set_up_for_dev(truth_set)
+    fall_off = None
+    db = build_load_database(database_file,verbose)
+    spectra, boundaries, mz_mapping  = load_all_spectra(spectra_files,ppm_tolerance,peak_filter,relative_abundance_filter,verbose)
+    matched_masses_b, matched_masses_y, db = merge_search.match_masses(boundaries, db, max_peptide_len)
+    results = {}
+    update_truth(is_dev,truth)
     if cores == 1:
         run_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,is_debug,results,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off)
     else:
         run_multi_core(is_dev,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest)
-
-    if is_dev:
-        output_dir = output_dir + '/' if output_dir[-1] != '/' else output_dir
-
-        safe_write_fall_off = {}
-
-        # we need to convert all our DEVFallOffEntries to dicts
-        for k, v in fall_off.items():
-            safe_write_fall_off[k] = v._asdict()
-
-        JSON.save_dict(output_dir + 'fall_off.json', safe_write_fall_off)
-        
+    output_for_dev(is_dev,output_dir,fall_off)
     return results
 
 def mp_id_spectrum(
