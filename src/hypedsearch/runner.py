@@ -21,7 +21,7 @@ def run(args: dict) -> None:
         digest=args['digest'], 
         n=args['n'] * 10,
         verbose=True, 
-        DEBUG=args['DEBUG'], 
+        is_debug=args['DEBUG'], 
         cores=cores,
         truth_set=args['truth_set'], 
         output_dir=args['output_dir']
