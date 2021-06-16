@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Run Main
-        run: python hypedsearch.py
+        run: python main.py
         working-directory: src/hypedsearch
       - name: Run Tests
         run: python -m unittest test_hypedsearch
