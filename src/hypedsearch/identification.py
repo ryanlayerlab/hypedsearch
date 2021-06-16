@@ -5,8 +5,8 @@ from utils import ppm_to_da, to_percent, overlap_intervals, hashable_boundaries,
 import utils
 from scoring import scoring, mass_comparisons
 from preprocessing import digestion, merge_search, preprocessing_utils
-import database
 from file_io import JSON
+import os
 
 import time
 import multiprocessing as mp
@@ -88,12 +88,6 @@ def id_spectrum(
         fall_off=fall_off, 
         is_last=is_last
     )
-
-def build_load_database(database_file,verbose):
-    verbose and print('Loading database...')
-    db = database.build(database_file)
-    verbose and print('Done')
-    return db
 
 def load_all_spectra(spectra_files,ppm_tolerance,peak_filter,relative_abundance_filter,verbose):
     verbose and print('Loading spectra...')
@@ -197,22 +191,20 @@ def output_for_dev(is_dev,output_dir,fall_off):
             safe_write_fall_off[k] = v._asdict()
         JSON.save_dict(output_dir + 'fall_off.json', safe_write_fall_off)
 
-def id_spectra(spectra_files: list, database_file: str, verbose: bool = True, min_peptide_len: int = 5, 
-    max_peptide_len: int = 20, peak_filter: int = 0, relative_abundance_filter: float = 0.0, ppm_tolerance: int = 20, 
-    precursor_tolerance: int = 10, digest: str = '',cores: int = 1,n: int = 5,is_debug: bool = False, 
-    truth_set: str = '', output_dir: str = '') -> dict:
-    is_dev, truth = set_up_for_dev(truth_set)
+def id_spectra(idsa:utils.Id_Spectra_Arguments) -> dict:
+    is_dev, truth = set_up_for_dev(idsa.truth_set)
     fall_off = None
-    db = build_load_database(database_file,verbose)
-    spectra, boundaries, mz_mapping  = load_all_spectra(spectra_files,ppm_tolerance,peak_filter,relative_abundance_filter,verbose)
-    matched_masses_b, matched_masses_y, db = merge_search.match_masses(boundaries, db, max_peptide_len)
+    spectra, boundaries, mz_mapping  = load_all_spectra(idsa.spectra_files,idsa.ppm_tolerance,idsa.peak_filter,idsa.relative_abundance_filter,idsa.verbose)
+    matched_masses_b, matched_masses_y, db = merge_search.match_masses(boundaries, idsa.database_file, idsa.max_peptide_len)
     results = {}
     update_truth(is_dev,truth)
-    if cores == 1:
-        run_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,is_debug,results,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off)
+    if idsa.cores == 1:
+        run_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,
+            idsa.is_debug,results,db,idsa.ppm_tolerance,idsa.precursor_tolerance,idsa.n,idsa.digest,truth,fall_off)
     else:
-        run_multi_core(is_dev,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest)
-    output_for_dev(is_dev,output_dir,fall_off)
+        run_multi_core(is_dev,truth,idsa.cores,idsa.mp_id_spectrum,db,spectra,mz_mapping,
+            boundaries,matched_masses_b,matched_masses_y,idsa.ppm_tolerance,idsa.precursor_tolerance,idsa.n,idsa.digest)
+    output_for_dev(is_dev,idsa.output_dir,fall_off)
     return results
 
 def mp_id_spectrum(
