@@ -250,28 +250,6 @@ def optimized_compare_masses(
     ppm_tolerance: int = 20, 
     needs_sorted: bool = False
     ) -> float:
-    '''Score two spectra against eachother. Simple additive scoring of ions found
-
-    :param observed: observed set of m/z values
-    :type observed: list
-    :param reference: reference set of m/z values
-    :type reference: list
-    :param ppm_tolerance: parts per million mass error allowed when matching masses. 
-        (default is 20)
-    :type ppm_tolerance: int
-    :param needs_sorted: Set to true if either the observed or reference need to 
-        be sorted. 
-        (default is False)
-    :type needs_sorted: bool
-
-    :returns: the number of matched ions
-    :rtype: int
-
-    :Example:
-
-    >>> optimized_compare_masses([1, 2, 4], [1, 3, 4], 1, False)
-    >>> 2
-    '''
     if len(observed) == 0 or len(reference) == 0:
         return 0.0
 
@@ -287,7 +265,11 @@ def optimized_compare_masses(
     observed_boundaries = []
     for obs in observed:
         observed_boundaries += boundaries(obs)
-        
-    # local variables for score
-    return sum([1 for ref in reference if bisect(observed_boundaries, ref) % 2])
+
+    post_reference = reference
+    if isinstance(reference,dict):
+        post_reference = reference.get('spectrum')
+
+    return_value = sum([1 for ref in post_reference if bisect(observed_boundaries, ref) % 2])
+    return return_value
     

@@ -484,7 +484,7 @@ def DEV_contains_truth_exact(truth_seq: str, hybrid: bool, seqs: list) -> bool:
 def build_load_database(database_file,verbose):
     verbose and print('Loading database...')
     db = database.build(database_file)
-    verbose and print('Done')
+    verbose and print('Loading database Done')
     return db
 
 def build_load_spectra_files(spectra_folder_path):

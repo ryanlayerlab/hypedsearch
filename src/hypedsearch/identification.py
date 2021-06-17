@@ -1,5 +1,6 @@
 from objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry
 #from cppModules import gen_spectra
+import gen_spectra
 from alignment import alignment
 from utils import ppm_to_da, to_percent, overlap_intervals, hashable_boundaries, is_json, is_file
 import utils
@@ -97,7 +98,7 @@ def load_all_spectra(spectra_files,ppm_tolerance,peak_filter,relative_abundance_
         peak_filter=peak_filter, 
         relative_abundance_filter=relative_abundance_filter
     )
-    verbose and print('Done')
+    verbose and print('Loading spectra Done')
     return spectra, boundaries, mz_mapping 
 
 def run_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,is_debug,results,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off):
