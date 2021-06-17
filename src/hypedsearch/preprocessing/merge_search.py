@@ -149,7 +149,7 @@ def make_database_set(
         index_list_y.append(len(kmers) + offset)
         kmer_list_y += kmers
 
-    print('Done')
+    print('Sorting the set of protein masses Done')
 
     return db_list_b, index_list_b, kmer_list_b, db_list_y, index_list_y, kmer_list_y, kmer_set
 
