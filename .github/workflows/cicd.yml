@@ -15,8 +15,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install numpy pyteomics lxml argparse 
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -r requirements.txt          
       - name: Run Main
         run: python main.py
         working-directory: src/hypedsearch
