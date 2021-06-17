@@ -4,11 +4,14 @@
 {
     "distutils": {
         "depends": [],
+        "extra_compile_args": [
+            "-std=c++11"
+        ],
         "language": "c++",
         "name": "cppModules.gen_spectra",
         "sources": [
-            "cpp/spectraGeneration/gen_spectra.pyx",
-            "cpp/spectraGeneration/genSpectra.cpp"
+            "./cppModules/spectraGeneration/gen_spectra.pyx",
+            "./cppModules/spectraGeneration/genSpectra.cpp"
         ]
     },
     "module_name": "cppModules.gen_spectra"
@@ -850,7 +853,7 @@ static const char *__pyx_filename;
 
 
 static const char *__pyx_f[] = {
-  "cpp/spectraGeneration/gen_spectra.pyx",
+  "cppModules/spectraGeneration/gen_spectra.pyx",
   "stringsource",
 };
 
@@ -1160,12 +1163,12 @@ static const char __pyx_k_sequence[] = "sequence";
 static const char __pyx_k_gen_spectrum[] = "gen_spectrum";
 static const char __pyx_k_cline_in_traceback[] = "cline_in_traceback";
 static const char __pyx_k_cppModules_gen_spectra[] = "cppModules.gen_spectra";
-static const char __pyx_k_cpp_spectraGeneration_gen_spectr[] = "cpp/spectraGeneration/gen_spectra.pyx";
+static const char __pyx_k_cppModules_spectraGeneration_gen[] = "cppModules/spectraGeneration/gen_spectra.pyx";
 static PyObject *__pyx_kp_s_;
 static PyObject *__pyx_n_s_charge;
 static PyObject *__pyx_n_s_cline_in_traceback;
 static PyObject *__pyx_n_s_cppModules_gen_spectra;
-static PyObject *__pyx_kp_s_cpp_spectraGeneration_gen_spectr;
+static PyObject *__pyx_kp_s_cppModules_spectraGeneration_gen;
 static PyObject *__pyx_n_s_encode;
 static PyObject *__pyx_n_s_gen_spectrum;
 static PyObject *__pyx_n_s_i;
@@ -1184,7 +1187,7 @@ static PyObject *__pyx_tuple__2;
 static PyObject *__pyx_codeobj__3;
 /* Late includes */
 
-/* "cpp/spectraGeneration/gen_spectra.pyx":9
+/* "cppModules/spectraGeneration/gen_spectra.pyx":9
  * cimport genSpectra
  * 
  * def gen_spectrum(sequence: str, ion='', charge=-1, sort=True) -> list:             # <<<<<<<<<<<<<<
@@ -1316,7 +1319,7 @@ static PyObject *__pyx_pf_10cppModules_11gen_spectra_gen_spectrum(CYTHON_UNUSED 
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("gen_spectrum", 0);
 
-  /* "cpp/spectraGeneration/gen_spectra.pyx":24
+  /* "cppModules/spectraGeneration/gen_spectra.pyx":24
  *         (list) the floats of the spectrum
  *     '''
  *     if len(sequence) == 0:             # <<<<<<<<<<<<<<
@@ -1327,7 +1330,7 @@ static PyObject *__pyx_pf_10cppModules_11gen_spectra_gen_spectrum(CYTHON_UNUSED 
   __pyx_t_2 = ((__pyx_t_1 == 0) != 0);
   if (__pyx_t_2) {
 
-    /* "cpp/spectraGeneration/gen_spectra.pyx":25
+    /* "cppModules/spectraGeneration/gen_spectra.pyx":25
  *     '''
  *     if len(sequence) == 0:
  *         return []             # <<<<<<<<<<<<<<
@@ -1341,7 +1344,7 @@ static PyObject *__pyx_pf_10cppModules_11gen_spectra_gen_spectrum(CYTHON_UNUSED 
     __pyx_t_3 = 0;
     goto __pyx_L0;
 
-    /* "cpp/spectraGeneration/gen_spectra.pyx":24
+    /* "cppModules/spectraGeneration/gen_spectra.pyx":24
  *         (list) the floats of the spectrum
  *     '''
  *     if len(sequence) == 0:             # <<<<<<<<<<<<<<
@@ -1350,7 +1353,7 @@ static PyObject *__pyx_pf_10cppModules_11gen_spectra_gen_spectrum(CYTHON_UNUSED 
  */
   }
 
-  /* "cpp/spectraGeneration/gen_spectra.pyx":27
+  /* "cppModules/spectraGeneration/gen_spectra.pyx":27
  *         return []
  * 
  *     seq = str.encode(sequence)             # <<<<<<<<<<<<<<
@@ -1377,7 +1380,7 @@ static PyObject *__pyx_pf_10cppModules_11gen_spectra_gen_spectrum(CYTHON_UNUSED 
   __pyx_v_seq = __pyx_t_3;
   __pyx_t_3 = 0;
 
-  /* "cpp/spectraGeneration/gen_spectra.pyx":28
+  /* "cppModules/spectraGeneration/gen_spectra.pyx":28
  * 
  *     seq = str.encode(sequence)
  *     i = str.encode(ion)             # <<<<<<<<<<<<<<
@@ -1404,7 +1407,7 @@ static PyObject *__pyx_pf_10cppModules_11gen_spectra_gen_spectrum(CYTHON_UNUSED 
   __pyx_v_i = __pyx_t_3;
   __pyx_t_3 = 0;
 
-  /* "cpp/spectraGeneration/gen_spectra.pyx":30
+  /* "cppModules/spectraGeneration/gen_spectra.pyx":30
  *     i = str.encode(ion)
  * 
  *     spec = genSpectra.genSpectrum(seq, i, charge, sort)             # <<<<<<<<<<<<<<
@@ -1417,7 +1420,7 @@ static PyObject *__pyx_pf_10cppModules_11gen_spectra_gen_spectrum(CYTHON_UNUSED 
   __pyx_t_9 = __Pyx_PyObject_IsTrue(__pyx_v_sort); if (unlikely((__pyx_t_9 == ((bool)-1)) && PyErr_Occurred())) __PYX_ERR(0, 30, __pyx_L1_error)
   __pyx_v_spec = genSpectrum(__pyx_t_6, __pyx_t_7, __pyx_t_8, __pyx_t_9);
 
-  /* "cpp/spectraGeneration/gen_spectra.pyx":31
+  /* "cppModules/spectraGeneration/gen_spectra.pyx":31
  * 
  *     spec = genSpectra.genSpectrum(seq, i, charge, sort)
  *     return [x for x in spec]             # <<<<<<<<<<<<<<
@@ -1442,7 +1445,7 @@ static PyObject *__pyx_pf_10cppModules_11gen_spectra_gen_spectrum(CYTHON_UNUSED 
   __pyx_t_3 = 0;
   goto __pyx_L0;
 
-  /* "cpp/spectraGeneration/gen_spectra.pyx":9
+  /* "cppModules/spectraGeneration/gen_spectra.pyx":9
  * cimport genSpectra
  * 
  * def gen_spectrum(sequence: str, ion='', charge=-1, sort=True) -> list:             # <<<<<<<<<<<<<<
@@ -1581,7 +1584,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_charge, __pyx_k_charge, sizeof(__pyx_k_charge), 0, 0, 1, 1},
   {&__pyx_n_s_cline_in_traceback, __pyx_k_cline_in_traceback, sizeof(__pyx_k_cline_in_traceback), 0, 0, 1, 1},
   {&__pyx_n_s_cppModules_gen_spectra, __pyx_k_cppModules_gen_spectra, sizeof(__pyx_k_cppModules_gen_spectra), 0, 0, 1, 1},
-  {&__pyx_kp_s_cpp_spectraGeneration_gen_spectr, __pyx_k_cpp_spectraGeneration_gen_spectr, sizeof(__pyx_k_cpp_spectraGeneration_gen_spectr), 0, 0, 1, 0},
+  {&__pyx_kp_s_cppModules_spectraGeneration_gen, __pyx_k_cppModules_spectraGeneration_gen, sizeof(__pyx_k_cppModules_spectraGeneration_gen), 0, 0, 1, 0},
   {&__pyx_n_s_encode, __pyx_k_encode, sizeof(__pyx_k_encode), 0, 0, 1, 1},
   {&__pyx_n_s_gen_spectrum, __pyx_k_gen_spectrum, sizeof(__pyx_k_gen_spectrum), 0, 0, 1, 1},
   {&__pyx_n_s_i, __pyx_k_i, sizeof(__pyx_k_i), 0, 0, 1, 1},
@@ -1604,7 +1607,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__Pyx_InitCachedConstants", 0);
 
-  /* "cpp/spectraGeneration/gen_spectra.pyx":9
+  /* "cppModules/spectraGeneration/gen_spectra.pyx":9
  * cimport genSpectra
  * 
  * def gen_spectrum(sequence: str, ion='', charge=-1, sort=True) -> list:             # <<<<<<<<<<<<<<
@@ -1614,7 +1617,7 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
   __pyx_tuple__2 = PyTuple_Pack(8, __pyx_n_s_sequence, __pyx_n_s_ion, __pyx_n_s_charge, __pyx_n_s_sort, __pyx_n_s_seq, __pyx_n_s_i, __pyx_n_s_spec, __pyx_n_s_x); if (unlikely(!__pyx_tuple__2)) __PYX_ERR(0, 9, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__2);
   __Pyx_GIVEREF(__pyx_tuple__2);
-  __pyx_codeobj__3 = (PyObject*)__Pyx_PyCode_New(4, 0, 8, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__2, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_cpp_spectraGeneration_gen_spectr, __pyx_n_s_gen_spectrum, 9, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__3)) __PYX_ERR(0, 9, __pyx_L1_error)
+  __pyx_codeobj__3 = (PyObject*)__Pyx_PyCode_New(4, 0, 8, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__2, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_cppModules_spectraGeneration_gen, __pyx_n_s_gen_spectrum, 9, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__3)) __PYX_ERR(0, 9, __pyx_L1_error)
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -1896,7 +1899,7 @@ if (!__Pyx_RefNanny) {
   if (__Pyx_patch_abc() < 0) __PYX_ERR(0, 1, __pyx_L1_error)
   #endif
 
-  /* "cpp/spectraGeneration/gen_spectra.pyx":9
+  /* "cppModules/spectraGeneration/gen_spectra.pyx":9
  * cimport genSpectra
  * 
  * def gen_spectrum(sequence: str, ion='', charge=-1, sort=True) -> list:             # <<<<<<<<<<<<<<
@@ -1908,7 +1911,7 @@ if (!__Pyx_RefNanny) {
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_gen_spectrum, __pyx_t_1) < 0) __PYX_ERR(0, 9, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "cpp/spectraGeneration/gen_spectra.pyx":1
+  /* "cppModules/spectraGeneration/gen_spectra.pyx":1
  * # distutils: language = c++             # <<<<<<<<<<<<<<
  * 
  * from libcpp.string cimport string
