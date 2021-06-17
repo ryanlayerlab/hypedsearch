@@ -15,7 +15,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install numpy pyteomics
+          pip install numpy pyteomics lxml argparse 
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: Run Main
         run: python main.py
