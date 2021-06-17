@@ -12,8 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy pyteomics
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
       - name: Run Main
-        run: python hypedsearch.py
+        run: python main.py
         working-directory: src/hypedsearch
       - name: Run Tests
         run: python -m unittest test_hypedsearch
