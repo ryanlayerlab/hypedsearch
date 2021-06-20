@@ -9,25 +9,7 @@ import math
 import database
 import re
 import multiprocessing as mp
-from dataclasses import dataclass
 
-@dataclass
-class Id_Spectra_Arguments:
-    spectra_files: list = [], 
-    database_file: database = None,     
-    verbose: bool = True, 
-    min_peptide_len: int = 5, 
-    max_peptide_len: int = 20, 
-    peak_filter: int = 0, 
-    relative_abundance_filter: float = 0.0,
-    ppm_tolerance: int = 20, 
-    precursor_tolerance: int = 10, 
-    digest: str = '',
-    cores: int = 1,
-    n: int = 5,
-    is_debug: bool = False, 
-    truth_set: str = '', 
-    output_dir: str = ''
 
 HYBRID_ALIGNMENT_PATTERN = re.compile(r'[-\(\)]')
 
@@ -481,42 +463,5 @@ def DEV_contains_truth_exact(truth_seq: str, hybrid: bool, seqs: list) -> bool:
 
     return contains_exact
 
-def build_load_database(database_file,verbose):
-    verbose and print('Loading database...')
-    db = database.build(database_file)
-    verbose and print('Loading database Done')
-    return db
 
-def build_load_spectra_files(spectra_folder_path):
-    spectra_files = []
-    for (root, _, filenames) in os.walk(spectra_folder_path):
-        for fname in filenames:
-            spectra_files.append(os.path.join(root, fname))
-    return spectra_files
 
-def create_id_spectra_arguments(args: dict):
-    verbose=True,
-    speactra_folder_path = args['spectra_folder']
-    database_file_path = args['database_file']
-    database_file = build_load_database(database_file_path,verbose)
-    spectra_files = build_load_spectra_files(speactra_folder_path)
-    min_peptide_len=args['min_peptide_len']
-    max_peptide_len=args['max_peptide_len']
-    peak_filter=args['peak_filter']
-    relative_abundance_filter=args['relative_abundance_filter']
-    ppm_tolerance=args['tolerance']
-    precursor_tolerance=args['precursor_tolerance']
-    digest=args['digest']
-    max_cores = max(1, args['cores'])
-    cores = min(max_cores, mp.cpu_count() - 1)
-    n=args['n'] * 10
-    is_debug=args['DEBUG']
-    truth_set=args['truth_set']
-    output_dir=args['output_dir']
-    id_spectra_arguments = Id_Spectra_Arguments(spectra_files=spectra_files,
-        database_file=database_file,verbose=verbose,
-        min_peptide_len=min_peptide_len,max_peptide_len=max_peptide_len,peak_filter=peak_filter,
-        relative_abundance_filter=relative_abundance_filter,ppm_tolerance=ppm_tolerance,
-        precursor_tolerance=precursor_tolerance,digest=digest,cores=cores,
-        n=n,is_debug=is_debug,truth_set=truth_set,output_dir=output_dir)
-    return id_spectra_arguments
