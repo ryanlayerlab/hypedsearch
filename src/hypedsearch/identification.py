@@ -101,7 +101,7 @@ def load_all_spectra(spectra_files,ppm_tolerance,peak_filter,relative_abundance_
     verbose and print('Loading spectra Done')
     return spectra, boundaries, mz_mapping 
 
-def run_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,is_debug,results,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off):
+def create_alignment_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,is_debug,results,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off):
     for i, spectrum in enumerate(spectra):
         print(f'Creating alignment for spectrum {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='\r')
         b_hits, y_hits = [], []
@@ -127,7 +127,7 @@ def run_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masse
             fall_off=fall_off, 
             is_last=is_last
         )
-def run_multi_core(is_dev,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
+def create_alignment_multi_core(is_dev,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
     print('Initializing other processors...')
     results = mp.Manager().dict()
     if is_dev:
@@ -200,10 +200,10 @@ def id_spectra(idsa:utils.Id_Spectra_Arguments) -> dict:
     results = {}
     update_truth(is_dev,truth)
     if idsa.cores == 1:
-        run_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,
+        create_alignment_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,
             idsa.is_debug,results,db,idsa.ppm_tolerance,idsa.precursor_tolerance,idsa.n,idsa.digest,truth,fall_off)
     else:
-        run_multi_core(is_dev,truth,idsa.cores,idsa.mp_id_spectrum,db,spectra,mz_mapping,
+        create_alignment_multi_core(is_dev,truth,idsa.cores,idsa.mp_id_spectrum,db,spectra,mz_mapping,
             boundaries,matched_masses_b,matched_masses_y,idsa.ppm_tolerance,idsa.precursor_tolerance,idsa.n,idsa.digest)
     output_for_dev(is_dev,idsa.output_dir,fall_off)
     return results
