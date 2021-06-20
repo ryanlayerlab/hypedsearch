@@ -8,41 +8,62 @@ from scoring import scoring, mass_comparisons
 from preprocessing import digestion, merge_search, preprocessing_utils
 from file_io import JSON
 import os
-
+from dataclasses import dataclass
 import time
 import multiprocessing as mp
 import copy
 import json
+import database
 
 TOP_X = 50
 
-def id_spectrum(
-    spectrum: Spectrum, 
-    db: Database,
-    b_hits: dict, 
-    y_hits: dict,
-    ppm_tolerance: int, 
-    precursor_tolerance: int, 
-    n: int,
+@dataclass
+class Id_Spectra_Arguments:
+    spectra_files: list = [], 
+    database_file: database = None,     
+    verbose: bool = True, 
+    min_peptide_len: int = 5, 
+    max_peptide_len: int = 20, 
+    peak_filter: int = 0, 
+    relative_abundance_filter: float = 0.0,
+    ppm_tolerance: int = 20, 
+    precursor_tolerance: int = 10, 
+    digest: str = '',
+    cores: int = 1,
+    n: int = 5,
+    is_debug: bool = False, 
+    truth_set: str = '', 
+    output_dir: str = ''
+
+@dataclass
+class Id_Spectrum_Arguments:
+    spectrum: Spectrum = None, 
+    db: Database = Database,
+    b_hits: dict = [], 
+    y_hits: dict = [],
+    ppm_tolerance: int = 0, 
+    precursor_tolerance: int = 0, 
+    n: int = 0,
     digest_type: str = '',
     truth: dict = None, 
     fall_off: dict = None, 
     is_last: bool = False
-    ) -> Alignments:
-    precursor_tolerance = utils.ppm_to_da(spectrum.precursor_mass, precursor_tolerance)
+
+def id_spectrum(idsa: Id_Spectrum_Arguments) -> Alignments:
+    precursor_tolerance = utils.ppm_to_da(idsa.spectrum.precursor_mass, idsa.precursor_tolerance)
     b_results = sorted([
         (
             kmer, 
-            mass_comparisons.optimized_compare_masses(spectrum.spectrum, gen_spectra.gen_spectrum(kmer, ion='b'))
-        ) for kmer in b_hits], 
+            mass_comparisons.optimized_compare_masses(idsa.spectrum.spectrum, gen_spectra.gen_spectrum(kmer, ion='b'))
+        ) for kmer in idsa.b_hits], 
         key=lambda x: (x[1], 1/len(x[0])), 
         reverse=True
     )
     y_results = sorted([
         (
             kmer, 
-            mass_comparisons.optimized_compare_masses(spectrum.spectrum, gen_spectra.gen_spectrum(kmer, ion='y'))
-        ) for kmer in y_hits], 
+            mass_comparisons.optimized_compare_masses(idsa.spectrum.spectrum, gen_spectra.gen_spectrum(kmer, ion='y'))
+        ) for kmer in idsa.y_hits], 
         key=lambda x: (x[1], 1/len(x[0])), 
         reverse=True
     )
@@ -55,10 +76,10 @@ def id_spectrum(
     keep_y_count = max(TOP_X, num_max_y)
     filtered_b = [x[0] for x in b_results[:keep_b_count] if x[1] > 0]
     filtered_y = [x[0] for x in y_results[:keep_y_count] if x[1] > 0]
-    if truth is not None and fall_off is not None:
-        _id = spectrum.id
-        truth_seq = truth[_id]['sequence']
-        is_hybrid = truth[_id]['hybrid']
+    if idsa.truth is not None and idsa.fall_off is not None:
+        _id = idsa.spectrum.id
+        truth_seq = idsa.truth[_id]['sequence']
+        is_hybrid = idsa.truth[_id]['hybrid']
 
         if not utils.DEV_contains_truth_parts(truth_seq, is_hybrid, filtered_b, filtered_y):
             metadata = {
@@ -69,37 +90,26 @@ def id_spectrum(
                 'cut_off_b_score': b_results[keep_b_count - 1][1], 
                 'cut_off_y_score': y_results[keep_y_count - 1][1]
             }
-            fall_off[_id] = DEVFallOffEntry(
+            idsa.fall_off[_id] = DEVFallOffEntry(
                 is_hybrid, 
                 truth_seq, 
                 'top_x_filtering', 
                 metadata
             )
-            return Alignments(spectrum, [])
+            return Alignments(idsa.spectrum, [])
 
-    return alignment.attempt_alignment(
-        spectrum, 
-        db, 
-        filtered_b, 
-        filtered_y, 
-        ppm_tolerance=ppm_tolerance, 
-        precursor_tolerance=precursor_tolerance,
-        n=n, 
-        truth=truth, 
-        fall_off=fall_off, 
-        is_last=is_last
-    )
+    aaa = alignment.Attempt_Alignment_Arguments(spectrum=idsa.spectrum,db=idsa.db,b_hits=idsa.b_hits,y_hits=idsa.y_hits,
+        n=idsa.n,ppm_tolerance=idsa.ppm_tolerance, precursor_tolerance=precursor_tolerance,digest_type=idsa.digest_type,
+        DEBUG=idsa.DEBUG,is_last=idsa.is_last,truth=idsa.truth,fall_off=idsa.fall_off)            
+    alignment_results = alignment.attempt_alignment(aaa)
+    return alignment_results
 
 def load_all_spectra(spectra_files,ppm_tolerance,peak_filter,relative_abundance_filter,verbose):
     verbose and print('Loading spectra...')
-    spectra, boundaries, mz_mapping = preprocessing_utils.load_spectra(
-        spectra_files, 
-        ppm_tolerance,
-        peak_filter=peak_filter, 
-        relative_abundance_filter=relative_abundance_filter
-    )
+    lsa = preprocessing_utils.Load_Spectra_Arguments(spectra_files=spectra_files,ppm_tolerance=ppm_tolerance,peak_filter=peak_filter,relative_abundance_filter=relative_abundance_filter)
+    lsr = preprocessing_utils.load_spectra(lsa)
     verbose and print('Loading spectra Done')
-    return spectra, boundaries, mz_mapping 
+    return lsr.all_spectra, lsr.boundaries, lsr.mz_mapping
 
 def create_alignment_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,is_debug,results,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off):
     for i, spectrum in enumerate(spectra):
@@ -264,3 +274,43 @@ def mp_id_spectrum(
             truth, 
             fall_off
         )
+
+def build_load_database(database_file,verbose):
+    verbose and print('Loading database...')
+    db = database.build(database_file)
+    verbose and print('Loading database Done')
+    return db
+
+def build_load_spectra_files(spectra_folder_path):
+    spectra_files = []
+    for (root, _, filenames) in os.walk(spectra_folder_path):
+        for fname in filenames:
+            spectra_files.append(os.path.join(root, fname))
+    return spectra_files
+
+def create_id_spectra_arguments(args: dict):
+    verbose=True,
+    speactra_folder_path = args['spectra_folder']
+    database_file_path = args['database_file']
+    database_file = build_load_database(database_file_path,verbose)
+    spectra_files = build_load_spectra_files(speactra_folder_path)
+    min_peptide_len=args['min_peptide_len']
+    max_peptide_len=args['max_peptide_len']
+    peak_filter=args['peak_filter']
+    relative_abundance_filter=args['relative_abundance_filter']
+    ppm_tolerance=args['tolerance']
+    precursor_tolerance=args['precursor_tolerance']
+    digest=args['digest']
+    max_cores = max(1, args['cores'])
+    cores = min(max_cores, mp.cpu_count() - 1)
+    n=args['n'] * 10
+    is_debug=args['DEBUG']
+    truth_set=args['truth_set']
+    output_dir=args['output_dir']
+    id_spectra_arguments = Id_Spectra_Arguments(spectra_files=spectra_files,
+        database_file=database_file,verbose=verbose,
+        min_peptide_len=min_peptide_len,max_peptide_len=max_peptide_len,peak_filter=peak_filter,
+        relative_abundance_filter=relative_abundance_filter,ppm_tolerance=ppm_tolerance,
+        precursor_tolerance=precursor_tolerance,digest=digest,cores=cores,
+        n=n,is_debug=is_debug,truth_set=truth_set,output_dir=output_dir)
+    return id_spectra_arguments        
