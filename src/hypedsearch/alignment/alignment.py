@@ -20,7 +20,7 @@ class Attempt_Alignment_Arguments:
     ppm_tolerance: int = 20, 
     precursor_tolerance: int = 10,
     digest_type: str = '',
-    DEBUG: bool = False, 
+    is_debug: bool = False, 
     is_last: bool = False, 
     truth: bool = None, 
     fall_off: bool = None
