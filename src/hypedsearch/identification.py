@@ -100,13 +100,13 @@ def id_spectrum(idsa: Id_Spectrum_Arguments) -> Alignments:
 
     aaa = alignment.Attempt_Alignment_Arguments(spectrum=idsa.spectrum,db=idsa.db,b_hits=idsa.b_hits,y_hits=idsa.y_hits,
         n=idsa.n,ppm_tolerance=idsa.ppm_tolerance, precursor_tolerance=precursor_tolerance,digest_type=idsa.digest_type,
-        DEBUG=idsa.DEBUG,is_last=idsa.is_last,truth=idsa.truth,fall_off=idsa.fall_off)            
+        is_debug=True,is_last=idsa.is_last,truth=idsa.truth,fall_off=idsa.fall_off)            
     alignment_results = alignment.attempt_alignment(aaa)
     return alignment_results
 
 def load_all_spectra(spectra_files,ppm_tolerance,peak_filter,relative_abundance_filter,verbose):
     verbose and print('Loading spectra...')
-    lsa = preprocessing_utils.Load_Spectra_Arguments(spectra_files=spectra_files,ppm_tolerance=ppm_tolerance,peak_filter=peak_filter,relative_abundance_filter=relative_abundance_filter)
+    lsa = preprocessing_utils.Load_Spectra_Arguments(spectra_files=spectra_files,ppm_tol=ppm_tolerance,peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
     lsr = preprocessing_utils.load_spectra(lsa)
     verbose and print('Loading spectra Done')
     return lsr.all_spectra, lsr.boundaries, lsr.mz_mapping
@@ -124,19 +124,12 @@ def create_alignment_single_core(spectra,mz_mapping,boundaries,matched_masses_b,
             if b in matched_masses_y:
                 y_hits += matched_masses_y[b]
         is_last = is_debug and i == len(spectra) - 1
-        results[spectrum.id] = id_spectrum(
-            spectrum, 
-            db, 
-            b_hits, 
-            y_hits, 
-            ppm_tolerance, 
-            precursor_tolerance,
-            n,
-            digest_type=digest,
-            truth=truth, 
-            fall_off=fall_off, 
-            is_last=is_last
-        )
+        
+        idsa = Id_Spectrum_Arguments(spectrum=spectrum, db=db, b_hits=b_hits, y_hits=y_hits, 
+            ppm_tolerance=ppm_tolerance, precursor_tolerance=precursor_tolerance,
+            n=n,digest_type=digest,truth=truth, fall_off=fall_off, is_last=is_last)
+        result = id_spectrum(idsa)
+        results[spectrum.id] = result
 def create_alignment_multi_core(is_dev,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
     print('Initializing other processors...')
     results = mp.Manager().dict()
@@ -202,7 +195,7 @@ def output_for_dev(is_dev,output_dir,fall_off):
             safe_write_fall_off[k] = v._asdict()
         JSON.save_dict(output_dir + 'fall_off.json', safe_write_fall_off)
 
-def id_spectra(idsa:utils.Id_Spectra_Arguments) -> dict:
+def id_spectra(idsa:Id_Spectra_Arguments) -> dict:
     is_dev, truth = set_up_for_dev(idsa.truth_set)
     fall_off = None
     spectra, boundaries, mz_mapping  = load_all_spectra(idsa.spectra_files,idsa.ppm_tolerance,idsa.peak_filter,idsa.relative_abundance_filter,idsa.verbose)
