@@ -2,7 +2,7 @@ from objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntr
 #from cppModules import gen_spectra
 import gen_spectra
 from alignment import alignment
-from utils import ppm_to_da, to_percent, overlap_intervals, hashable_boundaries, is_json, is_file
+from utils import ppm_to_da, to_percent, make_overlap_boundaries, hashable_boundaries, is_json, is_file
 import utils
 from scoring import scoring, mass_comparisons
 from preprocessing import digestion, merge_search, preprocessing_utils

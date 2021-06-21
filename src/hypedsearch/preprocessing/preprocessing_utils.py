@@ -1,5 +1,5 @@
 from file_io import spectra
-from utils import ppm_to_da, overlap_intervals
+from utils import ppm_to_da, make_overlap_boundaries
 from dataclasses import dataclass, field
 
 @dataclass
@@ -45,7 +45,7 @@ def load_spectra(lsa:Load_Spectra_Arguments)-> (Load_Spectra_Results):
     all_spectra,linear_spectra = load_spectra_file_into_memory(lsa.spectra_files,lsa.peak_filter,lsa.relative_abundance_filter)
     linear_spectra.sort()
     boundaries = [make_boundaries(mz,lsa.ppm_tol) for mz in linear_spectra]
-    overlapped_boundaries = overlap_intervals(boundaries)
+    overlapped_boundaries = make_overlap_boundaries(boundaries)
     mz_mapping = make_mapping_for_mz_to_boundaries(linear_spectra,overlapped_boundaries)
     lsr = Load_Spectra_Results(all_spectra=all_spectra, boundaries=overlapped_boundaries, mz_mapping=mz_mapping)
     return lsr

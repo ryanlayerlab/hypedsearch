@@ -236,17 +236,7 @@ def make_sparse_array(spectrum: list, width: float, value=50) -> np.ndarray:
 
     return sparse
 
-def overlap_intervals(intervals: list) -> list:
-    '''Take a list of intervals and turn it into a smaller list by finding any 
-    overlapping intervals and making it a larger interval
-
-    :param intervals: Intervals (in the form of lists [lower_bound, upper_bound]). Both ends are inclusive
-    :type intervals: list
-
-    :returns: Overlapped intervals of [lower_bound, upper_bound]
-    :rtype: list 
-    '''
-
+def make_overlap_boundaries(intervals: list) -> list:
     intervals.sort(key=lambda interval: interval[0])
     merged = [intervals[0]]
     for current in intervals:
