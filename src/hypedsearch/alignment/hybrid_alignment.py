@@ -2,6 +2,7 @@ from objects import Database, Spectrum
 from utils import all_perms_of_s
 from scoring import scoring
 from alignment import alignment_utils
+
 import database
 
 #################### Private functions ####################

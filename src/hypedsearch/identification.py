@@ -1,26 +1,165 @@
 from objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry
 #from cppModules import gen_spectra
 import gen_spectra
+
 from alignment import alignment
-from utils import ppm_to_da, to_percent, make_overlap_boundaries, hashable_boundaries, is_json, is_file
+from utils import ppm_to_da, to_percent, overlap_intervals, hashable_boundaries, is_json, is_file
 import utils
 from scoring import scoring, mass_comparisons
 from preprocessing import digestion, merge_search, preprocessing_utils
+import database
 from file_io import JSON
-import os
-from dataclasses import dataclass
+
 import time
 import multiprocessing as mp
 import copy
 import json
-import database
 
+# top results to keep for creating an alignment
 TOP_X = 50
 
-@dataclass
-class Id_Spectra_Arguments:
-    spectra_files: list = [], 
-    database_file: database = None,     
+def id_spectrum(
+    spectrum: Spectrum, 
+    db: Database,
+    b_hits: dict, 
+    y_hits: dict,
+    ppm_tolerance: int, 
+    precursor_tolerance: int, 
+    n: int,
+    digest_type: str = '',
+    truth: dict = None, 
+    fall_off: dict = None, 
+    is_last: bool = False
+    ) -> Alignments:
+    '''Given the spectrum and initial hits, start the alignment process for 
+    the input spectrum
+
+    :param spectrum: observed spectrum in question
+    :type spectrum: Spectrum
+    :param db: Holds all the source sequences
+    :type db: Database
+    :param b_hits: all k-mers found from the b-ion search
+    :type b_hits: list
+    :param y_hits: all k-mers found from the y-ion search
+    :type y_hits: list
+    :param ppm_tolerance: the parts per million error allowed when trying to match masses
+    :type ppm_tolerance: int
+    :param precursor_tolerance: the parts per million error allowed when trying to match
+        precursor masses
+    :type percursor_tolerance: int
+    :param n: the number of alignments to save
+    :type n: int
+    :param digest_type: the digest performed on the sample
+        (default is '')
+    :type digest_type: str
+    :param truth: a set of id keyed spectra with the desired spectra. A better description of what this looks like can be 
+        seen in the param.py file. If left None, the program will continue normally
+        (default is None)
+    :type truth: dict
+    :param fall_off: only works if the truth param is set to a dictionary. This is a dictionary (if using multiprocessing, 
+        needs to be process safe) where, if a sequence loses the desired sequence, a key value pair of spectrum id, 
+        DevFallOffEntry object are added to it. 
+        (default is None)
+    :type fall_off: dict
+    :param is_last: Only works if DEV is set to true in params. If set to true, timing evaluations are done. 
+        (default is False)
+    :type is_last: bool
+
+    :returns: Alignments for the spectrum. If no alignment can be created, and empty Alignments object is inserted
+    :rtype: Alignments
+    '''
+
+    # convert the ppm tolerance of the precursor to an int for the rest of the time
+    precursor_tolerance = utils.ppm_to_da(spectrum.precursor_mass, precursor_tolerance)
+
+    # score and sort these results
+    b_results = sorted([
+        (
+            kmer, 
+            mass_comparisons.optimized_compare_masses(spectrum.spectrum, gen_spectra.gen_spectrum(kmer, ion='b'))
+        ) for kmer in b_hits], 
+        key=lambda x: (x[1], 1/len(x[0])), 
+        reverse=True
+    )
+    y_results = sorted([
+        (
+            kmer, 
+            mass_comparisons.optimized_compare_masses(spectrum.spectrum, gen_spectra.gen_spectrum(kmer, ion='y'))
+        ) for kmer in y_hits], 
+        key=lambda x: (x[1], 1/len(x[0])), 
+        reverse=True
+    )
+
+    # filter out the results
+    # 1. take all non-zero values 
+    # 2. either take the TOP_X or if > TOP_X have the same score, all of those values
+    filtered_b, filtered_y = [], []
+
+    # find the highest b and y scores
+    max_b_score = max([x[1] for x in b_results])
+    max_y_score = max([x[1] for x in y_results])
+
+    # count the number fo kmers that have the highest value
+    num_max_b = sum([1 for x in b_results if x[1] == max_b_score])
+    num_max_y = sum([1 for x in y_results if x[1] == max_y_score])
+
+    # if we have more than TOP_X number of the highest score, take all of them
+    keep_b_count = max(TOP_X, num_max_b)
+    keep_y_count = max(TOP_X, num_max_y)
+
+    # take the afformentioned number of results that > than zero
+    filtered_b = [x[0] for x in b_results[:keep_b_count] if x[1] > 0]
+    filtered_y = [x[0] for x in y_results[:keep_y_count] if x[1] > 0]
+
+    # if fall off and truth are not none, check to see that we can still make the truth seq
+    if truth is not None and fall_off is not None:
+
+        # pull out id, hybrid, and truth seq to make it easier
+        _id = spectrum.id
+        truth_seq = truth[_id]['sequence']
+        is_hybrid = truth[_id]['hybrid']
+
+        if not utils.DEV_contains_truth_parts(truth_seq, is_hybrid, filtered_b, filtered_y):
+
+            # add some metadata about what we kept and what fell off
+            metadata = {
+                'top_x_b_hits': filtered_b, 
+                'top_x_y_hits': filtered_y, 
+                'excluded_b_hits': [x[0] for x in b_results[keep_b_count:]],
+                'excluded_y_hits': [x[0] for x in y_results[keep_y_count:]], 
+                'cut_off_b_score': b_results[keep_b_count - 1][1], 
+                'cut_off_y_score': y_results[keep_y_count - 1][1]
+            }
+
+            # make dev fall off object and add to fall off
+            fall_off[_id] = DEVFallOffEntry(
+                is_hybrid, 
+                truth_seq, 
+                'top_x_filtering', 
+                metadata
+            )
+
+            # skip this entry all together
+            return Alignments(spectrum, [])
+
+    # create an alignment for the spectrum
+    return alignment.attempt_alignment(
+        spectrum, 
+        db, 
+        filtered_b, 
+        filtered_y, 
+        ppm_tolerance=ppm_tolerance, 
+        precursor_tolerance=precursor_tolerance,
+        n=n, 
+        truth=truth, 
+        fall_off=fall_off, 
+        is_last=is_last
+    )
+
+
+def id_spectra(
+    spectra_files: list, 
+    database_file: str, 
     verbose: bool = True, 
     min_peptide_len: int = 5, 
     max_peptide_len: int = 20, 
@@ -31,184 +170,241 @@ class Id_Spectra_Arguments:
     digest: str = '',
     cores: int = 1,
     n: int = 5,
-    is_debug: bool = False, 
+    DEBUG: bool = False, 
     truth_set: str = '', 
     output_dir: str = ''
+) -> dict:
+    '''Load in all the spectra and try to create an alignment for every spectrum
 
-@dataclass
-class Id_Spectrum_Arguments:
-    spectrum: Spectrum = None, 
-    db: Database = Database,
-    b_hits: dict = [], 
-    y_hits: dict = [],
-    ppm_tolerance: int = 0, 
-    precursor_tolerance: int = 0, 
-    n: int = 0,
-    digest_type: str = '',
-    truth: dict = None, 
-    fall_off: dict = None, 
-    is_last: bool = False
+    :param spectra_files: file names of input spectra
+    :type spectra_files: list
+    :param database_file: file name of the fasta database
+    :type database_file: str
+    :param verbose: print progress to the console. 
+        (default is True)
+    :type verbose: bool
+    :param min_peptide_len: the minimum length alignment to create
+        (default is 5)
+    :type min_peptide_len: int
+    :param max_peptide_len: the maximum length alignment to create
+        (default is 20)
+    :type max_peptide_len: int
+    :param peak_filter: If set to a number, this metric is used over the relative abundance filter. 
+        The most abundanct X peaks to use in the alignment. 
+        (default is 0)
+    :type peak_filter: int
+    :param relative_abundance_filter: If peak_filter is set, this parameter is ignored. The 
+        relative abundance threshold (in percent as a decimal) a peak must be of the total 
+        intensity to be used in the alignment. 
+        (default is 0.0)
+    :type relative_abundance_filter: float
+    :param ppm_tolerance: the parts per million error allowed when trying to match masses
+        (default is 20)
+    :type ppm_tolerance: int
+    :param precursor_tolerance: the parts per million error allowed when trying to match
+        a calculated precursor mass to the observed precursor mass
+        (default is 10)
+    :type precurosor_tolerance: int
+    :param digest: the type of digest used in the sample preparation. If left blank, 
+        a digest-free search is performed. 
+        (default is '')
+    :type digest: str
+    :param cores: the number of cores allowed to use in running the program. If a number 
+        provided is greater than the number of cores available, the maximum number of 
+        cores is used. 
+        (default is 1)
+    :type cores: int
+    :param n: the number of aligments to keep per spectrum. 
+        (default is 5)
+    :type n: int
+    :param DEBUG: DEVELOPMENT USE ONLY. Used only for timing of modules. 
+        (default is False)
+    :type DEBUG: bool
+    :param truth_set: the path to a json file of the desired alignments to make for each spectrum. 
+        The format of the file is {spectrum_id: {'sequence': str, 'hybrid': bool, 'parent': str}}. 
+        If left an empty string, the program proceeds as normal. Otherwise results of the analysis
+        will be saved in the file 'fall_off.json' saved in the output directory specified.
+        (default is '')
+    :type truth_set: str
+    :param output_dir: the full path to the output directory to save all output files.
+        (default is '')
+    :type output_dir: str
 
-def id_spectrum(idsa: Id_Spectrum_Arguments) -> Alignments:
-    precursor_tolerance = utils.ppm_to_da(idsa.spectrum.precursor_mass, idsa.precursor_tolerance)
-    b_results = sorted([
-        (
-            kmer, 
-            mass_comparisons.optimized_compare_masses(idsa.spectrum.spectrum, gen_spectra.gen_spectrum(kmer, ion='b'))
-        ) for kmer in idsa.b_hits], 
-        key=lambda x: (x[1], 1/len(x[0])), 
-        reverse=True
-    )
-    y_results = sorted([
-        (
-            kmer, 
-            mass_comparisons.optimized_compare_masses(idsa.spectrum.spectrum, gen_spectra.gen_spectrum(kmer, ion='y'))
-        ) for kmer in idsa.y_hits], 
-        key=lambda x: (x[1], 1/len(x[0])), 
-        reverse=True
-    )
-    filtered_b, filtered_y = [], []
-    max_b_score = max([x[1] for x in b_results])
-    max_y_score = max([x[1] for x in y_results])
-    num_max_b = sum([1 for x in b_results if x[1] == max_b_score])
-    num_max_y = sum([1 for x in y_results if x[1] == max_y_score])
-    keep_b_count = max(TOP_X, num_max_b)
-    keep_y_count = max(TOP_X, num_max_y)
-    filtered_b = [x[0] for x in b_results[:keep_b_count] if x[1] > 0]
-    filtered_y = [x[0] for x in y_results[:keep_y_count] if x[1] > 0]
-    if idsa.truth is not None and idsa.fall_off is not None:
-        _id = idsa.spectrum.id
-        truth_seq = idsa.truth[_id]['sequence']
-        is_hybrid = idsa.truth[_id]['hybrid']
+    :returns: alignments for all spectra save in the form {spectrum.id: Alignments}
+    :rtype: dict
+    '''
 
-        if not utils.DEV_contains_truth_parts(truth_seq, is_hybrid, filtered_b, filtered_y):
-            metadata = {
-                'top_x_b_hits': filtered_b, 
-                'top_x_y_hits': filtered_y, 
-                'excluded_b_hits': [x[0] for x in b_results[keep_b_count:]],
-                'excluded_y_hits': [x[0] for x in y_results[keep_y_count:]], 
-                'cut_off_b_score': b_results[keep_b_count - 1][1], 
-                'cut_off_y_score': y_results[keep_y_count - 1][1]
-            }
-            idsa.fall_off[_id] = DEVFallOffEntry(
-                is_hybrid, 
-                truth_seq, 
-                'top_x_filtering', 
-                metadata
-            )
-            return Alignments(idsa.spectrum, [])
+    DEV = False
+    truth = None
 
-    aaa = alignment.Attempt_Alignment_Arguments(spectrum=idsa.spectrum,db=idsa.db,b_hits=idsa.b_hits,y_hits=idsa.y_hits,
-        n=idsa.n,ppm_tolerance=idsa.ppm_tolerance, precursor_tolerance=precursor_tolerance,digest_type=idsa.digest_type,
-        is_debug=True,is_last=idsa.is_last,truth=idsa.truth,fall_off=idsa.fall_off)            
-    alignment_results = alignment.attempt_alignment(aaa)
-    return alignment_results
-
-def load_all_spectra(spectra_files,ppm_tolerance,peak_filter,relative_abundance_filter,verbose):
-    verbose and print('Loading spectra...')
-    lsa = preprocessing_utils.Load_Spectra_Arguments(spectra_files=spectra_files,ppm_tol=ppm_tolerance,peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
-    lsr = preprocessing_utils.load_spectra(lsa)
-    verbose and print('Loading spectra Done')
-    return lsr.all_spectra, lsr.boundaries, lsr.mz_mapping
-
-def create_alignment_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,is_debug,results,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off):
-    for i, spectrum in enumerate(spectra):
-        print(f'Creating alignment for spectrum {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='\r')
-        b_hits, y_hits = [], []
-        for mz in spectrum.spectrum:
-            mapped = mz_mapping[mz]
-            b = boundaries[mapped]
-            b = hashable_boundaries(b)
-            if b in matched_masses_b:
-                b_hits += matched_masses_b[b]
-            if b in matched_masses_y:
-                y_hits += matched_masses_y[b]
-        is_last = is_debug and i == len(spectra) - 1
-        
-        idsa = Id_Spectrum_Arguments(spectrum=spectrum, db=db, b_hits=b_hits, y_hits=y_hits, 
-            ppm_tolerance=ppm_tolerance, precursor_tolerance=precursor_tolerance,
-            n=n,digest_type=digest,truth=truth, fall_off=fall_off, is_last=is_last)
-        result = id_spectrum(idsa)
-        results[spectrum.id] = result
-def create_alignment_multi_core(is_dev,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
-    print('Initializing other processors...')
-    results = mp.Manager().dict()
-    if is_dev:
-        fall_off = mp.Manager().dict()
-        truth = mp.Manager().dict(truth)
-    q = mp.Manager().Queue()
-    num_processes = cores
-    ps = [
-        mp.Process(
-            target=mp_id_spectrum, 
-            args=(q, copy.deepcopy(db), results, fall_off, truth)
-        ) for _ in range(num_processes) 
-    ]
-    for p in ps:
-        p.start()
-    print('Done.')
-    for i, spectrum in enumerate(spectra):
-        b_hits, y_hits = [], []
-        for mz in spectrum.spectrum:
-            mapped = mz_mapping[mz]
-            b = boundaries[mapped]
-            b = hashable_boundaries(b)
-            if b in matched_masses_b:
-                b_hits += matched_masses_b[b]
-            if b in matched_masses_y:
-                y_hits += matched_masses_y[b]
-        o = MPSpectrumID(
-            b_hits, 
-            y_hits, 
-            spectrum, 
-            ppm_tolerance, 
-            precursor_tolerance, 
-            n, 
-            digest
-        )
-        q.put(o)
-    while len(results) < len(spectra):
-        print(f'\rCreating an alignment for {len(results)}/{len(spectra)} [{to_percent(len(results), len(spectra))}%]', end='')
-        time.sleep(1)
-    [q.put('exit') for _ in range(num_processes)]
-    for p in ps:
-        p.join()
-
-def set_up_for_dev(truth_set):
+    # for dev use only. If a truth set is passed in, we can check where results
+    # drop off. 
     if is_json(truth_set) and is_file(truth_set):
-        truth= json.load(open(truth_set, 'r'))
-        return True, truth
-    else:       
-        return False, None
+        DEV = True
+        print(
+            '''
+DEV set to True. 
+Tracking when correct answer falls off. 
+Results are stored in a json named 'fall_off.json' in the specified output directory
+File will be of the form
 
-def update_truth(is_dev,truth):
-    if is_dev:
+    {
+        spectrum_id: {
+            hybrid: bool, 
+            truth_sequence: str, 
+            fall_off_operation: str, 
+        }
+    }
+            '''
+        )
+        # load in the truth set
+        truth = json.load(open(truth_set, 'r'))
+
+    fall_off = None
+
+    # build/load the database
+    verbose and print('Loading database...')
+    db = database.build(database_file)
+    verbose and print('Done')
+
+    
+    # load all of the spectra
+    verbose and print('Loading spectra...')
+    spectra, boundaries, mz_mapping = preprocessing_utils.load_spectra(
+        spectra_files, 
+        ppm_tolerance,
+        peak_filter=peak_filter, 
+        relative_abundance_filter=relative_abundance_filter
+    )
+    verbose and print('Done')
+
+    # get the boundary -> kmer mappings for b and y ions
+    matched_masses_b, matched_masses_y, db = merge_search.match_masses(boundaries, db, max_peptide_len)
+
+    # keep track of the alingment made for every spectrum
+    results = {}
+
+    if DEV:
         fall_off = {}
         fall_off = mp.Manager().dict()
         truth = mp.Manager().dict(truth)
 
-def output_for_dev(is_dev,output_dir,fall_off):
-    if is_dev:
+    # if we only get 1 core, don't do the multiporcessing bit
+    if cores == 1:
+        # go through and id all spectra
+        for i, spectrum in enumerate(spectra):
+
+            print(f'Creating alignment for spectrum {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='\r')
+
+            # get b and y hits
+            b_hits, y_hits = [], []
+            for mz in spectrum.spectrum:
+
+                # get the correct boundary
+                mapped = mz_mapping[mz]
+                b = boundaries[mapped]
+                b = hashable_boundaries(b)
+
+                if b in matched_masses_b:
+                    b_hits += matched_masses_b[b]
+
+                if b in matched_masses_y:
+                    y_hits += matched_masses_y[b]
+
+            is_last = DEBUG and i == len(spectra) - 1
+
+            # pass it into id_spectrum
+            results[spectrum.id] = id_spectrum(
+                spectrum, 
+                db, 
+                b_hits, 
+                y_hits, 
+                ppm_tolerance, 
+                precursor_tolerance,
+                n,
+                digest_type=digest,
+                truth=truth, 
+                fall_off=fall_off, 
+                is_last=is_last
+            )
+
+    else:
+
+        print('Initializing other processors...')
+        results = mp.Manager().dict()
+
+        if DEV:
+            fall_off = mp.Manager().dict()
+            truth = mp.Manager().dict(truth)
+
+        # start up processes and queue for parallelizing things
+        q = mp.Manager().Queue()
+        num_processes = cores
+        ps = [
+            mp.Process(
+                target=mp_id_spectrum, 
+                args=(q, copy.deepcopy(db), results, fall_off, truth)
+            ) for _ in range(num_processes) 
+        ]
+
+        # start each of the process
+        for p in ps:
+            p.start()
+        print('Done.')
+
+        # go through and id all spectra
+        for i, spectrum in enumerate(spectra):
+            # get b and y hits
+            b_hits, y_hits = [], []
+            for mz in spectrum.spectrum:
+
+                # get the correct boundary
+                mapped = mz_mapping[mz]
+                b = boundaries[mapped]
+                b = hashable_boundaries(b)
+
+                if b in matched_masses_b:
+                    b_hits += matched_masses_b[b]
+
+                if b in matched_masses_y:
+                    y_hits += matched_masses_y[b]
+
+            # create a named tuple to put in the database
+            o = MPSpectrumID(
+                b_hits, 
+                y_hits, 
+                spectrum, 
+                ppm_tolerance, 
+                precursor_tolerance, 
+                n, 
+                digest
+            )
+            
+            q.put(o)
+
+        while len(results) < len(spectra):
+            print(f'\rCreating an alignment for {len(results)}/{len(spectra)} [{to_percent(len(results), len(spectra))}%]', end='')
+            time.sleep(1)
+
+        # now send 'exit' message to all our processes
+        [q.put('exit') for _ in range(num_processes)]
+
+        # join them
+        for p in ps:
+            p.join()
+
+    # if we have set DEV, we need to dump this to a json
+    if DEV:
         output_dir = output_dir + '/' if output_dir[-1] != '/' else output_dir
+
         safe_write_fall_off = {}
+
+        # we need to convert all our DEVFallOffEntries to dicts
         for k, v in fall_off.items():
             safe_write_fall_off[k] = v._asdict()
-        JSON.save_dict(output_dir + 'fall_off.json', safe_write_fall_off)
 
-def id_spectra(idsa:Id_Spectra_Arguments) -> dict:
-    is_dev, truth = set_up_for_dev(idsa.truth_set)
-    fall_off = None
-    spectra, boundaries, mz_mapping  = load_all_spectra(idsa.spectra_files,idsa.ppm_tolerance,idsa.peak_filter,idsa.relative_abundance_filter,idsa.verbose)
-    matched_masses_b, matched_masses_y, db = merge_search.match_masses(boundaries, idsa.database_file, idsa.max_peptide_len)
-    results = {}
-    update_truth(is_dev,truth)
-    if idsa.cores == 1:
-        create_alignment_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,
-            idsa.is_debug,results,db,idsa.ppm_tolerance,idsa.precursor_tolerance,idsa.n,idsa.digest,truth,fall_off)
-    else:
-        create_alignment_multi_core(is_dev,truth,idsa.cores,idsa.mp_id_spectrum,db,spectra,mz_mapping,
-            boundaries,matched_masses_b,matched_masses_y,idsa.ppm_tolerance,idsa.precursor_tolerance,idsa.n,idsa.digest)
-    output_for_dev(is_dev,idsa.output_dir,fall_off)
+        JSON.save_dict(output_dir + 'fall_off.json', safe_write_fall_off)
+        
     return results
 
 def mp_id_spectrum(
@@ -218,6 +414,27 @@ def mp_id_spectrum(
     fall_off: dict = None, 
     truth: dict = None
     ) -> None:
+    '''Multiprocessing function for to identify a spectrum. Each entry in the 
+    input_q must be a MPSpectrumID object
+
+    :param input_q: a queue to pull MPSpectrumID objects from for analysis
+    :type input_q: mp.Queue
+    :param db_copy: a copy of the original database for alignments
+    :type db_copy: Database
+    :param results: a multiprocesses safe dictionary to save the alignments in
+    :type results: dict
+    :param truth_set: dictionary containing all the desired alignments to make. 
+        The format of the file is {spectrum_id: {'sequence': str, 'hybrid': bool, 'parent': str}}. 
+        If left as None, the program will continue as normal
+        (default is None)
+    :type truth_set: dict
+    :param fall_off: only used if the truth_set param is set to a valid json. Must be a multiprocess
+        safe dictionary to store the fall off information to
+    :type fall_off: dict
+
+    :returns: None
+    :rtype: None
+    '''
     while True:
 
         # wait to get something from the input queue
@@ -267,43 +484,3 @@ def mp_id_spectrum(
             truth, 
             fall_off
         )
-
-def build_load_database(database_file,verbose):
-    verbose and print('Loading database...')
-    db = database.build(database_file)
-    verbose and print('Loading database Done')
-    return db
-
-def build_load_spectra_files(spectra_folder_path):
-    spectra_files = []
-    for (root, _, filenames) in os.walk(spectra_folder_path):
-        for fname in filenames:
-            spectra_files.append(os.path.join(root, fname))
-    return spectra_files
-
-def create_id_spectra_arguments(args: dict):
-    verbose=True,
-    speactra_folder_path = args['spectra_folder']
-    database_file_path = args['database_file']
-    database_file = build_load_database(database_file_path,verbose)
-    spectra_files = build_load_spectra_files(speactra_folder_path)
-    min_peptide_len=args['min_peptide_len']
-    max_peptide_len=args['max_peptide_len']
-    peak_filter=args['peak_filter']
-    relative_abundance_filter=args['relative_abundance_filter']
-    ppm_tolerance=args['tolerance']
-    precursor_tolerance=args['precursor_tolerance']
-    digest=args['digest']
-    max_cores = max(1, args['cores'])
-    cores = min(max_cores, mp.cpu_count() - 1)
-    n=args['n'] * 10
-    is_debug=args['DEBUG']
-    truth_set=args['truth_set']
-    output_dir=args['output_dir']
-    id_spectra_arguments = Id_Spectra_Arguments(spectra_files=spectra_files,
-        database_file=database_file,verbose=verbose,
-        min_peptide_len=min_peptide_len,max_peptide_len=max_peptide_len,peak_filter=peak_filter,
-        relative_abundance_filter=relative_abundance_filter,ppm_tolerance=ppm_tolerance,
-        precursor_tolerance=precursor_tolerance,digest=digest,cores=cores,
-        n=n,is_debug=is_debug,truth_set=truth_set,output_dir=output_dir)
-    return id_spectra_arguments        

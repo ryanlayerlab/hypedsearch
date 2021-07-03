@@ -1,6 +1,15 @@
+'''
+main.py
 
-import sys
+Author: Zach McGrath
+Date: 6 April 2020
+
+Description:
+Main file for hypedsearch. Handles input parameters and flow of the program
+'''
 import argparse
+import sys
+
 import utils, runner
 from config_loader import Config
 
@@ -11,8 +20,11 @@ def stringtobool(s: str) -> bool:
     return True
 
 def set_args(args) -> dict:
+
+    # check if we use the params file or the user arguments
     use_params = stringtobool(args.config)
     config = Config()
+
     spectra_folder = args.spectra_folder if not use_params else config['spectra_dir']
     database_file = args.database_file if not use_params else config['database_file']
     output_dir = args.output_dir if not use_params else config['output_dir']
@@ -29,6 +41,7 @@ def set_args(args) -> dict:
     debug = config['debug']
     truth_set = config['truth_set']
 
+    ############## Argument checking ################
     if not utils.is_dir(spectra_folder):
         print(f'Error: {spectra_folder} is not a real path. Path to directory with spectra files is necessary.')
         sys.exit(0)
@@ -36,6 +49,7 @@ def set_args(args) -> dict:
         print(f'Error: {database_file} is not a valid .fasta file. .fasta file needed.')
         sys.exit(0)
 
+    # make the output directory
     output_dir = utils.make_valid_dir_string(output_dir)
     utils.make_dir(output_dir)
 
@@ -57,12 +71,17 @@ def set_args(args) -> dict:
         'truth_set': truth_set
     }
 
+##############################################################
+
 def main(args: object) -> None:
+    # get the arguments 
     arguments = set_args(args)
+
     runner.run(arguments)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Tool for identifying proteins, both hybrid and non hybrid from MS/MS data')
+
     parser.add_argument('--spectra-folder', dest='spectra_folder', type=str, default='./', help='Path to folder containing spectra files.')
     parser.add_argument('--database-file', dest='database_file', type=str, default='./', help='Path to .fasta file containing proteins')
     parser.add_argument('--output-dir', dest='output_dir', type=str, default='~/', help='Directory to save all figures. Default=~/')
