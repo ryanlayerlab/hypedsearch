@@ -1,7 +1,7 @@
 from utils import hashable_boundaries, predicted_len
 from objects import Database
-import gen_spectra
 #from cppModules import gen_spectra
+import gen_spectra
 
 from collections import defaultdict
 from typing import Iterable
@@ -91,10 +91,14 @@ def make_database_set(
     def add_all(kmer, prot_name):
         for ion in 'by':
             for charge in [1, 2]:
+                #hack
+                #spec = pre_spec.spectrum
+                #the_type = type(spec) #python = 'dict' #cpp = 'list'
                 pre_spec = gen_spectra.gen_spectrum(kmer, ion=ion, charge=charge)
                 spec = pre_spec
                 if isinstance(pre_spec,dict):
                     spec = pre_spec.get('spectrum')
+
                 for i, mz in enumerate(spec):
                     kmer_to_add = kmer[:i+1] if ion == 'b' else kmer[-i-1:]
                     r_d = db_dict_b if ion == 'b' else db_dict_y
@@ -149,7 +153,7 @@ def make_database_set(
         index_list_y.append(len(kmers) + offset)
         kmer_list_y += kmers
 
-    print('Sorting the set of protein masses Done')
+    print('Done')
 
     return db_list_b, index_list_b, kmer_list_b, db_list_y, index_list_y, kmer_list_y, kmer_set
 

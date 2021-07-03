@@ -1,5 +1,6 @@
 from pyteomics import fasta
 from collections import namedtuple, defaultdict
+
 from objects import Database
 
 def extract_protein_name(prot_entry: namedtuple) -> str:

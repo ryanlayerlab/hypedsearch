@@ -3,13 +3,12 @@ from typing import Iterable, Any
 from itertools import product
 import numpy as np
 from collections import namedtuple
+
 from objects import Spectrum
 import gen_spectra
-import math
-import database
-import re
-import multiprocessing as mp
 
+import math
+import re
 
 HYBRID_ALIGNMENT_PATTERN = re.compile(r'[-\(\)]')
 
@@ -236,7 +235,17 @@ def make_sparse_array(spectrum: list, width: float, value=50) -> np.ndarray:
 
     return sparse
 
-def make_overlap_boundaries(intervals: list) -> list:
+def overlap_intervals(intervals: list) -> list:
+    '''Take a list of intervals and turn it into a smaller list by finding any 
+    overlapping intervals and making it a larger interval
+
+    :param intervals: Intervals (in the form of lists [lower_bound, upper_bound]). Both ends are inclusive
+    :type intervals: list
+
+    :returns: Overlapped intervals of [lower_bound, upper_bound]
+    :rtype: list 
+    '''
+
     intervals.sort(key=lambda interval: interval[0])
     merged = [intervals[0]]
     for current in intervals:
@@ -452,6 +461,3 @@ def DEV_contains_truth_exact(truth_seq: str, hybrid: bool, seqs: list) -> bool:
     contains_exact = any([x == truth_seq for x in seqs])
 
     return contains_exact
-
-
-
