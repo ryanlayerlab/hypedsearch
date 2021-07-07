@@ -3,15 +3,12 @@ import identification
 from postprocessing import summary, review
 import multiprocessing as mp
 
-def run(args: dict) -> None:
-    spectra_files = []
-    for (root, _, filenames) in os.walk(args['spectra_folder']):
-        for fname in filenames:
-            spectra_files.append(os.path.join(root, fname))
+
+def run(args: dict) -> dict:
     cores = max(1, args['cores'])
     cores = min(cores, mp.cpu_count() - 1)
     matched_spectra = identification.id_spectra(
-        spectra_files, args['database_file'], 
+        args['spectra_files'], args['database_file'], 
         min_peptide_len=args['min_peptide_len'], 
         max_peptide_len=args['max_peptide_len'], 
         ppm_tolerance=args['tolerance'], 
@@ -26,7 +23,6 @@ def run(args: dict) -> None:
         truth_set=args['truth_set'], 
         output_dir=args['output_dir']
     )
-    print('\nFinished search. Writting results to {}...'.format(args['output_dir']))
-    summary.generate(matched_spectra, args['output_dir'])
+    return matched_spectra
     
     

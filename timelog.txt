@@ -1,4 +1,12 @@
+<<<<<<< HEAD
 Time to build database: 0.015924692153930664
 Time to load in spectra: 3.1744680404663086
 Time to map boundaries to kmers: 123.82465720176697
 Time to spin up cores: 209.44694805145264
+=======
+B and Y full bipartite alignment time: 0.08252739906311035s 	 average dataset size100.0 	 seconds/op: 0.0002750913302103678s
+Removing ambiguous hybrids time: 0.01830267906188965s 	 average dataset size171.33333333333334 	 seconds/op: 3.5608325023131614e-05s
+Matching precursor masses time: 4.352097511291504s 	 average dataset size2188.0 	 seconds/op: 0.0006630252150047995s
+Turning matches into objects time: 0.10005569458007812 	 average dataset size205.0 	 seconds/op: 0.00016269218630907012
+Initial sequences with too many or few amino acids to try to precursor match: 1444/6564
+>>>>>>> 062d54f84b0a078e3d1cd0e81f2d12e4efa90cb5
