@@ -19,4 +19,4 @@ jobs:
         working-directory: src
       - name: Run Tests
         run: python -m unittest test_hypedsearch
-        working-directory: src/test
+        working-directory: test
