@@ -18,5 +18,5 @@ jobs:
           pip install -r requirements.txt
         working-directory: src
       - name: Run Tests
-        run: python -m unittest test_runner
+        run: python -m unittest test_hypedsearch
         working-directory: test
