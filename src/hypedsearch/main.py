@@ -4,6 +4,7 @@ import sys
 from objects import Database
 import utils, runner, database
 from config_loader import Config
+from postprocessing import summary, review
 
 def string_to_bool(s: str) -> bool:
     s = str(s)
@@ -72,7 +73,10 @@ def set_args(args) -> dict:
 
 def main(args: object) -> None:
     arguments = set_args(args)
-    runner.run(arguments)
+    matched_spectra = runner.run(arguments)
+    output_dir = arguments['output_dir']
+    print('\nFinished search. Writting results to {}...'.format(output_dir))
+    summary.generate(matched_spectra, output_dir)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Tool for identifying proteins, both hybrid and non hybrid from MS/MS data')

@@ -4,7 +4,7 @@ from postprocessing import summary, review
 import multiprocessing as mp
 
 
-def run(args: dict) -> None:
+def run(args: dict) -> dict:
     cores = max(1, args['cores'])
     cores = min(cores, mp.cpu_count() - 1)
     matched_spectra = identification.id_spectra(
@@ -23,7 +23,6 @@ def run(args: dict) -> None:
         truth_set=args['truth_set'], 
         output_dir=args['output_dir']
     )
-    print('\nFinished search. Writting results to {}...'.format(args['output_dir']))
-    summary.generate(matched_spectra, args['output_dir'])
+    return matched_spectra
     
     
