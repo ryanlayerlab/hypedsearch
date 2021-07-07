@@ -257,7 +257,7 @@ def overlap_intervals(intervals: list) -> list:
     return merged  
 
 def to_percent(index, total):
-    return int(100 * (index + 1)/total)
+    return int(100 * (index)/total)
 
 def predicted_len(precursor_mass: float, precursor_charge: int) -> int:
     '''The predicted length of a spectrum based on its maximum mass
