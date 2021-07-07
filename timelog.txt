@@ -1,5 +1,5 @@
-B and Y full bipartite alignment time: 0.07632780075073242s 	 average dataset size100.0 	 seconds/op: 0.00025442600250244143s
-Removing ambiguous hybrids time: 0.01827073097229004s 	 average dataset size171.33333333333334 	 seconds/op: 3.554616920678996e-05s
-Matching precursor masses time: 4.119080066680908s 	 average dataset size2188.0 	 seconds/op: 0.0006275259090007477s
-Turning matches into objects time: 0.09835195541381836 	 average dataset size205.0 	 seconds/op: 0.00015992187872165587
-Initial sequences with too many or few amino acids to try to precursor match: 1442/6564
+B and Y full bipartite alignment time: 0.03871583938598633s 	 average dataset size100.0 	 seconds/op: 0.00012905279795328775s
+Removing ambiguous hybrids time: 0.009418725967407227s 	 average dataset size171.33333333333334 	 seconds/op: 1.8324369586395382e-05s
+Matching precursor masses time: 1.8349647521972656s 	 average dataset size2189.3333333333335 	 seconds/op: 0.00027937952987169086s
+Turning matches into objects time: 0.035105228424072266 	 average dataset size205.0 	 seconds/op: 5.7081672234263844e-05
+Initial sequences with too many or few amino acids to try to precursor match: 1444/6568
