@@ -1,27 +1,37 @@
-
+import os
 import argparse
 import sys
-
-import utils, runner
+from objects import Database
+import utils, runner, database
 from config_loader import Config
 
-def stringtobool(s: str) -> bool:
+def string_to_bool(s: str) -> bool:
     s = str(s)
     if s.lower() == 'false' or 'f' in s.lower():
         return False
     return True
 
+def get_spectra_files(spectra_folder):
+    spectra_files = []
+    for (root, _, filenames) in os.walk(spectra_folder):
+        for fname in filenames:
+            spectra_files.append(os.path.join(root, fname))
+    return spectra_files
+
+def get_database_file(database_file_path):
+    return database.build(database_file_path)
+
 def set_args(args) -> dict:
-    use_params = stringtobool(args.config)
+    use_params = string_to_bool(args.config)
     config = Config()
     spectra_folder = args.spectra_folder if not use_params else config['spectra_dir']
-    database_file = args.database_file if not use_params else config['database_file']
+    database_file_path = args.database_file if not use_params else config['database_file']
     output_dir = args.output_dir if not use_params else config['output_dir']
     min_peptide_len = args.min_peptide_len if not use_params else config['min_peptide_len']
     max_peptide_len = args.max_peptide_len if not use_params else config['max_peptide_len']
     ppm_tolerance = args.tolerance if not use_params else config['ppm_tolerance']
     precursor_tolerance = args.precursor_tolerance if not use_params else config['precursor_tolerance']
-    verbose = stringtobool(args.verbose) if not use_params else config['verbose']
+    verbose = string_to_bool(args.verbose) if not use_params else config['verbose']
     peak_filter = args.peak_filter if not use_params else config['num_peaks']
     relative_abundance_filter = args.rel_abund_filter if not use_params else config['relative_abundance']
     digest = args.digest if not use_params else config['digest']
@@ -33,15 +43,17 @@ def set_args(args) -> dict:
     if not utils.is_dir(spectra_folder):
         print(f'Error: {spectra_folder} is not a real path. Path to directory with spectra files is necessary.')
         sys.exit(0)
-    if not utils.is_fasta(database_file) or not utils.is_file(database_file):
-        print(f'Error: {database_file} is not a valid .fasta file. .fasta file needed.')
+    if not utils.is_fasta(database_file_path) or not utils.is_file(database_file_path):
+        print(f'Error: {database_file_path} is not a valid .fasta file. .fasta file needed.')
         sys.exit(0)
 
+    spectra_files = get_spectra_files(spectra_folder)
+    database_file = get_database_file(database_file_path)
     output_dir = utils.make_valid_dir_string(output_dir)
     utils.make_dir(output_dir)
 
     return {
-        'spectra_folder': spectra_folder,
+        'spectra_files': spectra_files,
         'database_file': database_file,
         'output_dir': output_dir,
         'min_peptide_len': min_peptide_len,
