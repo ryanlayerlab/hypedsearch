@@ -159,7 +159,7 @@ def id_spectrum(
 
 def id_spectra(
     spectra_files: list, 
-    database_file: str, 
+    database_file: database, 
     verbose: bool = True, 
     min_peptide_len: int = 5, 
     max_peptide_len: int = 20, 
@@ -264,7 +264,7 @@ File will be of the form
 
     # build/load the database
     verbose and print('Loading database...')
-    db = database.build(database_file)
+    db = database_file
     verbose and print('Done')
 
     
