@@ -2,7 +2,8 @@ import sys, os.path
 import unittest
 src_dir = (os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) + '/src/')
 sys.path.append(src_dir)
-import src.runner, src.utils, src.database, src.runner, src.objects
+from src import runner, utils, database, runner, objects
+
 
 class Test_Main(unittest.TestCase):
     def setUp(self):
