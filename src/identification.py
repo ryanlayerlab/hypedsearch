@@ -183,7 +183,7 @@ def id_spectrum(
 
 def id_spectra(
     spectra_files: list, 
-    database_file: str, 
+    database_file: database, 
     verbose: bool = True, 
     min_peptide_len: int = 5, 
     max_peptide_len: int = 20, 
@@ -292,7 +292,7 @@ File will be of the form
     database_start = time.time()
     # build/load the database
     verbose and print('Loading database...')
-    db = database.build(database_file)
+    db = database_file
     verbose and print('Done')
     with open('timelog.txt', 'a') as t:
         t.write('Time to build database: ' + str(time.time() - database_start) + '\n')
