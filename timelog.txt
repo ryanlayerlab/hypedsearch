@@ -1,18 +1,18 @@
-Time to build database: 0.00014209747314453125
-Time to load in spectra: 0.004853010177612305
-Time to map boundaries to kmers: 233.63548922538757
-B and Y full bipartite alignment time: 0.046277761459350586s 	 average dataset size100.0 	 seconds/op: 0.00015425920486450195s
-Removing ambiguous hybrids time: 0.009655952453613281s 	 average dataset size166.33333333333334 	 seconds/op: 1.9350606119465493e-05s
-Matching precursor masses time: 2.0318689346313477s 	 average dataset size2189.0 	 seconds/op: 0.0003094059592860283s
-Turning matches into objects time: 0.03589487075805664 	 average dataset size199.66666666666666 	 seconds/op: 5.9924659028475195e-05
-Initial sequences with too many or few amino acids to try to precursor match: 1573/6567
-average b scoring time: 0.11338122685750325
-average y scoring time: 0.10704716046651204
-Time to filter out top 50 kmers: 0.0017851988474527996
-average extension time: 0.004878600438435872
-average non hybrid refinement time 0.02852932612101237
-average non hybrid scoring time 0.00013339519500732422
-average hybrid refinement time 0.6524581909179688
-average hybrid scoring time 0.00010723620653152466
-average extension time: 0.004878600438435872
-average alignment time: 0.7141037782033285
+Time to build database: 0.00027871131896972656
+Time to load in spectra: 0.009472131729125977
+Time to map boundaries to kmers: 232.9022102355957
+B and Y full bipartite alignment time: 0.0426633358001709s 	 average dataset size100.0 	 seconds/op: 0.000142211119333903s
+Removing ambiguous hybrids time: 0.009471893310546875s 	 average dataset size166.33333333333334 	 seconds/op: 1.8981750121336424e-05s
+Matching precursor masses time: 1.8305344581604004s 	 average dataset size2190.0 	 seconds/op: 0.0002786201610594217s
+Turning matches into objects time: 0.0356290340423584 	 average dataset size199.66666666666666 	 seconds/op: 5.948085816754324e-05
+Initial sequences with too many or few amino acids to try to precursor match: 1573/6570
+average b scoring time: 0.1156478722890218
+average y scoring time: 0.0996841589609782
+Time to filter out top 50 kmers: 0.0011759599049886067
+average extension time: 0.004404624303181966
+average non hybrid refinement time 0.030516862869262695
+average non hybrid scoring time 0.00012946128845214844
+average hybrid refinement time 0.5832133293151855
+average hybrid scoring time 0.0001054517924785614
+average extension time: 0.004404624303181966
+average alignment time: 0.6445855299631754
