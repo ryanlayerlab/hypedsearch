@@ -2,7 +2,8 @@ import sys, os.path
 import unittest
 src_path = (os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) + '/src/')
 sys.path.append(src_path)
-import src.runner, src.utils, src.database, src.objects
+from src import runner, utils, database, objects
+#import src.runner, src.utils, src.database, src.objects
 
 class Test_Main(unittest.TestCase):
     def setUp(self):
@@ -12,7 +13,7 @@ class Test_Main(unittest.TestCase):
         dirname = os.path.dirname(__file__)
         spectra_file_paths = [os.path.join(dirname, '../data/spectra/hybrid_nod2e3.mzML')]  
         database_file_path = os.path.join(dirname, '../data/database/sample_database.fasta')
-        database_file = src.database.build(database_file_path)
+        database_file = database.build(database_file_path)
         output_dir = '../output'
         min_peptide_len = 3
         max_peptide_len = 30
@@ -37,7 +38,7 @@ class Test_Main(unittest.TestCase):
 
     def test_runner(self):  
         arguments = self.get_arguments()
-        matched_spectra = src.runner.run(arguments)
+        matched_spectra = runner.run(arguments)
         actual = len(matched_spectra)
         expected = 3
         self.assertEqual(expected, actual, 'matched_spectra length is three')
