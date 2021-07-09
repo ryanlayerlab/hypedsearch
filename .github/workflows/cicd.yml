@@ -17,8 +17,6 @@ jobs:
           cd $GITHUB_WORKSPACE
           python -m pip install --upgrade pip
         working-directory: src
-      - name: Update Path Value
-        run: echo "../src/" >> $GITHUB_PATH
       - name: Run Tests
         run: python -m unittest test_hypedsearch
         working-directory: test
