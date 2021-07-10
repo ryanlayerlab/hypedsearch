@@ -17,7 +17,8 @@ jobs:
           cd $GITHUB_WORKSPACE
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          echo "PYTHONPATH=home/runner/work/hypedsearch/src" >> $GITHUB_ENV
       - name: Run Tests
-        run: python -m unittest test_hypedsearch
+        run: |
+          echo "PYTHONPATH=home/runner/work/hypedsearch/src" >> $GITHUB_ENV
+          python -m unittest test_hypedsearch
         working-directory: test
