@@ -27,7 +27,8 @@ jobs:
       - name: Use the value
         id: step_two
         run: |
-          echo "${{ GITHUB_WORKSPACE }}"
+          echo "$GITHUB_WORKSPACE "
+       #  echo "${{ GITHUB_WORKSPACE }}" #throws an error
        #  echo "${{ env.PYTHONPATH }}" #returns the path          
        #  echo "${{ env.GITHUB_PATH }}" #returns nothing
        #  echo "${{ sys.path }}" #throws an error
