@@ -27,7 +27,7 @@ jobs:
       - name: Use the value
         id: step_two
         run: |
-          echo "${{ env.action_state }}" 
+          echo "${{ sys.path }}" 
        #  echo "${{ env.GITHUB_PATH }}" #returns nothing
        #  echo "${{ sys.path }}" #returns nothing
        #  echo "${{ env.action_state }}" #returns yellow
