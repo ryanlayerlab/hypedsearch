@@ -3,4 +3,3 @@ pyteomics
 lxml
 argparse
 pandas
-src
