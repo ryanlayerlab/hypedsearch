@@ -5,9 +5,7 @@ sys.path.append(src_path)
 from src import runner, utils, database, objects
 
 class Test_Main(unittest.TestCase):
-    def setUp(self):
-        sys.path.insert(0, "../src")
-
+    
     def get_arguments(self):
         dirname = os.path.dirname(__file__)
         spectra_file_paths = [os.path.join(dirname, '../data/spectra/hybrid_nod2e3.mzML')]  
