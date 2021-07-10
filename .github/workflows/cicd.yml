@@ -17,9 +17,9 @@ jobs:
           cd $GITHUB_WORKSPACE
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Update Environment Varaible
-        run: |
-          echo "PYTHONPATH=home/runner/work/hypedsearch/src" >> $GITHUB_ENV
+      #- name: Update Environment Varaible
+      #  run: |
+      #    echo "PYTHONPATH=home/runner/work/hypedsearch/src" >> $GITHUB_ENV
       - name: Set the value
         id: step_one
         run: |
@@ -27,8 +27,8 @@ jobs:
       - name: Use the value
         id: step_two
         run: |
-          echo "$GITHUB_WORKSPACE "
-       #  echo "$GITHUB_WORKSPACE " returns path
+          echo "$GITHUB_ENV"
+       #  echo "$GITHUB_WORKSPACE " returns path - /home/runner/work/hypedsearch/hypedsearch 
        #  echo "${{ GITHUB_WORKSPACE }}" #throws an error
        #  echo "${{ env.PYTHONPATH }}" #returns the path          
        #  echo "${{ env.GITHUB_PATH }}" #returns nothing
