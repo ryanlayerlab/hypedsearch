@@ -27,8 +27,9 @@ jobs:
       - name: Use the value
         id: step_two
         run: |
-          echo "$GITHUB_ENV"
-       #  echo "$GITHUB_WORKSPACE " returns path - /home/runner/work/hypedsearch/hypedsearch 
+          echo "$sys.path"
+       #  echo "$GITHUB_ENV" returns path /home/runner/work/_temp/_runner_file_commands/set_env_4e0fb2e1-e383-466c-b6a2-5d499c60d0d2
+       #  echo "$GITHUB_WORKSPACE " returns path /home/runner/work/hypedsearch/hypedsearch 
        #  echo "${{ GITHUB_WORKSPACE }}" #throws an error
        #  echo "${{ env.PYTHONPATH }}" #returns the path          
        #  echo "${{ env.GITHUB_PATH }}" #returns nothing
