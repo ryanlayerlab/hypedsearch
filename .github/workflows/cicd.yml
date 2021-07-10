@@ -21,4 +21,4 @@ jobs:
       - name: Run Tests
         run: |
           python -m unittest test_hypedsearch
-        working-directory: src
+        working-directory: test
