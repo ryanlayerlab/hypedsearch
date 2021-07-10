@@ -1,8 +1,10 @@
 import sys, os.path  
 import unittest
-src_path = (os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) + '/src/')
-sys.path.append(src_path)
-from src import runner, utils, database, objects
+#src_path = (os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) + '/src/')
+#sys.path.append(src_path)
+#from src import runner, utils, database, objects
+
+import runner, utils, database, objects
 
 class Test_Main(unittest.TestCase):
     
