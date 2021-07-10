@@ -20,7 +20,15 @@ jobs:
       - name: Update Environment Varaible
         run: |
           echo "PYTHONPATH=home/runner/work/hypedsearch/src" >> $GITHUB_ENV
-      - name: Run Tests
+      - name: Set the value
+        id: step_one
         run: |
-          python -m unittest test_hypedsearch
-        working-directory: test
+          echo "action_state=yellow" >> $GITHUB_ENV
+      - name: Use the value
+        id: step_two
+        run: |
+          echo "${{ env.action_state }}"
+      # - name: Run Tests
+      #  run: |
+      #    python -m unittest test_hypedsearch
+      #  working-directory: test
