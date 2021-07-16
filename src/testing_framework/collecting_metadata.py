@@ -36,6 +36,7 @@ with open('metadata.txt', 'w') as m:
     m.close()
 
 print('Collecting metadata...')
+testing_utils.collect_metadata()
 avg_hits = 0
 total_hits = 0
 tot_ideal_spec_length = 0

@@ -442,8 +442,34 @@ def merge(
 
     return matched_masses
 
-def map_mz(mz, start_location, parent_protein_num, protein_location):
+def map_mz(input_spectra, ppm_tolerance, matched_masses_b, matched_masses_y):
     #Map to (P_y, S_i, P_j, seq, b/y)
     # Where P_y is protein this was found in, S_i is m/z number, P_j is location within that protein, seq and b/y are straightforward 
+    mz_mapping = defaultdict(set)
+    for spectrum in input_spectra:
+        find_matches_in_spectrum(spectrum, mz_mapping, ppm_tolerance, matched_masses_b, matched_masses_y)
 
-    return Tuple[mz, parent_protein_num, start_location, protein_location]
+def find_matches_in_spectrum(spectrum, mz_mapping, ppm_tolerance, matched_masses_b, matched_masses_y):
+    for i, mz in enumerate(spectrum[0]):
+        boundaries = preprocessing_utils.make_boundaries(mz, ppm_tolerance)
+        match_b(matched_masses_b, matched_masses_y, boundaries, mz_mapping, i, mz)
+        match_y(matched_masses_b, matched_masses_y, boundaries, mz_mapping, i, mz)
+    return mz_mapping
+
+def match_b(matched_masses_b, matched_masses_y, boundaries, mz_mapping, i, mz):
+    for boundary in matched_masses_b.keys():
+        if boundary == str(boundaries[0]) + '-' + str(boundaries[1]):
+            add_match_to_dict('b', matched_masses_b, matched_masses_y, boundary, mz_mapping, i, mz)
+
+def match_y(matched_masses_b, matched_masses_y, boundaries, mz_mapping, i, mz):
+    for boundary in matched_masses_y.keys():
+        if boundary == str(boundaries[0]) + '-' + str(boundaries[1]):
+            add_match_to_dict('y', matched_masses_b, matched_masses_y, boundary, mz_mapping, i, mz)
+
+def add_match_to_dict(ion, matched_masses_b, matched_masses_y, boundary, mz_mapping, i, mz):
+    if ion == 'b':
+        for matching in matched_masses_b[boundary]:
+            mz_mapping[mz].add((mz, matching[0], i, matching[2], matching[1], matching[3], matching[4]))
+    else:
+        for matching in matched_masses_y[boundary]:
+            mz_mapping[mz].add((mz, matching[0], i, matching[2], matching[1], matching[3], matching[4]))
