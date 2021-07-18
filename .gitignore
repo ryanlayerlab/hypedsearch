@@ -128,3 +128,5 @@ dmypy.json
 # Pyre type checker
 .pyre/
 timelog.txt
+.DS_Store
+src/config.yaml
