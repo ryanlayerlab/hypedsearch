@@ -304,8 +304,10 @@ def hashable_boundaries(boundaries: list) -> str:
     :returns: A string of the lower and upper bounds connected that looks like <lower_bound>-<upper_bound>
     :rtype: str
     '''
-
-    return '-'.join([str(x) for x in boundaries])
+    if (len(boundaries) == 2):
+        return '-'.join([str(x) for x in boundaries])
+    else:
+        return None
 
 def cosine_similarity(a: list, b: list) -> float:
     '''Calculate the cosine similarity of two vectors
@@ -328,7 +330,7 @@ def cosine_similarity(a: list, b: list) -> float:
 
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
-def __split_hybrid(sequence: str) -> (str, str):
+def split_hybrid(sequence: str) -> (str, str):
     '''Split a hybrid sequence into it's left and right components
     
     :param sequence: hybrid sequence with special characters [() -]
