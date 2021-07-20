@@ -89,7 +89,7 @@ def __add_amino_acids(
                 # the most left and most right SHOULD be the best scoring bits, so adding 
                 # to the left of the left will only hurt, and adding to the right of the right
                 # will only hurt
-                left_seq, right_seq = utils.__split_hybrid(sequence)
+                left_seq, right_seq = utils.split_hybrid(sequence)
                 
                 # get the left and right protein sequences
                 left_seqs = database.get_entry_by_name(db, l_p)
@@ -191,7 +191,7 @@ def __remove_amino_acids(
     if '-' in sequence or '(' in sequence or ')' in sequence:
         
         # get the left and right seperately
-        left_seq, right_seq = utils.__split_hybrid(sequence)
+        left_seq, right_seq = utils.split_hybrid(sequence)
         
         # since this is a hybrid, we assume that the left is ~correct and the right is ~correct
         # so we only want to remove amino acids from the middle section
@@ -408,7 +408,7 @@ def get_parents(
     if utils.HYBRID_ALIGNMENT_PATTERN.findall(seq):
 
         # get the left and right sequnces
-        left_seq, right_seq = utils.__split_hybrid(seq)
+        left_seq, right_seq = utils.split_hybrid(seq)
         
         return (get_sources_ion(left_seq, 'b'), get_sources_ion(right_seq, 'y'))
 
