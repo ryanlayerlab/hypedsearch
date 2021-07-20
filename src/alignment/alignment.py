@@ -9,18 +9,13 @@ import gen_spectra
 import math
 import re
 
-####################### Time constants #######################
-
 import time
-TIME_LOG_FILE = './timelog.txt'
 
-# to keep track of the time each step takes
 FIRST_ALIGN_TIME = 0
 AMBIGUOUS_REMOVAL_TIME = 0
 PRECURSOR_MASS_TIME = 0
 OBJECTIFY_TIME = 0
 
-# keep track of frequency
 FIRST_ALIGN_COUNT = 0
 AMBIGUOUS_REMOVAL_COUNT = 0
 PRECURSOR_MASS_COUNT = 0
@@ -606,16 +601,6 @@ def attempt_alignment(
             reverse=True
         )
         top_n_alignments = sorted_alignments[:n]
-        # write the time log to file
-        if is_last:
-
-            with open(TIME_LOG_FILE, 'a') as o:
-                o.write(f'B and Y full bipartite alignment time: {FIRST_ALIGN_TIME}s \t average dataset size{FIRST_ALIGN_COUNT/TOTAL_ITERATIONS} \t seconds/op: {FIRST_ALIGN_TIME/FIRST_ALIGN_COUNT}s\n')
-                o.write(f'Removing ambiguous hybrids time: {AMBIGUOUS_REMOVAL_TIME}s \t average dataset size{AMBIGUOUS_REMOVAL_COUNT/TOTAL_ITERATIONS} \t seconds/op: {AMBIGUOUS_REMOVAL_TIME/AMBIGUOUS_REMOVAL_COUNT}s\n')
-                o.write(f'Matching precursor masses time: {PRECURSOR_MASS_TIME}s \t average dataset size{PRECURSOR_MASS_COUNT/TOTAL_ITERATIONS} \t seconds/op: {PRECURSOR_MASS_TIME/PRECURSOR_MASS_COUNT}s\n')
-                o.write(f'Turning matches into objects time: {OBJECTIFY_TIME} \t average dataset size{OBJECTIFY_COUNT/TOTAL_ITERATIONS} \t seconds/op: {OBJECTIFY_TIME/OBJECTIFY_COUNT}\n')
-                o.write(f'Initial sequences with too many or few amino acids to try to precursor match: {OUT_OF_RANGE_SEQS}/{PRECURSOR_MASS_COUNT}\n')
-
         return Alignments(spectrum, top_n_alignments)
 
     #---------------------------------------------------#
@@ -693,28 +678,6 @@ def attempt_alignment(
                     total_error
                 )
             )
-            # #looking at scores
-            # file1 = open("metadata.txt", 'a')
-            # i = 0
-            # avg_b_score = 0
-            # avg_y_score = 0
-            # avg_total_score = 0
-            # for score in non_hybrid_alignments:
-            #     avg_b_score = avg_b_score + score[2]
-            #     avg_y_score = avg_y_score + score[3]
-            #     avg_total_score = avg_total_score + score[4]
-            #     i = i + 1
-            
-            # avg_b_score = avg_b_score/i
-            # file1.write("average non_hybrid b score:" + str(avg_b_score) + '\n')
-            # avg_y_score = avg_y_score/i
-            # file1.write("average non_hybrid y score:" + str(avg_y_score) + '\n')
-            # avg_total_score = avg_total_score/i
-            # file1.write("average non_hybrid total score:" + str(avg_total_score) + '\n')
-            # file1.close()
-
-        
-        # we get a hybrid back
         else: 
 
             t_score = scoring.hybrid_score(spectrum, special_hr, ppm_tolerance)\
@@ -733,30 +696,9 @@ def attempt_alignment(
                     total_error
                 )
             )
-            # #looking at scores
-            # file1 = open("metadata.txt", 'a')
-            # i = 0
-            # avg_b_score = 0
-            # avg_y_score = 0
-            # avg_total_score = 0
-            # for score in hybrid_alignments:
-            #     avg_b_score = avg_b_score + score[4]
-            #     avg_y_score = avg_y_score + score[5]
-            #     avg_total_score = avg_total_score + score[6]
-            #     i = i + 1
-            
-            # avg_b_score = avg_b_score/i
-            # file1.write("average hybrid b score:" + str(avg_b_score) + '\n')
-            # avg_y_score = avg_y_score/i
-            # file1.write("average hybrid y score:" + str(avg_y_score) + '\n')
-            # avg_total_score = avg_total_score/i
-            # file1.write("average hybrid total score:" + str(avg_total_score) + '\n')
-            # file1.close()
 
     OBJECTIFY_COUNT += len(hybrid_refined)
     OBJECTIFY_TIME += time.time() - st
-
-    # combine hybrid and non hybrid, sort, take top n
     all_alignments = non_hybrid_alignments + hybrid_alignments
 
     sorted_alignments = sorted(
@@ -773,159 +715,6 @@ def attempt_alignment(
         )
 
     top_n_alignments = sorted_alignments[:n]
-
-    # write the time log to file
-    if is_last:
-
-        with open(TIME_LOG_FILE, 'a') as o:
-            o.write(f'B and Y full bipartite alignment time: {FIRST_ALIGN_TIME}s \t average dataset size{FIRST_ALIGN_COUNT/TOTAL_ITERATIONS} \t seconds/op: {FIRST_ALIGN_TIME/FIRST_ALIGN_COUNT}s\n')
-            o.write(f'Removing ambiguous hybrids time: {AMBIGUOUS_REMOVAL_TIME}s \t average dataset size{AMBIGUOUS_REMOVAL_COUNT/TOTAL_ITERATIONS} \t seconds/op: {AMBIGUOUS_REMOVAL_TIME/AMBIGUOUS_REMOVAL_COUNT}s\n')
-            o.write(f'Matching precursor masses time: {PRECURSOR_MASS_TIME}s \t average dataset size{PRECURSOR_MASS_COUNT/TOTAL_ITERATIONS} \t seconds/op: {PRECURSOR_MASS_TIME/PRECURSOR_MASS_COUNT}s\n')
-            o.write(f'Turning matches into objects time: {OBJECTIFY_TIME} \t average dataset size{OBJECTIFY_COUNT/TOTAL_ITERATIONS} \t seconds/op: {OBJECTIFY_TIME/OBJECTIFY_COUNT}\n')
-            o.write(f'Initial sequences with too many or few amino acids to try to precursor match: {OUT_OF_RANGE_SEQS}/{PRECURSOR_MASS_COUNT}\n')
-
     return Alignments(spectrum, top_n_alignments)
    
  
-    # # Make alignments into the namedtuple types SpectrumAlignments
-    # # and HybridSequenceAlignments
-    # alignments = []
-    # tracker = {}
-    # st = time.time()
-
-    # for aligned_pair in refined_alignments:
-
-    #     # add to tracker, continue if what we see is already in the tracker
-    #     if aligned_pair[0] in tracker:
-    #         continue
-
-    #     tracker[aligned_pair[0]] = True
-
-    #     # get the precursor distance. If its too big, continue
-    #     p_d = scoring.precursor_distance(
-    #         spectrum.precursor_mass, 
-    #         gen_spectra.get_precursor(aligned_pair[0], spectrum.precursor_charge)
-    #     )
-
-    #     # get the final score of these sequences
-    #     b_score = scoring.score_sequence(
-    #         spectrum.spectrum, 
-    #         sorted(gen_spectra.gen_spectrum(aligned_pair[0], ion='b')), 
-    #         ppm_tolerance
-    #     )
-    #     y_score = scoring.score_sequence(
-    #         spectrum.spectrum, 
-    #         sorted(gen_spectra.gen_spectrum(aligned_pair[0], ion='y')), 
-    #         ppm_tolerance
-    #     )
-
-    #     # get the total error
-    #     total_error = scoring.total_mass_error(spectrum, aligned_pair[0], ppm_tolerance)
-
-    #     # the total score for non hybrids will be the sum of the b and y, but hybrids will use 
-    #     # the hybrid score
-    #     t_score = None
-
-    #     # get the parent proteins of the sequence
-    #     parents = alignment_utils.get_parents(aligned_pair[0] if aligned_pair[1] is None else aligned_pair[1], db)
-
-    #     # check if the second entry is None
-    #     if aligned_pair[1] is not None:
-
-    #         # get the hybrid score
-    #         t_score = scoring.hybrid_score(spectrum, aligned_pair[1], ppm_tolerance) \
-    #             + scoring.digest_score(aligned_pair[1], db, digest_type)
-
-    #         alignments.append(
-    #             HybridSequenceAlignment(
-    #                 parents[0], 
-    #                 parents[1], 
-    #                 aligned_pair[0], 
-    #                 aligned_pair[1], 
-    #                 b_score, 
-    #                 y_score, 
-    #                 t_score, 
-    #                 p_d, 
-    #                 total_error
-    #             )
-    #         )
-
-    #     # if its not a hybrid sequence, make a SequenceAlignment object
-    #     else:
-    #         t_score = b_score + y_score + scoring.digest_score(
-    #             aligned_pair[0], db, digest_type
-    #         )
-
-    #         alignments.append(
-    #             SequenceAlignment(
-    #                 parents[0], 
-    #                 aligned_pair[0], 
-    #                 b_score, 
-    #                 y_score, 
-    #                 t_score, 
-    #                 p_d, 
-    #                 total_error
-    #             )
-    #         )
-    # OBJECTIFY_COUNT += len(refined_alignments)
-    # OBJECTIFY_TIME += time.time() - st
-
-    # TOTAL_ITERATIONS += 1
-
-    # # write the time log to file
-    # if is_last:
-
-    #     with open(TIME_LOG_FILE, 'w') as o:
-    #         o.write(f'B and Y full bipartite alignment time: {FIRST_ALIGN_TIME}s \t average dataset size{FIRST_ALIGN_COUNT/TOTAL_ITERATIONS} \t seconds/op: {FIRST_ALIGN_TIME/FIRST_ALIGN_COUNT}s\n')
-    #         o.write(f'Removing ambiguous hybrids time: {AMBIGUOUS_REMOVAL_TIME}s \t average dataset size{AMBIGUOUS_REMOVAL_COUNT/TOTAL_ITERATIONS} \t seconds/op: {AMBIGUOUS_REMOVAL_TIME/AMBIGUOUS_REMOVAL_COUNT}s\n')
-    #         o.write(f'Matching precursor masses time: {PRECURSOR_MASS_TIME}s \t average dataset size{PRECURSOR_MASS_COUNT/TOTAL_ITERATIONS} \t seconds/op: {PRECURSOR_MASS_TIME/PRECURSOR_MASS_COUNT}s\n')
-    #         o.write(f'Turning matches into objects time: {OBJECTIFY_TIME} \t average dataset size{OBJECTIFY_COUNT/TOTAL_ITERATIONS} \t seconds/op: {OBJECTIFY_TIME/OBJECTIFY_COUNT}\n')
-
-    # # get only the top n alignments
-    # # if all scores are equal, float the non hybrids to the top
-    # # non hybrid alignment objects have 6 entries, hybrids have 8, so doing 1/len(x) puts non hybrids before hybrids
-    # sorted_alignments = sorted(
-    #     alignments, 
-    #     key=lambda x: (
-    #         x.total_score, 
-    #         math.inf if x.total_mass_error <= 0 else 1/x.total_mass_error, 
-    #         math.inf if x.precursor_distance <= 0 else 1/x.precursor_distance, 
-    #         1/len(x), 
-    #         x.b_score, 
-    #         x.y_score
-    #     ), 
-    #     reverse=True
-    # )
-    # top_n_alignments = sorted_alignments[:n]
-
-    # # check to see if we lost the sequence
-    # if DEV:
-
-    #     # get the id, the sequnce, and if its a hybrid
-    #     _id = spectrum.id
-    #     is_hybrid = truth[_id]['hybrid']
-    #     truth_seq = truth[_id]['sequence']
-
-    #     # the sequence is in x.sequence
-    #     if not utils.DEV_contains_truth_exact(truth_seq, is_hybrid, [x.sequence for x in top_n_alignments]):
-
-    #         # add some metadata about which ones were accepted and which ones werent
-    #         metadata = {
-    #             'top_n': [x._asdict() for x in top_n_alignments], 
-    #             'not_top_n': [x._asdict() for x in sorted_alignments[n:]]
-    #         }
-
-    #         fall_off[_id] = DEVFallOffEntry(
-    #             is_hybrid, 
-    #             truth_seq, 
-    #             'taking_top_n_alignments', 
-    #             metadata
-    #         )
-
-    #         # exit the alignment
-    #         return Alignments(spectrum, [])
-
-    # return Alignments(
-    #     spectrum, 
-    #     top_n_alignments
-    # )

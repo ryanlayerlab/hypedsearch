@@ -621,15 +621,13 @@ def digest_score(sequence: str, db: Database, digest_type: str) -> int:
         # golden
         left_point = 1 \
             if left_point == 1 or any(
-                [x['amino_acid'] == left[0] for x in digest['start'] \
-                and x['cut_position'] == 'left']
+                [x['amino_acid'] == left[0] for x in digest['start'] and x['cut_position'] == 'left']
             ) else 0
 
         # do the same for the right
         right_point = 1 \
             if right_point == 1 or any(
-                [x['amino_acid'] == sequence[-1] for x in digest['end'] \
-                and x['cut_position'] == 'right']  
+                [x['amino_acid'] == sequence[-1] for x in digest['end'] and x['cut_position'] == 'right']  
             ) else 0
 
         if left_point == 0:

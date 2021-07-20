@@ -15,8 +15,6 @@ import multiprocessing as mp
 import copy
 import json
 
-TIME_LOG_FILE = 'timelog.txt'
-o = open(TIME_LOG_FILE, 'a')
 ID_SPECTRUM = 0
 MULTIPROCESSING = 0
 # top results to keep for creating an alignment
@@ -285,17 +283,11 @@ File will be of the form
 
     fall_off = None
     
-    #Refresh timelog.txt
-    with open('timelog.txt', 'w') as t:
-        t.write('')
-
     database_start = time.time()
     # build/load the database
     verbose and print('Loading database...')
     db = database_file
     verbose and print('Done')
-    with open('timelog.txt', 'a') as t:
-        t.write('Time to build database: ' + str(time.time() - database_start) + '\n')
     
     # load all of the spectra
     spectra_start = time.time()
@@ -307,14 +299,10 @@ File will be of the form
         relative_abundance_filter=relative_abundance_filter
     )
     verbose and print('Done')
-    with open('timelog.txt', 'a') as t:
-        t.write('Time to load in spectra: ' + str(time.time() - spectra_start) + '\n')
 
     # get the boundary -> kmer mappings for b and y ions
     mapping_start = time.time()
     matched_masses_b, matched_masses_y, db = merge_search.match_masses(boundaries, db, max_peptide_len)
-    with open('timelog.txt', 'a') as t:
-        t.write('Time to map boundaries to kmers: ' + str(time.time() - mapping_start) + '\n')
 
     # keep track of the alingment made for every spectrum
     results = {}
@@ -388,8 +376,6 @@ File will be of the form
             p.start()
         print('Done.')
 
-        with open('timelog.txt', 'a') as t:
-            t.write('Time to spin up cores: ' + str(time.time() - multiprocessing_start) + '\n')
         # go through and id all spectra
         for i, spectrum in enumerate(spectra):
             print(f'\rStarting job for {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='')
@@ -443,18 +429,6 @@ File will be of the form
             safe_write_fall_off[k] = v._asdict()
 
         JSON.save_dict(output_dir + 'fall_off.json', safe_write_fall_off)
-    if cores == 1:
-        with open ('timelog.txt', 'a') as o:
-            o.write('average b scoring time: ' + str(sum(b_scoring_times)/len(b_scoring_times)) + '\n')
-            o.write('average y scoring time: ' + str(sum(y_scoring_times)/len(y_scoring_times)) + '\n')
-            o. write('Time to filter out top 50 kmers: ' + str(sum(filter_times)/len(filter_times)) + '\n')
-            o.write('average extension time: ' + str(sum(alignment.extension_times)/len(alignment.extension_times)) + '\n')
-            o.write('average non hybrid refinement time ' + str(sum(alignment.Non_hybrid_refine_time)/len(alignment.Non_hybrid_refine_time)) + '\n')
-            o.write('average non hybrid scoring time ' + str(sum(alignment.non_hybrid_scoring_times)/len(alignment.non_hybrid_scoring_times)) + '\n')
-            o.write('average hybrid refinement time ' + str(sum(alignment.Hybrid_refine_times)/len(alignment.Hybrid_refine_times)) + '\n')
-            o.write('average hybrid scoring time ' + str(sum(alignment.hybrid_scoring_times)/len(alignment.hybrid_scoring_times)) + '\n')
-            o.write('average extension time: ' + str(sum(alignment.extension_times)/len(alignment.extension_times)) + '\n')
-            o.write('average alignment time: ' + str(sum(alignment_times)/len(alignment_times)) + '\n')
     return results
 
 def mp_id_spectrum(
