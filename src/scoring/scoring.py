@@ -613,7 +613,7 @@ def digest_score(sequence: str, db: Database, digest_type: str) -> int:
     if utils.HYBRID_ALIGNMENT_PATTERN.findall(sequence):
 
         # get the left and right halves
-        left, right = utils.__split_hybrid(sequence)
+        left, right = utils.split_hybrid(sequence)
 
         # well first check to see if we can assign a point to left
         # before even looking at the source proteins. If we just look 
