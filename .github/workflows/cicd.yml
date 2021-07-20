@@ -20,7 +20,7 @@ jobs:
       - name: Update Environment Varaible
         run: |
           echo "PYTHONPATH=/home/runner/work/hypedsearch/hypedsearch/src" >> $GITHUB_ENV
-      - name: Run Tests
+      - name: Run Unit Tests
         run: |
           python -m unittest test_unit_hypedsearch
         working-directory: test
