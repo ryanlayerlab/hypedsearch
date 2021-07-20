@@ -131,3 +131,4 @@ timelog.txt
 .DS_Store
 src/config.yaml
 data/.DS_Store
+.DS_Store
