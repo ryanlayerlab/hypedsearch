@@ -287,7 +287,9 @@ File will be of the form
     # build/load the database
     verbose and print('Loading database...')
     db = database_file
-    verbose and print('Done')
+    verbose and print('Loading database Done')
+    #instrumentation
+    time_to_build_database = time.time() - database_start
     
     # load all of the spectra
     spectra_start = time.time()
@@ -298,11 +300,16 @@ File will be of the form
         peak_filter=peak_filter, 
         relative_abundance_filter=relative_abundance_filter
     )
-    verbose and print('Done')
+    verbose and print('Loading spectra Done')
+    #instrumentation
+    time_to_load_in_spectra = time.time() - spectra_start
+
 
     # get the boundary -> kmer mappings for b and y ions
     mapping_start = time.time()
     matched_masses_b, matched_masses_y, db = merge_search.match_masses(boundaries, db, max_peptide_len)
+    #instrumentation
+    time_to_map_boundaries_to_kmers = time.time() - mapping_start
 
     # keep track of the alingment made for every spectrum
     results = {}
@@ -374,7 +381,9 @@ File will be of the form
         # start each of the process
         for p in ps:
             p.start()
-        print('Done.')
+        #instrumentation
+        time_to_spin_up_cores = time.time() - multiprocessing_start          
+        print('start each of the process Done.')
 
         # go through and id all spectra
         for i, spectrum in enumerate(spectra):
@@ -429,6 +438,18 @@ File will be of the form
             safe_write_fall_off[k] = v._asdict()
 
         JSON.save_dict(output_dir + 'fall_off.json', safe_write_fall_off)
+        #instrumentation
+        if cores == 1:
+            average_b_scoring_time = sum(b_scoring_times)/len(b_scoring_times)
+            average_y_scoring_time = sum(y_scoring_times)/len(y_scoring_times)
+            time_to_filter_out_top_50_kmers = sum(filter_times)/len(filter_times)
+            average_extension_time = sum(alignment.extension_times)/len(alignment.extension_times)
+            average_non_hybrid_refinement_time = sum(alignment.Non_hybrid_refine_time)/len(alignment.Non_hybrid_refine_time)
+            average_non_hybrid_scoring_time = sum(alignment.non_hybrid_scoring_times)/len(alignment.non_hybrid_scoring_times)
+            average_hybrid_refinement_time = sum(alignment.Hybrid_refine_times)/len(alignment.Hybrid_refine_times)
+            average_hybrid_scoring_time = sum(alignment.hybrid_scoring_times)/len(alignment.hybrid_scoring_times)
+            average_extension_time = sum(alignment.extension_times)/len(alignment.extension_times)
+            average_alignment_time = sum(alignment_times)/len(alignment_times)
     return results
 
 def mp_id_spectrum(
