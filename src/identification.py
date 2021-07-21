@@ -448,7 +448,6 @@ File will be of the form
             average_non_hybrid_scoring_time = sum(alignment.non_hybrid_scoring_times)/len(alignment.non_hybrid_scoring_times)
             average_hybrid_refinement_time = sum(alignment.Hybrid_refine_times)/len(alignment.Hybrid_refine_times)
             average_hybrid_scoring_time = sum(alignment.hybrid_scoring_times)/len(alignment.hybrid_scoring_times)
-            average_extension_time = sum(alignment.extension_times)/len(alignment.extension_times)
             average_alignment_time = sum(alignment_times)/len(alignment_times)
     return results
 
