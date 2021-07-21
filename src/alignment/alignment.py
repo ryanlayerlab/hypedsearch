@@ -1,5 +1,5 @@
 from scoring import scoring
-from objects import Spectrum, SequenceAlignment, HybridSequenceAlignment, Database, Alignments, DEVFallOffEntry
+from objects import Alignment_Instrumentation, Spectrum, SequenceAlignment, HybridSequenceAlignment, Database, Alignments, DEVFallOffEntry
 from alignment import alignment_utils, hybrid_alignment
 import objects
 import utils
@@ -419,7 +419,7 @@ def attempt_alignment_dev(
             'first_alignment_round', 
             metadata
         )
-        return Alignments(spectrum, [])
+        return Alignments(spectrum, [], None)
 
 def attempt_alignment_first_pass(
     spectrum: Spectrum, 
@@ -506,7 +506,6 @@ def attempt_alignment_first_pass(
             reverse=True
         )
         top_n_alignments = sorted_alignments[:n]
-        #instrumentation
         if is_last:
             alignment_instrumentation = objects.Alignment_Instrumentation(
             B_and_Y_full_bipartite_alignment = FIRST_ALIGN_TIME,
@@ -523,7 +522,8 @@ def attempt_alignment_first_pass(
             seconds_op_4 = OBJECTIFY_TIME/OBJECTIFY_COUNT,
             initial_sequences_with_too_many_or_few_amino_acids_to_try_to_precursor_match = OUT_OF_RANGE_SEQS/PRECURSOR_MASS_COUNT
             )
-        return Alignments(spectrum, top_n_alignments),None
+            current_alignments = Alignments(spectrum, top_n_alignments,alignment_instrumentation)
+        return current_alignments,None
     else:
         return None, non_hybrid_alignments        
 
@@ -677,7 +677,7 @@ def attempt_alignment_second_pass(
         seconds_op_4 = OBJECTIFY_TIME/OBJECTIFY_COUNT,
         initial_sequences_with_too_many_or_few_amino_acids_to_try_to_precursor_match = OUT_OF_RANGE_SEQS/PRECURSOR_MASS_COUNT
         )
-    return Alignments(spectrum, top_n_alignments) 
+    return Alignments(spectrum, top_n_alignments,alignment_instrumentation) 
 
 def attempt_alignment(
     spectrum: Spectrum, 

@@ -42,10 +42,22 @@ HybridSequenceAlignment = namedtuple(
     defaults=[[], [], '', '', 0.0, 0.0, 0.0, 100, 100]
 )
 
+Alignment_Instrumentation = namedtuple(
+    'Alignment_Instrumentation', 
+    ['B_and_Y_full_bipartite_alignment', 'average_dataset_size_1',
+    'seconds_op_1','removing_ambiguous_hybrids_time','average_dataset_size_2',
+    'seconds_op_2','matching_precursor_masses_time','average_dataset_size_3',
+    'seconds_op_3','turning_matches_into_objects_time','average_dataset_size_4',
+    'seconds_op_4',
+    'initial_sequences_with_too_many_or_few_amino_acids_to_try_to_precursor_match',
+    'avg_b_score','avg_y_score','avg_total_score'],
+    defaults=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+)
+
 Alignments = namedtuple(
     'Alignments', 
-    ['spectrum', 'alignments'], 
-    defaults=[Spectrum([], [], 0, 0, 0.0, ''), []]
+    ['spectrum', 'alignments', 'Alignment_Instrumentation'], 
+    defaults=[Spectrum([], [], 0, 0, 0.0, ''), [], None]
 )
 
 MPSpectrumID = namedtuple(
@@ -61,17 +73,6 @@ DEVFallOffEntry = namedtuple(
     defaults=[False, '', '', {}]
 )
 
-Alignment_Instrumentation = namedtuple(
-    'Alignment_Instrumentation', 
-    ['B_and_Y_full_bipartite_alignment', 'average_dataset_size_1',
-    'seconds_op_1','removing_ambiguous_hybrids_time','average_dataset_size_2',
-    'seconds_op_2','matching_precursor_masses_time','average_dataset_size_3',
-    'seconds_op_3','turning_matches_into_objects_time','average_dataset_size_4',
-    'seconds_op_4',
-    'initial_sequences_with_too_many_or_few_amino_acids_to_try_to_precursor_match',
-    'avg_b_score','avg_y_score','avg_total_score'],
-    defaults=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-)
 
 Identification_Instrumentation = namedtuple(
     'Identification_Instrumentation', 
