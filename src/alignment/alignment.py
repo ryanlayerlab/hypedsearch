@@ -1,7 +1,7 @@
 from scoring import scoring
 from objects import Spectrum, SequenceAlignment, HybridSequenceAlignment, Database, Alignments, DEVFallOffEntry
 from alignment import alignment_utils, hybrid_alignment
-
+import objects
 import utils
 import database
 import gen_spectra
@@ -508,20 +508,21 @@ def attempt_alignment_first_pass(
         top_n_alignments = sorted_alignments[:n]
         #instrumentation
         if is_last:
-            B_and_Y_full_bipartite_alignment = FIRST_ALIGN_TIME
-            average_dataset_size_1 = FIRST_ALIGN_COUNT/TOTAL_ITERATIONS
-            seconds_op_1 = FIRST_ALIGN_TIME/FIRST_ALIGN_COUNT
-            removing_ambiguous_hybrids_time = AMBIGUOUS_REMOVAL_TIME
-            average_dataset_size_2 = AMBIGUOUS_REMOVAL_COUNT/TOTAL_ITERATIONS
-            seconds_op_2 = AMBIGUOUS_REMOVAL_TIME/AMBIGUOUS_REMOVAL_COUNT
-            matching_precursor_masses_time = PRECURSOR_MASS_TIME
-            average_dataset_size_3 = PRECURSOR_MASS_COUNT/TOTAL_ITERATIONS
-            seconds_op_3 = PRECURSOR_MASS_TIME/PRECURSOR_MASS_COUNT
-            turning_matches_into_objects_time = OBJECTIFY_TIME
-            average_dataset_size_4 = OBJECTIFY_COUNT/TOTAL_ITERATIONS
-            seconds_op_4 = OBJECTIFY_TIME/OBJECTIFY_COUNT
+            alignment_instrumentation = objects.Alignment_Instrumentation(
+            B_and_Y_full_bipartite_alignment = FIRST_ALIGN_TIME,
+            average_dataset_size_1 = FIRST_ALIGN_COUNT/TOTAL_ITERATIONS,
+            seconds_op_1 = FIRST_ALIGN_TIME/FIRST_ALIGN_COUNT,
+            removing_ambiguous_hybrids_time = AMBIGUOUS_REMOVAL_TIME,
+            average_dataset_size_2 = AMBIGUOUS_REMOVAL_COUNT/TOTAL_ITERATIONS,
+            seconds_op_2 = AMBIGUOUS_REMOVAL_TIME/AMBIGUOUS_REMOVAL_COUNT,
+            matching_precursor_masses_time = PRECURSOR_MASS_TIME,
+            average_dataset_size_3 = PRECURSOR_MASS_COUNT/TOTAL_ITERATIONS,
+            seconds_op_3 = PRECURSOR_MASS_TIME/PRECURSOR_MASS_COUNT,
+            turning_matches_into_objects_time = OBJECTIFY_TIME,
+            average_dataset_size_4 = OBJECTIFY_COUNT/TOTAL_ITERATIONS,
+            seconds_op_4 = OBJECTIFY_TIME/OBJECTIFY_COUNT,
             initial_sequences_with_too_many_or_few_amino_acids_to_try_to_precursor_match = OUT_OF_RANGE_SEQS/PRECURSOR_MASS_COUNT
-
+            )
         return Alignments(spectrum, top_n_alignments),None
     else:
         return None, non_hybrid_alignments        
@@ -603,10 +604,11 @@ def attempt_alignment_second_pass(
                  avg_y_score = avg_y_score + score[3]
                  avg_total_score = avg_total_score + score[4]
                  i = i + 1
-
-            avg_b_score = avg_b_score/i
-            avg_y_score = avg_y_score/i
+            alignment_instrumentation = objects.Alignment_Instrumentation(
+            avg_b_score = avg_b_score/i,
+            avg_y_score = avg_y_score/i,
             avg_total_score = avg_total_score/i
+            )
         else: 
 
             t_score = scoring.hybrid_score(spectrum, special_hr, ppm_tolerance)\
@@ -634,9 +636,11 @@ def attempt_alignment_second_pass(
                 avg_y_score = avg_y_score + score[5]
                 avg_total_score = avg_total_score + score[6]
                 i = i + 1
-            avg_b_score = avg_b_score/i
-            avg_y_score = avg_y_score/i
+            objects.Alignment_Instrumentation(
+            avg_b_score = avg_b_score/i,
+            avg_y_score = avg_y_score/i,
             avg_total_score = avg_total_score/i
+            )
 
 
     OBJECTIFY_COUNT += len(hybrid_refined)
@@ -658,20 +662,21 @@ def attempt_alignment_second_pass(
     top_n_alignments = sorted_alignments[:n]
     #instrumentation
     if is_last:
-        B_and_Y_full_bipartite_alignment = FIRST_ALIGN_TIME
-        average_dataset_size_1 = FIRST_ALIGN_COUNT/TOTAL_ITERATIONS
-        seconds_op_1 = FIRST_ALIGN_TIME/FIRST_ALIGN_COUNT
-        removing_ambiguous_hybrids_time = AMBIGUOUS_REMOVAL_TIME
-        average_dataset_size_2 = AMBIGUOUS_REMOVAL_COUNT/TOTAL_ITERATIONS
-        seconds_op_2 = AMBIGUOUS_REMOVAL_TIME/AMBIGUOUS_REMOVAL_COUNT
-        matching_precursor_masses_time = PRECURSOR_MASS_TIME
-        average_dataset_size_3 = PRECURSOR_MASS_COUNT/TOTAL_ITERATIONS
-        seconds_op_3 = PRECURSOR_MASS_TIME/PRECURSOR_MASS_COUNT
-        turning_matches_into_objects_time = OBJECTIFY_TIME
-        average_dataset_size_4 = OBJECTIFY_COUNT/TOTAL_ITERATIONS
-        seconds_op_4 = OBJECTIFY_TIME/OBJECTIFY_COUNT
+        alignment_instrumentation = objects.Alignment_Instrumentation(
+        B_and_Y_full_bipartite_alignment = FIRST_ALIGN_TIME,
+        average_dataset_size_1 = FIRST_ALIGN_COUNT/TOTAL_ITERATIONS,
+        seconds_op_1 = FIRST_ALIGN_TIME/FIRST_ALIGN_COUNT,
+        removing_ambiguous_hybrids_time = AMBIGUOUS_REMOVAL_TIME,
+        average_dataset_size_2 = AMBIGUOUS_REMOVAL_COUNT/TOTAL_ITERATIONS,
+        seconds_op_2 = AMBIGUOUS_REMOVAL_TIME/AMBIGUOUS_REMOVAL_COUNT,
+        matching_precursor_masses_time = PRECURSOR_MASS_TIME,
+        average_dataset_size_3 = PRECURSOR_MASS_COUNT/TOTAL_ITERATIONS,
+        seconds_op_3 = PRECURSOR_MASS_TIME/PRECURSOR_MASS_COUNT,
+        turning_matches_into_objects_time = OBJECTIFY_TIME,
+        average_dataset_size_4 = OBJECTIFY_COUNT/TOTAL_ITERATIONS,
+        seconds_op_4 = OBJECTIFY_TIME/OBJECTIFY_COUNT,
         initial_sequences_with_too_many_or_few_amino_acids_to_try_to_precursor_match = OUT_OF_RANGE_SEQS/PRECURSOR_MASS_COUNT
-
+        )
     return Alignments(spectrum, top_n_alignments) 
 
 def attempt_alignment(

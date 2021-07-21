@@ -68,8 +68,9 @@ Alignment_Instrumentation = namedtuple(
     'seconds_op_2','matching_precursor_masses_time','average_dataset_size_3',
     'seconds_op_3','turning_matches_into_objects_time','average_dataset_size_4',
     'seconds_op_4',
-    'initial_sequences_with_too_many_or_few_amino_acids_to_try_to_precursor_match'],
-    defaults=[0,0,0,0,0,0,0,0,0,0,0,0,0]
+    'initial_sequences_with_too_many_or_few_amino_acids_to_try_to_precursor_match',
+    'avg_b_score','avg_y_score','avg_total_score'],
+    defaults=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
 )
 
 Identification_Instrumentation = namedtuple(
