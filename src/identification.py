@@ -265,7 +265,6 @@ def id_spectra(
             is_last = DEBUG and i == len(spectra) - 1
 
             # pass it into id_spectrum
-            #TODO: HERE
             raw_results = id_spectrum(
                 spectrum, db, 
                 b_hits, y_hits, 
@@ -273,7 +272,7 @@ def id_spectra(
                 n,digest_type=digest,
                 truth=truth, fall_off=fall_off, 
                 is_last=is_last)
-            results[spectrum.id]=raw_results.alignments
+            results[spectrum.id]=raw_results
     else:
         
         multiprocessing_start = time.time()
@@ -435,7 +434,6 @@ def mp_id_spectrum(
                 continue
 
         # otherwise run id spectrum 
-         #TODO: HERE
         results[next_entry.spectrum.id] = id_spectrum(
             next_entry.spectrum, 
             db_copy, 
