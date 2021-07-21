@@ -506,6 +506,7 @@ def attempt_alignment_first_pass(
             reverse=True
         )
         top_n_alignments = sorted_alignments[:n]
+        #instrumentation
         if is_last:
             B_and_Y_full_bipartite_alignment = FIRST_ALIGN_TIME
             average_dataset_size_1 = FIRST_ALIGN_COUNT/TOTAL_ITERATIONS
@@ -592,6 +593,20 @@ def attempt_alignment_second_pass(
                     total_error
                 )
             )
+            #instrumentation
+            i = 0
+            avg_b_score = 0
+            avg_y_score = 0
+            avg_total_score = 0
+            for score in non_hybrid_alignments:
+                 avg_b_score = avg_b_score + score[2]
+                 avg_y_score = avg_y_score + score[3]
+                 avg_total_score = avg_total_score + score[4]
+                 i = i + 1
+
+            avg_b_score = avg_b_score/i
+            avg_y_score = avg_y_score/i
+            avg_total_score = avg_total_score/i
         else: 
 
             t_score = scoring.hybrid_score(spectrum, special_hr, ppm_tolerance)\
@@ -609,6 +624,21 @@ def attempt_alignment_second_pass(
                     total_error
                 )
             )
+            #instrumentation
+            i = 0
+            avg_b_score = 0
+            avg_y_score = 0
+            avg_total_score = 0
+            for score in hybrid_alignments:
+                avg_b_score = avg_b_score + score[4]
+                avg_y_score = avg_y_score + score[5]
+                avg_total_score = avg_total_score + score[6]
+                i = i + 1
+            avg_b_score = avg_b_score/i
+            avg_y_score = avg_y_score/i
+            avg_total_score = avg_total_score/i
+
+
     OBJECTIFY_COUNT += len(hybrid_refined)
     OBJECTIFY_TIME += time.time() - st
     all_alignments = non_hybrid_alignments + hybrid_alignments
@@ -626,6 +656,7 @@ def attempt_alignment_second_pass(
         )
 
     top_n_alignments = sorted_alignments[:n]
+    #instrumentation
     if is_last:
         B_and_Y_full_bipartite_alignment = FIRST_ALIGN_TIME
         average_dataset_size_1 = FIRST_ALIGN_COUNT/TOTAL_ITERATIONS
