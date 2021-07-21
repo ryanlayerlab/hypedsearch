@@ -265,20 +265,15 @@ def id_spectra(
             is_last = DEBUG and i == len(spectra) - 1
 
             # pass it into id_spectrum
-            results[spectrum.id] = id_spectrum(
-                spectrum, 
-                db, 
-                b_hits, 
-                y_hits, 
-                ppm_tolerance, 
-                precursor_tolerance,
-                n,
-                digest_type=digest,
-                truth=truth, 
-                fall_off=fall_off, 
-                is_last=is_last
-            )
-
+            #TODO: HERE
+            raw_results = id_spectrum(
+                spectrum, db, 
+                b_hits, y_hits, 
+                ppm_tolerance, precursor_tolerance,
+                n,digest_type=digest,
+                truth=truth, fall_off=fall_off, 
+                is_last=is_last)
+            results[spectrum.id]=raw_results.alignments
     else:
         
         multiprocessing_start = time.time()
@@ -371,7 +366,7 @@ def id_spectra(
             average_hybrid_refinement_time = sum(alignment.Hybrid_refine_times)/len(alignment.Hybrid_refine_times),
             average_hybrid_scoring_time = sum(alignment.hybrid_scoring_times)/len(alignment.hybrid_scoring_times),
             average_alignment_time = sum(alignment_times)/len(alignment_times)
-            )
+            )          
     return results
 
 def mp_id_spectrum(
@@ -440,6 +435,7 @@ def mp_id_spectrum(
                 continue
 
         # otherwise run id spectrum 
+         #TODO: HERE
         results[next_entry.spectrum.id] = id_spectrum(
             next_entry.spectrum, 
             db_copy, 
