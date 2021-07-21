@@ -37,8 +37,6 @@ Hybrid_refine_times = []
 global hybrid_scoring_times
 hybrid_scoring_times = []
 
-####################### Public functions #######################
-
 def same_protein_alignment(
     seq1: str, 
     seq2: str, 
@@ -435,7 +433,8 @@ def attempt_alignment_first_pass(
     DEV: bool = False,
     OBJECTIFY_COUNT: int = 0,
     OBJECTIFY_TIME: int = 0,
-    a: list = None
+    a: list = None,
+    is_last: bool = False
 )-> Alignments:
     refine_start = time.time()
     non_hybrid_refined = refine_alignments(
@@ -507,6 +506,21 @@ def attempt_alignment_first_pass(
             reverse=True
         )
         top_n_alignments = sorted_alignments[:n]
+        if is_last:
+            B_and_Y_full_bipartite_alignment = FIRST_ALIGN_TIME
+            average_dataset_size_1 = FIRST_ALIGN_COUNT/TOTAL_ITERATIONS
+            seconds_op_1 = FIRST_ALIGN_TIME/FIRST_ALIGN_COUNT
+            removing_ambiguous_hybrids_time = AMBIGUOUS_REMOVAL_TIME
+            average_dataset_size_2 = AMBIGUOUS_REMOVAL_COUNT/TOTAL_ITERATIONS
+            seconds_op_2 = AMBIGUOUS_REMOVAL_TIME/AMBIGUOUS_REMOVAL_COUNT
+            matching_precursor_masses_time = PRECURSOR_MASS_TIME
+            average_dataset_size_3 = PRECURSOR_MASS_COUNT/TOTAL_ITERATIONS
+            seconds_op_3 = PRECURSOR_MASS_TIME/PRECURSOR_MASS_COUNT
+            turning_matches_into_objects_time = OBJECTIFY_TIME
+            average_dataset_size_4 = OBJECTIFY_COUNT/TOTAL_ITERATIONS
+            seconds_op_4 = OBJECTIFY_TIME/OBJECTIFY_COUNT
+            initial_sequences_with_too_many_or_few_amino_acids_to_try_to_precursor_match = OUT_OF_RANGE_SEQS/PRECURSOR_MASS_COUNT
+
         return Alignments(spectrum, top_n_alignments),None
     else:
         return None, non_hybrid_alignments        
@@ -524,7 +538,8 @@ def attempt_alignment_second_pass(
     OBJECTIFY_COUNT: int = 0,
     OBJECTIFY_TIME: int = 0,
     a: list = [],
-    non_hybrid_alignments: list = []
+    non_hybrid_alignments: list = [],
+    is_last: bool = False
 ) -> Alignments:
     refine_start = time.time()
     hybrid_refined = refine_alignments(
@@ -611,6 +626,21 @@ def attempt_alignment_second_pass(
         )
 
     top_n_alignments = sorted_alignments[:n]
+    if is_last:
+        B_and_Y_full_bipartite_alignment = FIRST_ALIGN_TIME
+        average_dataset_size_1 = FIRST_ALIGN_COUNT/TOTAL_ITERATIONS
+        seconds_op_1 = FIRST_ALIGN_TIME/FIRST_ALIGN_COUNT
+        removing_ambiguous_hybrids_time = AMBIGUOUS_REMOVAL_TIME
+        average_dataset_size_2 = AMBIGUOUS_REMOVAL_COUNT/TOTAL_ITERATIONS
+        seconds_op_2 = AMBIGUOUS_REMOVAL_TIME/AMBIGUOUS_REMOVAL_COUNT
+        matching_precursor_masses_time = PRECURSOR_MASS_TIME
+        average_dataset_size_3 = PRECURSOR_MASS_COUNT/TOTAL_ITERATIONS
+        seconds_op_3 = PRECURSOR_MASS_TIME/PRECURSOR_MASS_COUNT
+        turning_matches_into_objects_time = OBJECTIFY_TIME
+        average_dataset_size_4 = OBJECTIFY_COUNT/TOTAL_ITERATIONS
+        seconds_op_4 = OBJECTIFY_TIME/OBJECTIFY_COUNT
+        initial_sequences_with_too_many_or_few_amino_acids_to_try_to_precursor_match = OUT_OF_RANGE_SEQS/PRECURSOR_MASS_COUNT
+
     return Alignments(spectrum, top_n_alignments) 
 
 def attempt_alignment(
@@ -644,9 +674,9 @@ def attempt_alignment(
     FIRST_ALIGN_TIME += time.time() - st
     if DEV:
         return attempt_alignment_dev(spectrum,truth,fall_off,a)
-    alignments, non_hybrid_alignments = attempt_alignment_first_pass(spectrum,db,n,ppm_tolerance,precursor_tolerance,digest_type,truth,fall_off,DEV,OBJECTIFY_COUNT,OBJECTIFY_TIME,a)
+    alignments, non_hybrid_alignments = attempt_alignment_first_pass(spectrum,db,n,ppm_tolerance,precursor_tolerance,digest_type,truth,fall_off,DEV,OBJECTIFY_COUNT,OBJECTIFY_TIME,a,is_last)
     if alignments is not None:
         return alignments
     else:
-        return attempt_alignment_second_pass(spectrum,db,n,ppm_tolerance,precursor_tolerance,digest_type,truth,fall_off,DEV,OBJECTIFY_COUNT,OBJECTIFY_TIME,a,non_hybrid_alignments)
+        return attempt_alignment_second_pass(spectrum,db,n,ppm_tolerance,precursor_tolerance,digest_type,truth,fall_off,DEV,OBJECTIFY_COUNT,OBJECTIFY_TIME,a,non_hybrid_alignments,is_last)
    
