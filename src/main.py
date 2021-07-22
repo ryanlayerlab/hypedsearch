@@ -73,10 +73,10 @@ def set_args(args) -> dict:
 
 def main(args: object) -> None:
     arguments = set_args(args)
-    matched_spectra = runner.run(arguments)
+    matched_spectras = runner.run(arguments)
     output_dir = arguments['output_dir']
     print('\nFinished search. Writting results to {}...'.format(output_dir))
-    summary.generate(matched_spectra, output_dir)
+    summary.generate(matched_spectras, output_dir)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Tool for identifying proteins, both hybrid and non hybrid from MS/MS data')
