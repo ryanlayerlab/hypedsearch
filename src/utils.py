@@ -423,6 +423,9 @@ def DEV_contains_truth_parts(truth_seq: str, hybrid: bool, b_seqs: list, y_seqs:
 
     return has_left or has_right
 
+def CICD_test():
+    return 1
+
 
 def DEV_contains_truth_exact(truth_seq: str, hybrid: bool, seqs: list) -> bool:
     '''DEVELOPMENT FUNCTION ONLY
