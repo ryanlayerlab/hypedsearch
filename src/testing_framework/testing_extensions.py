@@ -42,6 +42,8 @@ input_spectra, boundaries, mz_mapping = testing_utils.preprocess_input_spectra(i
 correct_sequences = testing_utils.generate_truth_set(datasets[0])
 correct_sequence = correct_sequences[0]
 
+input_spectrum = input_spectra[0]
+
 # for i, sequence in enumerate(correct_sequences):
 #     if sequence[0] == 'G':
 #         print(i, sequence)
@@ -49,11 +51,28 @@ correct_sequence = correct_sequences[0]
 #Generate all subsequences of each protein
 db = database.build(dataset[2])
 matched_masses_b, matched_masses_y, db = testing_utils.modified_match_masses(boundaries, db, max_peptide_length)
-
+matched_b_list = []
+matched_y_list = []
+for key in matched_masses_b.keys():
+    matched_b_list.append((key, matched_masses_b[key]))
+for key in matched_masses_y.keys():
+    matched_y_list.append((key, matched_masses_y[key]))
+with open('matched_masses_b.txt', 'w') as b:
+    [b.write(str(x[0]) + ': ' + str(x[1]) + '\n') for x in matched_b_list]
+with open('matched_masses_y.txt', 'w') as y:
+    [y.write(str(x[0]) + ': ' + str(x[1]) + '\n') for x in matched_y_list]
 print('Starting mapping...')
-testing_utils.map_mz
-mz_mapping = testing_utils.map_mz(input_spectra, ppm_tolerance, matched_masses_b, matched_masses_y)
+
+mz_mapping = defaultdict(set)
+testing_utils.find_matches_in_spectrum(input_spectrum, mz_mapping, ppm_tolerance, matched_masses_b, matched_masses_y)
 print('Done')
 
-mz_mapping = sorted(mz_mapping)
-print(mz_mapping)
+#Sorting dict
+print('Writing data...')
+mapping_list = []
+for key in sorted(mz_mapping.keys()):
+    mapping_list.append(mz_mapping[key])
+
+with open('metadata.txt', 'w') as m:
+    [m.write(str(x) + '\n') for x in mapping_list]
+print('Done')
