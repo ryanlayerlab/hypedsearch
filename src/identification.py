@@ -9,7 +9,7 @@ from scoring import scoring, mass_comparisons
 from preprocessing import digestion, merge_search, preprocessing_utils
 import database
 from file_io import JSON
-
+import objects
 import time
 import multiprocessing as mp
 import copy
@@ -196,98 +196,21 @@ def id_spectra(
     truth_set: str = '', 
     output_dir: str = ''
 ) -> dict:
-    '''Load in all the spectra and try to create an alignment for every spectrum
-
-    :param spectra_files: file names of input spectra
-    :type spectra_files: list
-    :param database_file: file name of the fasta database
-    :type database_file: str
-    :param verbose: print progress to the console. 
-        (default is True)
-    :type verbose: bool
-    :param min_peptide_len: the minimum length alignment to create
-        (default is 5)
-    :type min_peptide_len: int
-    :param max_peptide_len: the maximum length alignment to create
-        (default is 20)
-    :type max_peptide_len: int
-    :param peak_filter: If set to a number, this metric is used over the relative abundance filter. 
-        The most abundanct X peaks to use in the alignment. 
-        (default is 0)
-    :type peak_filter: int
-    :param relative_abundance_filter: If peak_filter is set, this parameter is ignored. The 
-        relative abundance threshold (in percent as a decimal) a peak must be of the total 
-        intensity to be used in the alignment. 
-        (default is 0.0)
-    :type relative_abundance_filter: float
-    :param ppm_tolerance: the parts per million error allowed when trying to match masses
-        (default is 20)
-    :type ppm_tolerance: int
-    :param precursor_tolerance: the parts per million error allowed when trying to match
-        a calculated precursor mass to the observed precursor mass
-        (default is 10)
-    :type precurosor_tolerance: int
-    :param digest: the type of digest used in the sample preparation. If left blank, 
-        a digest-free search is performed. 
-        (default is '')
-    :type digest: str
-    :param cores: the number of cores allowed to use in running the program. If a number 
-        provided is greater than the number of cores available, the maximum number of 
-        cores is used. 
-        (default is 1)
-    :type cores: int
-    :param n: the number of aligments to keep per spectrum. 
-        (default is 5)
-    :type n: int
-    :param DEBUG: DEVELOPMENT USE ONLY. Used only for timing of modules. 
-        (default is False)
-    :type DEBUG: bool
-    :param truth_set: the path to a json file of the desired alignments to make for each spectrum. 
-        The format of the file is {spectrum_id: {'sequence': str, 'hybrid': bool, 'parent': str}}. 
-        If left an empty string, the program proceeds as normal. OFwise results of the analysis
-        will be saved in the file 'fall_off.json' saved in the output directory specified.
-        (default is '')
-    :type truth_set: str
-    :param output_dir: the full path to the output directory to save all output files.
-        (default is '')
-    :type output_dir: str
-
-    :returns: alignments for all spectra save in the form {spectrum.id: Alignments}
-    :rtype: dict
-    '''
     DEV = False
     truth = None
 
-    # for dev use only. If a truth set is passed in, we can check where results
-    # drop off. 
     if is_json(truth_set) and is_file(truth_set):
         DEV = True
-        print(
-            '''
-DEV set to True. 
-Tracking when correct answer falls off. 
-Results are stored in a json named 'fall_off.json' in the specified output directory
-File will be of the form
-
-    {
-        spectrum_id: {
-            hybrid: bool, 
-            truth_sequence: str, 
-            fall_off_operation: str, 
-        }
-    }
-            '''
-        )
-        # load in the truth set
         truth = json.load(open(truth_set, 'r'))
 
     fall_off = None
-    
     database_start = time.time()
     # build/load the database
     verbose and print('Loading database...')
     db = database_file
-    verbose and print('Done')
+    verbose and print('Loading database Done')
+    #instrumentation
+    time_to_build_database = time.time() - database_start
     
     # load all of the spectra
     spectra_start = time.time()
@@ -298,11 +221,16 @@ File will be of the form
         peak_filter=peak_filter, 
         relative_abundance_filter=relative_abundance_filter
     )
-    verbose and print('Done')
+    verbose and print('Loading spectra Done')
+    #instrumentation
+    time_to_load_in_spectra = time.time() - spectra_start
+
 
     # get the boundary -> kmer mappings for b and y ions
     mapping_start = time.time()
     matched_masses_b, matched_masses_y, db = merge_search.match_masses(boundaries, db, max_peptide_len)
+    #instrumentation
+    time_to_map_boundaries_to_kmers = time.time() - mapping_start
 
     # keep track of the alingment made for every spectrum
     results = {}
@@ -337,20 +265,14 @@ File will be of the form
             is_last = DEBUG and i == len(spectra) - 1
 
             # pass it into id_spectrum
-            results[spectrum.id] = id_spectrum(
-                spectrum, 
-                db, 
-                b_hits, 
-                y_hits, 
-                ppm_tolerance, 
-                precursor_tolerance,
-                n,
-                digest_type=digest,
-                truth=truth, 
-                fall_off=fall_off, 
-                is_last=is_last
-            )
-
+            raw_results = id_spectrum(
+                spectrum, db, 
+                b_hits, y_hits, 
+                ppm_tolerance, precursor_tolerance,
+                n,digest_type=digest,
+                truth=truth, fall_off=fall_off, 
+                is_last=is_last)
+            results[spectrum.id]=raw_results
     else:
         
         multiprocessing_start = time.time()
@@ -374,7 +296,9 @@ File will be of the form
         # start each of the process
         for p in ps:
             p.start()
-        print('Done.')
+        #instrumentation
+        time_to_spin_up_cores = time.time() - multiprocessing_start          
+        print('start each of the process Done.')
 
         # go through and id all spectra
         for i, spectrum in enumerate(spectra):
@@ -429,6 +353,19 @@ File will be of the form
             safe_write_fall_off[k] = v._asdict()
 
         JSON.save_dict(output_dir + 'fall_off.json', safe_write_fall_off)
+        #instrumentation
+        if cores == 1:
+            identification_instrumentation = objects.Identification_Instrumentation(
+            average_b_scoring_time = sum(b_scoring_times)/len(b_scoring_times),
+            average_y_scoring_time = sum(y_scoring_times)/len(y_scoring_times),
+            time_to_filter_out_top_50_kmers = sum(filter_times)/len(filter_times),
+            average_extension_time = sum(alignment.extension_times)/len(alignment.extension_times),
+            average_non_hybrid_refinement_time = sum(alignment.Non_hybrid_refine_time)/len(alignment.Non_hybrid_refine_time),
+            average_non_hybrid_scoring_time = sum(alignment.non_hybrid_scoring_times)/len(alignment.non_hybrid_scoring_times),
+            average_hybrid_refinement_time = sum(alignment.Hybrid_refine_times)/len(alignment.Hybrid_refine_times),
+            average_hybrid_scoring_time = sum(alignment.hybrid_scoring_times)/len(alignment.hybrid_scoring_times),
+            average_alignment_time = sum(alignment_times)/len(alignment_times)
+            )          
     return results
 
 def mp_id_spectrum(
