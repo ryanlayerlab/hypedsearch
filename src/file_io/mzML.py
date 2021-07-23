@@ -65,12 +65,10 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
         # get the id
         id_ = content.get('id', '')
 
-        spectra.append(Spectrum(
+        spectra.append(
+            Spectrum(
             masses,
             abundances,
-            ti,
-            int(content['ms level']),
-            int(content['index']),
             precursor,
             precursor_charge,
             filename, 

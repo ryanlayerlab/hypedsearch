@@ -16,16 +16,13 @@ Spectrum = namedtuple(
     'Spectrum', [
         'mz_values',
         'abundance',
-        'total_intensity',
-        'ms_level',
-        'scan_number',
         'precursor_mass',
         'precursor_charge',
         'file_name',
         'id', 
         'other_metadata'
     ],
-    defaults=[[], [], 0, 0, -1, 0, '', '', '', {}]
+    defaults=[[], [], 0, '', '', '', {}]
 )
 
 SequenceAlignment = namedtuple(
