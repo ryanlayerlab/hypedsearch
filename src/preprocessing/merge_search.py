@@ -112,10 +112,17 @@ def make_database_set(
         
         print(f'\rOn protein {i+1}/{plen} [{int((i+1) * 100 / plen)}%]', end='')
         
-        for kmer_len in range(1,max_len):
-            for j in range(len(prot_entry.sequence) - kmer_len + 1):
-                kmer = prot_entry.sequence[j:j+kmer_len]
-                add_all(kmer, prot_name)
+        for j in range(1, max_len):
+            kmer = prot_entry.sequence[:j]
+            add_all(kmer, prot_name)
+
+        for j in range(len(prot_entry.sequence) - max_len):
+            kmer = prot_entry.sequence[j:j+max_len]
+            add_all(kmer, prot_name)
+
+        for j in range(len(prot_entry.sequence) - max_len, len(prot_entry.sequence)):
+            kmer = prot_entry.sequence[j:]
+            add_all(kmer, prot_name)
 
     print('\nSorting the set of protein masses...')
     

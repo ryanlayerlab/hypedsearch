@@ -365,6 +365,9 @@ class Test_Main(unittest.TestCase):
             #calculate extension length
             extension_len = utils.predicted_len_precursor(spectrum, seq) - len(seq)
 
+    def test_CICD(self):
+        self.assertEqual(utils.CICD_test(), 1)
+
     
     def test_runner(self):  
         arguments = self.get_arguments()
