@@ -60,7 +60,7 @@ class Test_Main(unittest.TestCase):
     def test_predicted_len_precursor(self): 
         #Run the predicted_len_precursor function with the sequence 'MAL' and the spectrum for 'MALWAR'. 
         sequence = 'MAL'
-        spectrum = Spectrum(gen_spectra.gen_spectra('MALWAR'), [], 0, 0, -1, gen_spectra.get_precursor('MALWAR'), 1)
+        spectrum = Spectrum(gen_spectra.gen_spectra('MALWAR'), [], gen_spectra.get_precursor('MALWAR'), 1)
         expected_length = 7 #Note that while "MALWAR" has a length of 6, the calculation is intentially rounded up because
         #it is better to overshoot than undershoot
         self.assertEqual(utils.predicted_len_precursor(spectrum, sequence), expected_length)
