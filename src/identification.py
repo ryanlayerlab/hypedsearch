@@ -88,7 +88,7 @@ def id_spectrum(
     b_results = sorted([
         (
             kmer, 
-            mass_comparisons.optimized_compare_masses(spectrum.spectrum, gen_spectra.gen_spectrum(kmer, ion='b'))
+            mass_comparisons.optimized_compare_masses(spectrum.mz_values, gen_spectra.gen_spectrum(kmer, ion='b'))
         ) for kmer in b_hits], 
         key=lambda x: (x[1], 1/len(x[0])), 
         reverse=True
@@ -98,7 +98,7 @@ def id_spectrum(
     y_results = sorted([
         (
             kmer, 
-            mass_comparisons.optimized_compare_masses(spectrum.spectrum, gen_spectra.gen_spectrum(kmer, ion='y'))
+            mass_comparisons.optimized_compare_masses(spectrum.mz_values, gen_spectra.gen_spectrum(kmer, ion='y'))
         ) for kmer in y_hits], 
         key=lambda x: (x[1], 1/len(x[0])), 
         reverse=True
@@ -249,7 +249,7 @@ def id_spectra(
 
             # get b and y hits
             b_hits, y_hits = [], []
-            for mz in spectrum.spectrum:
+            for mz in spectrum.mz_values:
 
                 # get the correct boundary
                 mapped = mz_mapping[mz]

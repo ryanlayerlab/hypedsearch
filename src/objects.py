@@ -14,7 +14,7 @@ DatabaseEntry = namedtuple(
 
 Spectrum = namedtuple(
     'Spectrum', [
-        'spectrum',
+        'mz_values',
         'abundance',
         'total_intensity',
         'ms_level',

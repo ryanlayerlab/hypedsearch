@@ -50,7 +50,7 @@ def load_spectra(
         # go through each mass of each s, load it into memory, 
         # round the numbers to 3 decimal places for easier, and append to linear_spectra
         linear_spectra += list(set([
-            x for spectrum in these_spectra for x in spectrum.spectrum
+            x for spectrum in these_spectra for x in spectrum.mz_values
         ]))
 
     # sort the linear spectra
