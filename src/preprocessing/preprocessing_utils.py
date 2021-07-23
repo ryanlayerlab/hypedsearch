@@ -1,6 +1,11 @@
 from file_io import spectra
 from utils import ppm_to_da, overlap_intervals
 
+# turn the all spectra list into a list of boundaries
+def make_boundaries(mz, ppm_tol):
+    da_tol = ppm_to_da(mz, ppm_tol)
+    return [mz - da_tol, mz + da_tol]
+
 def load_spectra(
     spectra_files: list, 
     ppm_tol: int, 
@@ -56,12 +61,7 @@ def load_spectra(
     # sort the linear spectra
     linear_spectra.sort()
 
-    # turn the all spectra list into a list of boundaries
-    def make_boundaries(mz):
-        da_tol = ppm_to_da(mz, ppm_tol)
-        return [mz - da_tol, mz + da_tol]
-
-    boundaries = [make_boundaries(mz) for mz in linear_spectra]
+    boundaries = [make_boundaries(mz, ppm_tol) for mz in linear_spectra]
 
     # make overlapped boundaries larger boundaries
     boundaries = overlap_intervals(boundaries)
