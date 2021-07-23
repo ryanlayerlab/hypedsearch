@@ -156,9 +156,6 @@ def get_precursor(sequence: str, charge: int = 1) -> float:
     for aa in sequence:
         total +=  AMINO_ACIDS[aa]
 
-    if charge == 0:
-        charge = 1
-
     return (total + charge * PROTON_MASS) / charge 
 
 def gen_spectrum(sequence: str, charge: int = None, ion: str = None) -> dict:
