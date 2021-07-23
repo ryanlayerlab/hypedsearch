@@ -461,13 +461,13 @@ def attempt_alignment_first_pass(
             gen_spectra.get_precursor(nhr, spectrum.precursor_charge)
         )
         b_score = scoring.score_sequence(
-            spectrum.spectrum, 
+            spectrum.mz_values, 
             sorted(gen_spectra.gen_spectrum(nhr, ion='b')['spectrum']), 
             ppm_tolerance
         )
 
         y_score = scoring.score_sequence(
-            spectrum.spectrum, 
+            spectrum.mz_values, 
             sorted(gen_spectra.gen_spectrum(nhr, ion='y')['spectrum']), 
             ppm_tolerance
         )
@@ -568,12 +568,12 @@ def attempt_alignment_second_pass(
             gen_spectra.get_precursor(hr, spectrum.precursor_charge)
         )
         b_score = scoring.score_sequence(
-            spectrum.spectrum, 
+            spectrum.mz_values, 
             sorted(gen_spectra.gen_spectrum(hr, ion='b')['spectrum']), 
             ppm_tolerance
         )
         y_score = scoring.score_sequence(
-            spectrum.spectrum, 
+            spectrum.mz_values, 
             sorted(gen_spectra.gen_spectrum(hr, ion='y')['spectrum']), 
             ppm_tolerance
         )
