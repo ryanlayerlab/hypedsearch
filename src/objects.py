@@ -2,7 +2,7 @@ from collections import namedtuple
 
 Database = namedtuple(
     'Database', 
-    ['protein_name', 'proteins', 'kmers'], 
+    ['fasta_file', 'proteins', 'kmers'], 
     defaults=['', {}, {}]
 )
 
