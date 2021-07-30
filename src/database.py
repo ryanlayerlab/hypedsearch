@@ -28,7 +28,7 @@ def build(fasta_file: str) -> Database:
     :returns: a Database object with the fasta file and protein fields filled in
     :rtype: Database
     '''
-
+    #TODO -> Start here
     db = Database(fasta_file)
 
     prots = defaultdict(list)
