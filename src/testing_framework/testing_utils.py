@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Union
 from pyteomics import fasta
 import os
 import pandas as pd
@@ -6,14 +6,12 @@ from collections import defaultdict
 
 from collections import namedtuple
 import sys
-module_path = os.path.abspath(os.path.join('..', 'hypedsearch', 'src', 'hypedsearch'))
+module_path = os.path.abspath(os.path.join('..', 'hypedsearch', 'src'))
 if module_path not in sys.path:
     sys.path.append(module_path)
 from preprocessing import preprocessing_utils
 from objects import Database
-import gen_spectra
-
-from utils import hashable_boundaries, predicted_len
+import gen_spectra, utils
 
 from file_io import spectra
 from collections import defaultdict
@@ -98,12 +96,14 @@ def define_data():
     NOD2_top_dir = 'NOD2_E3'
     BALB3_top_dir = 'BALB3_E3'
 
+    spectra_dir = '/home/ncol107453/jaime_hypedsearch/hypedsearch/data/unused_spectra/'
+    database_file = '/home/ncol107453/jaime_hypedsearch/hypedsearch/data/database/sample_database.fasta'
+
 
     NOD2_data = Dataset(
-        # os.path.join(root, 'mnt', 'c', 'Users', 'Maxim', 'Documents', 'Layer_Lab', 'Database', 'Hybrid_inputs') + os.path.sep,
-        os.path.join(raw_prefix, NOD2_top_dir, 'mzml') + os.path.sep,
+        spectra_dir,
         os.path.join(raw_prefix, NOD2_top_dir, 'NOD2_E3_results.ssv'),
-        os.path.join(root, 'home', 'ncol107453', 'jaime_hypedsearch', 'hypedsearch', 'data', 'database', 'sample_database.fasta'),
+        database_file,
         os.path.join(raw_prefix, NOD2_top_dir) + os.path.sep,
         ''
     )
@@ -178,37 +178,6 @@ def get_average_from_set(input_set) -> float:
 
     set_average = set_total / len(input_set)
     return set_average
-
-# def get_proteins(db: Database):
-#     return db.proteins
-# def get_kmers(db: Database, proteins: list, ):
-
-#     for i, (prot_name, prot_entry) in enumerate(proteins):
-        
-#         print(f'\rOn protein {i+1}/{plen} [{int((i+1) * 100 / plen)}%]', end='')
-        
-#         #Create all kmers
-#         for kmer_len in range(1,max_len):
-#             for j in range(len(prot_entry.sequence) - kmer_len + 1):
-#                 kmer = prot_entry.sequence[j:j+kmer_len]
-#                 add_all_masses(kmer, prot_name, )
-
-#     b = db_dict_b.keys().sort()
-#     y = db_dict_y.keys().sort()
-
-# def add_all_masses(kmer, prot_name, start_location):
-#     for ion in 'by':
-#         for charge in [1, 2]:
-#             pre_spec = gen_spectra.gen_spectrum(kmer, ion=ion, charge=charge)
-#             spec = pre_spec
-#             if isinstance(pre_spec,dict):
-#                 spec = pre_spec.get('spectrum')
-
-#             for i, mz in enumerate(spec):
-#                 kmer_to_add = kmer[:i+1] if ion == 'b' else kmer[-i-1:]
-#                 r_d = db_dict_b if ion == 'b' else db_dict_y
-#                 r_d[mz].add(kmer_to_add)
-#                 kmer_set[kmer_to_add].append((prot_name, start_location))
 
 def modified_match_masses(
     spectra_boundaries: list, 
@@ -323,9 +292,9 @@ def make_database_set(
                     r_d = db_dict_b if ion == 'b' else db_dict_y
                     # r_d[mz].add(kmer_to_add)
                     if ion == 'b':
-                        r_d[mz].add((protein_number, kmer_to_add, str(start_position) + '-' + str(end_position), ion, charge))
+                        r_d[mz].add((mz, protein_number, kmer_to_add, str(start_position) + '-' + str(end_position), ion, charge))
                     else:
-                        r_d[mz].add((protein_number, kmer_to_add, str(end_position) + '-' + str(start_position), ion, charge))
+                        r_d[mz].add((mz, protein_number, kmer_to_add, str(end_position) + '-' + str(start_position), ion, charge))
                     kmer_set[kmer_to_add].append(prot_name)
 
     plen = len(proteins)
@@ -429,7 +398,7 @@ def merge(
 
         # if mz_s[mz_i] is in the boundary, keep track of it increment mz_i
         if boundaries[b_i][0] <= mz_s[mz_i] <= boundaries[b_i][1]:
-            matched_masses[hashable_boundaries(boundaries[b_i])] += kmers[indices[mz_i - 1]:indices[mz_i]]
+            matched_masses[utils.hashable_boundaries(boundaries[b_i])] += kmers[indices[mz_i - 1]:indices[mz_i]]
             mz_i += 1
 
         # if the upper boundary is less than the mz_i, increment b_i
@@ -442,6 +411,41 @@ def merge(
 
     return matched_masses
 
+def find_hits(mz_mapping, boundaries, spectrum, spec_num, matched_masses_b, matched_masses_y, b_hits, y_hits, b_hit_set, y_hit_set, miss_set):
+    hit_list = []
+    for k, mz in enumerate(spectrum.spectrum):
+        mapped = mz_mapping[mz]
+        b = boundaries[mapped]
+        b = utils.hashable_boundaries(b)
+
+        if b in matched_masses_b:
+            for tuple in matched_masses_b[b]:
+                extended_tuple = (spec_num, tuple)
+                b_hits.append(extended_tuple)
+                mz_hit_tuple = (k, mz)
+                b_hit_set.add(mz_hit_tuple)
+                hit_list.append(mz)
+            # b_hits += matched_masses_b[b]
+
+        if b in matched_masses_y:
+            for tuple in matched_masses_y[b]:
+                extended_tuple = (spec_num, tuple)
+                y_hits.append(extended_tuple)
+                mz_hit_tuple = (k, mz)
+                y_hit_set.add(mz_hit_tuple)
+                hit_list.append(mz)
+            # y_hits += matched_masses_y[b]
+        
+        if mz not in hit_list:
+            miss_tuple = (k,mz)
+            miss_set.add(miss_tuple)
+
+def find_misses(input_spectrum, hit_set, miss_set):
+    for k, mz in enumerate(input_spectrum.spectrum):
+        if (k,mz) not in hit_set:
+            miss_tuple = (k,mz)
+            miss_set.add(miss_tuple)
+
 def map_mz(input_spectra, ppm_tolerance, matched_masses_b, matched_masses_y):
     #Map to (P_y, S_i, P_j, seq, b/y)
     # Where P_y is protein this was found in, S_i is m/z number, P_j is location within that protein, seq and b/y are straightforward 
@@ -451,19 +455,19 @@ def map_mz(input_spectra, ppm_tolerance, matched_masses_b, matched_masses_y):
 
 def find_matches_in_spectrum(spectrum, mz_mapping, ppm_tolerance, matched_masses_b, matched_masses_y):
     for i, mz in enumerate(spectrum[0]):
-        boundaries = preprocessing_utils.make_boundaries(mz, ppm_tolerance)
-        match_b(matched_masses_b, matched_masses_y, boundaries, mz_mapping, i, mz)
-        match_y(matched_masses_b, matched_masses_y, boundaries, mz_mapping, i, mz)
+        boundary_set = preprocessing_utils.make_boundaries(mz, ppm_tolerance)
+        match_b(matched_masses_b, matched_masses_y, boundary_set, mz_mapping, i, mz)
+        match_y(matched_masses_b, matched_masses_y, boundary_set, mz_mapping, i, mz)
     return mz_mapping
 
-def match_b(matched_masses_b, matched_masses_y, boundaries, mz_mapping, i, mz):
+def match_b(matched_masses_b, matched_masses_y, boundary_set, mz_mapping, i, mz):
     for boundary in matched_masses_b.keys():
-        if boundary == str(boundaries[0]) + '-' + str(boundaries[1]):
+        if boundary == str(boundary_set[0]) + '-' + str(boundary_set[1]):
             add_match_to_dict('b', matched_masses_b, matched_masses_y, boundary, mz_mapping, i, mz)
 
-def match_y(matched_masses_b, matched_masses_y, boundaries, mz_mapping, i, mz):
+def match_y(matched_masses_b, matched_masses_y, boundary_set, mz_mapping, i, mz):
     for boundary in matched_masses_y.keys():
-        if boundary == str(boundaries[0]) + '-' + str(boundaries[1]):
+        if boundary == str(boundary_set[0]) + '-' + str(boundary_set[1]):
             add_match_to_dict('y', matched_masses_b, matched_masses_y, boundary, mz_mapping, i, mz)
 
 def add_match_to_dict(ion, matched_masses_b, matched_masses_y, boundary, mz_mapping, i, mz):
@@ -473,3 +477,147 @@ def add_match_to_dict(ion, matched_masses_b, matched_masses_y, boundary, mz_mapp
     else:
         for matching in matched_masses_y[boundary]:
             mz_mapping[mz].add((mz, matching[0], i, matching[2], matching[1], matching[3], matching[4]))
+
+def check_if_max(val1, current_max, location):
+    if (val1 > current_max):
+        max = val1
+        max_location = location
+    
+    return max, max_location
+def collect_metadata(input_spectra, correct_sequences, ppm_tolerance, all_hits, all_misses, hit_abundances, miss_abundances, misleading_abundances):
+    for i, spectrum in enumerate(input_spectra):
+        max_abundance = 0
+        found = False
+        initial_hits = []
+        input_spectrum = spectrum[0]
+        tot_measured_spec_length = tot_measured_spec_length + len(input_spectrum)
+        input_abundance_set = spectrum[1]
+        precursor_mass = spectrum[5]
+        precursor_charge = spectrum[6]
+        ideal_spectrum = gen_spectra.gen_spectrum(correct_sequences[i])
+        tot_ideal_spec_length = tot_ideal_spec_length + len(ideal_spectrum['spectrum'])
+        # Checking input_spectrum for hits
+        for a, j in enumerate(input_spectrum):
+            #Finding max abundance
+            max_abundance, max_abundance_location = check_if_max(input_abundance_set[a], max_abundance, a)
+
+        # Checking precursor mass
+        tolerance = utils.ppm_to_da(precursor_mass, ppm_tolerance)
+        if (not isintolerance(precursor_mass, gen_spectra.get_precursor(correct_sequences[i], precursor_charge), tolerance)):
+            count = count + 1
+
+    # Collecting average abundance
+    avg_hit_abundance = get_average_from_set(hit_abundances)
+    avg_miss_abundance = get_average_from_set(miss_abundances)
+    # Collecting total length
+    total_length = get_total_length(correct_sequences)
+
+def append_correct_hits(correct_hits, correct_sequence, input_spectrum, ppm_tolerance):
+    ideal_spectrum = gen_spectra.gen_spectrum(correct_sequence)
+    for val in ideal_spectrum['spectrum']:
+        boundary = preprocessing_utils.make_boundaries(float(val), ppm_tolerance)
+        for mz in input_spectrum[0]:
+            if mz > boundary[0] and mz < boundary[1]:
+                correct_hits.append(mz)
+
+def map_hits_to_intervals(ion = ''):
+    interval_list = []
+    if ion == 'b':
+        interval_list = map_to_interval('b_hits.txt')
+    elif ion == 'y':
+        interval_list = map_to_interval('y_hits.txt')
+    else:
+        b_interval_list = map_to_interval('b_hits.txt')
+        y_interval_list = (map_to_interval('y_hits.txt'))
+        interval_list = b_interval_list + y_interval_list
+    return interval_list
+
+def transform(line):
+    A = line.rstrip().split()
+    spectrum_num = int(A[0])
+    mz = float(A[1])
+    parent_prot = int(A[2])
+    seq = A[3]
+    interval = A[4]
+    ion = A[5]
+    charge = int(A[6])
+
+    start_end = interval.split('-')
+    interval_start = int(start_end[0])
+    interval_end = int(start_end[1])
+    interval = [parent_prot, interval_start, interval_end, 1, seq]
+    return interval
+
+
+def map_to_interval(hit_file):
+    interval_list = []
+    with open(hit_file, 'r') as h:
+        for line in h:
+            interval = transform(line)
+            interval_list.append(interval)
+        return interval_list
+
+def group_intervals(sorted_intervals):
+    interval_dict = dict()
+    for interval in sorted_intervals:
+        if int(interval[0]) not in interval_dict.keys():
+            interval_dict[int(interval[0])] = []
+            interval_dict[int(interval[0])].append([interval[0], interval[1], interval[2], interval[3], interval[4]])
+        else:
+            interval_dict[int(interval[0])].append([interval[0], interval[1], interval[2], interval[3], interval[4]])
+    return interval_dict
+
+def isempty(list):
+    if len(list) == 0:
+        return True
+    else:
+        return False
+
+def merge_intervals(interval_dict):
+    updated_interval_list = []
+    for parent_prot in interval_dict.keys():
+        interval_list = interval_dict[parent_prot]
+        interval_list.sort(key=lambda x: x[1])
+        interval_list = merge_overlapping_interval(interval_list)
+        [updated_interval_list.append(x) for x in interval_list]
+    return updated_interval_list
+
+def merge_interval(interval1, interval2, stack):
+    interval1_len = interval1[2] - interval1[1]
+    interval2_len = interval2[2] - interval2[1]
+    if interval1_len >= interval2_len:
+        interval1.append(interval2)
+        stack[-1] = interval1
+    else:
+        interval2.append(interval1)
+        stack[-1] = interval2
+    return stack
+
+def compare_intervals(interval, comparison_interval):
+    if (interval != comparison_interval):
+        #Case 1: interval encompasses comparison_interval
+        if (interval[1] <= comparison_interval[1]) and (interval[2] >= comparison_interval[2]):
+            interval[3] = interval[3] + comparison_interval[3]
+            return True
+        #Case 2: comparison_interval encompasses interval
+        elif (interval[1] >= comparison_interval[1]) and (interval[2] <= comparison_interval[2]):
+            comparison_interval[3] = comparison_interval[3] + interval[3]
+            return True
+        #Case 3: Neither interval encompasses the other
+        else:
+            return False
+    return True
+
+# 7     9     25     142     (4	148	417	419	SMS)     189    191     204     225     245     249      261     268
+def merge_overlapping_interval(interval_list):
+    # input: [[170, 175], [170, 180], [1, 2]]
+    # output: [[0, 170, 180, 2], [0, 1, 2, 1]]
+    stack = []
+    stack.append(interval_list[0])
+    for interval in interval_list:
+        if compare_intervals(stack[-1], interval):
+            stack = merge_interval(stack[-1], interval, stack)
+        else:
+            stack.append(interval)
+
+    return stack
