@@ -31,7 +31,7 @@ Type One Diabetes (T1D) is a chronic autoimmune disesase where the human body no
 ## T1D Biological Background
 In a Type 1 Diabetic, the body's immune system attacks a region of the pancreas called the islets of Langerhans.  The islets of Langerhans contains beta cells that produce to body's insulin - there are an estimated one to three million beta cells in an adult human.  Insulin is a peptide hormone comprised of 51 amino acids in two chains connected by two disulfide bridges.  The creation of insulin by the beta cells is a multi-step process where a single peptide chain is translated in the ribosome (called preproinsulin), cleaved into proinsulin and then folded into its correct shape in the endoplasmic reticulum (RER), and then moved via the Golgi Network to where it finally forms into mature insulin.
 
-In 2019, it was discoved that hybrid insulin peptides (HIPs) are highly concentrated in Type One Diabetics - and seem to trigger the body's autoimmune response which ultimately attacks the beeta cells.  The fact that insulin undergos extensive posttranslational modification aligns with this theory - somewhere in the process of creating mature insulin from preproinsulin a modification is introduced which creates the HIPs.
+In 2019, it was discoved that hybrid insulin peptides (HIPs) are highly concentrated in Type One Diabetics - and seem to trigger the body's autoimmune response which ultimately attacks the beta cells.  The fact that insulin undergos extensive posttranslational modification aligns with this theory - somewhere in the process of creating mature insulin from preproinsulin a modification is introduced which creates the HIPs.
 
 ## Installation and Usage
 First clone the repository
