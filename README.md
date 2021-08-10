@@ -34,19 +34,11 @@ In a Type 1 Diabetic, the body's immune system attacks a region of the pancreas 
 In 2019, it was discoved that hybrid insulin peptides (HIPs) are highly concentrated in Type One Diabetics - and seem to trigger the body's autoimmune response which ultimately attacks the beta cells.  The fact that insulin undergos extensive posttranslational modification aligns with this theory - somewhere in the process of creating mature insulin from preproinsulin a modification is introduced which creates the HIPs.
 
 ## Installation and Usage
-First clone the repository
+Clone the repository
 ```bash
 $> git clone https://github.com/zmcgrath96/hypedsearch.git
 ```
-Then run the setup script that will install dependencies and build the C++ code.
-```bash
-$hypedsearch> ./setup.sh
-```
-If you get a permissions error, try the following:
-```bash
-$> cd hypedsearch
-$hypedsearch> chmod u+x setup.sh
-$hypedsearch> ./setup.sh
+
 ```
 ## Usage
 There are two ways to use hypedsearch: command line arguments or the param file
