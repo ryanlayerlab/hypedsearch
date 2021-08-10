@@ -36,7 +36,7 @@ In 2019, it was discoved that hybrid insulin peptides (HIPs) are highly concentr
 ## Installation and Usage
 Clone the repository
 ```bash
-$> git clone https://github.com/zmcgrath96/hypedsearch.git
+$> git clone https://github.com/ryanlayerlab/hypedsearch.git
 ```
 
 ```
