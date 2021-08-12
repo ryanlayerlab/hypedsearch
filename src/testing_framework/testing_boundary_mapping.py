@@ -77,8 +77,8 @@ db = database.build(path)
 
 #Determined sequence
 correct_sequence = 'MSSP'
-ion = None
-charge = None
+ion = 'b'
+charge = 1
 mz_array = gen_spectra.gen_spectrum(correct_sequence, 1, ion)['spectrum']
 
 #Random sequence

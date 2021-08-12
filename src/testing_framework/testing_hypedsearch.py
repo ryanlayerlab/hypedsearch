@@ -8,14 +8,18 @@ import json
 
 import os
 import sys
-module_path = os.path.abspath(os.path.join('..', 'hypedsearch', 'src', 'hypedsearch'))
+module_path = os.path.abspath(os.path.join('..', 'hypedsearch', 'src'))
+if module_path not in sys.path:
+    sys.path.append(module_path)
+
+module_path = os.path.abspath(os.path.join('..'))
 if module_path not in sys.path:
     sys.path.append(module_path)
 
 from collections import defaultdict, namedtuple
 from pyteomics import fasta
 
-import identification, objects, runner, utils, gen_spectra, scoring
+import identification, objects, runner, utils, gen_spectra, scoring, main
 import testing_utils
 # DEFINE THE DATA
 
@@ -34,25 +38,35 @@ cores = 2
 for dataset in datasets:
         
     st = time.time()
-    
-    run_params = {
-        'spectra_folder': dataset.spectra_dir,
-        'database_file': dataset.filtered_fasta,
-        'output_dir': os.path.join(dataset.highest_dir, 'output'),
-        'min_peptide_len': min_pep,
-        'max_peptide_len': max_pep,
-        'tolerance': tolerance,
-        'precursor_tolerance': precursor_tolerance,
-        'peak_filter': peak_filter, 
-        'relative_abundance_filter': relative_abundance_filter,
-        'digest': 'trypsin', 
-        'verbose': True,
-        'DEBUG': True,
-        'cores': cores,
-        'truth_set': '', 
-        'n': 5
-    }
 
+    spectra_folder = dataset.spectra_dir
+    spectra_files = main.get_spectra_files(spectra_folder)
+
+    database_file_path = dataset.filtered_fasta
+    database_file = main.get_database_file(database_file_path)
+
+    output_dir = os.path.join(dataset.highest_dir, 'output')
+    output_dir = utils.make_valid_dir_string(output_dir)
+    utils.make_dir(output_dir)
+    
+    run_params = dict()
+    run_params['spectra_files'] = spectra_files
+    run_params['database_file'] = database_file
+    run_params['output_dir'] = output_dir
+    run_params['config'] = True
+    run_params['min_peptide_len'] = min_pep
+    run_params['max_peptide_len'] = max_pep
+    run_params['tolerance'] = tolerance
+    run_params['precursor_tolerance'] = precursor_tolerance
+    run_params['peak_filter'] = peak_filter
+    run_params['relative_abundance_filter'] = relative_abundance_filter
+    run_params['digest'] = 'trypsin'
+    run_params['verbose'] = True
+    run_params['cores'] = cores
+    run_params['truth_set'] = '',
+    run_params['n'] = 5
+    run_params['DEBUG'] = True
+    
     runner.run(run_params)
     
     total_time = time.time() - st

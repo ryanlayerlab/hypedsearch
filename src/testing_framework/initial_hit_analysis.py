@@ -89,34 +89,45 @@ correct_hits = []
 mz_miss_set = set()
 for i, spectrum in enumerate(input_spectra):
     #Remember to add in abundance if it is helpful
-    input_num = i+1
     correct_sequence = correct_sequences[i]
-    testing_utils.find_hits(mz_mapping, boundaries, spectrum, input_num, matched_masses_b, matched_masses_y, b_hits, y_hits, b_set, y_set, mz_miss_set)
+    testing_utils.find_hits(mz_mapping, boundaries, spectrum, i, matched_masses_b, matched_masses_y, b_hits, y_hits, b_set, y_set, mz_miss_set)
     testing_utils.append_correct_hits(correct_hits, correct_sequence, spectrum, ppm_tolerance)
 print('Done')
 
 #Writing b and y hits
-print('Writing data...')
-with open("b_hits.txt", 'w') as b:
-    for x in b_hits:
-        pep_id = x[0]
-        w = x[1][0]
-        prot_id = x[1][1]
-        seq = x[1][2]
-        loc = x[1][3]
-        ion = x[1][4]
-        charge = x[1][5]
-        out = [pep_id, w, prot_id, seq, loc, ion, charge]
-        b.write('\t'.join([str(i) for i in out]) + '\n')
-with open("y_hits.txt", 'w') as y_file:
-    for y in y_hits:
-        pep_id = y[0]
-        w = y[1][0]
-        prot_id = y[1][1]
-        seq = y[1][2]
-        loc = y[1][3]
-        ion = y[1][4]
-        charge = y[1][5]
-        out = [pep_id, w, prot_id, seq, loc, ion, charge]
-        y_file.write('\t'.join([str(i) for i in out]) + '\n')
-print('Done')
+# print('Writing data...')
+# with open("b_hits.txt", 'w') as b:
+#     for x in b_hits:
+#         pep_id = x[0]
+#         w = x[1][0]
+#         prot_id = x[1][1]
+#         seq = x[1][2]
+#         loc = x[1][3]
+#         ion = x[1][4]
+#         charge = x[1][5]
+#         out = [pep_id, w, prot_id, seq, loc, ion, charge]
+#         b.write('\t'.join([str(i) for i in out]) + '\n')
+# with open("y_hits.txt", 'w') as y_file:
+#     for y in y_hits:
+#         pep_id = y[0]
+#         w = y[1][0]
+#         prot_id = y[1][1]
+#         seq = y[1][2]
+#         loc = y[1][3]
+#         ion = y[1][4]
+#         charge = y[1][5]
+#         out = [pep_id, w, prot_id, seq, loc, ion, charge]
+#         y_file.write('\t'.join([str(i) for i in out]) + '\n')
+# print('Done')
+
+# Calculating total length
+total_len = 0
+for spectrum in input_spectra:
+    total_len = total_len + len(spectrum[0])
+mz_hit_set = b_set | y_set
+    
+print('Total number of hits:', len(mz_hit_set), 'out of', total_len, 'total mz values', '(' + str(round((len(mz_hit_set) / total_len * 100))) + '%)')
+print('Total number of misses:', len(mz_miss_set), 'out of', total_len, 'total mz values', '(' + str(round((len(mz_miss_set) / total_len * 100))) + '%)')
+print('Num b hits:', len(b_set))
+print('Num y hits:', len(y_set))
+print(len(mz_hit_set), len(mz_miss_set), len(mz_hit_set) + len(mz_miss_set))
