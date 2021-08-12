@@ -92,19 +92,14 @@ def define_data():
     )
 
 
-    raw_prefix = os.path.join(root, 'mnt', 'c', 'Users', 'Maxim', 'Documents', "Layer_Lab", 'Database', 'raw_inputs')
-    NOD2_top_dir = 'NOD2_E3'
-    BALB3_top_dir = 'BALB3_E3'
-
-    spectra_dir = '/home/ncol107453/jaime_hypedsearch/hypedsearch/data/unused_spectra/'
-    database_file = '/home/ncol107453/jaime_hypedsearch/hypedsearch/data/database/sample_database.fasta'
+    raw_prefix = os.path.join(root, 'home', 'ncol107453', 'jaime_hypedsearch', 'hypedsearch', 'data')
 
 
     NOD2_data = Dataset(
-        spectra_dir,
-        os.path.join(raw_prefix, NOD2_top_dir, 'NOD2_E3_results.ssv'),
-        database_file,
-        os.path.join(raw_prefix, NOD2_top_dir) + os.path.sep,
+        os.path.join(raw_prefix, 'spectra'),
+        os.path.join(raw_prefix, 'NOD2_E3_results.ssv'),
+        os.path.join(raw_prefix, 'database', 'sample_database.fasta'),
+        os.path.join(raw_prefix) + os.path.sep,
         ''
     )
 
@@ -419,25 +414,25 @@ def find_hits(mz_mapping, boundaries, spectrum, spec_num, matched_masses_b, matc
         b = utils.hashable_boundaries(b)
 
         if b in matched_masses_b:
+            mz_hit_tuple = (spec_num, k, mz)
+            b_hit_set.add(mz_hit_tuple)
             for tuple in matched_masses_b[b]:
                 extended_tuple = (spec_num, tuple)
                 b_hits.append(extended_tuple)
-                mz_hit_tuple = (k, mz)
-                b_hit_set.add(mz_hit_tuple)
                 hit_list.append(mz)
             # b_hits += matched_masses_b[b]
 
         if b in matched_masses_y:
+            mz_hit_tuple = (spec_num, k, mz)
+            y_hit_set.add(mz_hit_tuple)
             for tuple in matched_masses_y[b]:
                 extended_tuple = (spec_num, tuple)
                 y_hits.append(extended_tuple)
-                mz_hit_tuple = (k, mz)
-                y_hit_set.add(mz_hit_tuple)
                 hit_list.append(mz)
             # y_hits += matched_masses_y[b]
         
         if mz not in hit_list:
-            miss_tuple = (k,mz)
+            miss_tuple = (spec_num, k,mz)
             miss_set.add(miss_tuple)
 
 def find_misses(input_spectrum, hit_set, miss_set):
