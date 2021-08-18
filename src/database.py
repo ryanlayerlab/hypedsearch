@@ -33,7 +33,7 @@ def build(fasta_file: str) -> Database:
 
     prots = defaultdict(list)
 
-    # pull the name out
+    # pull the protein name out
     get_name = lambda x: x.split('|')[-1].split()[0]
 
     for entry in fasta.read(fasta_file):
