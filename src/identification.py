@@ -181,7 +181,7 @@ def id_spectrum(
 
 def id_spectra(
     spectra_files: list, 
-    database_file: database, 
+    database: database, 
     verbose: bool = True, 
     min_peptide_len: int = 5, 
     max_peptide_len: int = 20, 
@@ -207,7 +207,7 @@ def id_spectra(
     database_start = time.time()
     # build/load the database
     verbose and print('Loading database...')
-    db = database_file
+    db = database
     verbose and print('Loading database Done')
     #instrumentation
     time_to_build_database = time.time() - database_start
