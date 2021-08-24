@@ -213,6 +213,7 @@ def id_spectra(
     time_to_build_database = time.time() - database_start
     
     # load all of the spectra
+    # don't need boundries any more - just ppm value
     spectra_start = time.time()
     verbose and print('Loading spectra...')
     spectra, boundaries, mz_mapping = preprocessing_utils.load_spectra(
@@ -225,7 +226,7 @@ def id_spectra(
     #instrumentation
     time_to_load_in_spectra = time.time() - spectra_start
 
-
+    #TODO: DB
     # get the boundary -> kmer mappings for b and y ions
     mapping_start = time.time()
     matched_masses_b, matched_masses_y, db = merge_search.match_masses(boundaries, db, max_peptide_len)
