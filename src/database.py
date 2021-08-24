@@ -28,18 +28,13 @@ def build(fasta_file: str) -> Database:
     :returns: a Database object with the fasta file and protein fields filled in
     :rtype: Database
     '''
-    #TODO -> Start here
+
     db = Database(fasta_file)
-
     prots = defaultdict(list)
-
-    # pull the protein name out
     get_name = lambda x: x.split('|')[-1].split()[0]
-
     for entry in fasta.read(fasta_file):
         p_name = get_name(entry.description)
         prots[p_name].append(entry)
-
     db = db._replace(proteins=prots)
     return db
 

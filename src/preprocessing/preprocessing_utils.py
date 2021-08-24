@@ -67,21 +67,21 @@ def load_spectra(
     boundaries = overlap_intervals(boundaries)
 
     # make a mapping for mz -> boundaries
-    b_i, s_i = 0, 0
+    boudaries_index,  spectra_index = 0, 0
     mz_mapping = {}
     while s_i < len(linear_spectra):
         
         # if the current boundary encapsulates s_i, add to list
-        if boundaries[b_i][0] <= linear_spectra[s_i] <= boundaries[b_i][1]:
-            mz_mapping[linear_spectra[s_i]] = b_i 
+        if boundaries[ boudaries_index][0] <= linear_spectra[s_i] <= boundaries[ boudaries_index][1]:
+            mz_mapping[linear_spectra[s_i]] =  boudaries_index 
             s_i += 1
 
         # else if the s_i < boundary, increment s_i
-        elif linear_spectra[s_i] < boundaries[b_i][0]:
+        elif linear_spectra[s_i] < boundaries[ boudaries_index][0]:
             s_i += 1
 
         # else if s_i > boundary, incrment b_i
-        elif linear_spectra[s_i] > boundaries[b_i][1]:
-            b_i += 1
+        elif linear_spectra[s_i] > boundaries[ boudaries_index][1]:
+             boudaries_index += 1
 
     return (all_spectra, boundaries, mz_mapping)

@@ -1,12 +1,10 @@
 from utils import hashable_boundaries, predicted_len
 from objects import Database
-#from cppModules import gen_spectra
-import gen_spectra
-
 from collections import defaultdict
 from typing import Iterable
 from math import ceil
 
+import gen_spectra
 import array as arr
 
 BATCH_SIZE = 300
@@ -41,27 +39,28 @@ def merge(
     :rtype: defaultdict
     '''
 
-    b_i, mz_i = 0, 0
+    boudaries_index, spectra_index = 0, 0
 
     matched_masses = defaultdict(list)
 
-    while b_i < len(boundaries) and mz_i < len(mz_s):
+    while boudaries_index < len(boundaries) and spectra_index < len(mz_s):
 
         # if mz_s[mz_i] is in the boundary, keep track of it increment mz_i
-        if boundaries[b_i][0] <= mz_s[mz_i] <= boundaries[b_i][1]:
-            matched_masses[hashable_boundaries(boundaries[b_i])] += kmers[indices[mz_i - 1]:indices[mz_i]]
-            mz_i += 1
+        if boundaries[boudaries_index][0] <= mz_s[spectra_index] <= boundaries[boudaries_index][1]:
+            matched_masses[hashable_boundaries(boundaries[boudaries_index])] += kmers[indices[spectra_index - 1]:indices[spectra_index]]
+            spectra_index += 1
 
         # if the upper boundary is less than the mz_i, increment b_i
-        elif mz_s[mz_i] > boundaries[b_i][1]:
-            b_i += 1
+        elif mz_s[spectra_index] > boundaries[boudaries_index][1]:
+            boudaries_index += 1
 
         # if the lower boundary is greater than the mz_i, increment mz_i
-        elif mz_s[mz_i] < boundaries[b_i][0]:
-            mz_i += 1
+        elif mz_s[spectra_index] < boundaries[boudaries_index][0]:
+            spectra_index += 1
 
     return matched_masses
 
+#todo: replace this with the web call
 def make_database_set(
     proteins: list, 
     max_len: int
@@ -107,6 +106,7 @@ def make_database_set(
 
     plen = len(proteins)
 
+    # todo: this is it
     # go through each protein and add all kmers to the correct dictionary for later sorting
     for i, (prot_name, prot_entry) in enumerate(proteins):
         
@@ -157,37 +157,25 @@ def make_database_set(
 
     return db_list_b, index_list_b, kmer_list_b, db_list_y, index_list_y, kmer_list_y, kmer_set
 
-
 def match_masses(
     spectra_boundaries: list, 
     db: Database, 
     max_pep_len: int = 30
     ) -> (dict, dict, Database):
-    '''Take in a list of boundaries from observed spectra and return a b and y
-    dictionary that maps boundaries -> kmers
 
-    :param spectra_boundaries: boundaries as lists as [lower_bound, upper_bound]
-    :type spectra_boundaries: list
-    :param db: source proteins
-    :type db: Database
-    :param max_pep_len: maximum peptide length in k-mer prefetching
-    :type max_pep_len: int
-
-    :returns: mapping of b ion masses to k-mers, mapping of y ion masses to 
-        k-mers, updated database
-    :rtype: (dict, dict, Database)
-    '''
-
-    # keep track of all of the good mass matches and kmers
-    matched_masses_b, matched_masses_y, kmer_set = defaultdict(list), defaultdict(list), defaultdict(list)
+    matched_masses_b  = defaultdict(list)
+    matched_masses_y= defaultdict(list)
+    kmer_set = defaultdict(list)
 
     # estimate the max len
     estimated_max_len = ceil(spectra_boundaries[-1][1] / 57.021464)
     max_len = min(estimated_max_len, max_pep_len)
 
+    #TODO: DB
     # calc the number of batches needed
     num_batches = ceil(len(db.proteins) / BATCH_SIZE)
 
+    #TODO: DB
     # create batches of proteins in the form of (prot name, prot entry)
     kv_prots = [(k, v) for k, v in db.proteins.items()]
     batched_prots = [kv_prots[i*BATCH_SIZE:(i+1)*BATCH_SIZE] for i in range(num_batches)]
@@ -196,7 +184,8 @@ def match_masses(
     for batch_num, batch_set in enumerate(batched_prots):
 
         print(f'On batch {batch_num + 1}/{num_batches}\n', end='')
-
+        #todo start here
+        #I think extended_batch_set is a list of protins (the database)
         extended_batch_set = [(k, entry) for (k, v) in batch_set for entry in v]
 
         # create our list representation
