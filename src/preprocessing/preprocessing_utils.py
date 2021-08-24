@@ -69,19 +69,19 @@ def load_spectra(
     # make a mapping for mz -> boundaries
     boudaries_index,  spectra_index = 0, 0
     mz_mapping = {}
-    while s_i < len(linear_spectra):
+    while spectra_index < len(linear_spectra):
         
         # if the current boundary encapsulates s_i, add to list
-        if boundaries[ boudaries_index][0] <= linear_spectra[s_i] <= boundaries[ boudaries_index][1]:
-            mz_mapping[linear_spectra[s_i]] =  boudaries_index 
-            s_i += 1
+        if boundaries[ boudaries_index][0] <= linear_spectra[spectra_index] <= boundaries[ boudaries_index][1]:
+            mz_mapping[linear_spectra[spectra_index]] =  boudaries_index 
+            spectra_index += 1
 
         # else if the s_i < boundary, increment s_i
-        elif linear_spectra[s_i] < boundaries[ boudaries_index][0]:
-            s_i += 1
+        elif linear_spectra[spectra_index] < boundaries[ boudaries_index][0]:
+            spectra_index += 1
 
         # else if s_i > boundary, incrment b_i
-        elif linear_spectra[s_i] > boundaries[ boudaries_index][1]:
+        elif linear_spectra[spectra_index] > boundaries[ boudaries_index][1]:
              boudaries_index += 1
 
     return (all_spectra, boundaries, mz_mapping)
