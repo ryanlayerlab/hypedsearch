@@ -134,3 +134,4 @@ data/.DS_Store
 .DS_Store
 data/output/hybrid_summary.tsv
 data/output/summary.json
+data/output/summary.tsv
