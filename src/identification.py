@@ -1,7 +1,5 @@
 from objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry
-#from cppModules import gen_spectra
 import gen_spectra
-
 from alignment import alignment
 from utils import ppm_to_da, to_percent, overlap_intervals, hashable_boundaries, is_json, is_file
 import utils
@@ -17,7 +15,7 @@ import json
 
 ID_SPECTRUM = 0
 MULTIPROCESSING = 0
-# top results to keep for creating an alignment
+
 global alignment_times
 alignment_times = []
 global b_scoring_times
@@ -29,117 +27,36 @@ filter_times = []
 
 TOP_X = 50
 
-def id_spectrum(
-    spectrum: Spectrum, 
-    db: Database,
-    b_hits: dict, 
-    y_hits: dict,
-    ppm_tolerance: int, 
-    precursor_tolerance: int,
-    n: int,
-    digest_type: str = '',
-    truth: dict = None, 
-    fall_off: dict = None, 
-    is_last: bool = False
-    ) -> Alignments:
-    '''Given the spectrum and initial hits, start the alignment process for 
-    the input spectrum
 
-    :param spectrum: observed spectrum in question
-    :type spectrum: Spectrum
-    :param db: Holds all the source sequences
-    :type db: Database
-    :param b_hits: all k-mers found from the b-ion search
-    :type b_hits: list
-    :param y_hits: all k-mers found from the y-ion search
-    :type y_hits: list
-    :param ppm_tolerance: the parts per million error allowed when trying to match masses
-    :type ppm_tolerance: int
-    :param precursor_tolerance: the parts per million error allowed when trying to match
-        precursor masses
-    :type percursor_tolerance: int
-    :param n: the number of alignments to save
-    :type n: int
-    :param digest_type: the digest performed on the sample
-        (default is '')
-    :type digest_type: str
-    :param truth: a set of id keyed spectra with the desired spectra. A better description of what this looks like can be 
-        seen in the param.py file. If left None, the program will continue normally
-        (default is None)
-    :type truth: dict
-    :param fall_off: only works if the truth param is set to a dictionary. This is a dictionary (if using multiprocessing, 
-        needs to be process safe) where, if a sequence loses the desired sequence, a key value pair of spectrum id, 
-        DevFallOffEntry object are added to it. 
-        (default is None)
-    :type fall_off: dict
-    :param is_last: Only works if DEV is set to true in params. If set to true, timing evaluations are done. 
-        (default is False)
-    :type is_last: bool
 
-    :returns: Alignments for the spectrum. If no alignment can be created, and empty Alignments object is inserted
-    :rtype: Alignments
-    '''
-    start_time = time.time()
-    # convert the ppm tolerance of the precursor to an int for the rest of the time
+def id_spectrum(spectrum: Spectrum, db: Database, b_hits: dict, y_hits: dict,
+    ppm_tolerance: int, precursor_tolerance: int,n: int,digest_type: str = '',
+    truth: dict = None, fall_off: dict = None, is_last: bool = False):
     precursor_tolerance = utils.ppm_to_da(spectrum.precursor_mass, precursor_tolerance)
-
-    # score and sort these results
     score_b_start = time.time()
-    b_results = sorted([
-        (
-            kmer, 
-            mass_comparisons.optimized_compare_masses(spectrum.mz_values, gen_spectra.gen_spectrum(kmer, ion='b'))
-        ) for kmer in b_hits], 
-        key=lambda x: (x[1], 1/len(x[0])), 
-        reverse=True
-    )
+    b_intermediate = [(kmer, mass_comparisons.optimized_compare_masses(spectrum.mz_values, gen_spectra.gen_spectrum(kmer, ion='b'))) for kmer in b_hits]
+    b_results = sorted(b_intermediate, key=lambda x: (x[1], 1/len(x[0])), reverse=True)
     b_scoring_times.append(time.time() - score_b_start)
     score_y_start = time.time()
-    y_results = sorted([
-        (
-            kmer, 
-            mass_comparisons.optimized_compare_masses(spectrum.mz_values, gen_spectra.gen_spectrum(kmer, ion='y'))
-        ) for kmer in y_hits], 
-        key=lambda x: (x[1], 1/len(x[0])), 
-        reverse=True
-    )
+    y_intermediate = [(kmer, mass_comparisons.optimized_compare_masses(spectrum.mz_values, gen_spectra.gen_spectrum(kmer, ion='y'))) for kmer in y_hits]
+    y_results = sorted(y_intermediate, key=lambda x: (x[1], 1/len(x[0])), reverse=True)
     y_scoring_times.append(time.time() - score_y_start)
-
     filter_start = time.time()
-    # filter out the results
-    # 1. take all non-zero values 
-    # 2. either take the TOP_X or if > TOP_X have the same score, all of those values
     filtered_b, filtered_y = [], []
-
-    # find the highest b and y scores
     max_b_score = max([x[1] for x in b_results])
     max_y_score = max([x[1] for x in y_results])
-
-    # count the number of kmers that have the highest value
     num_max_b = sum([1 for x in b_results if x[1] == max_b_score])
     num_max_y = sum([1 for x in y_results if x[1] == max_y_score])
-
-    # if we have more than TOP_X number of the highest score, take all of them
     keep_b_count = max(TOP_X, num_max_b)
     keep_y_count = max(TOP_X, num_max_y)
-
-    # take the afformentioned number of results that > than zero
     filtered_b = [x[0] for x in b_results[:keep_b_count] if x[1] > 0]
     filtered_y = [x[0] for x in y_results[:keep_y_count] if x[1] > 0]
-
     filter_times.append(time.time() - filter_start)
-
-    # if fall off and truth are not none, check to see that we can still make the truth seq
     if truth is not None and fall_off is not None:
-
-        # pull out id, hybrid, and truth seq to make it easier
         _id = spectrum.id
         truth_seq = truth[_id]['sequence']
         is_hybrid = truth[_id]['hybrid']
-
         if not utils.DEV_contains_truth_parts(truth_seq, is_hybrid, filtered_b, filtered_y):
-
-            # add some metadata about what we kept and what fell off
             metadata = {
                 'top_x_b_hits': filtered_b, 
                 'top_x_y_hits': filtered_y, 
@@ -148,36 +65,21 @@ def id_spectrum(
                 'cut_off_b_score': b_results[keep_b_count - 1][1], 
                 'cut_off_y_score': y_results[keep_y_count - 1][1]
             }
-
-            # make dev fall off object and add to fall off
             fall_off[_id] = DEVFallOffEntry(
                 is_hybrid, 
                 truth_seq, 
                 'top_x_filtering', 
                 metadata
             )
-
-            # skip this entry all together
             return Alignments(spectrum, [])
 
-    # create an alignment for the spectrum
     align_start = time.time()
-    alignments = alignment.attempt_alignment(
-        spectrum, 
-        db, 
-        filtered_b, 
-        filtered_y, 
-        ppm_tolerance=ppm_tolerance, 
-        precursor_tolerance=precursor_tolerance,
-        n=n, 
-        truth=truth, 
-        fall_off=fall_off, 
-        is_last=is_last
-    )
+    alignments = alignment.attempt_alignment(spectrum, db, filtered_b, filtered_y, 
+        ppm_tolerance=ppm_tolerance, precursor_tolerance=precursor_tolerance,
+        n=n, truth=truth, fall_off=fall_off, is_last=is_last)
     TOT_ALIGNMENT = time.time() - align_start
     alignment_times.append(TOT_ALIGNMENT)
     return alignments
-
 
 def id_spectra(
     spectra_files: list, 
