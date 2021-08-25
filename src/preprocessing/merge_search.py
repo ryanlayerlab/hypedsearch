@@ -54,6 +54,13 @@ def sort_masses_in_sorted_keys_b(db_dict_b,mz,db_list_b,index_list_b,kmer_list_b
     index_list_b.append(len(kmers) + offset)
     kmer_list_b += kmers
 
+def sort_masses_in_sorted_keys_y(db_dict_y,mz,db_list_y,index_list_y,kmer_list_y):
+    kmers = db_dict_y[mz]
+    db_list_y.append(mz)
+    offset = 0 if not len(index_list_y) else index_list_y[-1]
+    index_list_y.append(len(kmers) + offset)
+    kmer_list_y += kmers
+
 def make_database_set(proteins: list, max_len: int):
     db_dict_b = defaultdict(set)
     db_dict_y = defaultdict(set)
@@ -69,14 +76,9 @@ def make_database_set(proteins: list, max_len: int):
         sort_masses_in_sorted_keys_b(db_dict_b,mz,db_list_b,index_list_b,kmer_list_b)
     sorted_keys = sorted(db_dict_y.keys())
     for mz in sorted_keys:
-        kmers = db_dict_y[mz]
-        db_list_y.append(mz)
-        offset = 0 if not len(index_list_y) else index_list_y[-1]
-        index_list_y.append(len(kmers) + offset)
-        kmer_list_y += kmers
-    print('Done')
+        sort_masses_in_sorted_keys_y(db_dict_y,mz,db_list_y,index_list_y,kmer_list_y)
+    print('Sorting the set of protein masses done')
     return db_list_b, index_list_b, kmer_list_b, db_list_y, index_list_y, kmer_list_y, kmer_set
-
 
 def match_masses(spectra_boundaries: list, db: Database, max_pep_len: int = 30):
     matched_masses_b, matched_masses_y, kmer_set = defaultdict(list), defaultdict(list), defaultdict(list)
