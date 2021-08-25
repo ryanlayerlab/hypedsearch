@@ -47,6 +47,13 @@ def make_database_set_for_protein(i,plen,max_len,prot_entry,prot_name,db_dict_b,
         kmer = prot_entry.sequence[j:]
         add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set)
 
+def sort_masses_in_sorted_keys_b(db_dict_b,mz,db_list_b,index_list_b,kmer_list_b):
+    kmers = db_dict_b[mz]
+    db_list_b.append(mz)
+    offset = 0 if not len(index_list_b) else index_list_b[-1]
+    index_list_b.append(len(kmers) + offset)
+    kmer_list_b += kmers
+
 def make_database_set(proteins: list, max_len: int):
     db_dict_b = defaultdict(set)
     db_dict_y = defaultdict(set)
@@ -59,12 +66,7 @@ def make_database_set(proteins: list, max_len: int):
     db_list_y, index_list_y, kmer_list_y = arr.array('f'), arr.array('i'), []
     sorted_keys = sorted(db_dict_b.keys())
     for mz in sorted_keys:
-        kmers = db_dict_b[mz]
-        db_list_b.append(mz)
-        offset = 0 if not len(index_list_b) else index_list_b[-1]
-        index_list_b.append(len(kmers) + offset)
-        kmer_list_b += kmers
-
+        sort_masses_in_sorted_keys_b(db_dict_b,mz,db_list_b,index_list_b,kmer_list_b)
     sorted_keys = sorted(db_dict_y.keys())
     for mz in sorted_keys:
         kmers = db_dict_y[mz]
