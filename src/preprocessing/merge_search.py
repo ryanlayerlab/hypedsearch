@@ -35,23 +35,25 @@ def add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set):
                 r_d[mz].add(kmer_to_add)
                 kmer_set[kmer_to_add].append(prot_name)
 
+def make_database_set_for_protein(i,plen,max_len,prot_entry,prot_name,db_dict_b,db_dict_y,kmer_set):
+    print(f'\rOn protein {i+1}/{plen} [{int((i+1) * 100 / plen)}%]', end='')
+    for j in range(1, max_len):
+        kmer = prot_entry.sequence[:j]
+        add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set)
+    for j in range(len(prot_entry.sequence) - max_len):
+        kmer = prot_entry.sequence[j:j+max_len]
+        add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set)
+    for j in range(len(prot_entry.sequence) - max_len, len(prot_entry.sequence)):
+        kmer = prot_entry.sequence[j:]
+        add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set)
+
 def make_database_set(proteins: list, max_len: int):
     db_dict_b = defaultdict(set)
     db_dict_y = defaultdict(set)
     kmer_set = defaultdict(list)
     plen = len(proteins)
     for i, (prot_name, prot_entry) in enumerate(proteins):
-        print(f'\rOn protein {i+1}/{plen} [{int((i+1) * 100 / plen)}%]', end='')
-        for j in range(1, max_len):
-            kmer = prot_entry.sequence[:j]
-            add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set)
-        for j in range(len(prot_entry.sequence) - max_len):
-            kmer = prot_entry.sequence[j:j+max_len]
-            add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set)
-        for j in range(len(prot_entry.sequence) - max_len, len(prot_entry.sequence)):
-            kmer = prot_entry.sequence[j:]
-            add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set)
-
+        make_database_set_for_protein(i,plen,max_len,prot_entry,prot_name,db_dict_b,db_dict_y,kmer_set)
     print('\nSorting the set of protein masses...')
     db_list_b, index_list_b, kmer_list_b = arr.array('f'), arr.array('i'), []
     db_list_y, index_list_y, kmer_list_y = arr.array('f'), arr.array('i'), []
