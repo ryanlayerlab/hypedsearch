@@ -80,12 +80,7 @@ def make_database_set(proteins: list, max_len: int):
     print('Sorting the set of protein masses done')
     return db_list_b, index_list_b, kmer_list_b, db_list_y, index_list_y, kmer_list_y, kmer_set
 
-def match_masses_per_protein(batch_num,num_batches,max_len,batch_set,spectra_boundaries,kmer_set, matched_masses_b,matched_masses_y):
-    print(f'On batch {batch_num + 1}/{num_batches}\n', end='')
-    extended_batch_set = [(k, entry) for (k, v) in batch_set for entry in v]
-    batch_b_list, index_list_b, batch_kmer_b, batch_y_list, index_list_y, batch_kmer_y, batch_kmer_set = make_database_set(extended_batch_set, max_len)
-    matched_masses_b_batch = merge(batch_b_list, index_list_b, batch_kmer_b, spectra_boundaries)
-    matched_masses_y_batch = merge(batch_y_list, index_list_y, batch_kmer_y, spectra_boundaries)
+def add_matched_to_matched_set(matched_masses_b_batch,matched_masses_b,kmer_set,batch_kmer_set,matched_masses_y_batch,matched_masses_y):
     for k, v in matched_masses_b_batch.items():
         matched_masses_b[k] += v 
         for kmer in v:
@@ -94,6 +89,14 @@ def match_masses_per_protein(batch_num,num_batches,max_len,batch_set,spectra_bou
         matched_masses_y[k] += v 
         for kmer in v:
             kmer_set[kmer] += batch_kmer_set[kmer]
+
+def match_masses_per_protein(batch_num,num_batches,max_len,batch_set,spectra_boundaries,kmer_set, matched_masses_b,matched_masses_y):
+    print(f'On batch {batch_num + 1}/{num_batches}\n', end='')
+    extended_batch_set = [(k, entry) for (k, v) in batch_set for entry in v]
+    batch_b_list, index_list_b, batch_kmer_b, batch_y_list, index_list_y, batch_kmer_y, batch_kmer_set = make_database_set(extended_batch_set, max_len)
+    matched_masses_b_batch = merge(batch_b_list, index_list_b, batch_kmer_b, spectra_boundaries)
+    matched_masses_y_batch = merge(batch_y_list, index_list_y, batch_kmer_y, spectra_boundaries)
+    add_matched_to_matched_set(matched_masses_b_batch,matched_masses_b,kmer_set,batch_kmer_set,matched_masses_y_batch,matched_masses_y)
 
 def match_masses(spectra_boundaries: list, db: Database, max_pep_len: int = 30):
     matched_masses_b, matched_masses_y, kmer_set = defaultdict(list), defaultdict(list), defaultdict(list)
