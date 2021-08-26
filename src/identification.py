@@ -80,6 +80,30 @@ def id_spectrum(spectrum: Spectrum, db: Database, b_hits: dict, y_hits: dict,
     alignment_times.append(TOT_ALIGNMENT)
     return alignments
 
+def mp_id_spectrum(input_q: mp.Queue, db_copy: Database, results: dict, fall_off: dict = None, truth: dict = None):
+    while True:
+        next_entry = input_q.get(True)
+        if next_entry == 'exit':
+            return 
+        if truth is not None and fall_off is not None:
+            _id = next_entry.spectrum.id 
+            truth_seq = truth[_id]['sequence']
+            is_hybrid = truth[_id]['hybrid']
+            if not utils.DEV_contains_truth_parts(truth_seq, is_hybrid, next_entry.b_hits, next_entry.y_hits):
+                metadata = {
+                    'initial_b_candidates': next_entry.b_hits, 
+                    'initial_y_candidates': next_entry.y_hits
+                }
+                fall_off[_id] = DEVFallOffEntry(
+                    is_hybrid, truth_seq, 'mass_matching', metadata
+                )
+                results[_id] = Alignments(next_entry.spectrum, [])
+                continue
+        results[next_entry.spectrum.id] = id_spectrum(next_entry.spectrum, 
+            db_copy, next_entry.b_hits, next_entry.y_hits, 
+            next_entry.ppm_tolerance, next_entry.precursor_tolerance,
+            next_entry.n,truth, fall_off)
+
 def match_on_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off,results,DEBUG):
     for i, spectrum in enumerate(spectra):
         print(f'Creating alignment for spectrum {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='\r')
@@ -156,93 +180,53 @@ def match_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,bou
     for p in ps:
         p.join()
 
-def id_spectra(spectra_files: list, database: database, verbose: bool = True, 
+def handle_DEV_setup(truth):
+    truth = mp.Manager().dict(truth)
+
+def handle_DEV_result(output_dir,fall_off,cores):
+    output_dir = output_dir + '/' if output_dir[-1] != '/' else output_dir
+    safe_write_fall_off = {}
+    for k, v in fall_off.items():
+        safe_write_fall_off[k] = v._asdict()
+    JSON.save_dict(output_dir + 'fall_off.json', safe_write_fall_off)
+    if cores == 1:
+        identification_instrumentation = objects.Identification_Instrumentation(
+        average_b_scoring_time = sum(b_scoring_times)/len(b_scoring_times),
+        average_y_scoring_time = sum(y_scoring_times)/len(y_scoring_times),
+        time_to_filter_out_top_50_kmers = sum(filter_times)/len(filter_times),
+        average_extension_time = sum(alignment.extension_times)/len(alignment.extension_times),
+        average_non_hybrid_refinement_time = sum(alignment.Non_hybrid_refine_time)/len(alignment.Non_hybrid_refine_time),
+        average_non_hybrid_scoring_time = sum(alignment.non_hybrid_scoring_times)/len(alignment.non_hybrid_scoring_times),
+        average_hybrid_refinement_time = sum(alignment.Hybrid_refine_times)/len(alignment.Hybrid_refine_times),
+        average_hybrid_scoring_time = sum(alignment.hybrid_scoring_times)/len(alignment.hybrid_scoring_times),
+        average_alignment_time = sum(alignment_times)/len(alignment_times)
+        )          
+
+def id_spectra(spectra_files: list, db: database, verbose: bool = True, 
     min_peptide_len: int = 5, max_peptide_len: int = 20, peak_filter: int = 0, 
     relative_abundance_filter: float = 0.0,ppm_tolerance: int = 20, 
     precursor_tolerance: int = 10, digest: str = '',cores: int = 1,
     n: int = 5,DEBUG: bool = False, truth_set: str = '', output_dir: str = ''):
     DEV = False
     truth = None
-
     if is_json(truth_set) and is_file(truth_set):
         DEV = True
         truth = json.load(open(truth_set, 'r'))
-
     fall_off = None
-    database_start = time.time()
     verbose and print('Loading database...')
-    db = database
     verbose and print('Loading database Done')
-    time_to_build_database = time.time() - database_start
-    spectra_start = time.time()
     verbose and print('Loading spectra...')
-    spectra, boundaries, mz_mapping = preprocessing_utils.load_spectra(
-        spectra_files, 
-        ppm_tolerance,
-        peak_filter=peak_filter, 
-        relative_abundance_filter=relative_abundance_filter
-    )
+    spectra, boundaries, mz_mapping = preprocessing_utils.load_spectra(spectra_files, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
     verbose and print('Loading spectra Done')
-    time_to_load_in_spectra = time.time() - spectra_start
-    mapping_start = time.time()
     matched_masses_b, matched_masses_y, db = merge_search.match_masses(boundaries, db, max_peptide_len)
-    time_to_map_boundaries_to_kmers = time.time() - mapping_start
     results = {}
     if DEV:
-        fall_off = {}
-        fall_off = mp.Manager().dict()
-        truth = mp.Manager().dict(truth)
+        handle_DEV_setup(truth)
     if cores == 1:
         match_on_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off,results,DEBUG)
     else:
         match_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest)
     if DEV:
-        output_dir = output_dir + '/' if output_dir[-1] != '/' else output_dir
-        safe_write_fall_off = {}
-        for k, v in fall_off.items():
-            safe_write_fall_off[k] = v._asdict()
-        JSON.save_dict(output_dir + 'fall_off.json', safe_write_fall_off)
-        if cores == 1:
-            identification_instrumentation = objects.Identification_Instrumentation(
-            average_b_scoring_time = sum(b_scoring_times)/len(b_scoring_times),
-            average_y_scoring_time = sum(y_scoring_times)/len(y_scoring_times),
-            time_to_filter_out_top_50_kmers = sum(filter_times)/len(filter_times),
-            average_extension_time = sum(alignment.extension_times)/len(alignment.extension_times),
-            average_non_hybrid_refinement_time = sum(alignment.Non_hybrid_refine_time)/len(alignment.Non_hybrid_refine_time),
-            average_non_hybrid_scoring_time = sum(alignment.non_hybrid_scoring_times)/len(alignment.non_hybrid_scoring_times),
-            average_hybrid_refinement_time = sum(alignment.Hybrid_refine_times)/len(alignment.Hybrid_refine_times),
-            average_hybrid_scoring_time = sum(alignment.hybrid_scoring_times)/len(alignment.hybrid_scoring_times),
-            average_alignment_time = sum(alignment_times)/len(alignment_times)
-            )          
+        handle_DEV_result(output_dir,fall_off,cores)
     return results
 
-def mp_id_spectrum(input_q: mp.Queue, db_copy: Database, results: dict, fall_off: dict = None, truth: dict = None):
-    while True:
-        next_entry = input_q.get(True)
-        if next_entry == 'exit':
-            return 
-        if truth is not None and fall_off is not None:
-            _id = next_entry.spectrum.id 
-            truth_seq = truth[_id]['sequence']
-            is_hybrid = truth[_id]['hybrid']
-            if not utils.DEV_contains_truth_parts(truth_seq, is_hybrid, next_entry.b_hits, next_entry.y_hits):
-                metadata = {
-                    'initial_b_candidates': next_entry.b_hits, 
-                    'initial_y_candidates': next_entry.y_hits
-                }
-                fall_off[_id] = DEVFallOffEntry(
-                    is_hybrid, truth_seq, 'mass_matching', metadata
-                )
-                results[_id] = Alignments(next_entry.spectrum, [])
-                continue
-        results[next_entry.spectrum.id] = id_spectrum(
-            next_entry.spectrum, 
-            db_copy, 
-            next_entry.b_hits, 
-            next_entry.y_hits, 
-            next_entry.ppm_tolerance, 
-            next_entry.precursor_tolerance,
-            next_entry.n,
-            truth, 
-            fall_off
-        )
