@@ -108,7 +108,6 @@ def match_masses_per_protein(batch_num,num_batches,max_len,batch_set,spectra_bou
     print(f'On batch {batch_num + 1}/{num_batches}\n', end='')
     extended_batch_set = [(k, entry) for (k, v) in batch_set for entry in v]
     batch_b_list, index_list_b, batch_kmer_b, batch_y_list, index_list_y, batch_kmer_y, batch_kmer_set = make_database_set(extended_batch_set, max_len)
-    #TODO: Start here I guess
     matched_masses_b_batch = merge(batch_b_list, index_list_b, batch_kmer_b, spectra_boundaries)
     matched_masses_y_batch = merge(batch_y_list, index_list_y, batch_kmer_y, spectra_boundaries)
     add_matched_to_matched_set(matched_masses_b_batch,matched_masses_b,kmer_set,batch_kmer_set,matched_masses_y_batch,matched_masses_y)
