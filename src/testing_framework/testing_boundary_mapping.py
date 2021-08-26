@@ -1,9 +1,7 @@
 import random
-import string
 
 import os
 import sys
-from typing import Tuple
 module_path = os.path.abspath(os.path.join('..', 'hypedsearch', 'src'))
 if module_path not in sys.path:
     sys.path.append(module_path)
@@ -27,37 +25,8 @@ ppm_tolerance = 20
 
 
 
-def define_single_spectrum(mz_list, ppm_tol):
-    boundaries = [make_boundaries(mz, ppm_tol) for mz in mz_list]
-
-    # make overlapped boundaries larger boundaries
-    boundaries = overlap_intervals(boundaries)
-
-    # make a mapping for mz -> boundaries
-    b_i, s_i = 0, 0
-    mz_mapping = {}
-    while s_i < len(mz_list):
-        
-        # if the current boundary encapsulates s_i, add to list
-        if boundaries[b_i][0] <= mz_list[s_i] <= boundaries[b_i][1]:
-            mz_mapping[mz_list[s_i]] = b_i 
-            s_i += 1
-
-        # else if the s_i < boundary, increment s_i
-        elif mz_list[s_i] < boundaries[b_i][0]:
-            s_i += 1
-
-        # else if s_i > boundary, incrment b_i
-        elif mz_list[s_i] > boundaries[b_i][1]:
-            b_i += 1
-    return boundaries, mz_mapping
-
-def make_boundaries(mz, ppm_tol):
-    da_tol = ppm_to_da(mz, ppm_tol)
-    return [mz - da_tol, mz + da_tol]
 
 datasets = testing_utils.define_data()
-
 dataset = datasets[0]
 
 input_spectra_path = dataset[0]
@@ -66,8 +35,8 @@ input_spectra, boundaries, mz_mapping = testing_utils.preprocess_input_spectra(i
 
 correct_sequences = testing_utils.generate_truth_set(datasets[0])
 
-# path = '/home/ncol107453/jaime_hypedsearch/hypedsearch/data/database/single_prot.fasta'
-path = dataset[2]
+path = '/home/ncol107453/jaime_hypedsearch/hypedsearch/data/database/prot_0_268.fasta'
+# path = dataset[2]
 db = database.build(path)
 
 
@@ -79,12 +48,15 @@ db = database.build(path)
 correct_sequence = 'MSSP'
 ion = 'b'
 charge = 1
-mz_array = gen_spectra.gen_spectrum(correct_sequence, 1, ion)['spectrum']
+mz_array = gen_spectra.gen_spectrum(correct_sequence, charge, ion)['spectrum']
 
-#Random sequence
-# correct_sequence = ''.join(random.choice(string.ascii_uppercase) for _ in range(0,6))
-# print(correct_sequence)
-# mz_array = gen_spectra.gen_spectrum(correct_sequence, 1, ion)['spectrum']
+# #Random sequence
+# correct_sequence = ''.join(random.choice(string.ascii_uppercase) for _ in range(0,15))
+# while testing_utils.wrong_char(correct_sequence):
+#     correct_sequence = ''.join(random.choice(string.ascii_uppercase) for _ in range(0,6))
+# ion = None
+# charge = 1
+# mz_array = gen_spectra.gen_spectrum(correct_sequence, charge, ion)['spectrum']
 
 abundances = []
 [abundances.append(random.random() * 10 * random.randrange(0,10000)) for x in range(0,len(mz_array))]
@@ -93,18 +65,20 @@ input_spectrum = Spectrum(mz_array, abundances)
 
 mz_array.sort()
 
-
 #Real data
 # spectrum_num = 0
 # input_spectrum = input_spectra[spectrum_num]
 # correct_sequence = correct_sequences[spectrum_num]
+# print(correct_sequence)
+# ion = None
 
-boundaries, mz_mapping = define_single_spectrum(input_spectrum[0], ppm_tolerance)
 
+
+
+
+
+boundaries, mz_mapping = testing_utils.define_single_spectrum(input_spectrum[0], ppm_tolerance)
 matched_masses_b, matched_masses_y, db = testing_utils.modified_match_masses(boundaries, db, max_peptide_length)
-
-
-
 
 
 
@@ -128,7 +102,7 @@ print('Done')
 #Writing b and y hits
 print('Writing data...')
 with open("b_hits.txt", 'w') as b:
-    for x in b_hits:
+    for i, x in enumerate(b_hits):
         pep_id = x[0]
         w = x[1][0]
         prot_id = x[1][1]
@@ -136,10 +110,11 @@ with open("b_hits.txt", 'w') as b:
         loc = x[1][3]
         write_ion = x[1][4]
         charge = x[1][5]
-        out = [pep_id, w, prot_id, seq, loc, write_ion, charge]
-        b.write('\t'.join([str(i) for i in out]) + '\n')
+        x = [pep_id, w, prot_id, seq, loc, write_ion, charge]
+        b_hits[i] = x
+        b.write('\t'.join([str(i) for i in x]) + '\n')
 with open("y_hits.txt", 'w') as y_file:
-    for y in y_hits:
+    for i, y in enumerate(y_hits):
         pep_id = y[0]
         w = y[1][0]
         prot_id = y[1][1]
@@ -147,8 +122,9 @@ with open("y_hits.txt", 'w') as y_file:
         loc = y[1][3]
         write_ion = y[1][4]
         charge = y[1][5]
-        out = [pep_id, w, prot_id, seq, loc, write_ion, charge]
-        y_file.write('\t'.join([str(i) for i in out]) + '\n')
+        y = [pep_id, w, prot_id, seq, loc, write_ion, charge]
+        y_hits[i] = y
+        y_file.write('\t'.join([str(i) for i in y]) + '\n')
 print('Done')
 
 # with open("mz_ab.txt", 'w') as m:
@@ -159,21 +135,54 @@ print('Done')
 #         out = [mz, abundance]
 #         m.write('\t'.join([str(i) for i in out]) + '\n')
 
+# Generate scored kmers
+scored_b, scored_y = testing_utils.score_hits(b_hits, y_hits, input_spectrum)
+top_x = 50
+filtered_b, filtered_y = testing_utils.filter_hits(scored_b, scored_y, top_x)
 
-# What we expect: [4, 0, 1, 4, MSSP]
+#Check if top 50 b and y have good kmers
+# good_kmers = testing_utils.check_scores_for_kmer(filtered_b, filtered_y, correct_sequence)
+
+
+# Generate overlapping boundaries
 intervals = testing_utils.map_hits_to_intervals(ion)
 grouped_intervals = testing_utils.group_intervals(intervals)
 scored_intervals = testing_utils.merge_intervals(grouped_intervals)
 scored_intervals.sort(key=lambda x: x[3], reverse=True)
-with open("scored_intervals.txt", 'w') as s:
+# Writing data
+with open("MSSP" + "_scored_intervals.txt", 'w') as s:
+    s.write(str(correct_sequence) + '\n')
+    [s.write(str(x) + ', ') for x in input_spectrum.spectrum]
+    s.write('\n')
+    [s.write(str(x) + ', ') for x in input_spectrum.abundance]
+    s.write('\n')
+    s.write('\n')
     for interval in scored_intervals:
-        # parent_prot = interval[0]
-        # start_pos = interval[1]
-        # end_pos = interval[2]
-        # score = interval[3]
-        # seq = interval[4]
-        # out = [score, parent_prot, start_pos, end_pos, seq]
         out = []
         for entry in interval:
             out.append(entry)
+
+        s.write('\t'.join([str(i) for i in out]) + '\n')
+
+with open("MSSP" + "_scored_kmers.txt", 'w') as s:
+    s.write(str(correct_sequence) + '\n')
+    [s.write(str(x) + ', ') for x in input_spectrum.spectrum]
+    s.write('\n')
+    [s.write(str(x) + ', ') for x in input_spectrum.abundance]
+    s.write('\n')
+    s.write('\n')
+    s.write('Filtered_b: \n')
+    for kmer in filtered_b:
+        out = []
+        for entry in filtered_b:
+            out.append(entry)
+
+        s.write('\t'.join([str(i) for i in out]) + '\n')
+    s.write('\n \n \n \n \n \n \n \n \n')
+    s.write("Filtered_y")
+    for kmer in filtered_y:
+        out = []
+        for entry in filtered_y:
+            out.append(entry)
+
         s.write('\t'.join([str(i) for i in out]) + '\n')
