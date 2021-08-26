@@ -9,16 +9,16 @@ import array as arr
 BATCH_SIZE = 300
 
 def merge(mz_s: Iterable, indices: Iterable, kmers: Iterable, boundaries: Iterable):
-    b_i, mz_i = 0, 0
+    boundry_index, mass_index = 0, 0
     matched_masses = defaultdict(list)
-    while b_i < len(boundaries) and mz_i < len(mz_s):
-        if boundaries[b_i][0] <= mz_s[mz_i] <= boundaries[b_i][1]:
-            matched_masses[hashable_boundaries(boundaries[b_i])] += kmers[indices[mz_i - 1]:indices[mz_i]]
-            mz_i += 1
-        elif mz_s[mz_i] > boundaries[b_i][1]:
-            b_i += 1
-        elif mz_s[mz_i] < boundaries[b_i][0]:
-            mz_i += 1
+    while boundry_index < len(boundaries) and mass_index < len(mz_s):
+       if boundaries[boundry_index][0] <= mz_s[mass_index] <= boundaries[boundry_index][1]:
+           matched_masses[hashable_boundaries(boundaries[boundry_index])] += kmers[indices[mass_index - 1]:indices[mass_index]]
+           mass_index += 1
+       elif mz_s[mass_index] > boundaries[boundry_index][1]:
+           boundry_index += 1
+       elif mz_s[mass_index] < boundaries[boundry_index][0]:
+           mass_index += 1
     return matched_masses
 
 def add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set):
@@ -28,7 +28,6 @@ def add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set):
             spec = pre_spec
             if isinstance(pre_spec,dict):
                 spec = pre_spec.get('spectrum')
-
             for i, mz in enumerate(spec):
                 kmer_to_add = kmer[:i+1] if ion == 'b' else kmer[-i-1:]
                 r_d = db_dict_b if ion == 'b' else db_dict_y
@@ -37,13 +36,19 @@ def add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set):
 
 def make_database_set_for_protein(i,plen,max_len,prot_entry,prot_name,db_dict_b,db_dict_y,kmer_set):
     print(f'\rOn protein {i+1}/{plen} [{int((i+1) * 100 / plen)}%]', end='')
-    for j in range(1, max_len):
+    start = 1
+    stop = max_len
+    for j in range(start, stop):
         kmer = prot_entry.sequence[:j]
         add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set)
-    for j in range(len(prot_entry.sequence) - max_len):
+    start = 0
+    stop = len(prot_entry.sequence) - max_len
+    for j in range(start,stop):
         kmer = prot_entry.sequence[j:j+max_len]
         add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set)
-    for j in range(len(prot_entry.sequence) - max_len, len(prot_entry.sequence)):
+    start = len(prot_entry.sequence) - max_len
+    stop = len(prot_entry.sequence)
+    for j in range(start, stop):
         kmer = prot_entry.sequence[j:]
         add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set)
 
@@ -103,6 +108,7 @@ def match_masses_per_protein(batch_num,num_batches,max_len,batch_set,spectra_bou
     print(f'On batch {batch_num + 1}/{num_batches}\n', end='')
     extended_batch_set = [(k, entry) for (k, v) in batch_set for entry in v]
     batch_b_list, index_list_b, batch_kmer_b, batch_y_list, index_list_y, batch_kmer_y, batch_kmer_set = make_database_set(extended_batch_set, max_len)
+    #TODO: Start here I guess
     matched_masses_b_batch = merge(batch_b_list, index_list_b, batch_kmer_b, spectra_boundaries)
     matched_masses_y_batch = merge(batch_y_list, index_list_y, batch_kmer_y, spectra_boundaries)
     add_matched_to_matched_set(matched_masses_b_batch,matched_masses_b,kmer_set,batch_kmer_set,matched_masses_y_batch,matched_masses_y)
