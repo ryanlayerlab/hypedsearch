@@ -6,8 +6,6 @@ from typing import Iterable
 from math import ceil
 import array as arr
 
-BATCH_SIZE = 300
-
 def merge(mz_s: Iterable, indices: Iterable, kmers: Iterable, boundaries: Iterable):
     boundry_index, mass_index = 0, 0
     matched_masses = defaultdict(list)
@@ -104,25 +102,19 @@ def add_matched_to_matched_set(matched_masses_b_batch,matched_masses_b,kmer_set,
         for kmer in v:
             kmer_set[kmer] += batch_kmer_set[kmer]
 
-def match_masses_per_protein(batch_num,num_batches,max_len,batch_set,spectra_boundaries,kmer_set, matched_masses_b,matched_masses_y):
-    print(f'On batch {batch_num + 1}/{num_batches}\n', end='')
+def match_masses_per_protein(batch_set,max_len,spectra_boundaries,kmer_set, matched_masses_b,matched_masses_y):
     extended_batch_set = [(k, entry) for (k, v) in batch_set for entry in v]
     batch_b_list, index_list_b, batch_kmer_b, batch_y_list, index_list_y, batch_kmer_y, batch_kmer_set = make_database_set(extended_batch_set, max_len)
     matched_masses_b_batch = merge(batch_b_list, index_list_b, batch_kmer_b, spectra_boundaries)
     matched_masses_y_batch = merge(batch_y_list, index_list_y, batch_kmer_y, spectra_boundaries)
     add_matched_to_matched_set(matched_masses_b_batch,matched_masses_b,kmer_set,batch_kmer_set,matched_masses_y_batch,matched_masses_y)
 
-def match_masses_for_all_proteins(batched_prots,num_batches,max_len,spectra_boundaries,kmer_set,matched_masses_b,matched_masses_y):
-    for batch_num, batch_set in enumerate(batched_prots):
-        match_masses_per_protein(batch_num,num_batches,max_len,batch_set,spectra_boundaries,kmer_set, matched_masses_b,matched_masses_y)
-
 def match_masses(spectra_boundaries: list, db: Database, max_pep_len: int = 30):
     matched_masses_b, matched_masses_y, kmer_set = defaultdict(list), defaultdict(list), defaultdict(list)
     estimated_max_len = ceil(spectra_boundaries[-1][1] / 57.021464)
     max_len = min(estimated_max_len, max_pep_len)
-    num_batches = ceil(len(db.proteins) / BATCH_SIZE)
     kv_prots = [(k, v) for k, v in db.proteins.items()]
-    batched_prots = [kv_prots[i*BATCH_SIZE:(i+1)*BATCH_SIZE] for i in range(num_batches)]
-    match_masses_for_all_proteins(batched_prots,num_batches,max_len,spectra_boundaries,kmer_set,matched_masses_b,matched_masses_y)
+    batched_prots = kv_prots
+    match_masses_per_protein(batched_prots,max_len,spectra_boundaries,kmer_set,matched_masses_b,matched_masses_y)
     db = db._replace(kmers=kmer_set)
     return (matched_masses_b, matched_masses_y, db)
