@@ -158,24 +158,11 @@ def match_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,bou
     for p in ps:
         p.join()
 
-
-def id_spectra(
-    spectra_files: list, 
-    database: database, 
-    verbose: bool = True, 
-    min_peptide_len: int = 5, 
-    max_peptide_len: int = 20, 
-    peak_filter: int = 0, 
-    relative_abundance_filter: float = 0.0,
-    ppm_tolerance: int = 20, 
-    precursor_tolerance: int = 10, 
-    digest: str = '',
-    cores: int = 1,
-    n: int = 5,
-    DEBUG: bool = False, 
-    truth_set: str = '', 
-    output_dir: str = ''
-) -> dict:
+def id_spectra(spectra_files: list, database: database, verbose: bool = True, 
+    min_peptide_len: int = 5, max_peptide_len: int = 20, peak_filter: int = 0, 
+    relative_abundance_filter: float = 0.0,ppm_tolerance: int = 20, 
+    precursor_tolerance: int = 10, digest: str = '',cores: int = 1,
+    n: int = 5,DEBUG: bool = False, truth_set: str = '', output_dir: str = ''):
     DEV = False
     truth = None
 
@@ -185,15 +172,10 @@ def id_spectra(
 
     fall_off = None
     database_start = time.time()
-    # build/load the database
     verbose and print('Loading database...')
     db = database
     verbose and print('Loading database Done')
-    #instrumentation
     time_to_build_database = time.time() - database_start
-    
-    # load all of the spectra
-    # don't need boundries any more - just ppm value
     spectra_start = time.time()
     verbose and print('Loading spectra...')
     spectra, boundaries, mz_mapping = preprocessing_utils.load_spectra(
@@ -202,45 +184,26 @@ def id_spectra(
         peak_filter=peak_filter, 
         relative_abundance_filter=relative_abundance_filter
     )
-    for foo in spectra:
-        print(len(foo.mz_values))
-
     verbose and print('Loading spectra Done')
-    #instrumentation
     time_to_load_in_spectra = time.time() - spectra_start
-
-    #TODO: DB
-    # get the boundary -> kmer mappings for b and y ions
     mapping_start = time.time()
     matched_masses_b, matched_masses_y, db = merge_search.match_masses(boundaries, db, max_peptide_len)
-    #instrumentation
     time_to_map_boundaries_to_kmers = time.time() - mapping_start
-
-    # keep track of the alingment made for every spectrum
     results = {}
-
     if DEV:
         fall_off = {}
         fall_off = mp.Manager().dict()
         truth = mp.Manager().dict(truth)
-
-    # if we only get 1 core, don't do the multiprocessing bit
     if cores == 1:
         match_on_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off,results,DEBUG)
     else:
         match_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest)
-
     if DEV:
         output_dir = output_dir + '/' if output_dir[-1] != '/' else output_dir
-
         safe_write_fall_off = {}
-
-        # we need to convert all our DEVFallOffEntries to dicts
         for k, v in fall_off.items():
             safe_write_fall_off[k] = v._asdict()
-
         JSON.save_dict(output_dir + 'fall_off.json', safe_write_fall_off)
-        #instrumentation
         if cores == 1:
             identification_instrumentation = objects.Identification_Instrumentation(
             average_b_scoring_time = sum(b_scoring_times)/len(b_scoring_times),
@@ -262,65 +225,24 @@ def mp_id_spectrum(
     fall_off: dict = None, 
     truth: dict = None
     ) -> None:
-    '''Multiprocessing function for to identify a spectrum. Each entry in the 
-    input_q must be a MPSpectrumID object
-
-    :param input_q: a queue to pull MPSpectrumID objects from for analysis
-    :type input_q: mp.Queue
-    :param db_copy: a copy of the original database for alignments
-    :type db_copy: Database
-    :param results: a multiprocesses safe dictionary to save the alignments in
-    :type results: dict
-    :param truth_set: dictionary containing all the desired alignments to make. 
-        The format of the file is {spectrum_id: {'sequence': str, 'hybrid': bool, 'parent': str}}. 
-        If left as None, the program will continue as normal
-        (default is None)
-    :type truth_set: dict
-    :param fall_off: only used if the truth_set param is set to a valid json. Must be a multiprocess
-        safe dictionary to store the fall off information to
-    :type fall_off: dict
-
-    :returns: None
-    :rtype: None
-    '''
     while True:
-
-        # wait to get something from the input queue
         next_entry = input_q.get(True)
-
-        # if it says 'exit', quit
         if next_entry == 'exit':
             return 
-
-        # if fall off is not none, see if we have the correct value in here
         if truth is not None and fall_off is not None:
-
-            # pull out the id to make it easier
             _id = next_entry.spectrum.id 
-
-            # pull out the truth sequence and the hybrid bool 
             truth_seq = truth[_id]['sequence']
             is_hybrid = truth[_id]['hybrid']
-
-            # see if we still have the correct results
             if not utils.DEV_contains_truth_parts(truth_seq, is_hybrid, next_entry.b_hits, next_entry.y_hits):
-
-                # add some metadata. Add the b and y hits we DID have
                 metadata = {
                     'initial_b_candidates': next_entry.b_hits, 
                     'initial_y_candidates': next_entry.y_hits
                 }
-                
-                # create the fall off dev object
                 fall_off[_id] = DEVFallOffEntry(
                     is_hybrid, truth_seq, 'mass_matching', metadata
                 )
-            
-                # add an empty entry to the results
                 results[_id] = Alignments(next_entry.spectrum, [])
                 continue
-
-        # otherwise run id spectrum 
         results[next_entry.spectrum.id] = id_spectrum(
             next_entry.spectrum, 
             db_copy, 
