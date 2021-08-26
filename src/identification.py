@@ -27,11 +27,10 @@ filter_times = []
 
 TOP_X = 50
 
-
-
 def id_spectrum(spectrum: Spectrum, db: Database, b_hits: dict, y_hits: dict,
     ppm_tolerance: int, precursor_tolerance: int,n: int,digest_type: str = '',
     truth: dict = None, fall_off: dict = None, is_last: bool = False):
+
     precursor_tolerance = utils.ppm_to_da(spectrum.precursor_mass, precursor_tolerance)
     score_b_start = time.time()
     b_intermediate = [(kmer, mass_comparisons.optimized_compare_masses(spectrum.mz_values, gen_spectra.gen_spectrum(kmer, ion='b'))) for kmer in b_hits]
@@ -80,7 +79,6 @@ def id_spectrum(spectrum: Spectrum, db: Database, b_hits: dict, y_hits: dict,
     TOT_ALIGNMENT = time.time() - align_start
     alignment_times.append(TOT_ALIGNMENT)
     return alignments
-
 
 def match_on_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off,results,DEBUG):
     for i, spectrum in enumerate(spectra):
@@ -218,13 +216,7 @@ def id_spectra(spectra_files: list, database: database, verbose: bool = True,
             )          
     return results
 
-def mp_id_spectrum(
-    input_q: mp.Queue, 
-    db_copy: Database, 
-    results: dict, 
-    fall_off: dict = None, 
-    truth: dict = None
-    ) -> None:
+def mp_id_spectrum(input_q: mp.Queue, db_copy: Database, results: dict, fall_off: dict = None, truth: dict = None):
     while True:
         next_entry = input_q.get(True)
         if next_entry == 'exit':
