@@ -10,6 +10,7 @@ module_path = os.path.abspath(os.path.join('..', 'hypedsearch', 'src'))
 if module_path not in sys.path:
     sys.path.append(module_path)
 from preprocessing import preprocessing_utils
+from scoring import mass_comparisons
 from objects import Database
 import gen_spectra, utils
 
@@ -18,7 +19,7 @@ from collections import defaultdict
 from typing import Iterable
 from utils import overlap_intervals, ppm_to_da
 import array as arr
-from math import ceil
+from math import ceil, trunc
 from posixpath import split
 
 BATCH_SIZE = 300
@@ -96,7 +97,7 @@ def define_data():
 
 
     NOD2_data = Dataset(
-        os.path.join(raw_prefix, 'spectra'),
+        os.path.join(raw_prefix, 'unused_spectra'),
         os.path.join(raw_prefix, 'NOD2_E3_results.ssv'),
         os.path.join(raw_prefix, 'database', 'sample_database.fasta'),
         os.path.join(raw_prefix) + os.path.sep,
@@ -522,8 +523,8 @@ def map_hits_to_intervals(ion = ''):
     elif ion == 'y':
         interval_list = map_to_interval('y_hits.txt')
     else:
-        b_interval_list = map_to_interval('b_hits.txt')
-        y_interval_list = (map_to_interval('y_hits.txt'))
+        b_interval_list = map_to_interval('b_hits.txt', 'b')
+        y_interval_list = (map_to_interval('y_hits.txt', 'y'))
         interval_list = b_interval_list + y_interval_list
     return interval_list
 
@@ -536,11 +537,12 @@ def transform(line):
     interval = A[4]
     ion = A[5]
     charge = int(A[6])
+    initial_score = 1
 
     start_end = interval.split('-')
     interval_start = int(start_end[0])
     interval_end = int(start_end[1])
-    interval = [parent_prot, interval_start, interval_end, 1, seq]
+    interval = [parent_prot, interval_start, interval_end, initial_score, seq, mz, ion]
     return interval
 
 
@@ -557,9 +559,9 @@ def group_intervals(sorted_intervals):
     for interval in sorted_intervals:
         if int(interval[0]) not in interval_dict.keys():
             interval_dict[int(interval[0])] = []
-            interval_dict[int(interval[0])].append([interval[0], interval[1], interval[2], interval[3], interval[4]])
+            interval_dict[int(interval[0])].append([interval[0], interval[1], interval[2], interval[3], interval[4], interval[5], interval[6]])
         else:
-            interval_dict[int(interval[0])].append([interval[0], interval[1], interval[2], interval[3], interval[4]])
+            interval_dict[int(interval[0])].append([interval[0], interval[1], interval[2], interval[3], interval[4], interval[5], interval[6]])
     return interval_dict
 
 def isempty(list):
@@ -568,6 +570,11 @@ def isempty(list):
     else:
         return False
 
+def wrong_char(sequence: str):
+    if (('B' in sequence) or ('J' in sequence) or ('O' in sequence) or ('U' in sequence) or ('Z' in sequence) or ('X' in sequence)):
+        return True
+    else:
+        return False
 def merge_intervals(interval_dict):
     updated_interval_list = []
     for parent_prot in interval_dict.keys():
@@ -577,16 +584,18 @@ def merge_intervals(interval_dict):
         [updated_interval_list.append(x) for x in interval_list]
     return updated_interval_list
 
-def merge_interval(interval1, interval2, stack):
+def merge_interval(interval1, interval2, stack, mz_hit_list):
     interval1_len = interval1[2] - interval1[1]
     interval2_len = interval2[2] - interval2[1]
     if interval1_len >= interval2_len:
         interval1.append(interval2)
         stack[-1] = interval1
+        mz_hit_list.append(interval1[5])
     else:
         interval2.append(interval1)
         stack[-1] = interval2
-    return stack
+        mz_hit_list.append(interval2[5])
+    return stack, mz_hit_list
 
 def compare_intervals(interval, comparison_interval):
     if (interval != comparison_interval):
@@ -603,16 +612,174 @@ def compare_intervals(interval, comparison_interval):
             return False
     return True
 
-# 7     9     25     142     (4	148	417	419	SMS)     189    191     204     225     245     249      261     268
 def merge_overlapping_interval(interval_list):
     # input: [[170, 175], [170, 180], [1, 2]]
     # output: [[0, 170, 180, 2], [0, 1, 2, 1]]
     stack = []
     stack.append(interval_list[0])
+    mz_hit_list = []
     for interval in interval_list:
-        if compare_intervals(stack[-1], interval):
-            stack = merge_interval(stack[-1], interval, stack)
+        if ((compare_intervals(stack[-1], interval)) and (interval[5] not in mz_hit_list)):
+            stack, mz_hit_list = merge_interval(stack[-1], interval, stack, mz_hit_list)
         else:
             stack.append(interval)
 
     return stack
+
+def score_hits(b_hits, y_hits, spectrum):
+    b_results = sorted([
+        (
+            hit, 
+            mass_comparisons.optimized_compare_masses(spectrum.spectrum, gen_spectra.gen_spectrum(hit[3], ion='b'))
+        ) for hit in b_hits], 
+        key=lambda x: (x[1], 1/len(x[0])), 
+        reverse=True
+    )
+    y_results = sorted([
+        (
+            hit, 
+            mass_comparisons.optimized_compare_masses(spectrum.spectrum, gen_spectra.gen_spectrum(hit[3], ion='y'))
+        ) for hit in y_hits], 
+        key=lambda x: (x[1], 1/len(x[0])), 
+        reverse=True
+    )
+
+    return b_results, y_results
+
+def filter_hits(b_hits, y_hits, precursor_mass, precursor_charge):
+
+    filtered_b, filtered_y = [], []
+    count = 0
+    for hit in b_hits:
+        if not (gen_spectra.get_precursor(hit[3]) * hit[6]) > (precursor_mass * precursor_charge):
+            filtered_b.append(hit)
+        else:
+            if hit[3] == "MSSP":
+                print(hit[3], hit[6], hit[3] * hit[6], gen_spectra.get_precursor(hit[3]), precursor_mass, precursor_charge, precursor_mass * precursor_charge, )
+            count = count + 1
+    for hit in y_hits:
+        if not (gen_spectra.get_precursor(hit[3]) * hit[6]) > (precursor_mass * precursor_charge):
+            filtered_y.append(hit)
+        else:
+            count = count + 1
+
+    print(str(count), "kmers were filtered out")
+    return filtered_b, filtered_y
+
+def parse_hits(b_hits, y_hits):
+    for i, x in enumerate(b_hits):
+        pep_id = x[0]
+        w = x[1][0]
+        prot_id = x[1][1]
+        seq = x[1][2]
+        loc = x[1][3]
+        write_ion = x[1][4]
+        charge = x[1][5]
+        x = [pep_id, w, prot_id, seq, loc, write_ion, charge]
+        b_hits[i] = x
+    for i, y in enumerate(y_hits):
+        pep_id = y[0]
+        w = y[1][0]
+        prot_id = y[1][1]
+        seq = y[1][2]
+        loc = y[1][3]
+        write_ion = y[1][4]
+        charge = y[1][5]
+        y = [pep_id, w, prot_id, seq, loc, write_ion, charge]
+        y_hits[i] = y
+    return b_hits, y_hits
+
+def isSubSequence(string1, string2, m, n):
+    # Base Cases
+    if m == 0:
+        return True
+    if n == 0:
+        return False
+ 
+    # If last characters of two
+    # strings are matching
+    if string1[m-1] == string2[n-1]:
+        return isSubSequence(string1, string2, m-1, n-1)
+ 
+    # If last characters are not matching
+    return isSubSequence(string1, string2, m, n-1)
+
+def get_top_X(b_results, y_results, TOP_X):
+    filtered_b, filtered_y = [], []
+
+    # find the highest b and y scores
+    max_b_score = max([x[1] for x in b_results])
+    max_y_score = max([x[1] for x in y_results])
+
+    # count the number of kmers that have the highest value
+    num_max_b = sum([1 for x in b_results if x[1] == max_b_score])
+    num_max_y = sum([1 for x in y_results if x[1] == max_y_score])
+
+    # if we have more than TOP_X number of the highest score, take all of them
+    keep_b_count = max(TOP_X, num_max_b)
+    keep_y_count = max(TOP_X, num_max_y)
+
+    # take the afformentioned number of results that > than zero
+    filtered_b = [x[0] for x in b_results[:keep_b_count] if x[1] > 0]
+    filtered_y = [x[0] for x in y_results[:keep_y_count] if x[1] > 0]
+
+    return filtered_b, filtered_y
+
+def get_good_kmers(b_results, y_results, correct_sequence, TOP_X):
+    good_kmers = []
+    bad_kmers = []
+    for i, b_entry in enumerate(b_results):
+        seq = b_entry[3]
+        if (seq[0] == correct_sequence[0]):
+            if (isSubSequence(seq, correct_sequence, len(seq), len(correct_sequence))):
+                b_entry.append(TOP_X - i)
+                good_kmers.append(b_entry)
+            else:
+                b_entry.append(TOP_X - i)
+                bad_kmers.append(b_entry)
+        else:
+            b_entry.append(TOP_X - i)
+            bad_kmers.append(b_entry)
+    for i, y_entry in enumerate(y_results):
+        seq = y_entry[3]
+        if (seq[-1] == correct_sequence[-1]):
+            if (isSubSequence(seq, correct_sequence, len(seq), len(correct_sequence))):
+                y_entry.append(TOP_X - i)
+                good_kmers.append(y_entry)
+            else:
+                y_entry.append(TOP_X - i)
+                bad_kmers.append(y_entry)
+        else:
+            y_entry.append(TOP_X - i)
+            bad_kmers.append(y_entry)
+    
+    return good_kmers, bad_kmers
+
+def make_boundaries(mz, ppm_tol):
+    da_tol = ppm_to_da(mz, ppm_tol)
+    return [mz - da_tol, mz + da_tol]
+
+def define_single_spectrum(mz_list, ppm_tol):
+    boundaries = [make_boundaries(mz, ppm_tol) for mz in mz_list]
+
+    # make overlapped boundaries larger boundaries
+    boundaries = overlap_intervals(boundaries)
+
+    # make a mapping for mz -> boundaries
+    b_i, s_i = 0, 0
+    mz_mapping = {}
+    while s_i < len(mz_list):
+        
+        # if the current boundary encapsulates s_i, add to list
+        if boundaries[b_i][0] <= mz_list[s_i] <= boundaries[b_i][1]:
+            mz_mapping[mz_list[s_i]] = b_i 
+            s_i += 1
+
+        # else if the s_i < boundary, increment s_i
+        elif mz_list[s_i] < boundaries[b_i][0]:
+            s_i += 1
+
+        # else if s_i > boundary, incrment b_i
+        elif mz_list[s_i] > boundaries[b_i][1]:
+            b_i += 1
+    return boundaries, mz_mapping
