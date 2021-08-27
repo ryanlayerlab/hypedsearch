@@ -189,18 +189,6 @@ def all_perms_of_s(s: str, keyletters: str) -> list:
     return perms
 
 def ppm_to_da(mass: float, ppm_tolerance: float) -> float:
-    '''Calculate the mass tolerance in Daltons for a particular mass and 
-    a parts per million value
-
-    :param mass: The mass to calculate the Dalton tolerance for
-    :type mass: float
-    :param ppm_tolerance: The tolerance in parts per million
-    :type ppm_tolerance: float
-
-    :returns: Dalton value to add/subtract for upper/lower bounds respectively
-    :rtype: float
-    '''
-
     return abs((ppm_tolerance / 1000000)*mass)
 
 def make_sparse_array(spectrum: list, width: float, value=50) -> np.ndarray:
