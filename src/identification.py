@@ -212,8 +212,8 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     verbose and print('Loading spectra...')
     spectra, boundaries, mz_mapping = preprocessing_utils.load_spectra(spectra_files, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
     verbose and print('Loading spectra Done')
-    matched_masses_b, matched_masses_y, kmer_set = merge_search.match_masses(boundaries, db, max_peptide_len)
-    #matched_masses_b, matched_masses_y, kmer_set = merge_search.match_masses_using_webservice(spectra, ppm_tolerance, max_peptide_len)
+    #matched_masses_b, matched_masses_y, kmer_set = merge_search.match_masses(boundaries, db, max_peptide_len)
+    matched_masses_b, matched_masses_y, kmer_set = merge_search.match_masses_using_webservice(spectra, ppm_tolerance)
     db = db._replace(kmers=kmer_set)
     results = {}
     if DEV:
