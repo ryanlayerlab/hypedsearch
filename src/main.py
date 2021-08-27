@@ -53,23 +53,11 @@ def set_args(args) -> dict:
     output_dir = utils.make_valid_dir_string(output_dir)
     utils.make_dir(output_dir)
 
-    return {
-        'spectra_files': spectra_files,
-        'database_file': database_file,
-        'output_dir': output_dir,
-        'min_peptide_len': min_peptide_len,
-        'max_peptide_len': max_peptide_len,
-        'tolerance': ppm_tolerance,
-        'precursor_tolerance': precursor_tolerance,
-        'verbose': verbose, 
-        'peak_filter': peak_filter, 
-        'relative_abundance_filter': relative_abundance_filter,
-        'digest': digest, 
-        'DEBUG': debug, 
-        'cores': cores,
-        'n': n,
-        'truth_set': truth_set
-    }
+    return {'spectra_files': spectra_files,'database_file': database_file,'output_dir': output_dir,
+        'min_peptide_len': min_peptide_len,'max_peptide_len': max_peptide_len,'tolerance': ppm_tolerance,
+        'precursor_tolerance': precursor_tolerance,'verbose': verbose, 'peak_filter': peak_filter, 
+        'relative_abundance_filter': relative_abundance_filter,'digest': digest, 'DEBUG': debug, 
+        'cores': cores,'n': n,'truth_set': truth_set}
 
 def main(args: object) -> None:
     arguments = set_args(args)
