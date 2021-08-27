@@ -5,6 +5,7 @@ from collections import defaultdict
 from typing import Iterable
 from math import ceil
 import array as arr
+import requests
 
 def merge(mz_s: Iterable, indices: Iterable, kmers: Iterable, boundaries: Iterable):
     boundry_index, mass_index = 0, 0
@@ -117,7 +118,28 @@ def match_masses(spectra_boundaries: list, db: Database, max_pep_len: int = 30):
     match_masses_per_protein(kv_prots,max_len,spectra_boundaries,kmer_set,matched_masses_b,matched_masses_y)
     return (matched_masses_b, matched_masses_y, kmer_set)
 
-def match_masses_using_webservice(spectra, ppm_tolerance, max_peptide_len):
+def get_all_mz_values(spectra):
+    all_mz_values = []
+    for spectrum in spectra:
+        for mz_value in spectrum.mz_values:
+            all_mz_values.append(mz_value)
+    return all_mz_values
+
+def get_speactras_for_mz_value(ion_charge, mz_value, ppm_tolerance):
+    base_url = "http://hypedsearchservice.azurewebsites.net/api/proteinmatch?"
+    url = base_url + "ion_charge=" + ion_charge
+    url += "&weight=" + str(mz_value)
+    url += "&ppm_tolerance=" + str(ppm_tolerance)
+    request = requests.get(url = url)
+    data = request.json()
+    return data
+
+def match_masses_using_webservice(spectra, ppm_tolerance):
     matched_masses_b, matched_masses_y, kmer_set = defaultdict(list), defaultdict(list), defaultdict(list)
-    #TODO: Populate here
+    all_mz_values = get_all_mz_values(spectra)
+    all_spectra = []
+    for mz_value in all_mz_values:
+        ion_charge = "B"
+        matched_spectra = get_speactras_for_mz_value(ion_charge, mz_value,ppm_tolerance)
+        all_spectra.append(matched_spectra)
     return (matched_masses_b, matched_masses_y, kmer_set)
