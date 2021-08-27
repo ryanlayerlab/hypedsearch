@@ -115,5 +115,4 @@ def match_masses(spectra_boundaries: list, db: Database, max_pep_len: int = 30):
     max_len = min(estimated_max_len, max_pep_len)
     kv_prots = [(k, v) for k, v in db.proteins.items()]
     match_masses_per_protein(kv_prots,max_len,spectra_boundaries,kmer_set,matched_masses_b,matched_masses_y)
-    db = db._replace(kmers=kmer_set)
-    return (matched_masses_b, matched_masses_y, db)
+    return (matched_masses_b, matched_masses_y, kmer_set)

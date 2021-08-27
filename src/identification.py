@@ -104,18 +104,22 @@ def mp_id_spectrum(input_q: mp.Queue, db_copy: Database, results: dict, fall_off
             next_entry.ppm_tolerance, next_entry.precursor_tolerance,
             next_entry.n,truth, fall_off)
 
-def match_on_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off,results,DEBUG):
+def create_hits(spectrum,mz_mapping,boundaries,matched_masses_b,matched_masses_y):
+    b_hits, y_hits = [], []
+    for mz in spectrum.mz_values:
+        mapped = mz_mapping[mz]
+        b = boundaries[mapped]
+        b = hashable_boundaries(b)
+        if b in matched_masses_b:
+            b_hits += matched_masses_b[b]
+        if b in matched_masses_y:
+            y_hits += matched_masses_y[b]
+    return b_hits, y_hits
+
+def align_on_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off,results,DEBUG):
     for i, spectrum in enumerate(spectra):
         print(f'Creating alignment for spectrum {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='\r')
-        b_hits, y_hits = [], []
-        for mz in spectrum.mz_values:
-            mapped = mz_mapping[mz]
-            b = boundaries[mapped]
-            b = hashable_boundaries(b)
-            if b in matched_masses_b:
-                b_hits += matched_masses_b[b]
-            if b in matched_masses_y:
-                y_hits += matched_masses_y[b]
+        b_hits,y_hits = create_hits(spectrum,mz_mapping,boundaries,matched_masses_b,matched_masses_y)
         is_last = DEBUG and i == len(spectra) - 1
         raw_results = id_spectrum(
             spectrum, db, 
@@ -126,7 +130,7 @@ def match_on_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_
             is_last=is_last)
         results[spectrum.id]=raw_results
 
-def match_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
+def align_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
     multiprocessing_start = time.time()
     print('Initializing other processors...')
     results = mp.Manager().dict()
@@ -217,15 +221,18 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     verbose and print('Loading database Done')
     verbose and print('Loading spectra...')
     spectra, boundaries, mz_mapping = preprocessing_utils.load_spectra(spectra_files, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
+    
     verbose and print('Loading spectra Done')
-    matched_masses_b, matched_masses_y, db = merge_search.match_masses(boundaries, db, max_peptide_len)
+    matched_masses_b, matched_masses_y, kmer_set = merge_search.match_masses(boundaries, db, max_peptide_len)
+    db = db._replace(kmers=kmer_set)
+    #matched_masses_b, matched_masses_y, db = merge_search.match_masses_using_webservice(boundaries, db, max_peptide_len)
     results = {}
     if DEV:
         handle_DEV_setup(truth)
     if cores == 1:
-        match_on_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off,results,DEBUG)
+        align_on_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off,results,DEBUG)
     else:
-        match_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest)
+        align_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest)
     if DEV:
         handle_DEV_result(output_dir,fall_off,cores)
     return results
