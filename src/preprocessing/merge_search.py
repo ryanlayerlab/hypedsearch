@@ -118,12 +118,13 @@ def match_masses(spectra_boundaries: list, db: Database, max_pep_len: int = 30):
     match_masses_per_protein(kv_prots,max_len,spectra_boundaries,kmer_set,matched_masses_b,matched_masses_y)
     return (matched_masses_b, matched_masses_y, kmer_set)
 
-def get_all_mz_values(spectra):
-    all_mz_values = []
-    for spectrum in spectra:
-        for mz_value in spectrum.mz_values:
-            all_mz_values.append(mz_value)
-    return all_mz_values
+def get_midpoints_of_boundries(spectra_boundaries):
+    midpoints = []
+    for spectra_boundry in spectra_boundaries:
+        lower,upper = spectra_boundry
+        midpoint = lower + ((upper-lower)/2)
+        midpoints.append(midpoint)
+    return midpoints        
 
 def get_speactras_for_mz_value(ion_charge, mz_value, ppm_tolerance):
     base_url = "http://hypedsearchservice.azurewebsites.net/api/proteinmatch?"
@@ -134,12 +135,16 @@ def get_speactras_for_mz_value(ion_charge, mz_value, ppm_tolerance):
     data = request.json()
     return data
 
-def match_masses_using_webservice(spectra, ppm_tolerance):
+def match_masses_using_webservice(spectra_boundaries, ppm_tolerance):
     matched_masses_b, matched_masses_y, kmer_set = defaultdict(list), defaultdict(list), defaultdict(list)
-    all_mz_values = get_all_mz_values(spectra)
-    all_spectra = []
-    for mz_value in all_mz_values:
+    midpoints = get_midpoints_of_boundries(spectra_boundaries)
+    adjusted_ppm_tolerance = abs(ppm_tolerance / 100)
+    for midpoint in midpoints:
         ion_charge = "B"
-        matched_spectra = get_speactras_for_mz_value(ion_charge, mz_value,ppm_tolerance)
-        all_spectra.append(matched_spectra)
+        matched_spectra = get_speactras_for_mz_value(ion_charge, midpoint,adjusted_ppm_tolerance)
+        matched_masses_b[0] = "A"
+    for midpoint in midpoints:
+        ion_charge = "Y"
+        matched_spectra = get_speactras_for_mz_value(ion_charge, midpoint,adjusted_ppm_tolerance)
+        matched_masses_y[0] = "A"
     return (matched_masses_b, matched_masses_y, kmer_set)
