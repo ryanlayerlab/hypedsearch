@@ -146,9 +146,7 @@ filtered_b, filtered_y = testing_utils.filter_hits(scored_b, scored_y, top_x)
 
 # Generate overlapping boundaries
 intervals = testing_utils.map_hits_to_intervals(ion)
-grouped_intervals = testing_utils.group_intervals(intervals)
-scored_intervals = testing_utils.merge_intervals(grouped_intervals)
-scored_intervals.sort(key=lambda x: x[3], reverse=True)
+
 # Writing data
 with open("MSSP" + "_scored_intervals.txt", 'w') as s:
     s.write(str(correct_sequence) + '\n')

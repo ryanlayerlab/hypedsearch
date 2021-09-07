@@ -1,4 +1,7 @@
-from typing import Tuple, Union
+from typing import Tuple
+import string
+import collections
+import operator
 from pyteomics import fasta
 import os
 import pandas as pd
@@ -14,7 +17,6 @@ from scoring import mass_comparisons
 from objects import Database
 import gen_spectra, utils
 
-from file_io import spectra
 from collections import defaultdict
 from typing import Iterable
 from utils import overlap_intervals, ppm_to_da
@@ -516,17 +518,73 @@ def append_correct_hits(correct_hits, correct_sequence, input_spectrum, ppm_tole
             if mz > boundary[0] and mz < boundary[1]:
                 correct_hits.append(mz)
 
-def map_hits_to_intervals(ion = ''):
-    interval_list = []
-    if ion == 'b':
-        interval_list = map_to_interval('b_hits.txt')
-    elif ion == 'y':
-        interval_list = map_to_interval('y_hits.txt')
-    else:
-        b_interval_list = map_to_interval('b_hits.txt', 'b')
-        y_interval_list = (map_to_interval('y_hits.txt', 'y'))
-        interval_list = b_interval_list + y_interval_list
-    return interval_list
+def map_hits_to_intervals(file_name):
+    Hit = collections.namedtuple('Hit', 'pid start end seq')
+
+    def print_cluster(cluster):
+        if len(cluster) == 0 : return None
+        O = []
+
+        O.append(len(cluster))
+        O.append(cluster[0].pid)
+
+        max_len = 0
+        max_hit = None
+
+        for hit in cluster:
+            l = hit.end - hit.start + 1
+            if l > max_len:
+                max_len = l
+                max_hit = hit
+
+        O.append(max_hit.seq)
+
+        for hit in cluster:
+            O.append( (hit.start, hit.end) )
+
+        print( '\t'.join( [str(o) for o in O] ) )
+
+
+
+    hits = []
+
+    for l in open(file_name):
+        A = l.rstrip().split('\t')
+        pid = int(A[2])
+        start = int(A[4].split('-')[0])
+        end = int(A[4].split('-')[1])
+        seq = A[3]
+
+        hits.append( Hit(pid=pid, start=start, end=end, seq=seq) )
+
+    sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
+
+    last_pid = None
+    last_start = None
+
+    cluster = []
+
+    for hit in sorted_hits:
+        if last_pid == hit.pid and last_start == hit.start:
+            cluster.append(hit)
+        else:
+            print_cluster(cluster)
+            cluster = [hit]
+        last_pid = hit.pid
+        last_start = hit.start
+
+
+
+    # interval_list = []
+    # if ion == 'b':
+    #     interval_list = map_to_interval('b_hits.txt')
+    # elif ion == 'y':
+    #     interval_list = map_to_interval('y_hits.txt')
+    # else:
+    #     b_interval_list = map_to_interval('b_hits.txt', 'b')
+    #     y_interval_list = (map_to_interval('y_hits.txt', 'y'))
+    #     interval_list = b_interval_list + y_interval_list
+    return cluster
 
 def transform(line):
     A = line.rstrip().split()
@@ -725,6 +783,25 @@ def get_top_X(b_results, y_results, TOP_X):
 
     return filtered_b, filtered_y
 
+def is_good_hit(kmer: string, ion, correct_sequence):
+    #take in a kmer and ion and determine if sequence is good subsequence. Also return score based on length of kmer
+    if ion == 'b':
+        if (kmer[0] == correct_sequence[0]):
+            if (isSubSequence(kmer, correct_sequence, len(kmer), len(correct_sequence))):
+                return (True, len(kmer))
+            else:
+                return (False, 0)
+        else:
+            return (False, 0)
+    else:
+        if (kmer[-1] == correct_sequence[-1]):
+            if (isSubSequence(kmer, correct_sequence, len(kmer), len(correct_sequence))):
+                return (True, len(kmer))
+            else:
+                return (False, 0)
+        else:
+            return (False, 0)
+
 def get_good_kmers(b_results, y_results, correct_sequence, TOP_X):
     good_kmers = []
     bad_kmers = []
@@ -783,3 +860,185 @@ def define_single_spectrum(mz_list, ppm_tol):
         elif mz_list[s_i] > boundaries[b_i][1]:
             b_i += 1
     return boundaries, mz_mapping
+
+def write_data(b_hits, y_hits):
+    #Writing b and y hits
+    print('Writing data...')
+    with open("b_hits.txt", 'w') as b:
+        for x in b_hits:
+            pep_id = x[0]
+            w = x[1][0]
+            prot_id = x[1][1]
+            seq = x[1][2]
+            loc = x[1][3]
+            ion = x[1][4]
+            charge = x[1][5]
+            out = [pep_id, w, prot_id, seq, loc, ion, charge]
+            b.write('\t'.join([str(i) for i in out]) + '\n')
+    with open("y_hits.txt", 'w') as y_file:
+        for y in y_hits:
+            pep_id = y[0]
+            w = y[1][0]
+            prot_id = y[1][1]
+            seq = y[1][2]
+            loc = y[1][3]
+            ion = y[1][4]
+            charge = y[1][5]
+            out = [pep_id, w, prot_id, seq, loc, ion, charge]
+            y_file.write('\t'.join([str(i) for i in out]) + '\n')
+    print('Done')
+
+def cluster_hits(ion):
+    # b_hits
+
+    Hit = collections.namedtuple('Hit', 'pid start end seq')
+
+    def write_cluster(cluster, ion):
+        if len(cluster) == 0 : return None
+        O = []
+
+        O.append(len(cluster))
+        O.append(cluster[0].pid)
+
+        max_len = 0
+        max_hit = None
+
+        for hit in cluster:
+            l = hit.end - hit.start + 1
+            if l > max_len:
+                max_len = l
+                max_hit = hit
+
+        O.append(max_hit.seq)
+        
+        for hit in cluster:
+            O.append( (hit.start, hit.end, hit.seq) )
+        
+    #     print( '\t'.join( [str(o) for o in O] ) )
+        with open(ion+'_clusters.txt', 'a') as c:
+            c.write( '\t'.join( [str(o) for o in O] ) )
+            c.write('\n')
+
+
+
+    if ion == 'b':
+        file_name = 'b_hits.txt'
+        ion = 'b'
+        # file_name = sys.argv[1]
+
+        hits = []
+
+        for l in open(file_name):
+            A = l.rstrip().split('\t')
+            pid = int(A[2])
+            start = int(A[4].split('-')[0])
+            end = int(A[4].split('-')[1])
+            seq = A[3]
+
+            hits.append( Hit(pid=pid, start=start, end=end, seq=seq) )
+
+        sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
+
+        last_pid = None
+        last_start = None
+
+        cluster = []
+
+        with open('b_clusters.txt', 'w') as c:
+            c.write('')
+
+        for hit in sorted_hits:
+            if last_pid == hit.pid and last_start == hit.start:
+                cluster.append(hit)
+            else:
+                write_cluster(cluster, ion)
+                cluster = [hit]
+            last_pid = hit.pid
+            last_start = hit.start
+    else:
+        file_name = 'y_hits.txt'
+        ion = 'y'
+        # file_name = sys.argv[1]
+
+        hits = []
+
+        for l in open(file_name):
+            A = l.rstrip().split('\t')
+            pid = int(A[2])
+            start = int(A[4].split('-')[0])
+            end = int(A[4].split('-')[1])
+            seq = A[3]
+
+            hits.append( Hit(pid=pid, start=start, end=end, seq=seq) )
+
+        sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
+
+        last_pid = None
+        last_start = None
+
+        cluster = []
+
+        with open('y_clusters.txt', 'w') as c:
+            c.write('')
+
+        for hit in sorted_hits:
+            if last_pid == hit.pid and last_start == hit.start:
+                cluster.append(hit)
+            else:
+                write_cluster(cluster, ion)
+                cluster = [hit]
+            last_pid = hit.pid
+            last_start = hit.start
+
+def sort_clusters():
+    # b_hits
+    b_cluster_array = []
+    cluster = collections.namedtuple('cluster', 'score pid seq indices')
+    with open('b_clusters.txt', 'r') as c:
+        for line in c:
+            A = line.rstrip().split('\t')
+            score = int(A[0])
+            pid = int(A[1])
+            seq = A[2]
+            indices = []
+            [indices.append(A[x]) for x in range(3,len(A))]
+
+            b_cluster_array.append(cluster(score=score, pid=pid, seq=seq, indices=indices) )
+
+    b_sorted_clusters = sorted(b_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
+
+    # y_hits
+    y_cluster_array = []
+    cluster = collections.namedtuple('cluster', 'score pid seq indices')
+    with open('y_clusters.txt', 'r') as c:
+        for line in c:
+            A = line.rstrip().split('\t')
+            score = int(A[0])
+            pid = int(A[1])
+            seq = A[2]
+            indices = []
+            [indices.append(A[x]) for x in range(3,len(A))]
+
+            y_cluster_array.append(cluster(score=score, pid=pid, seq=seq, indices=indices) )
+
+    y_sorted_clusters = sorted(y_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
+
+    return b_sorted_clusters, y_sorted_clusters
+    
+def print_clusters(b_sorted_clusters, y_sorted_clusters):
+    for cluster in b_sorted_clusters:
+        non_indices = str(cluster.score) + '\t' + str(cluster.pid) + '\t' + cluster.seq
+        print(non_indices + '\t'+ '\t'.join([str(o) for o in cluster.indices]))
+    for cluster in y_sorted_clusters:
+        non_indices = str(cluster.score) + '\t' + str(cluster.pid) + '\t' + cluster.seq
+        print(non_indices + '\t'+ '\t'.join([str(o) for o in cluster.indices]))
+
+def get_hits_from_cluster(b_sorted_clusters, y_sorted_clusters):
+    b_hit_arr = []
+    y_hit_arr = []
+    for cluster in b_sorted_clusters:
+        b_hit_arr.append(cluster.seq)
+    for cluster in y_sorted_clusters:
+        y_hit_arr.append(cluster.seq)
+    
+    return b_hit_arr, y_hit_arr

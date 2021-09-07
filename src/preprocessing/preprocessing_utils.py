@@ -50,6 +50,9 @@ def load_spectra(
             relative_abundance_filter=relative_abundance_filter
         )
 
+        for spectrum in these_spectra:
+            spectrum.spectrum.append(spectrum.precursor_mass)
+
         all_spectra += these_spectra
 
         # go through each mass of each s, load it into memory, 
