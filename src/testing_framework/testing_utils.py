@@ -1,4 +1,7 @@
 from typing import Tuple
+import string
+import collections
+import operator
 from pyteomics import fasta
 import os
 import pandas as pd
@@ -6,21 +9,19 @@ from collections import defaultdict
 
 from collections import namedtuple
 import sys
-module_path = os.path.abspath(os.path.join('..', 'hypedsearch', 'src', 'hypedsearch'))
+module_path = os.path.abspath(os.path.join('..', 'hypedsearch', 'src'))
 if module_path not in sys.path:
     sys.path.append(module_path)
 from preprocessing import preprocessing_utils
+from scoring import mass_comparisons
 from objects import Database
-import gen_spectra
+import gen_spectra, utils
 
-from utils import hashable_boundaries, predicted_len
-
-from file_io import spectra
 from collections import defaultdict
 from typing import Iterable
 from utils import overlap_intervals, ppm_to_da
 import array as arr
-from math import ceil
+from math import ceil, trunc
 from posixpath import split
 
 BATCH_SIZE = 300
@@ -94,17 +95,14 @@ def define_data():
     )
 
 
-    raw_prefix = os.path.join(root, 'mnt', 'c', 'Users', 'Maxim', 'Documents', "Layer_Lab", 'Database', 'raw_inputs')
-    NOD2_top_dir = 'NOD2_E3'
-    BALB3_top_dir = 'BALB3_E3'
+    raw_prefix = os.path.join(root, 'home', 'ncol107453', 'jaime_hypedsearch', 'hypedsearch', 'data')
 
 
     NOD2_data = Dataset(
-        # os.path.join(root, 'mnt', 'c', 'Users', 'Maxim', 'Documents', 'Layer_Lab', 'Database', 'Hybrid_inputs') + os.path.sep,
-        os.path.join(raw_prefix, NOD2_top_dir, 'mzml') + os.path.sep,
-        os.path.join(raw_prefix, NOD2_top_dir, 'NOD2_E3_results.ssv'),
-        os.path.join(root, 'home', 'ncol107453', 'jaime_hypedsearch', 'hypedsearch', 'data', 'database', 'sample_database.fasta'),
-        os.path.join(raw_prefix, NOD2_top_dir) + os.path.sep,
+        os.path.join(raw_prefix, 'unused_spectra'),
+        os.path.join(raw_prefix, 'NOD2_E3_results.ssv'),
+        os.path.join(raw_prefix, 'database', 'sample_database.fasta'),
+        os.path.join(raw_prefix) + os.path.sep,
         ''
     )
 
@@ -178,37 +176,6 @@ def get_average_from_set(input_set) -> float:
 
     set_average = set_total / len(input_set)
     return set_average
-
-# def get_proteins(db: Database):
-#     return db.proteins
-# def get_kmers(db: Database, proteins: list, ):
-
-#     for i, (prot_name, prot_entry) in enumerate(proteins):
-        
-#         print(f'\rOn protein {i+1}/{plen} [{int((i+1) * 100 / plen)}%]', end='')
-        
-#         #Create all kmers
-#         for kmer_len in range(1,max_len):
-#             for j in range(len(prot_entry.sequence) - kmer_len + 1):
-#                 kmer = prot_entry.sequence[j:j+kmer_len]
-#                 add_all_masses(kmer, prot_name, )
-
-#     b = db_dict_b.keys().sort()
-#     y = db_dict_y.keys().sort()
-
-# def add_all_masses(kmer, prot_name, start_location):
-#     for ion in 'by':
-#         for charge in [1, 2]:
-#             pre_spec = gen_spectra.gen_spectrum(kmer, ion=ion, charge=charge)
-#             spec = pre_spec
-#             if isinstance(pre_spec,dict):
-#                 spec = pre_spec.get('spectrum')
-
-#             for i, mz in enumerate(spec):
-#                 kmer_to_add = kmer[:i+1] if ion == 'b' else kmer[-i-1:]
-#                 r_d = db_dict_b if ion == 'b' else db_dict_y
-#                 r_d[mz].add(kmer_to_add)
-#                 kmer_set[kmer_to_add].append((prot_name, start_location))
 
 def modified_match_masses(
     spectra_boundaries: list, 
@@ -323,9 +290,9 @@ def make_database_set(
                     r_d = db_dict_b if ion == 'b' else db_dict_y
                     # r_d[mz].add(kmer_to_add)
                     if ion == 'b':
-                        r_d[mz].add((protein_number, kmer_to_add, str(start_position) + '-' + str(end_position), ion, charge))
+                        r_d[mz].add((mz, protein_number, kmer_to_add, str(start_position) + '-' + str(end_position), ion, charge))
                     else:
-                        r_d[mz].add((protein_number, kmer_to_add, str(end_position) + '-' + str(start_position), ion, charge))
+                        r_d[mz].add((mz, protein_number, kmer_to_add, str(end_position) + '-' + str(start_position), ion, charge))
                     kmer_set[kmer_to_add].append(prot_name)
 
     plen = len(proteins)
@@ -429,7 +396,7 @@ def merge(
 
         # if mz_s[mz_i] is in the boundary, keep track of it increment mz_i
         if boundaries[b_i][0] <= mz_s[mz_i] <= boundaries[b_i][1]:
-            matched_masses[hashable_boundaries(boundaries[b_i])] += kmers[indices[mz_i - 1]:indices[mz_i]]
+            matched_masses[utils.hashable_boundaries(boundaries[b_i])] += kmers[indices[mz_i - 1]:indices[mz_i]]
             mz_i += 1
 
         # if the upper boundary is less than the mz_i, increment b_i
@@ -442,6 +409,41 @@ def merge(
 
     return matched_masses
 
+def find_hits(mz_mapping, boundaries, spectrum, spec_num, matched_masses_b, matched_masses_y, b_hits, y_hits, b_hit_set, y_hit_set, miss_set):
+    hit_list = []
+    for k, mz in enumerate(spectrum.spectrum):
+        mapped = mz_mapping[mz]
+        b = boundaries[mapped]
+        b = utils.hashable_boundaries(b)
+
+        if b in matched_masses_b:
+            mz_hit_tuple = (spec_num, k, mz)
+            b_hit_set.add(mz_hit_tuple)
+            for tuple in matched_masses_b[b]:
+                extended_tuple = (spec_num, tuple)
+                b_hits.append(extended_tuple)
+                hit_list.append(mz)
+            # b_hits += matched_masses_b[b]
+
+        if b in matched_masses_y:
+            mz_hit_tuple = (spec_num, k, mz)
+            y_hit_set.add(mz_hit_tuple)
+            for tuple in matched_masses_y[b]:
+                extended_tuple = (spec_num, tuple)
+                y_hits.append(extended_tuple)
+                hit_list.append(mz)
+            # y_hits += matched_masses_y[b]
+        
+        if mz not in hit_list:
+            miss_tuple = (spec_num, k,mz)
+            miss_set.add(miss_tuple)
+
+def find_misses(input_spectrum, hit_set, miss_set):
+    for k, mz in enumerate(input_spectrum.spectrum):
+        if (k,mz) not in hit_set:
+            miss_tuple = (k,mz)
+            miss_set.add(miss_tuple)
+
 def map_mz(input_spectra, ppm_tolerance, matched_masses_b, matched_masses_y):
     #Map to (P_y, S_i, P_j, seq, b/y)
     # Where P_y is protein this was found in, S_i is m/z number, P_j is location within that protein, seq and b/y are straightforward 
@@ -451,19 +453,19 @@ def map_mz(input_spectra, ppm_tolerance, matched_masses_b, matched_masses_y):
 
 def find_matches_in_spectrum(spectrum, mz_mapping, ppm_tolerance, matched_masses_b, matched_masses_y):
     for i, mz in enumerate(spectrum[0]):
-        boundaries = preprocessing_utils.make_boundaries(mz, ppm_tolerance)
-        match_b(matched_masses_b, matched_masses_y, boundaries, mz_mapping, i, mz)
-        match_y(matched_masses_b, matched_masses_y, boundaries, mz_mapping, i, mz)
+        boundary_set = preprocessing_utils.make_boundaries(mz, ppm_tolerance)
+        match_b(matched_masses_b, matched_masses_y, boundary_set, mz_mapping, i, mz)
+        match_y(matched_masses_b, matched_masses_y, boundary_set, mz_mapping, i, mz)
     return mz_mapping
 
-def match_b(matched_masses_b, matched_masses_y, boundaries, mz_mapping, i, mz):
+def match_b(matched_masses_b, matched_masses_y, boundary_set, mz_mapping, i, mz):
     for boundary in matched_masses_b.keys():
-        if boundary == str(boundaries[0]) + '-' + str(boundaries[1]):
+        if boundary == str(boundary_set[0]) + '-' + str(boundary_set[1]):
             add_match_to_dict('b', matched_masses_b, matched_masses_y, boundary, mz_mapping, i, mz)
 
-def match_y(matched_masses_b, matched_masses_y, boundaries, mz_mapping, i, mz):
+def match_y(matched_masses_b, matched_masses_y, boundary_set, mz_mapping, i, mz):
     for boundary in matched_masses_y.keys():
-        if boundary == str(boundaries[0]) + '-' + str(boundaries[1]):
+        if boundary == str(boundary_set[0]) + '-' + str(boundary_set[1]):
             add_match_to_dict('y', matched_masses_b, matched_masses_y, boundary, mz_mapping, i, mz)
 
 def add_match_to_dict(ion, matched_masses_b, matched_masses_y, boundary, mz_mapping, i, mz):
@@ -473,3 +475,570 @@ def add_match_to_dict(ion, matched_masses_b, matched_masses_y, boundary, mz_mapp
     else:
         for matching in matched_masses_y[boundary]:
             mz_mapping[mz].add((mz, matching[0], i, matching[2], matching[1], matching[3], matching[4]))
+
+def check_if_max(val1, current_max, location):
+    if (val1 > current_max):
+        max = val1
+        max_location = location
+    
+    return max, max_location
+def collect_metadata(input_spectra, correct_sequences, ppm_tolerance, all_hits, all_misses, hit_abundances, miss_abundances, misleading_abundances):
+    for i, spectrum in enumerate(input_spectra):
+        max_abundance = 0
+        found = False
+        initial_hits = []
+        input_spectrum = spectrum[0]
+        tot_measured_spec_length = tot_measured_spec_length + len(input_spectrum)
+        input_abundance_set = spectrum[1]
+        precursor_mass = spectrum[5]
+        precursor_charge = spectrum[6]
+        ideal_spectrum = gen_spectra.gen_spectrum(correct_sequences[i])
+        tot_ideal_spec_length = tot_ideal_spec_length + len(ideal_spectrum['spectrum'])
+        # Checking input_spectrum for hits
+        for a, j in enumerate(input_spectrum):
+            #Finding max abundance
+            max_abundance, max_abundance_location = check_if_max(input_abundance_set[a], max_abundance, a)
+
+        # Checking precursor mass
+        tolerance = utils.ppm_to_da(precursor_mass, ppm_tolerance)
+        if (not isintolerance(precursor_mass, gen_spectra.get_precursor(correct_sequences[i], precursor_charge), tolerance)):
+            count = count + 1
+
+    # Collecting average abundance
+    avg_hit_abundance = get_average_from_set(hit_abundances)
+    avg_miss_abundance = get_average_from_set(miss_abundances)
+    # Collecting total length
+    total_length = get_total_length(correct_sequences)
+
+def append_correct_hits(correct_hits, correct_sequence, input_spectrum, ppm_tolerance):
+    ideal_spectrum = gen_spectra.gen_spectrum(correct_sequence)
+    for val in ideal_spectrum['spectrum']:
+        boundary = preprocessing_utils.make_boundaries(float(val), ppm_tolerance)
+        for mz in input_spectrum[0]:
+            if mz > boundary[0] and mz < boundary[1]:
+                correct_hits.append(mz)
+
+def map_hits_to_intervals(file_name):
+    Hit = collections.namedtuple('Hit', 'pid start end seq')
+
+    def print_cluster(cluster):
+        if len(cluster) == 0 : return None
+        O = []
+
+        O.append(len(cluster))
+        O.append(cluster[0].pid)
+
+        max_len = 0
+        max_hit = None
+
+        for hit in cluster:
+            l = hit.end - hit.start + 1
+            if l > max_len:
+                max_len = l
+                max_hit = hit
+
+        O.append(max_hit.seq)
+
+        for hit in cluster:
+            O.append( (hit.start, hit.end) )
+
+        print( '\t'.join( [str(o) for o in O] ) )
+
+
+
+    hits = []
+
+    for l in open(file_name):
+        A = l.rstrip().split('\t')
+        pid = int(A[2])
+        start = int(A[4].split('-')[0])
+        end = int(A[4].split('-')[1])
+        seq = A[3]
+
+        hits.append( Hit(pid=pid, start=start, end=end, seq=seq) )
+
+    sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
+
+    last_pid = None
+    last_start = None
+
+    cluster = []
+
+    for hit in sorted_hits:
+        if last_pid == hit.pid and last_start == hit.start:
+            cluster.append(hit)
+        else:
+            print_cluster(cluster)
+            cluster = [hit]
+        last_pid = hit.pid
+        last_start = hit.start
+
+
+
+    # interval_list = []
+    # if ion == 'b':
+    #     interval_list = map_to_interval('b_hits.txt')
+    # elif ion == 'y':
+    #     interval_list = map_to_interval('y_hits.txt')
+    # else:
+    #     b_interval_list = map_to_interval('b_hits.txt', 'b')
+    #     y_interval_list = (map_to_interval('y_hits.txt', 'y'))
+    #     interval_list = b_interval_list + y_interval_list
+    return cluster
+
+def transform(line):
+    A = line.rstrip().split()
+    spectrum_num = int(A[0])
+    mz = float(A[1])
+    parent_prot = int(A[2])
+    seq = A[3]
+    interval = A[4]
+    ion = A[5]
+    charge = int(A[6])
+    initial_score = 1
+
+    start_end = interval.split('-')
+    interval_start = int(start_end[0])
+    interval_end = int(start_end[1])
+    interval = [parent_prot, interval_start, interval_end, initial_score, seq, mz, ion]
+    return interval
+
+
+def map_to_interval(hit_file):
+    interval_list = []
+    with open(hit_file, 'r') as h:
+        for line in h:
+            interval = transform(line)
+            interval_list.append(interval)
+        return interval_list
+
+def group_intervals(sorted_intervals):
+    interval_dict = dict()
+    for interval in sorted_intervals:
+        if int(interval[0]) not in interval_dict.keys():
+            interval_dict[int(interval[0])] = []
+            interval_dict[int(interval[0])].append([interval[0], interval[1], interval[2], interval[3], interval[4], interval[5], interval[6]])
+        else:
+            interval_dict[int(interval[0])].append([interval[0], interval[1], interval[2], interval[3], interval[4], interval[5], interval[6]])
+    return interval_dict
+
+def isempty(list):
+    if len(list) == 0:
+        return True
+    else:
+        return False
+
+def wrong_char(sequence: str):
+    if (('B' in sequence) or ('J' in sequence) or ('O' in sequence) or ('U' in sequence) or ('Z' in sequence) or ('X' in sequence)):
+        return True
+    else:
+        return False
+def merge_intervals(interval_dict):
+    updated_interval_list = []
+    for parent_prot in interval_dict.keys():
+        interval_list = interval_dict[parent_prot]
+        interval_list.sort(key=lambda x: x[1])
+        interval_list = merge_overlapping_interval(interval_list)
+        [updated_interval_list.append(x) for x in interval_list]
+    return updated_interval_list
+
+def merge_interval(interval1, interval2, stack, mz_hit_list):
+    interval1_len = interval1[2] - interval1[1]
+    interval2_len = interval2[2] - interval2[1]
+    if interval1_len >= interval2_len:
+        interval1.append(interval2)
+        stack[-1] = interval1
+        mz_hit_list.append(interval1[5])
+    else:
+        interval2.append(interval1)
+        stack[-1] = interval2
+        mz_hit_list.append(interval2[5])
+    return stack, mz_hit_list
+
+def compare_intervals(interval, comparison_interval):
+    if (interval != comparison_interval):
+        #Case 1: interval encompasses comparison_interval
+        if (interval[1] <= comparison_interval[1]) and (interval[2] >= comparison_interval[2]):
+            interval[3] = interval[3] + comparison_interval[3]
+            return True
+        #Case 2: comparison_interval encompasses interval
+        elif (interval[1] >= comparison_interval[1]) and (interval[2] <= comparison_interval[2]):
+            comparison_interval[3] = comparison_interval[3] + interval[3]
+            return True
+        #Case 3: Neither interval encompasses the other
+        else:
+            return False
+    return True
+
+def merge_overlapping_interval(interval_list):
+    # input: [[170, 175], [170, 180], [1, 2]]
+    # output: [[0, 170, 180, 2], [0, 1, 2, 1]]
+    stack = []
+    stack.append(interval_list[0])
+    mz_hit_list = []
+    for interval in interval_list:
+        if ((compare_intervals(stack[-1], interval)) and (interval[5] not in mz_hit_list)):
+            stack, mz_hit_list = merge_interval(stack[-1], interval, stack, mz_hit_list)
+        else:
+            stack.append(interval)
+
+    return stack
+
+def score_hits(b_hits, y_hits, spectrum):
+    b_results = sorted([
+        (
+            hit, 
+            mass_comparisons.optimized_compare_masses(spectrum.spectrum, gen_spectra.gen_spectrum(hit[3], ion='b'))
+        ) for hit in b_hits], 
+        key=lambda x: (x[1], 1/len(x[0])), 
+        reverse=True
+    )
+    y_results = sorted([
+        (
+            hit, 
+            mass_comparisons.optimized_compare_masses(spectrum.spectrum, gen_spectra.gen_spectrum(hit[3], ion='y'))
+        ) for hit in y_hits], 
+        key=lambda x: (x[1], 1/len(x[0])), 
+        reverse=True
+    )
+
+    return b_results, y_results
+
+def filter_hits(b_hits, y_hits, precursor_mass, precursor_charge):
+
+    filtered_b, filtered_y = [], []
+    count = 0
+    for hit in b_hits:
+        if not (gen_spectra.get_precursor(hit[3]) * hit[6]) > (precursor_mass * precursor_charge):
+            filtered_b.append(hit)
+        else:
+            if hit[3] == "MSSP":
+                print(hit[3], hit[6], hit[3] * hit[6], gen_spectra.get_precursor(hit[3]), precursor_mass, precursor_charge, precursor_mass * precursor_charge, )
+            count = count + 1
+    for hit in y_hits:
+        if not (gen_spectra.get_precursor(hit[3]) * hit[6]) > (precursor_mass * precursor_charge):
+            filtered_y.append(hit)
+        else:
+            count = count + 1
+
+    print(str(count), "kmers were filtered out")
+    return filtered_b, filtered_y
+
+def parse_hits(b_hits, y_hits):
+    for i, x in enumerate(b_hits):
+        pep_id = x[0]
+        w = x[1][0]
+        prot_id = x[1][1]
+        seq = x[1][2]
+        loc = x[1][3]
+        write_ion = x[1][4]
+        charge = x[1][5]
+        x = [pep_id, w, prot_id, seq, loc, write_ion, charge]
+        b_hits[i] = x
+    for i, y in enumerate(y_hits):
+        pep_id = y[0]
+        w = y[1][0]
+        prot_id = y[1][1]
+        seq = y[1][2]
+        loc = y[1][3]
+        write_ion = y[1][4]
+        charge = y[1][5]
+        y = [pep_id, w, prot_id, seq, loc, write_ion, charge]
+        y_hits[i] = y
+    return b_hits, y_hits
+
+def isSubSequence(string1, string2, m, n):
+    # Base Cases
+    if m == 0:
+        return True
+    if n == 0:
+        return False
+ 
+    # If last characters of two
+    # strings are matching
+    if string1[m-1] == string2[n-1]:
+        return isSubSequence(string1, string2, m-1, n-1)
+ 
+    # If last characters are not matching
+    return isSubSequence(string1, string2, m, n-1)
+
+def get_top_X(b_results, y_results, TOP_X):
+    filtered_b, filtered_y = [], []
+
+    # find the highest b and y scores
+    max_b_score = max([x[1] for x in b_results])
+    max_y_score = max([x[1] for x in y_results])
+
+    # count the number of kmers that have the highest value
+    num_max_b = sum([1 for x in b_results if x[1] == max_b_score])
+    num_max_y = sum([1 for x in y_results if x[1] == max_y_score])
+
+    # if we have more than TOP_X number of the highest score, take all of them
+    keep_b_count = max(TOP_X, num_max_b)
+    keep_y_count = max(TOP_X, num_max_y)
+
+    # take the afformentioned number of results that > than zero
+    filtered_b = [x[0] for x in b_results[:keep_b_count] if x[1] > 0]
+    filtered_y = [x[0] for x in y_results[:keep_y_count] if x[1] > 0]
+
+    return filtered_b, filtered_y
+
+def is_good_hit(kmer: string, ion, correct_sequence):
+    #take in a kmer and ion and determine if sequence is good subsequence. Also return score based on length of kmer
+    if ion == 'b':
+        if (kmer[0] == correct_sequence[0]):
+            if (isSubSequence(kmer, correct_sequence, len(kmer), len(correct_sequence))):
+                return (True, len(kmer))
+            else:
+                return (False, 0)
+        else:
+            return (False, 0)
+    else:
+        if (kmer[-1] == correct_sequence[-1]):
+            if (isSubSequence(kmer, correct_sequence, len(kmer), len(correct_sequence))):
+                return (True, len(kmer))
+            else:
+                return (False, 0)
+        else:
+            return (False, 0)
+
+def get_good_kmers(b_results, y_results, correct_sequence, TOP_X):
+    good_kmers = []
+    bad_kmers = []
+    for i, b_entry in enumerate(b_results):
+        seq = b_entry[3]
+        if (seq[0] == correct_sequence[0]):
+            if (isSubSequence(seq, correct_sequence, len(seq), len(correct_sequence))):
+                b_entry.append(TOP_X - i)
+                good_kmers.append(b_entry)
+            else:
+                b_entry.append(TOP_X - i)
+                bad_kmers.append(b_entry)
+        else:
+            b_entry.append(TOP_X - i)
+            bad_kmers.append(b_entry)
+    for i, y_entry in enumerate(y_results):
+        seq = y_entry[3]
+        if (seq[-1] == correct_sequence[-1]):
+            if (isSubSequence(seq, correct_sequence, len(seq), len(correct_sequence))):
+                y_entry.append(TOP_X - i)
+                good_kmers.append(y_entry)
+            else:
+                y_entry.append(TOP_X - i)
+                bad_kmers.append(y_entry)
+        else:
+            y_entry.append(TOP_X - i)
+            bad_kmers.append(y_entry)
+    
+    return good_kmers, bad_kmers
+
+def make_boundaries(mz, ppm_tol):
+    da_tol = ppm_to_da(mz, ppm_tol)
+    return [mz - da_tol, mz + da_tol]
+
+def define_single_spectrum(mz_list, ppm_tol):
+    boundaries = [make_boundaries(mz, ppm_tol) for mz in mz_list]
+
+    # make overlapped boundaries larger boundaries
+    boundaries = overlap_intervals(boundaries)
+
+    # make a mapping for mz -> boundaries
+    b_i, s_i = 0, 0
+    mz_mapping = {}
+    while s_i < len(mz_list):
+        
+        # if the current boundary encapsulates s_i, add to list
+        if boundaries[b_i][0] <= mz_list[s_i] <= boundaries[b_i][1]:
+            mz_mapping[mz_list[s_i]] = b_i 
+            s_i += 1
+
+        # else if the s_i < boundary, increment s_i
+        elif mz_list[s_i] < boundaries[b_i][0]:
+            s_i += 1
+
+        # else if s_i > boundary, incrment b_i
+        elif mz_list[s_i] > boundaries[b_i][1]:
+            b_i += 1
+    return boundaries, mz_mapping
+
+def write_data(b_hits, y_hits):
+    #Writing b and y hits
+    print('Writing data...')
+    with open("b_hits.txt", 'w') as b:
+        for x in b_hits:
+            pep_id = x[0]
+            w = x[1][0]
+            prot_id = x[1][1]
+            seq = x[1][2]
+            loc = x[1][3]
+            ion = x[1][4]
+            charge = x[1][5]
+            out = [pep_id, w, prot_id, seq, loc, ion, charge]
+            b.write('\t'.join([str(i) for i in out]) + '\n')
+    with open("y_hits.txt", 'w') as y_file:
+        for y in y_hits:
+            pep_id = y[0]
+            w = y[1][0]
+            prot_id = y[1][1]
+            seq = y[1][2]
+            loc = y[1][3]
+            ion = y[1][4]
+            charge = y[1][5]
+            out = [pep_id, w, prot_id, seq, loc, ion, charge]
+            y_file.write('\t'.join([str(i) for i in out]) + '\n')
+    print('Done')
+
+def cluster_hits(ion):
+    # b_hits
+
+    Hit = collections.namedtuple('Hit', 'pid start end seq')
+
+    def write_cluster(cluster, ion):
+        if len(cluster) == 0 : return None
+        O = []
+
+        O.append(len(cluster))
+        O.append(cluster[0].pid)
+
+        max_len = 0
+        max_hit = None
+
+        for hit in cluster:
+            l = hit.end - hit.start + 1
+            if l > max_len:
+                max_len = l
+                max_hit = hit
+
+        O.append(max_hit.seq)
+        
+        for hit in cluster:
+            O.append( (hit.start, hit.end, hit.seq) )
+        
+    #     print( '\t'.join( [str(o) for o in O] ) )
+        with open(ion+'_clusters.txt', 'a') as c:
+            c.write( '\t'.join( [str(o) for o in O] ) )
+            c.write('\n')
+
+
+
+    if ion == 'b':
+        file_name = 'b_hits.txt'
+        ion = 'b'
+        # file_name = sys.argv[1]
+
+        hits = []
+
+        for l in open(file_name):
+            A = l.rstrip().split('\t')
+            pid = int(A[2])
+            start = int(A[4].split('-')[0])
+            end = int(A[4].split('-')[1])
+            seq = A[3]
+
+            hits.append( Hit(pid=pid, start=start, end=end, seq=seq) )
+
+        sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
+
+        last_pid = None
+        last_start = None
+
+        cluster = []
+
+        with open('b_clusters.txt', 'w') as c:
+            c.write('')
+
+        for hit in sorted_hits:
+            if last_pid == hit.pid and last_start == hit.start:
+                cluster.append(hit)
+            else:
+                write_cluster(cluster, ion)
+                cluster = [hit]
+            last_pid = hit.pid
+            last_start = hit.start
+    else:
+        file_name = 'y_hits.txt'
+        ion = 'y'
+        # file_name = sys.argv[1]
+
+        hits = []
+
+        for l in open(file_name):
+            A = l.rstrip().split('\t')
+            pid = int(A[2])
+            start = int(A[4].split('-')[0])
+            end = int(A[4].split('-')[1])
+            seq = A[3]
+
+            hits.append( Hit(pid=pid, start=start, end=end, seq=seq) )
+
+        sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
+
+        last_pid = None
+        last_start = None
+
+        cluster = []
+
+        with open('y_clusters.txt', 'w') as c:
+            c.write('')
+
+        for hit in sorted_hits:
+            if last_pid == hit.pid and last_start == hit.start:
+                cluster.append(hit)
+            else:
+                write_cluster(cluster, ion)
+                cluster = [hit]
+            last_pid = hit.pid
+            last_start = hit.start
+
+def sort_clusters():
+    # b_hits
+    b_cluster_array = []
+    cluster = collections.namedtuple('cluster', 'score pid seq indices')
+    with open('b_clusters.txt', 'r') as c:
+        for line in c:
+            A = line.rstrip().split('\t')
+            score = int(A[0])
+            pid = int(A[1])
+            seq = A[2]
+            indices = []
+            [indices.append(A[x]) for x in range(3,len(A))]
+
+            b_cluster_array.append(cluster(score=score, pid=pid, seq=seq, indices=indices) )
+
+    b_sorted_clusters = sorted(b_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
+
+    # y_hits
+    y_cluster_array = []
+    cluster = collections.namedtuple('cluster', 'score pid seq indices')
+    with open('y_clusters.txt', 'r') as c:
+        for line in c:
+            A = line.rstrip().split('\t')
+            score = int(A[0])
+            pid = int(A[1])
+            seq = A[2]
+            indices = []
+            [indices.append(A[x]) for x in range(3,len(A))]
+
+            y_cluster_array.append(cluster(score=score, pid=pid, seq=seq, indices=indices) )
+
+    y_sorted_clusters = sorted(y_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
+
+    return b_sorted_clusters, y_sorted_clusters
+    
+def print_clusters(b_sorted_clusters, y_sorted_clusters):
+    for cluster in b_sorted_clusters:
+        non_indices = str(cluster.score) + '\t' + str(cluster.pid) + '\t' + cluster.seq
+        print(non_indices + '\t'+ '\t'.join([str(o) for o in cluster.indices]))
+    for cluster in y_sorted_clusters:
+        non_indices = str(cluster.score) + '\t' + str(cluster.pid) + '\t' + cluster.seq
+        print(non_indices + '\t'+ '\t'.join([str(o) for o in cluster.indices]))
+
+def get_hits_from_cluster(b_sorted_clusters, y_sorted_clusters):
+    b_hit_arr = []
+    y_hit_arr = []
+    for cluster in b_sorted_clusters:
+        b_hit_arr.append(cluster.seq)
+    for cluster in y_sorted_clusters:
+        y_hit_arr.append(cluster.seq)
+    
+    return b_hit_arr, y_hit_arr
