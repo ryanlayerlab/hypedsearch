@@ -409,9 +409,14 @@ def merge(
 
     return matched_masses
 
-def find_hits(mz_mapping, boundaries, spectrum, spec_num, matched_masses_b, matched_masses_y, b_hits, y_hits, b_hit_set, y_hit_set, miss_set):
+def find_hits(mz_mapping, boundaries, spectrum, spec_num, matched_masses_b, matched_masses_y,):
+    b_hits =[]
+    y_hits = []
+    b_hit_set = set()
+    y_hit_set = set()
+    miss_set = set()
     hit_list = []
-    for k, mz in enumerate(spectrum.spectrum):
+    for k, mz in enumerate(spectrum.mz_values):
         mapped = mz_mapping[mz]
         b = boundaries[mapped]
         b = utils.hashable_boundaries(b)
@@ -420,7 +425,7 @@ def find_hits(mz_mapping, boundaries, spectrum, spec_num, matched_masses_b, matc
             mz_hit_tuple = (spec_num, k, mz)
             b_hit_set.add(mz_hit_tuple)
             for tuple in matched_masses_b[b]:
-                extended_tuple = (spec_num, tuple)
+                extended_tuple = (spec_num, mz, tuple)
                 b_hits.append(extended_tuple)
                 hit_list.append(mz)
             # b_hits += matched_masses_b[b]
@@ -429,7 +434,7 @@ def find_hits(mz_mapping, boundaries, spectrum, spec_num, matched_masses_b, matc
             mz_hit_tuple = (spec_num, k, mz)
             y_hit_set.add(mz_hit_tuple)
             for tuple in matched_masses_y[b]:
-                extended_tuple = (spec_num, tuple)
+                extended_tuple = (spec_num, mz, tuple)
                 y_hits.append(extended_tuple)
                 hit_list.append(mz)
             # y_hits += matched_masses_y[b]
@@ -437,6 +442,8 @@ def find_hits(mz_mapping, boundaries, spectrum, spec_num, matched_masses_b, matc
         if mz not in hit_list:
             miss_tuple = (spec_num, k,mz)
             miss_set.add(miss_tuple)
+   
+    return b_hits, y_hits, b_hit_set, y_hit_set, miss_set
 
 def find_misses(input_spectrum, hit_set, miss_set):
     for k, mz in enumerate(input_spectrum.spectrum):
