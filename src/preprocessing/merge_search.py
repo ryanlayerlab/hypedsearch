@@ -6,6 +6,7 @@ from typing import Iterable
 from math import ceil
 import array as arr
 import requests
+import json
 
 def merge(mz_s: Iterable, indices: Iterable, kmers: Iterable, boundaries: Iterable):
     boundry_index, mass_index = 0, 0
@@ -126,25 +127,48 @@ def get_midpoints_of_boundries(spectra_boundaries):
         midpoints.append(midpoint)
     return midpoints        
 
+def is_kmers_in_kmer_matches(kmers,kmer_matches):
+    contained = False
+    for kmer_match in kmer_matches:
+        if kmer_match == kmers:
+            contained = True
+            break
+    return contained
+
 def get_speactras_for_mz_value(ion_charge, mz_value, ppm_tolerance):
     base_url = "http://hypedsearchservice.azurewebsites.net/api/proteinmatch?"
     url = base_url + "ion_charge=" + ion_charge
     url += "&weight=" + str(mz_value)
     url += "&ppm_tolerance=" + str(ppm_tolerance)
     request = requests.get(url = url)
-    data = request.json()
-    return data
+    protein_matches = request.json()
+    kmer_matches = []
+    proteins_matched = []
+    for protein_match in protein_matches:
+        protein_match_list = list(protein_match.values())
+        kmers = protein_match_list[1]
+        protein = protein_match_list[0]
+        proteins_matched.append(protein)
+        if is_kmers_in_kmer_matches(kmers,kmer_matches):
+            pass
+        else:
+            kmer_matches.append(kmers)
+    return kmer_matches, proteins_matched
 
 def match_masses_using_webservice(spectra_boundaries, ppm_tolerance):
     matched_masses_b, matched_masses_y, kmer_set = defaultdict(list), defaultdict(list), defaultdict(list)
     midpoints = get_midpoints_of_boundries(spectra_boundaries)
-    adjusted_ppm_tolerance = abs(ppm_tolerance / 100)
-    for midpoint in midpoints:
+    adjusted_ppm_tolerance = abs(ppm_tolerance / 1000)
+    for index, midpoint in enumerate(midpoints):
         ion_charge = "B"
-        matched_spectra = get_speactras_for_mz_value(ion_charge, midpoint,adjusted_ppm_tolerance)
-        matched_masses_b[0] = "A"
-    for midpoint in midpoints:
+        boundry = str(spectra_boundaries[index][0]) + '-' + str(spectra_boundaries[index][1])
+        matched_spectra,proteins_matched = get_speactras_for_mz_value(ion_charge, midpoint,adjusted_ppm_tolerance)
+        matched_masses_b[boundry].append(matched_spectra)
+        kmer_set = proteins_matched
+    for index, midpoint in enumerate(midpoints):
         ion_charge = "Y"
-        matched_spectra = get_speactras_for_mz_value(ion_charge, midpoint,adjusted_ppm_tolerance)
-        matched_masses_y[0] = "A"
+        boundry = str(spectra_boundaries[index][0]) + '-' + str(spectra_boundaries[index][1])
+        matched_spectra,proteins_matched = get_speactras_for_mz_value(ion_charge, midpoint,adjusted_ppm_tolerance)
+        kmer_set.extend(proteins_matched)
+        matched_masses_y[boundry].append(matched_spectra)
     return (matched_masses_b, matched_masses_y, kmer_set)
