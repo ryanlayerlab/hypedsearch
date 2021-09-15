@@ -137,3 +137,6 @@ data/output/summary.json
 data/output/summary.tsv
 data/output/summary.json
 data/output/summary.tsv
+
+.fake
+.ionide
