@@ -137,6 +137,7 @@ def align_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,bou
             args=(q, copy.deepcopy(db), results, fall_off, truth)
         ) for _ in range(num_processes) 
     ]
+
     for p in ps:
         p.start()
     time_to_spin_up_cores = time.time() - multiprocessing_start          
