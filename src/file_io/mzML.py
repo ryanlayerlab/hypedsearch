@@ -28,6 +28,7 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
     filecontents = mzml.read(filename)
 
     content: dict
+
     for content in filecontents:
 
         masses = list(content['m/z array'])
