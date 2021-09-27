@@ -406,16 +406,10 @@ def attempt_alignment(spectrum: Spectrum, db: Database, b_hits: list,y_hits: lis
     global TOTAL_ITERATIONS
     TOTAL_ITERATIONS += 1
     DEV = truth is not None and fall_off is not None
-    extension_time = time.time()
     b_non_hybrids, y_non_hybrids = extend_base_kmers(b_hits, y_hits, spectrum, db)
-    extension_times.append(time.time() - extension_time)
     non_hybrids = b_non_hybrids + y_non_hybrids
-    st = time.time()
-    initial_alignment_start = time.time()
     a = align_b_y(b_hits, y_hits, spectrum, db) + [(kmer, None) for kmer in non_hybrids]
-    initial_alignment_times.append(time.time() - initial_alignment_start)
     FIRST_ALIGN_COUNT += len(b_hits) + len(y_hits)
-    FIRST_ALIGN_TIME += time.time() - st
     if DEV:
         return attempt_alignment_dev(spectrum,truth,fall_off,a)
     alignments, non_hybrid_alignments = attempt_alignment_first_pass(spectrum,db,n,ppm_tolerance,precursor_tolerance,digest_type,truth,fall_off,DEV,OBJECTIFY_COUNT,OBJECTIFY_TIME,a,is_last)
