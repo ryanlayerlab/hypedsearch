@@ -245,8 +245,6 @@ from bisect import bisect
 
 #   CREATED JULY 1 2020
 def optimized_compare_masses(
-    mz_mapping,
-    bbby,
     observed: list, 
     reference: list, 
     ppm_tolerance: int = 20, 
@@ -289,16 +287,6 @@ def optimized_compare_masses(
     observed_boundaries = []
     for obs in observed:
         observed_boundaries += boundaries(obs)
-
-    obs_boundaries = []
-    for mz in observed:
-        mapped = mz_mapping[mz]
-        b = bbby[mapped]
-        obs_boundaries.append(b[0])
-        obs_boundaries.append(b[1])
-    
-    if obs_boundaries != observed_boundaries:
-        print('WRONG!')
         
     #hack
     #the_type = type(reference) #python = 'dict' #cpp = 'list'
