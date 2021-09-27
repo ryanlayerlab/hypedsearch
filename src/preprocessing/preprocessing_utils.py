@@ -17,6 +17,8 @@ def load_spectra(
             relative_abundance_filter=relative_abundance_filter
         )
         all_spectra += these_spectra
+        # these_spectra = [these_spectra[0]]
+        # all_spectra = [all_spectra[0]]
         linear_spectra += list(set([
             x for spectrum in these_spectra for x in spectrum.mz_values
         ]))

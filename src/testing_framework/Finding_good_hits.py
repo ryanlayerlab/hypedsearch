@@ -49,16 +49,10 @@ for spectrum_num, input_spectrum in enumerate(input_spectra):
 
     # input_spectrum = input_spectra[spectrum_num]
 
-    b_hits =[]
-    y_hits = []
-    b_set = set()
-    y_set = set()
-    correct_hits = []
-    mz_miss_set = set()
     #Remember to add in abundance if it is helpful
     input_num = 0
-    testing_utils.find_hits(mz_mapping, boundaries, input_spectrum, input_num, matched_masses_b, matched_masses_y, b_hits, y_hits, b_set, y_set, mz_miss_set)
-    testing_utils.append_correct_hits(correct_hits, correct_sequence, input_spectrum, ppm_tolerance)
+    b_hits, y_hits, b_hit_set, y_hit_set, miss_set = testing_utils.find_hits(mz_mapping, boundaries, input_spectrum, input_num, matched_masses_b, matched_masses_y)
+    correct_hits = testing_utils.append_correct_hits(correct_sequence, input_spectrum, ppm_tolerance)
     # print('Done')
 
     testing_utils.write_data(b_hits, y_hits)
