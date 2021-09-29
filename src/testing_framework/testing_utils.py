@@ -895,7 +895,7 @@ def write_data(b_hits, y_hits):
             y_file.write('\t'.join([str(i) for i in out]) + '\n')
     print('Done')
 
-def cluster_hits(ion):
+# def cluster_hits(ion):
     # b_hits
 
     Hit = collections.namedtuple('Hit', 'pid start end seq')
@@ -1049,3 +1049,66 @@ def get_hits_from_cluster(b_sorted_clusters, y_sorted_clusters):
         y_hit_arr.append(cluster.seq)
     
     return b_hit_arr, y_hit_arr
+
+def write_cluster(cluster):
+    if len(cluster) == 0 : return None
+    O = []
+
+    O.append(len(cluster))
+    O.append(cluster[0].pid)
+
+    max_len = 0
+    max_hit = None
+
+    for hit in cluster:
+        l = hit.end - hit.start + 1
+        if l > max_len:
+            max_len = l
+            max_hit = hit
+
+    O.append(max_hit.seq)
+    O.append(max_hit.mz)
+    
+    for hit in cluster:
+        O.append( (hit.start, hit.end, hit.seq, hit.mz) )
+    
+#     print( '\t'.join( [str(o) for o in O] ) )
+    with open('clusters.txt', 'a') as c:
+        c.write( '\t'.join( [str(o) for o in O] ) )
+        c.write('\n')
+
+def set_prior(mz, ion, mz_mapping, boundaries, matched_masses_b, matched_masses_y):
+    # for i in range (0, len(b_sorted_clusters)):
+    # prior = 1 / # of occurances
+    mapped = mz_mapping[mz]
+    b = boundaries[mapped]
+    b = utils.hashable_boundaries(b)
+    if ion == 'b':
+        if len(matched_masses_b[b]) == 0:
+            print(mz)
+            print(mapped)
+            print(b)
+            with open('mz_mapping.txt', 'w') as m:
+                [m.write(str(x) + '\n') for x in mz_mapping]
+        P_A = 1/len(matched_masses_b[b]) # if (len(matched_masses_b[b]) !=0) else 1
+    else:
+        if len(matched_masses_y[b]) == 0:
+            print(mz)
+            print(mapped)
+            print(b)
+            with open('mz_mapping.txt', 'w') as m:
+                [m.write(str(x) + '\n') for x in mz_mapping]
+        P_A = 1/len(matched_masses_y[b]) # if (len(matched_masses_b[b]) !=0) else 1
+    
+    return P_A
+def calc_post_prob(prior, indices):
+    post = 0
+    current_prob = prior
+    for element in indices:
+        A = element.rstrip().split(',')
+        string = A[2]
+#         mz = (A[3])
+#         mz = mz[:-1]
+#         mz = mz[2:]
+        post = post + 1/len(string) + prior
+    return post
