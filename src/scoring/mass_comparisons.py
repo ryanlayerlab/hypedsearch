@@ -1,5 +1,5 @@
 from gen_spectra import calc_masses
-from utils import ppm_to_da
+from utils import ppm_to_da, hashable_boundaries
 
 from bisect import bisect
 
@@ -295,7 +295,11 @@ def optimized_compare_masses(
         reference = updated_reference.get('spectrum')
     
     # local variables for score
-    return_value = sum([1 for ref in reference if bisect(observed_boundaries, ref) % 2])
+    return_value = 0
+    for ref in reference:
+        if bisect(observed_boundaries, ref) % 2:
+            return_value = return_value + 1
+    # return_value = sum([1 for ref in reference if bisect(observed_boundaries, ref) % 2])
     return return_value
     
 

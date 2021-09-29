@@ -95,7 +95,7 @@ def define_data():
     )
 
 
-    raw_prefix = os.path.join(root, 'home', 'ncol107453', 'jaime_hypedsearch', 'hypedsearch', 'data')
+    raw_prefix = os.path.join(root, 'home', 'naco3124', 'jaime_hypedsearch', 'hypedsearch', 'data')
 
 
     NOD2_data = Dataset(
@@ -518,80 +518,13 @@ def collect_metadata(input_spectra, correct_sequences, ppm_tolerance, all_hits, 
     total_length = get_total_length(correct_sequences)
 
 def append_correct_hits(correct_hits, correct_sequence, input_spectrum, ppm_tolerance):
+    correct_hits = []
     ideal_spectrum = gen_spectra.gen_spectrum(correct_sequence)
     for val in ideal_spectrum['spectrum']:
         boundary = preprocessing_utils.make_boundaries(float(val), ppm_tolerance)
         for mz in input_spectrum[0]:
             if mz > boundary[0] and mz < boundary[1]:
                 correct_hits.append(mz)
-
-def map_hits_to_intervals(file_name):
-    Hit = collections.namedtuple('Hit', 'pid start end seq')
-
-    def print_cluster(cluster):
-        if len(cluster) == 0 : return None
-        O = []
-
-        O.append(len(cluster))
-        O.append(cluster[0].pid)
-
-        max_len = 0
-        max_hit = None
-
-        for hit in cluster:
-            l = hit.end - hit.start + 1
-            if l > max_len:
-                max_len = l
-                max_hit = hit
-
-        O.append(max_hit.seq)
-
-        for hit in cluster:
-            O.append( (hit.start, hit.end) )
-
-        print( '\t'.join( [str(o) for o in O] ) )
-
-
-
-    hits = []
-
-    for l in open(file_name):
-        A = l.rstrip().split('\t')
-        pid = int(A[2])
-        start = int(A[4].split('-')[0])
-        end = int(A[4].split('-')[1])
-        seq = A[3]
-
-        hits.append( Hit(pid=pid, start=start, end=end, seq=seq) )
-
-    sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
-
-    last_pid = None
-    last_start = None
-
-    cluster = []
-
-    for hit in sorted_hits:
-        if last_pid == hit.pid and last_start == hit.start:
-            cluster.append(hit)
-        else:
-            print_cluster(cluster)
-            cluster = [hit]
-        last_pid = hit.pid
-        last_start = hit.start
-
-
-
-    # interval_list = []
-    # if ion == 'b':
-    #     interval_list = map_to_interval('b_hits.txt')
-    # elif ion == 'y':
-    #     interval_list = map_to_interval('y_hits.txt')
-    # else:
-    #     b_interval_list = map_to_interval('b_hits.txt', 'b')
-    #     y_interval_list = (map_to_interval('y_hits.txt', 'y'))
-    #     interval_list = b_interval_list + y_interval_list
-    return cluster
 
 def transform(line):
     A = line.rstrip().split()
@@ -868,169 +801,32 @@ def define_single_spectrum(mz_list, ppm_tol):
             b_i += 1
     return boundaries, mz_mapping
 
-def write_data(b_hits, y_hits):
-    #Writing b and y hits
-    print('Writing data...')
-    with open("b_hits.txt", 'w') as b:
-        for x in b_hits:
-            pep_id = x[0]
-            w = x[1][0]
-            prot_id = x[1][1]
-            seq = x[1][2]
-            loc = x[1][3]
-            ion = x[1][4]
-            charge = x[1][5]
-            out = [pep_id, w, prot_id, seq, loc, ion, charge]
-            b.write('\t'.join([str(i) for i in out]) + '\n')
-    with open("y_hits.txt", 'w') as y_file:
-        for y in y_hits:
-            pep_id = y[0]
-            w = y[1][0]
-            prot_id = y[1][1]
-            seq = y[1][2]
-            loc = y[1][3]
-            ion = y[1][4]
-            charge = y[1][5]
-            out = [pep_id, w, prot_id, seq, loc, ion, charge]
-            y_file.write('\t'.join([str(i) for i in out]) + '\n')
-    print('Done')
+def write_cluster(cluster):
+    if len(cluster) == 0 : return None
+    O = []
 
-# def cluster_hits(ion):
-    # b_hits
+    O.append(len(cluster))
+    O.append(cluster[0].pid)
 
-    Hit = collections.namedtuple('Hit', 'pid start end seq')
+    max_len = 0
+    max_hit = None
 
-    def write_cluster(cluster, ion):
-        if len(cluster) == 0 : return None
-        O = []
+    for hit in cluster:
+        l = hit.end - hit.start + 1
+        if l > max_len:
+            max_len = l
+            max_hit = hit
 
-        O.append(len(cluster))
-        O.append(cluster[0].pid)
+    O.append(max_hit.seq)
+    O.append(max_hit.mz)
+    
+    for hit in cluster:
+        O.append( (hit.start, hit.end, hit.seq, hit.mz) )    # b_hits
 
-        max_len = 0
-        max_hit = None
+    with open('clusters.txt', 'a') as c:
+        c.write( '\t'.join( [str(o) for o in O] ) )
+        c.write('\n')
 
-        for hit in cluster:
-            l = hit.end - hit.start + 1
-            if l > max_len:
-                max_len = l
-                max_hit = hit
-
-        O.append(max_hit.seq)
-        
-        for hit in cluster:
-            O.append( (hit.start, hit.end, hit.seq) )
-        
-    #     print( '\t'.join( [str(o) for o in O] ) )
-        with open(ion+'_clusters.txt', 'a') as c:
-            c.write( '\t'.join( [str(o) for o in O] ) )
-            c.write('\n')
-
-
-
-    if ion == 'b':
-        file_name = 'b_hits.txt'
-        ion = 'b'
-        # file_name = sys.argv[1]
-
-        hits = []
-
-        for l in open(file_name):
-            A = l.rstrip().split('\t')
-            pid = int(A[2])
-            start = int(A[4].split('-')[0])
-            end = int(A[4].split('-')[1])
-            seq = A[3]
-
-            hits.append( Hit(pid=pid, start=start, end=end, seq=seq) )
-
-        sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
-
-        last_pid = None
-        last_start = None
-
-        cluster = []
-
-        with open('b_clusters.txt', 'w') as c:
-            c.write('')
-
-        for hit in sorted_hits:
-            if last_pid == hit.pid and last_start == hit.start:
-                cluster.append(hit)
-            else:
-                write_cluster(cluster, ion)
-                cluster = [hit]
-            last_pid = hit.pid
-            last_start = hit.start
-    else:
-        file_name = 'y_hits.txt'
-        ion = 'y'
-        # file_name = sys.argv[1]
-
-        hits = []
-
-        for l in open(file_name):
-            A = l.rstrip().split('\t')
-            pid = int(A[2])
-            start = int(A[4].split('-')[0])
-            end = int(A[4].split('-')[1])
-            seq = A[3]
-
-            hits.append( Hit(pid=pid, start=start, end=end, seq=seq) )
-
-        sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
-
-        last_pid = None
-        last_start = None
-
-        cluster = []
-
-        with open('y_clusters.txt', 'w') as c:
-            c.write('')
-
-        for hit in sorted_hits:
-            if last_pid == hit.pid and last_start == hit.start:
-                cluster.append(hit)
-            else:
-                write_cluster(cluster, ion)
-                cluster = [hit]
-            last_pid = hit.pid
-            last_start = hit.start
-
-def sort_clusters():
-    # b_hits
-    b_cluster_array = []
-    cluster = collections.namedtuple('cluster', 'score pid seq indices')
-    with open('b_clusters.txt', 'r') as c:
-        for line in c:
-            A = line.rstrip().split('\t')
-            score = int(A[0])
-            pid = int(A[1])
-            seq = A[2]
-            indices = []
-            [indices.append(A[x]) for x in range(3,len(A))]
-
-            b_cluster_array.append(cluster(score=score, pid=pid, seq=seq, indices=indices) )
-
-    b_sorted_clusters = sorted(b_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
-
-    # y_hits
-    y_cluster_array = []
-    cluster = collections.namedtuple('cluster', 'score pid seq indices')
-    with open('y_clusters.txt', 'r') as c:
-        for line in c:
-            A = line.rstrip().split('\t')
-            score = int(A[0])
-            pid = int(A[1])
-            seq = A[2]
-            indices = []
-            [indices.append(A[x]) for x in range(3,len(A))]
-
-            y_cluster_array.append(cluster(score=score, pid=pid, seq=seq, indices=indices) )
-
-    y_sorted_clusters = sorted(y_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
-
-    return b_sorted_clusters, y_sorted_clusters
     
 def print_clusters(b_sorted_clusters, y_sorted_clusters):
     for cluster in b_sorted_clusters:
@@ -1049,6 +845,266 @@ def get_hits_from_cluster(b_sorted_clusters, y_sorted_clusters):
         y_hit_arr.append(cluster.seq)
     
     return b_hit_arr, y_hit_arr
+
+def write_hits(b_hits, y_hits):
+    with open("b_hits.txt", 'w') as b:
+        for x in b_hits:
+            pep_id = x[0]
+            w = x[1]
+            prot_id = x[2][1]
+            seq = x[2][2]
+            loc = x[2][3]
+            ion = x[2][4]
+            charge = x[2][5]
+            out = [pep_id, w, prot_id, seq, loc, ion, charge]
+            b.write('\t'.join([str(i) for i in out]) + '\n')
+    with open("y_hits.txt", 'w') as y_file:
+        for y in y_hits:
+            pep_id = y[0]
+            w = y[1]
+            prot_id = y[2][1]
+            seq = y[2][2]
+            loc = y[2][3]
+            ion = y[2][4]
+            charge = y[2][5]
+            out = [pep_id, w, prot_id, seq, loc, ion, charge]
+            y_file.write('\t'.join([str(i) for i in out]) + '\n')
+    print('Done')
+
+# def cluster_hits(ion):
+    # b_hits
+
+    Hit = collections.namedtuple('Hit', 'pid start end seq')
+
+    def write_cluster(cluster, ion):
+        if len(cluster) == 0 : return None
+        O = []
+
+        O.append(len(cluster))
+        O.append(cluster[0].pid)
+
+def parse_hits(Hit, file_name):
+    hits = []
+    for l in open(file_name):
+            A = l.rstrip().split('\t')
+            pid = int(A[2])
+            start = int(A[4].split('-')[0])
+            end = int(A[4].split('-')[1])
+            seq = A[3]
+            mz = A[1]
+
+            hits.append( Hit(pid=pid, start=start, end=end, seq=seq, mz=mz) )
+    return hits
+def create_clusters(ion):
+    Hit = collections.namedtuple('Hit', 'pid start end seq mz')
+
+    if ion == 'b':
+        file_name = 'b_hits.txt'
+        # file_name = sys.argv[1]
+
+        hits = parse_hits(Hit, file_name)
+
+        sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
+
+        last_pid = None
+        last_start = None
+
+        cluster = []
+
+        with open('clusters.txt', 'w') as c:
+            c.write('')
+
+        if ion == 'b':
+            for hit in sorted_hits:
+                if last_pid == hit.pid and last_start == hit.start:
+                    cluster.append(hit)
+                else:
+                    write_cluster(cluster)
+                    cluster = [hit]
+                last_pid = hit.pid
+                last_start = hit.start
+    
+    else:
+        file_name = 'y_hits.txt'
+        # file_name = sys.argv[1]
+
+        hits = parse_hits(Hit, file_name)
+
+        sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
+
+        last_pid = None
+        last_start = None
+
+        cluster = []
+
+        with open('clusters.txt', 'w') as c:
+            c.write('')
+
+
+        if ion == 'y':
+            for hit in sorted_hits:
+                if last_pid == hit.pid and last_end == hit.end:
+                    cluster.append(hit)
+                else:
+                    write_cluster(cluster)
+                    cluster = [hit]
+                last_pid = hit.pid
+                last_end = hit.end
+
+def set_prior(mz, ion, mz_mapping, boundaries, matched_masses_b, matched_masses_y):
+    # for i in range (0, len(b_sorted_clusters)):
+    # prior = 1 / # of occurances
+    mapped = mz_mapping[mz]
+    b = boundaries[mapped]
+    b = utils.hashable_boundaries(b)
+    if ion == 'b':
+        if len(matched_masses_b[b]) == 0:
+            print(mz)
+            print(mapped)
+            print(b)
+            with open('mz_mapping.txt', 'w') as m:
+                [m.write(str(x) + '\n') for x in mz_mapping]
+        P_A = 1/len(matched_masses_b[b]) # if (len(matched_masses_b[b]) !=0) else 1
+    else:
+        if len(matched_masses_y[b]) == 0:
+            print(mz)
+            print(mapped)
+            print(b)
+            with open('mz_mapping.txt', 'w') as m:
+                [m.write(str(x) + '\n') for x in mz_mapping]
+        P_A = 1/len(matched_masses_y[b]) # if (len(matched_masses_b[b]) !=0) else 1
+    
+    return P_A
+
+def calc_post_prob(prior, indices):
+    post = 0
+    current_prob = prior
+    for element in indices:
+        A = element.rstrip().split(',')
+        string = A[2]
+#         mz = (A[3])
+#         mz = mz[:-1]
+#         mz = mz[2:]
+        post = post + 1/len(string) + prior
+    return post
+
+def sort_clusters_by_post_prob(ion, mz_mapping, boundaries, matched_masses_b, matched_masses_y):
+    cluster = collections.namedtuple('cluster', 'post_prob prior score pid seq mz indices')
+    if ion == 'b':
+        b_cluster_array = []
+        with open('clusters.txt', 'r') as c:
+            for line in c:
+                A = line.rstrip().split('\t')
+                score = int(A[0])
+                pid = int(A[1])
+                seq = A[2]
+                mz = float(A[3])
+                indices = []
+                [indices.append(A[x]) for x in range(4,len(A))]
+                prior = set_prior(mz, ion, mz_mapping, boundaries, matched_masses_b, matched_masses_y)
+                post_prob = calc_post_prob(prior, indices)
+
+                b_cluster_array.append(cluster(post_prob=post_prob, prior=prior, score=score, pid=pid, seq=seq, mz=mz, indices=indices) )
+
+        b_sorted_clusters = sorted(b_cluster_array, key=operator.attrgetter('post_prob', 'score', 'pid', 'prior'), reverse = True)
+        return b_sorted_clusters
+    else:
+        # y_hits
+        y_cluster_array = []
+        with open('clusters.txt', 'r') as c:
+            for line in c:
+                A = line.rstrip().split('\t')
+                score = int(A[0])
+                pid = int(A[1])
+                seq = A[2]
+                mz = float(A[3])
+                indices = []
+                [indices.append(A[x]) for x in range(4,len(A))]
+                prior = set_prior(mz, 'y', mz_mapping, boundaries, matched_masses_b, matched_masses_y)
+                post_prob = calc_post_prob(prior, indices)
+
+                y_cluster_array.append(cluster(post_prob=post_prob, prior=prior, score=score, pid=pid, seq=seq, mz=mz, indices=indices) )
+
+        y_sorted_clusters = sorted(y_cluster_array, key=operator.attrgetter('post_prob', 'score', 'pid', 'prior'), reverse = True)
+        return y_sorted_clusters
+
+
+def write_b_sorted_cluster(b_sorted_clusters):
+    # for cluster in b_sorted_clusters:
+    #     non_indices = str(cluster.score) + '\t' + str(cluster.post_prob) + '\t' + str(cluster.prior) + '\t' + str(cluster.pid) + '\t' + cluster.seq + '\t' + str(cluster.mz)
+    #     print(non_indices) #+ '\t'+ '\t'.join([str(o) for o in cluster.indices]))
+    with open("b_sorted_clusters.txt", 'w') as b:
+        [b.write(str(x) + '\n') for x in b_sorted_clusters]
+def write_y_sorted_cluster(y_sorted_clusters):
+    # for cluster in y_sorted_clusters:
+        # non_indices = str(cluster.score) + '\t' + str(cluster.post_prob) + '\t' + str(cluster.prior) + '\t' + str(cluster.pid) + '\t' + cluster.seq + '\t' + str(cluster.mz)
+        # print(non_indices) #+ '\t'+ '\t'.join([str(o) for o in cluster.indices]))
+        with open("y_sorted_clusters.txt", 'w') as y:
+            [y.write(str(x) + '\n') for x in y_sorted_clusters]
+
+def test_optimized_compare_masses(
+    mz_mapping,
+    bbby,
+    observed: list, 
+    reference: list, 
+    ppm_tolerance: int = 20, 
+    needs_sorted: bool = False
+    ) -> float:
+    '''Score two spectra against eachother. Simple additive scoring of ions found
+
+    :param observed: observed set of m/z values
+    :type observed: list
+    :param reference: reference set of m/z values
+    :type reference: list
+    :param ppm_tolerance: parts per million mass error allowed when matching masses. 
+        (default is 20)
+    :type ppm_tolerance: int
+    :param needs_sorted: Set to true if either the observed or reference need to 
+        be sorted. 
+        (default is False)
+    :type needs_sorted: bool
+
+    :returns: the number of matched ions
+    :rtype: int
+
+    :Example:
+
+    >>> optimized_compare_masses([1, 2, 4], [1, 3, 4], 1, False)
+    >>> 2
+    '''
+    if len(observed) == 0 or len(reference) == 0:
+        return 0.0
+
+    if needs_sorted:
+        observed.sort()
+        reference.sort()
+        
+    def boundaries(mass):
+        tol = ppm_to_da(mass, ppm_tolerance)
+        return [mass - tol, mass + tol]
+                
+    # calculate the boundaries for each of the reference masses for binary search
+    observed_boundaries = []
+    for obs in observed:
+        observed_boundaries += boundaries(obs)
+
+    obs_boundaries = []
+    for mz in observed:
+        mapped = mz_mapping[mz]
+        b = bbby[mapped]
+        obs_boundaries.append(b[0])
+        obs_boundaries.append(b[1])
+    
+    if obs_boundaries != observed_boundaries:
+        print('WRONG!')
+        
+    #hack
+    #the_type = type(reference) #python = 'dict' #cpp = 'list'
+    updated_reference = reference      
+    if isinstance(updated_reference,dict):
+        reference = updated_reference.get('spectrum')
+    
+    return 
 
 def write_cluster(cluster):
     if len(cluster) == 0 : return None
