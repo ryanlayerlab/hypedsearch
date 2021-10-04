@@ -95,11 +95,11 @@ def define_data():
     )
 
 
-    raw_prefix = os.path.join(root, 'home', 'naco3124', 'jaime_hypedsearch', 'hypedsearch', 'data')
+    raw_prefix = os.path.join(root, 'home', 'ncol107453', 'jaime_hypedsearch', 'hypedsearch', 'data')
 
 
     NOD2_data = Dataset(
-        os.path.join(raw_prefix, 'unused_spectra'),
+        os.path.join(raw_prefix, 'spectra', 'NOD2_E3'),
         os.path.join(raw_prefix, 'NOD2_E3_results.ssv'),
         os.path.join(raw_prefix, 'database', 'sample_database.fasta'),
         os.path.join(raw_prefix) + os.path.sep,

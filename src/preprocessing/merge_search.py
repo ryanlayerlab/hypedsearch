@@ -111,8 +111,8 @@ def match_masses_per_protein(kv_prots,max_len,spectra_boundaries,kmer_set, match
     matched_masses_y_batch = merge(batch_y_list, index_list_y, batch_kmer_y, spectra_boundaries)
     add_matched_to_matched_set(matched_masses_b_batch,matched_masses_b,kmer_set,batch_kmer_set,matched_masses_y_batch,matched_masses_y)
 
-def match_masses(spectra_boundaries: list, db: Database, max_pep_len: int = 30):
-    matched_masses_b, matched_masses_y, kmer_set = defaultdict(list), defaultdict(list), defaultdict(list)
+def match_masses(spectra_boundaries: list, db: Database, max_pep_len: int):
+    matched_masses_b, matched_masses_y, kmer_set = defaultdict(list), defaultdict(list), defaultdict(list) #Not sure this is needed
     estimated_max_len = ceil(spectra_boundaries[-1][1] / 57.021464)
     max_len = min(estimated_max_len, max_pep_len)
     kv_prots = [(k, v) for k, v in db.proteins.items()]
