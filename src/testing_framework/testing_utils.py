@@ -147,7 +147,7 @@ def preprocess_input_spectra(spectra_folder, ppm_tolerance, peak_filter: int = 2
     
     # load all of the spectra
     print('Loading spectra...')
-    spectra, boundaries, mz_mapping = preprocessing_utils.load_spectra(
+    spectra, boundaries = preprocessing_utils.load_spectra(
         spectra_files, 
         ppm_tolerance,
         peak_filter = peak_filter, 
@@ -155,7 +155,7 @@ def preprocess_input_spectra(spectra_folder, ppm_tolerance, peak_filter: int = 2
     )
     print('Done')
 
-    return spectra, boundaries, mz_mapping
+    return spectra, boundaries
 
 def isintolerance(val1, val2, tolerance):
     if abs(val1-val2) <= tolerance:

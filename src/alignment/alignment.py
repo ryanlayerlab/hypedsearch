@@ -356,7 +356,7 @@ def attempt_alignment_second_pass(spectrum: Spectrum, db: Database, n: int = 3,
                 avg_y_score = avg_y_score + score[5]
                 avg_total_score = avg_total_score + score[6]
                 i = i + 1
-            objects.Alignment_Instrumentation(
+            alignment_instrumentation = objects.Alignment_Instrumentation(
             avg_b_score = avg_b_score/i,
             avg_y_score = avg_y_score/i,
             avg_total_score = avg_total_score/i

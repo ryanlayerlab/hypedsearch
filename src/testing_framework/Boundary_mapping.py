@@ -25,7 +25,7 @@ datasets = testing_utils.define_data()
 dataset = datasets[0]
 
 input_spectra_path = dataset[0]
-input_spectra, boundaries, mz_mapping = testing_utils.preprocess_input_spectra(input_spectra_path, ppm_tolerance)
+input_spectra, boundaries = testing_utils.preprocess_input_spectra(input_spectra_path, ppm_tolerance)
 
 correct_sequences = testing_utils.generate_truth_set(datasets[0])
 
