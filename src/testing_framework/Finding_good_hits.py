@@ -13,7 +13,7 @@ import database, gen_spectra
 import testing_utils
 
 from constants import WATER_MASS, SINGLY_CHARGED_B_BASE, SINGLY_CHARGED_Y_BASE
-from utils import ppm_to_da, overlap_intervals
+from utils import ppm_to_da
 from preprocessing import merge_search, preprocessing_utils
 from collections import defaultdict
 from objects import Spectrum

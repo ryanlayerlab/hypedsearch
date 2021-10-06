@@ -19,7 +19,7 @@ import gen_spectra, utils
 
 from collections import defaultdict
 from typing import Iterable
-from utils import overlap_intervals, ppm_to_da
+from utils import ppm_to_da
 import array as arr
 from math import ceil, trunc
 from posixpath import split
@@ -775,31 +775,6 @@ def get_good_kmers(b_results, y_results, correct_sequence, TOP_X):
 def make_boundaries(mz, ppm_tol):
     da_tol = ppm_to_da(mz, ppm_tol)
     return [mz - da_tol, mz + da_tol]
-
-def define_single_spectrum(mz_list, ppm_tol):
-    boundaries = [make_boundaries(mz, ppm_tol) for mz in mz_list]
-
-    # make overlapped boundaries larger boundaries
-    boundaries = overlap_intervals(boundaries)
-
-    # make a mapping for mz -> boundaries
-    b_i, s_i = 0, 0
-    mz_mapping = {}
-    while s_i < len(mz_list):
-        
-        # if the current boundary encapsulates s_i, add to list
-        if boundaries[b_i][0] <= mz_list[s_i] <= boundaries[b_i][1]:
-            mz_mapping[mz_list[s_i]] = b_i 
-            s_i += 1
-
-        # else if the s_i < boundary, increment s_i
-        elif mz_list[s_i] < boundaries[b_i][0]:
-            s_i += 1
-
-        # else if s_i > boundary, incrment b_i
-        elif mz_list[s_i] > boundaries[b_i][1]:
-            b_i += 1
-    return boundaries, mz_mapping
 
 def write_cluster(cluster):
     if len(cluster) == 0 : return None

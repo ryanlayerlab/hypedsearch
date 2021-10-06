@@ -8,16 +8,17 @@ import array as arr
 import requests
 import json
 
-def merge(mz_s: Iterable, indices: Iterable, kmers: Iterable, boundaries: Iterable):
-    boundry_index, mass_index = 0, 0
+def merge(mz_s: Iterable, indices: Iterable, kmers: Iterable, boundaries: Iterable, mz_mapping):
+    boundary_index, mass_index = 0, 0
     matched_masses = defaultdict(list)
-    while boundry_index < len(boundaries) and mass_index < len(mz_s):
-       if boundaries[boundry_index][0] <= mz_s[mass_index] <= boundaries[boundry_index][1]:
-           matched_masses[hashable_boundaries(boundaries[boundry_index])] += kmers[indices[mass_index - 1]:indices[mass_index]]
+    while boundary_index < len(boundaries.keys()) and mass_index < len(mz_s):
+        mapped = mz_mapping[boundary_index] 
+        if boundaries[mapped][0] <= mz_s[mass_index] <= boundaries[mapped][1]:
+           matched_masses[hashable_boundaries(boundaries[mapped])] += kmers[indices[mass_index - 1]:indices[mass_index]]
            mass_index += 1
-       elif mz_s[mass_index] > boundaries[boundry_index][1]:
-           boundry_index += 1
-       elif mz_s[mass_index] < boundaries[boundry_index][0]:
+        elif mz_s[mass_index] > boundaries[mapped][1]:
+           boundary_index += 1
+        elif mz_s[mass_index] < boundaries[mapped][0]:
            mass_index += 1
     return matched_masses
 
@@ -104,19 +105,23 @@ def add_matched_to_matched_set(matched_masses_b_batch,matched_masses_b,kmer_set,
         for kmer in v:
             kmer_set[kmer] += batch_kmer_set[kmer]
 
-def match_masses_per_protein(kv_prots,max_len,spectra_boundaries,kmer_set, matched_masses_b,matched_masses_y):
+def match_masses_per_protein(kv_prots,max_len,boundaries,kmer_set, matched_masses_b,matched_masses_y):
     extended_kv_prots = [(k, entry) for (k, v) in kv_prots for entry in v]
     batch_b_list, index_list_b, batch_kmer_b, batch_y_list, index_list_y, batch_kmer_y, batch_kmer_set = make_database_set(extended_kv_prots, max_len)
-    matched_masses_b_batch = merge(batch_b_list, index_list_b, batch_kmer_b, spectra_boundaries)
-    matched_masses_y_batch = merge(batch_y_list, index_list_y, batch_kmer_y, spectra_boundaries)
+    mz_mapping = dict()
+    for i, entry in enumerate(boundaries.keys()):
+        mz_mapping[i] = entry
+    matched_masses_b_batch = merge(batch_b_list, index_list_b, batch_kmer_b, boundaries, mz_mapping)
+    matched_masses_y_batch = merge(batch_y_list, index_list_y, batch_kmer_y, boundaries, mz_mapping)
     add_matched_to_matched_set(matched_masses_b_batch,matched_masses_b,kmer_set,batch_kmer_set,matched_masses_y_batch,matched_masses_y)
 
-def match_masses(spectra_boundaries: list, db: Database, max_pep_len: int):
+def match_masses(boundaries: dict, db: Database, max_pep_len: int):
     matched_masses_b, matched_masses_y, kmer_set = defaultdict(list), defaultdict(list), defaultdict(list) #Not sure this is needed
-    estimated_max_len = ceil(spectra_boundaries[-1][1] / 57.021464)
+    max_boundary = max(boundaries.keys())
+    estimated_max_len = ceil(boundaries[max_boundary][1] / 57.021464)
     max_len = min(estimated_max_len, max_pep_len)
     kv_prots = [(k, v) for k, v in db.proteins.items()]
-    match_masses_per_protein(kv_prots,max_len,spectra_boundaries,kmer_set,matched_masses_b,matched_masses_y)
+    match_masses_per_protein(kv_prots,max_len,boundaries,kmer_set,matched_masses_b,matched_masses_y)
     return (matched_masses_b, matched_masses_y, kmer_set)
 
 def get_midpoints_of_boundries(spectra_boundaries):
