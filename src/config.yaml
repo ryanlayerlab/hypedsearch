@@ -1,10 +1,10 @@
 paths: 
   # full path to the spectra folder containing all spectra files
-  spectra_dir: '/Users/jamesdixon/Documents/Hypedsearch_All/hypedsearch/data/spectra'
+  spectra_dir: '/home/ncol107453/old_hypedsearch/hypedsearch/data/spectra/NOD2_E3'
   # full path to the .fasta database file
-  database_file: '/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/sample_database.fasta'
+  database_file: '/home/ncol107453/old_hypedsearch/hypedsearch/data/database/sample_database.fasta'
   # full path to the output directory
-  output_dir: '/home/naco3124/jaime_hypedsearch/hypedsearch/data/output'
+  output_dir: '/home/ncol107453/old_hypedsearch/hypedsearch/data/output'
 
 search_params:
   # minimum length peptide to look for
@@ -38,7 +38,7 @@ run_parameters:
   # printing to the console during the run
   verbose: True
   # the number of cores to allow in the search. Should be a number 
-  cores: 1
+  cores: 2
   # the number of alignments to keep per spectrum
   top_results: 5
 
