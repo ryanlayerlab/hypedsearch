@@ -95,11 +95,11 @@ def define_data():
     )
 
 
-    raw_prefix = os.path.join(root, 'home', 'naco3124', 'jaime_hypedsearch', 'hypedsearch', 'data')
+    raw_prefix = os.path.join(root, 'home', 'nol107453', 'jaime_hypedsearch', 'hypedsearch', 'data')
 
 
     NOD2_data = Dataset(
-        os.path.join(raw_prefix, 'unused_spectra'),
+        os.path.join(raw_prefix, 'spectra', 'NOD2_E3'),
         os.path.join(raw_prefix, 'NOD2_E3_results.ssv'),
         os.path.join(raw_prefix, 'database', 'sample_database.fasta'),
         os.path.join(raw_prefix) + os.path.sep,
@@ -147,7 +147,7 @@ def preprocess_input_spectra(spectra_folder, ppm_tolerance, peak_filter: int = 2
     
     # load all of the spectra
     print('Loading spectra...')
-    spectra, boundaries, mz_mapping = preprocessing_utils.load_spectra(
+    spectra, boundaries = preprocessing_utils.load_spectra(
         spectra_files, 
         ppm_tolerance,
         peak_filter = peak_filter, 
@@ -155,7 +155,7 @@ def preprocess_input_spectra(spectra_folder, ppm_tolerance, peak_filter: int = 2
     )
     print('Done')
 
-    return spectra, boundaries, mz_mapping
+    return spectra, boundaries
 
 def isintolerance(val1, val2, tolerance):
     if abs(val1-val2) <= tolerance:
