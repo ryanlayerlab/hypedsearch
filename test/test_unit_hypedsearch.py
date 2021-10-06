@@ -31,13 +31,6 @@ class Test_Main(unittest.TestCase):
         self.assertEqual(sorted(utils.all_perms_of_s(string1, keyletter1)), sorted(['LMWHOMP', 'JMWHOMP', 'IMWHOMP']))
         self.assertEqual(sorted(utils.all_perms_of_s(string2, keyletter2)), sorted(['MALWAR MZHL', 'MAHWAR MZHL', 
             'MALWAR MZLL', 'MALWAR MZHH', 'MAHWAR MZLL', 'MAHWAR MZHH', 'MAHWAR MZLH', 'MALWAR MZLH']))
-
-    def test_overlap_intervals(self):
-        #Run the utils.overlap_intervals function with two different intervals. One set will overlap and one won't
-        intervals1 = [[0,3], [2,5], [3,7]] #Expected to return [0,7]
-        intervals2 = [[-1,4], [6,15]] #Expected to return itself
-        self.assertEqual(utils.overlap_intervals(intervals1), [[0,7]])
-        self.assertEqual(utils.overlap_intervals(intervals2), intervals2)
     
     def test_to_percent(self):
         #Run the utils.to_percent function with two different values to convert to a percent.

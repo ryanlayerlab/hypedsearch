@@ -1,7 +1,7 @@
 from objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry
 import gen_spectra
 from alignment import alignment
-from utils import ppm_to_da, to_percent, overlap_intervals, hashable_boundaries, is_json, is_file
+from utils import ppm_to_da, to_percent, hashable_boundaries, is_json, is_file
 import utils
 from scoring import scoring, mass_comparisons
 from preprocessing import digestion, merge_search, preprocessing_utils
@@ -102,11 +102,10 @@ def mp_id_spectrum(input_q: mp.Queue, db_copy: Database, results: dict, fall_off
             next_entry.ppm_tolerance, next_entry.precursor_tolerance,
             next_entry.n,truth, fall_off)
 
-def create_hits(spectrum,mz_mapping,boundaries,matched_masses_b,matched_masses_y):
+def create_hits(spectrum,boundaries,matched_masses_b,matched_masses_y):
     b_hits, y_hits = [], []
     for mz in spectrum.mz_values:
-        mapped = mz_mapping[mz]
-        b = boundaries[mapped]
+        b = boundaries[mz]
         b = hashable_boundaries(b)
         if b in matched_masses_b:
             b_hits += matched_masses_b[b]
@@ -114,15 +113,15 @@ def create_hits(spectrum,mz_mapping,boundaries,matched_masses_b,matched_masses_y
             y_hits += matched_masses_y[b]
     return b_hits, y_hits
 
-def align_on_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off,results,DEBUG):
+def align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off,results,DEBUG):
     for i, spectrum in enumerate(spectra):
         print(f'Creating alignment for spectrum {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='\r')
-        b_hits,y_hits = create_hits(spectrum,mz_mapping,boundaries,matched_masses_b,matched_masses_y)
+        b_hits,y_hits = create_hits(spectrum,boundaries,matched_masses_b,matched_masses_y)
         is_last = DEBUG and i == len(spectra) - 1
         raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off, is_last=is_last)
         results[spectrum.id]=raw_results
 
-def align_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
+def align_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,ppm_tol,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
     multiprocessing_start = time.time()
     print('Initializing other processors...')
     results = mp.Manager().dict()
@@ -211,7 +210,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
         truth = json.load(open(truth_set, 'r'))
     fall_off = None
     verbose and print('Loading spectra...')
-    spectra, boundaries, mz_mapping = preprocessing_utils.load_spectra(spectra_files, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
+    spectra, boundaries = preprocessing_utils.load_spectra(spectra_files, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
     verbose and print('Loading spectra Done')
     matched_masses_b, matched_masses_y, kmer_set = merge_search.match_masses(boundaries, db, max_peptide_len)
     # TODO
@@ -221,9 +220,9 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     if DEV:
         handle_DEV_setup(truth)
     if cores == 1:
-        align_on_single_core(spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off,results,DEBUG)
+        align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off,results,DEBUG)
     else:
-        align_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,mz_mapping,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest)
+        align_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest)
     if DEV:
         handle_DEV_result(output_dir,fall_off,cores)
     return results
