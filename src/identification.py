@@ -121,19 +121,16 @@ def align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db
         raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off, is_last=is_last)
         results[spectrum.id]=raw_results
 
-def align_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,ppm_tol,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
+def align_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
     multiprocessing_start = time.time()
     print('Initializing other processors...')
     results = mp.Manager().dict()
-    if DEV:
-        fall_off = mp.Manager().dict()
-        truth = mp.Manager().dict(truth)
     q = mp.Manager().Queue()
     num_processes = cores
     ps = [
         mp.Process(
             target=mp_id_spectrum, 
-            args=(q, copy.deepcopy(db), results, fall_off, truth)
+            args=(q, copy.deepcopy(db), results)
         ) for _ in range(num_processes) 
     ]
 
@@ -144,8 +141,8 @@ def align_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,ppm_tol,bounda
     for i, spectrum in enumerate(spectra):
         print(f'\rStarting job for {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='')
         b_hits, y_hits = [], []
-        for mz in spectrum.spectrum:
-            mapped = mz_mapping[mz]
+        for mz in spectrum.mz_values:
+            mapped = preprocessing_utils.make_boundaries(mz)
             b = boundaries[mapped]
             b = hashable_boundaries(b)
 
