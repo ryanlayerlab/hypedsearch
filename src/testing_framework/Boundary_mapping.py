@@ -1,5 +1,6 @@
 import os
 import sys
+
 module_path = os.path.abspath(os.path.join('..'))
 if module_path not in sys.path:
     sys.path.append(module_path)
@@ -12,7 +13,8 @@ import database
 import testing_utils
 import operator
 
-from objects import Spectrum
+from preprocessing.merge_search import match_masses
+
 
 #Assumptions:
 max_peptide_length = 20
@@ -41,7 +43,7 @@ matched_masses_b, matched_masses_y, db = testing_utils.modified_match_masses(bou
 print('Finished matching masses')
 
 
-
+# filtered_boundaries = testing_utils.filter_boundaries(boundaries, matched_masses_b, matched_masses_y)
 
 
 print('Collecting data...')
@@ -59,10 +61,9 @@ for spectrum_num, input_spectrum in enumerate(input_spectra):
 
     # input_spectrum = input_spectra[spectrum_num]
 
-    correct_hits = []
     #Remember to add in abundance if it is helpful
-    b_hits, y_hits, b_set, y_set, misses = testing_utils.find_hits(mz_mapping, boundaries, input_spectrum, spectrum_num, matched_masses_b, matched_masses_y)
-    testing_utils.append_correct_hits(correct_hits, correct_sequence, input_spectrum, ppm_tolerance)
+    b_hits, y_hits, b_set, y_set, misses = testing_utils.find_hits(boundaries, input_spectrum, spectrum_num, matched_masses_b, matched_masses_y)
+    correct_hits = testing_utils.append_correct_hits(correct_sequence, input_spectrum, ppm_tolerance)
 
 
 
@@ -73,12 +74,12 @@ for spectrum_num, input_spectrum in enumerate(input_spectra):
 
     ion = 'b'
     testing_utils.create_clusters(ion)
-    b_sorted_clusters = testing_utils.sort_clusters_by_post_prob(ion, mz_mapping, boundaries, matched_masses_b, matched_masses_y)
+    b_sorted_clusters = testing_utils.sort_clusters_by_post_prob(ion, boundaries, matched_masses_b, matched_masses_y)
     testing_utils.write_b_sorted_cluster(b_sorted_clusters)
 
     ion = 'y'
     testing_utils.create_clusters(ion)
-    y_sorted_clusters = testing_utils.sort_clusters_by_post_prob(ion, mz_mapping, boundaries, matched_masses_b, matched_masses_y)
+    y_sorted_clusters = testing_utils.sort_clusters_by_post_prob(ion, boundaries, matched_masses_b, matched_masses_y)
     testing_utils.write_y_sorted_cluster(y_sorted_clusters)
 
     b_sorted_clusters = sorted(b_sorted_clusters, key=operator.attrgetter('score', 'post_prob', 'pid', 'prior'), reverse = True)

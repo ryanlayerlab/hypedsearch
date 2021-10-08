@@ -121,7 +121,7 @@ def align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db
         raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off, is_last=is_last)
         results[spectrum.id]=raw_results
 
-def align_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
+def align_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,boundaries,ppm_tol,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
     multiprocessing_start = time.time()
     print('Initializing other processors...')
     results = mp.Manager().dict()
@@ -142,7 +142,7 @@ def align_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,boundaries,mat
         print(f'\rStarting job for {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='')
         b_hits, y_hits = [], []
         for mz in spectrum.mz_values:
-            mapped = preprocessing_utils.make_boundaries(mz)
+            mapped = preprocessing_utils.make_boundaries(mz, ppm_tolerance)
             b = boundaries[mapped]
             b = hashable_boundaries(b)
 
@@ -200,7 +200,6 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     relative_abundance_filter: float = 0.0,ppm_tolerance: int = 20, 
     precursor_tolerance: int = 10, digest: str = '',cores: int = 1,
     n: int = 5,DEBUG: bool = False, truth_set: str = '', output_dir: str = ''):
-    DEV = False
     truth = None
     if is_json(truth_set) and is_file(truth_set):
         DEV = True
@@ -214,6 +213,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     #matched_masses_b, matched_masses_y, kmer_set = merge_search.match_masses_using_webservice(boundaries, ppm_tolerance)
     db = db._replace(kmers=kmer_set)
     results = {}
+    DEV = False
     if DEV:
         handle_DEV_setup(truth)
     if cores == 1:
