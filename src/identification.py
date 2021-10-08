@@ -121,8 +121,7 @@ def align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db
         raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off, is_last=is_last)
         results[spectrum.id]=raw_results
 
-def align_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,boundaries,ppm_tol,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
-    multiprocessing_start = time.time()
+def align_on_multi_core(cores,mp_id_spectrum,db,spectra,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
     print('Initializing other processors...')
     results = mp.Manager().dict()
     q = mp.Manager().Queue()
@@ -136,14 +135,12 @@ def align_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,boundaries,ppm
 
     for p in ps:
         p.start()
-    time_to_spin_up_cores = time.time() - multiprocessing_start          
     print('start each of the process Done.')
     for i, spectrum in enumerate(spectra):
         print(f'\rStarting job for {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='')
         b_hits, y_hits = [], []
         for mz in spectrum.mz_values:
-            mapped = preprocessing_utils.make_boundaries(mz, ppm_tolerance)
-            b = boundaries[mapped]
+            b = boundaries[mz]
             b = hashable_boundaries(b)
 
             if b in matched_masses_b:
@@ -219,7 +216,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     if cores == 1:
         align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off,results,DEBUG)
     else:
-        align_on_multi_core(DEV,truth,cores,mp_id_spectrum,db,spectra,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest)
+        align_on_multi_core(cores,mp_id_spectrum,db,spectra,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest)
     if DEV:
         handle_DEV_result(output_dir,fall_off,cores)
     return results
