@@ -276,7 +276,7 @@ def make_database_set(proteins: list, max_len: int):
     print('Sorting the set of protein masses done')
     return db_list_b, index_list_b, kmer_list_b, db_list_y, index_list_y, kmer_list_y, kmer_set
 
-def add_matched_to_matched_set(matched_masses_b_batch,kmer_set,batch_kmer_set,matched_masses_y_batch,matched_masses_y):
+def add_matched_to_matched_set(matched_masses_b_batch,kmer_set,batch_kmer_set,matched_masses_y_batch):
     matched_masses_b, matched_masses_y = defaultdict(list), defaultdict(list)
     for k, v in matched_masses_b_batch.items():
         matched_masses_b[k] += v 
@@ -296,7 +296,7 @@ def match_masses_per_protein(kv_prots,max_len,boundaries,kmer_set, db):
     matched_masses_b_batch, _ = modified_merge(batch_kmer_b, boundaries, 'b', db, max_len)
     _, matched_masses_y_batch = modified_merge(batch_kmer_y, boundaries, 'y', db, max_len)
     print('Done')
-    matched_masses_b, matched_masses_y = add_matched_to_matched_set(matched_masses_b_batch,kmer_set,batch_kmer_set,matched_masses_y_batch,matched_masses_y)
+    matched_masses_b, matched_masses_y = add_matched_to_matched_set(matched_masses_b_batch,kmer_set,batch_kmer_set,matched_masses_y_batch)
     return matched_masses_b, matched_masses_y
 
 def modified_match_masses(boundaries: dict, db: Database, max_pep_len: int):
