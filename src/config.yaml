@@ -38,7 +38,7 @@ run_parameters:
   # printing to the console during the run
   verbose: True
   # the number of cores to allow in the search. Should be a number 
-  cores: 2
+  cores: 1
   # the number of alignments to keep per spectrum
   top_results: 5
 
