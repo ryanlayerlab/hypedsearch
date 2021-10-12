@@ -276,7 +276,8 @@ def make_database_set(proteins: list, max_len: int):
     print('Sorting the set of protein masses done')
     return db_list_b, index_list_b, kmer_list_b, db_list_y, index_list_y, kmer_list_y, kmer_set
 
-def add_matched_to_matched_set(matched_masses_b_batch,matched_masses_b,kmer_set,batch_kmer_set,matched_masses_y_batch,matched_masses_y):
+def add_matched_to_matched_set(matched_masses_b_batch,kmer_set,batch_kmer_set,matched_masses_y_batch,matched_masses_y):
+    matched_masses_b, matched_masses_y = defaultdict(list), defaultdict(list)
     for k, v in matched_masses_b_batch.items():
         matched_masses_b[k] += v 
         for kmer in v:
@@ -285,24 +286,26 @@ def add_matched_to_matched_set(matched_masses_b_batch,matched_masses_b,kmer_set,
         matched_masses_y[k] += v 
         for kmer in v:
             kmer_set[kmer] += batch_kmer_set[kmer]
+    return matched_masses_b, matched_masses_y
+    
 
-def match_masses_per_protein(kv_prots,max_len,boundaries,kmer_set, matched_masses_b,matched_masses_y):
+def match_masses_per_protein(kv_prots,max_len,boundaries,kmer_set, db):
     extended_kv_prots = [(k, entry) for (k, v) in kv_prots for entry in v]
     batch_b_list, index_list_b, batch_kmer_b, batch_y_list, index_list_y, batch_kmer_y, batch_kmer_set = make_database_set(extended_kv_prots, max_len)
-    mz_mapping = dict()
-    for i, entry in enumerate(boundaries.keys()):
-        mz_mapping[i] = entry
-    matched_masses_b_batch = merge(batch_b_list, index_list_b, batch_kmer_b, boundaries, mz_mapping)
-    matched_masses_y_batch = merge(batch_y_list, index_list_y, batch_kmer_y, boundaries, mz_mapping)
-    add_matched_to_matched_set(matched_masses_b_batch,matched_masses_b,kmer_set,batch_kmer_set,matched_masses_y_batch,matched_masses_y)
+    print('Merging...')
+    matched_masses_b_batch, _ = modified_merge(batch_kmer_b, boundaries, 'b', db, max_len)
+    _, matched_masses_y_batch = modified_merge(batch_kmer_y, boundaries, 'y', db, max_len)
+    print('Done')
+    matched_masses_b, matched_masses_y = add_matched_to_matched_set(matched_masses_b_batch,kmer_set,batch_kmer_set,matched_masses_y_batch,matched_masses_y)
+    return matched_masses_b, matched_masses_y
 
 def modified_match_masses(boundaries: dict, db: Database, max_pep_len: int):
-    matched_masses_b, matched_masses_y, kmer_set = defaultdict(list), defaultdict(list), defaultdict(list) #Not sure this is needed
+    # matched_masses_b, matched_masses_y, kmer_set = defaultdict(list), defaultdict(list), defaultdict(list) #Not sure this is needed
     max_boundary = max(boundaries.keys())
     estimated_max_len = ceil(boundaries[max_boundary][1] / 57.021464)
     max_len = min(estimated_max_len, max_pep_len)
     kv_prots = [(k, v) for k, v in db.proteins.items()]
-    match_masses_per_protein(kv_prots,max_len,boundaries,kmer_set,matched_masses_b,matched_masses_y)
+    matched_masses_b, matched_masses_y = match_masses_per_protein(kv_prots,max_len,boundaries,kmer_set, db)
     return (matched_masses_b, matched_masses_y, kmer_set)
 
 def make_boundaries(mz, ppm_tol):
@@ -1005,3 +1008,38 @@ def calc_post_prob(prior, indices):
 
 # def filter_boundaries(boundaries, matched_masses_b, matched_masses_y):
 #     filtered_boundaries = []
+
+def in_bounds(int1, interval):
+    if int1 >= interval[0] and int1 <= interval[1]:
+        return True
+    else:
+        return False
+
+def modified_merge(kmers, boundaries: dict, ion: string, db: Database, max_len: int):
+    matched_masses_b_batch, matched_masses_y_batch = defaultdict(list), defaultdict(list)
+    #Goal: b and y dictionaries mapping mz values to lists of kmers that have a mass within the tolerance
+    # kmers = make_database_set(db.proteins, max_len)
+    mz_mapping = dict()
+    for i,mz in enumerate(boundaries):
+        mz_mapping[i] = boundaries.keys()[mz]
+    boundary_index, kmer_index, starting_point = 0,0,0
+    while (boundary_index < len(boundaries)) and (kmer_index < len(kmers)):
+        #idea is to increment kmer index when mass is too small for boundaries[0] and then stop when mass is too big for boundaries[1]
+        target_kmer = kmers[kmer_index]
+        target_boundary_key = mz_mapping[boundary_index]
+        target_boundary = boundaries[target_boundary_key]
+        if in_bounds(target_kmer[0], target_boundary):
+            if ion == 'b':
+                matched_masses_b_batch[target_boundary].append(target_kmer)
+            else:
+                matched_masses_y_batch[target_boundary].append(target_kmer)
+                kmer_index = kmer_index + 1
+            if (kmer_index == 0) or (not in_bounds(kmers[kmer_index-1][0], target_boundary)):
+                starting_point = kmer_index
+        elif target_kmer < target_boundary[0]:
+            kmer_index = kmer_index + 1
+        else:                                            #target_kmer > target_boundary[1]
+            boundary_index = boundary_index + 1
+            kmer_index = starting_point
+
+    return matched_masses_b_batch, matched_masses_y_batch
