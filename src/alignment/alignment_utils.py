@@ -419,53 +419,19 @@ def get_parents(
     return (get_sources(seq), None)
 
 def extend_non_hybrid(seq: str, spectrum: Spectrum, ion: str, db: Database) -> list:
-    '''Extend a non hybrid sequence to try and match the predicted length. 
-    b ion kmers will be extended to the right, and y ion kmers to the left
-
-    :param seq: sequence to be extended
-    :type seq: str
-    :param spectrum: observed spectrum
-    :type spectrum: Spectrum
-    :param ion: ion type. Either 'b' or 'y'
-    :type ion: str
-    :param db: source of proteins
-    :type db: Database
-
-    :returns: all possible extensions of the initial sequence
-    :rtype: list
-    '''
     extensions = []
-
-    # first estimate the extension length
     extension_len = utils.predicted_len_precursor(spectrum, seq) - len(seq)
-
-    # if the extension length <= 0, return the sequence 
     if extension_len <= 0:
         return [seq]
-
-    # get the sources
     parents, _ = get_parents(seq, db)
-
-    # go through each parent
     for parent in parents:
-
-        # get the entry. entry has 'description' and 'sequence' properties
         entries = database.get_entry_by_name(db, parent)
-
         for entry in entries:
-            
-            # get all occurances
             seq_idxes = [m.start() for m in re.finditer(seq, entry.sequence)]
-            
-            # go through all of the indices and extend
             for seq_idx in seq_idxes:
-                
-                # extend to left
                 if 'y' in ion:
                     min_idx = max(0, seq_idx - extension_len)
                     extensions.append(entry.sequence[min_idx:len(seq) + seq_idx])
-
-                # extend to the right
                 else:
                     max_idx = min(len(entry.sequence), seq_idx + len(seq) + extension_len)
                     extensions.append(entry.sequence[seq_idx:max_idx])
