@@ -21,7 +21,7 @@ def load_spectra(
             object.abundance.append(100000000) #I gave it a crazy high abundance to represent precursor. Still a hack
         all_spectra += these_spectra
         # these_spectra = [these_spectra[0]]
-        all_spectra = [all_spectra[0]]
+        # all_spectra = [all_spectra[0]]
         linear_spectra += list(set([
             x for spectrum in these_spectra for x in spectrum.mz_values
         ]))

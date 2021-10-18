@@ -56,9 +56,9 @@ def id_spectrum(spectrum: Spectrum, db: Database, b_hits: dict, y_hits: dict,
     truth: dict = None, fall_off: dict = None, is_last: bool = False):
 
     precursor_tolerance = utils.ppm_to_da(spectrum.precursor_mass, precursor_tolerance)
-    b_intermediate = [(kmer, mass_comparisons.optimized_compare_masses(spectrum.mz_values, gen_spectra.gen_spectrum(kmer, ion='b'))) for kmer in b_hits]
+    b_intermediate = [(kmer, mass_comparisons.optimized_compare_masses(spectrum.mz_values, gen_spectra.gen_spectrum(kmer[2], ion='b'))) for kmer in b_hits]
     b_results = sorted(b_intermediate, key=lambda x: (x[1], 1/len(x[0])), reverse=True)
-    y_intermediate = [(kmer, mass_comparisons.optimized_compare_masses(spectrum.mz_values, gen_spectra.gen_spectrum(kmer, ion='y'))) for kmer in y_hits]
+    y_intermediate = [(kmer, mass_comparisons.optimized_compare_masses(spectrum.mz_values, gen_spectra.gen_spectrum(kmer[2], ion='y'))) for kmer in y_hits]
     y_results = sorted(y_intermediate, key=lambda x: (x[1], 1/len(x[0])), reverse=True)
     filtered_b, filtered_y = [], []
     max_b_score = max([x[1] for x in b_results])
@@ -205,7 +205,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     verbose and print('Loading spectra...')
     spectra, boundaries = preprocessing_utils.load_spectra(spectra_files, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
     verbose and print('Loading spectra Done')
-    matched_masses_b, matched_masses_y, kmer_set = merge_search.match_masses(boundaries, db, max_peptide_len)
+    matched_masses_b, matched_masses_y, kmer_set = merge_search.modified_match_masses(boundaries, db, max_peptide_len)
     # TODO
     #matched_masses_b, matched_masses_y, kmer_set = merge_search.match_masses_using_webservice(boundaries, ppm_tolerance)
     db = db._replace(kmers=kmer_set)

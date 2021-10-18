@@ -13,6 +13,8 @@ import database
 import testing_utils
 import operator
 
+from testing_framework.match_masses import match_masses
+from testing_framework.modified_match_masses import modified_match_masses
 
 
 #Assumptions:
@@ -36,10 +38,11 @@ db = database.build(path)
 
 
 
+# matched_masses_b2, matched_masses_y2, db2 = match_masses(boundaries, db, max_peptide_length)
 
-
-matched_masses_b, matched_masses_y, db = testing_utils.modified_match_masses(boundaries, db, max_peptide_length)
+matched_masses_b, matched_masses_y, db = modified_match_masses(boundaries, db, max_peptide_length)
 print('Finished matching masses')
+
 
 
 # filtered_boundaries = testing_utils.filter_boundaries(boundaries, matched_masses_b, matched_masses_y)
@@ -50,6 +53,7 @@ with open('data.txt', 'w') as d:
     d.write('')
 
 for spectrum_num, input_spectrum in enumerate(input_spectra):
+    spectrum_num = 0
     
     
     

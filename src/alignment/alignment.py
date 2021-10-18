@@ -64,9 +64,11 @@ def same_protein_alignment(seq1: str, seq2: str, parent_sequence: str):
 
 def align_b_y(b_kmers: list, y_kmers: list, spectrum: Spectrum, db: Database):
     spec_alignments = []
-    for b_seq in b_kmers:
+    for b_kmer in b_kmers:
+        b_seq = b_kmer[2]
         b_proteins = database.get_proteins_with_subsequence(db, b_seq)
-        for y_seq in y_kmers:
+        for y_kmer in y_kmers:
+            y_seq = y_kmer[2]
             y_proteins = database.get_proteins_with_subsequence(db, y_seq)
             if any([x in y_proteins for x in b_proteins]):
                 shared_prots = [x for x in y_proteins if x in b_proteins]
