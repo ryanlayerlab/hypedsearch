@@ -96,13 +96,13 @@ def define_data():
     )
 
 
-    raw_prefix = os.path.join(root, 'home', 'naco3124', 'jaime_hypedsearch', 'hypedsearch', 'data')
+    raw_prefix = os.path.join(root, 'home', 'ncol107453', 'jaime_hypedsearch', 'hypedsearch', 'data')
 
 
     NOD2_data = Dataset(
         os.path.join(raw_prefix, 'spectra', 'NOD2_E3'),
         os.path.join(raw_prefix, 'NOD2_E3_results.ssv'),
-        os.path.join(raw_prefix, 'database', 'single_prot.fasta'), #'sample_database.fasta'),
+        os.path.join(raw_prefix, 'database', 'sample_database.fasta'),
         os.path.join(raw_prefix) + os.path.sep,
         ''
     )
@@ -615,18 +615,6 @@ def write_hits(b_hits, y_hits):
             y_file.write('\t'.join([str(i) for i in out]) + '\n')
     print('Done')
 
-# def cluster_hits(ion):
-    # b_hits
-
-    Hit = collections.namedtuple('Hit', 'pid start end seq')
-
-    def write_cluster(cluster, ion):
-        if len(cluster) == 0 : return None
-        O = []
-
-        O.append(len(cluster))
-        O.append(cluster[0].pid)
-
 def parse_hits(Hit, file_name):
     hits = []
     for l in open(file_name):
@@ -674,7 +662,7 @@ def create_clusters(ion):
 
         hits = parse_hits(Hit, file_name)
 
-        sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
+        sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'end', 'start'))
 
         last_pid = None
         last_start = None
@@ -837,33 +825,6 @@ def test_optimized_compare_masses(
     
     return 
 
-def write_cluster(cluster):
-    if len(cluster) == 0 : return None
-    O = []
-
-    O.append(len(cluster))
-    O.append(cluster[0].pid)
-
-    max_len = 0
-    max_hit = None
-
-    for hit in cluster:
-        l = hit.end - hit.start + 1
-        if l > max_len:
-            max_len = l
-            max_hit = hit
-
-    O.append(max_hit.seq)
-    O.append(max_hit.mz)
-    
-    for hit in cluster:
-        O.append( (hit.start, hit.end, hit.seq, hit.mz) )
-    
-#     print( '\t'.join( [str(o) for o in O] ) )
-    with open('clusters.txt', 'a') as c:
-        c.write( '\t'.join( [str(o) for o in O] ) )
-        c.write('\n')
-
 def calc_post_prob(prior, indices):
     post = 0
     current_prob = prior
@@ -1004,7 +965,9 @@ def modified_match_masses_per_protein(kv_prots,max_len,boundaries,kmer_set):
     extended_kv_prots = [(k, entry) for (k, v) in kv_prots for entry in v]
     kmers, kmer_set = modified_make_database_set(extended_kv_prots, max_len)
     # check_for_y_kmers(kmers)
+    print("Performing Merge")
     matched_masses_b, matched_masses_y = modified_merge(kmers, boundaries)
+    print("Done")
     # modified_add_matched_to_matched_set(matched_masses_b,kmer_set,kmers,matched_masses_y)
 
     return matched_masses_b, matched_masses_y, kmer_set
