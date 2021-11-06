@@ -32,21 +32,6 @@ correct_sequences = testing_utils.generate_truth_set(datasets[0])
 
 path = dataset[2]
 db = database.build(path)
-
-print(input_spectra[0].mz_values)
-ideal_spectrum = gen_spectra.gen_spectrum(correct_sequences[0], None, 'y')
-print(ideal_spectrum)
-tol = ppm_to_da(ideal_spectrum["spectrum"][0], ppm_tolerance)
-tolerance_list = [ideal_spectrum["spectrum"][0] - tol, ideal_spectrum["spectrum"][0] + tol]
-print(tolerance_list)
-
-
-# y matches: 132.101 - , 261.142 - , 535.772 - DPQVEQLEL
-# indices=["(67, 68, 'EL', '261.1429443359375')", "(68, 68, 'L', '132.10121154785156')"])
-# indices=["(60, 68, 'DPQVEQLEL', '535.772527')"])
-
-print("Mass of L:", gen_spectra.get_precursor('L', 1))
-print("Mass of EL:", gen_spectra.get_precursor('EL', 1))
 # matched_masses_b2, matched_masses_y2, db2 = match_masses(boundaries, db, max_peptide_length)
 
 matched_masses_b, matched_masses_y, db = testing_utils.modified_match_masses(boundaries, db, max_peptide_length)
@@ -58,11 +43,14 @@ print('Finished matching masses')
 
 
 print('Collecting data...')
-with open('data.txt', 'w') as d:
+write_path = "/home/naco3124/jaime_hypedsearch/hypedsearch/src/testing_framework/data"
+
+with open(os.path.join(write_path, 'total_data.txt'), 'w') as d:
     d.write('')
 
 for spectrum_num, input_spectrum in enumerate(input_spectra):
-    
+    with open(os.path.join(write_path, str(spectrum_num)+ "_data.txt"), 'w') as d:
+        d.write('')
     
     
     
@@ -93,9 +81,11 @@ for spectrum_num, input_spectrum in enumerate(input_spectra):
     y_sorted_clusters = testing_utils.sort_clusters_by_post_prob(ion, boundaries, matched_masses_b, matched_masses_y)
     testing_utils.write_y_sorted_cluster(y_sorted_clusters)
 
-    b_sorted_clusters = sorted(b_sorted_clusters, key=operator.attrgetter('score', 'post_prob', 'pid', 'prior'), reverse = True)
-    y_sorted_clusters = sorted(y_sorted_clusters, key=operator.attrgetter('score', 'post_prob', 'pid', 'prior'), reverse = True)
+    # b_sorted_clusters = sorted(b_sorted_clusters, key=operator.attrgetter('score', 'post_prob', 'pid', 'prior'), reverse = True)
+    # y_sorted_clusters = sorted(y_sorted_clusters, key=operator.attrgetter('score', 'post_prob', 'pid', 'prior'), reverse = True)
 
+    # with open(os.path.join(write_path, str(spectrum_num)+ "_data.txt"), 'a') as d:
+    #     d.write(correct_sequences[spectrum_num] + '\n')
     for i, cluster in enumerate(b_sorted_clusters):
         score = cluster.score
         post_prob = cluster.post_prob
@@ -105,8 +95,11 @@ for spectrum_num, input_spectrum in enumerate(input_spectra):
         assessment, _ = testing_utils.is_good_hit(cluster.seq, ion, correct_sequence)
 
 
-        with open("data.txt", 'a') as d:
+        with open(os.path.join(write_path, str(spectrum_num)+ "_data.txt"), 'a') as d:
             d.write(str(score) + '\t' + str(post_prob) + '\t' + seq + '\t' + str(cluster_num) + '\t' + str(assessment) + '\t' + ion + '\n')
+        
+        with open(os.path.join(write_path, "total_data.txt"), 'a') as d:
+            d.write(str(spectrum_num) + '\t' + str(score) + '\t' + str(post_prob) + '\t' + seq + '\t' + str(cluster_num) + '\t' + str(assessment) + '\t' + ion + '\n')
 
     for i, cluster in enumerate(y_sorted_clusters):
         score = cluster.score
@@ -116,6 +109,9 @@ for spectrum_num, input_spectrum in enumerate(input_spectra):
         ion = 'y'
         assessment, _ = testing_utils.is_good_hit(cluster.seq, ion, correct_sequence)
     
-        with open("data.txt", 'a') as d:
+        with open(os.path.join(write_path, str(spectrum_num)+ "_data.txt"), 'a') as d:
             d.write(str(score) + '\t' + str(post_prob) + '\t' + seq + '\t' + str(cluster_num) + '\t' + str(assessment) + '\t' + ion + '\n')
+        
+        with open(os.path.join(write_path, "total_data.txt"), 'a') as d:
+            d.write(str(spectrum_num) + '\t' + str(score) + '\t' + str(post_prob) + '\t' + seq + '\t' + str(cluster_num) + '\t' + str(assessment) + '\t' + ion + '\n')
 print('Done')

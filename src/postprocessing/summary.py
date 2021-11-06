@@ -29,6 +29,51 @@ def json_file(results: dict, output_dir: str) -> None:
         }
     JSON.save_dict(json_file_name, dictified)
 
+
+def text_file(results: dict, output_dir: str) -> None:
+    txt_file_name = os.path.join(output_dir, f'{SUMMARY_NAME}.txt')
+    # dictified = {}
+    # for name, alignment in results.items():
+    #     dictified[name] = {
+    #         'spectrum': alignment.spectrum._asdict(),
+    #         'alignments': [x._asdict() for x in alignment.alignments]
+    #    }
+    # with open(txt_file_name, 'w') as o:
+    #     for i, x in enumerate(dictified.keys()):
+    #         target_entry = dictified[x]
+    #         target_alignments = target_entry['alignments']
+
+    with open(txt_file_name, 'w') as t:
+        for i, x in enumerate(results):
+            result = results[x]
+            target_alignments = result.alignments
+            for alignment in target_alignments:
+                alignment_type = type(alignment)
+                if str(alignment_type) == "<class 'objects.SequenceAlignment'>":
+                    spec_num = str(i)
+                    non_hybrid = 'Non_hybrid'
+                    proteins = str(alignment.proteins)
+                    sequence = str(alignment.sequence)
+                    b_score = str(alignment.b_score)
+                    y_score = str(alignment.y_score)
+                    total_score = str(alignment.total_score)
+                    precursor_distance = str(alignment.precursor_distance)
+                    total_mass_error = str(alignment.total_mass_error)
+                    t.write(spec_num + '\t' + non_hybrid + '\t' + proteins + '\t' + sequence + '\t' + b_score + '\t' + y_score + '\t' + total_score + '\t' + precursor_distance + '\t' + total_mass_error + '\n')
+                else:
+                    spec_num = str(i)
+                    hybrid = 'Hybrid'
+                    left_protein = str(alignment.left_proteins)
+                    right_protein = str(alignment.right_proteins)
+                    sequence = str(alignment.sequence)
+                    hybrid_sequence = str(alignment.hybrid_sequence)
+                    b_score = str(alignment.b_score)
+                    y_score = str(alignment.y_score)
+                    total_score = str(alignment.total_score)
+                    precursor_distance = str(alignment.precursor_distance)
+                    total_mass_error = str(alignment.total_mass_error)
+                    t.write(spec_num + '\t' + hybrid + '\t' + left_protein + '\t' + right_protein + '\t' + sequence + '\t' + hybrid_sequence + '\t' + b_score + '\t' + y_score + '\t' + total_score + '\t' + precursor_distance + '\t' + total_mass_error + '\n')
+
 def tsv_file(results: dict, output_dir: str) -> None:
     '''
     Write the results of the experiment to 2 tsv files. One tsv file is for 
@@ -93,3 +138,10 @@ def generate(alignments: dict, output_dir='./') -> None:
 
     json_file(alignments, output_dir)
     tsv_file(alignments, output_dir)
+
+def generate_to_txt(alignments: dict, output_dir='./') -> None:
+
+    # output_dir = make_valid_dir_string(output_dir)
+    # make_dir(output_dir)
+
+    text_file(alignments, output_dir)
