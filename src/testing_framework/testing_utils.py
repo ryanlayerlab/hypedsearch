@@ -96,7 +96,7 @@ def define_data():
     )
 
 
-    raw_prefix = os.path.join(root, 'home', 'naco3124', 'jaime_hypedsearch', 'hypedsearch', 'data')
+    raw_prefix = os.path.join(root, 'home', 'ncol107453', 'jaime_hypedsearch', 'hypedsearch', 'data')
 
 
     NOD2_data = Dataset(
@@ -563,6 +563,8 @@ def write_cluster(cluster):
 
     O.append(max_hit.seq)
     O.append(max_hit.mz)
+    O.append(max_hit.start)
+    O.append(max_hit.end)
     
     for hit in cluster:
         O.append( (hit.start, hit.end, hit.seq, hit.mz) )    # b_hits
@@ -708,7 +710,7 @@ def calc_post_prob(prior, indices):
     return post
 
 def sort_clusters_by_post_prob(ion, boundaries, matched_masses_b, matched_masses_y):
-    cluster = collections.namedtuple('cluster', 'post_prob prior score pid seq mz indices')
+    cluster = collections.namedtuple('cluster', 'post_prob prior score pid start end seq mz indices')
     if ion == 'b':
         b_cluster_array = []
         with open('clusters.txt', 'r') as c:
@@ -718,12 +720,14 @@ def sort_clusters_by_post_prob(ion, boundaries, matched_masses_b, matched_masses
                 pid = int(A[1])
                 seq = A[2]
                 mz = float(A[3])
+                start = int(A[4])
+                end = int(A[5])
                 indices = []
-                [indices.append(A[x]) for x in range(4,len(A))]
+                [indices.append(A[x]) for x in range(6,len(A))]
                 prior = set_prior(mz, ion, boundaries, matched_masses_b, matched_masses_y)
                 post_prob = calc_post_prob(prior, indices)
 
-                b_cluster_array.append(cluster(post_prob=post_prob, prior=prior, score=score, pid=pid, seq=seq, mz=mz, indices=indices) )
+                b_cluster_array.append(cluster(post_prob=post_prob, prior=prior, score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices) )
 
         b_sorted_clusters = sorted(b_cluster_array, key=operator.attrgetter('post_prob', 'score', 'pid', 'prior'), reverse = True)
         return b_sorted_clusters
@@ -737,12 +741,14 @@ def sort_clusters_by_post_prob(ion, boundaries, matched_masses_b, matched_masses
                 pid = int(A[1])
                 seq = A[2]
                 mz = float(A[3])
+                start = int(A[4])
+                end = int(A[5])
                 indices = []
-                [indices.append(A[x]) for x in range(4,len(A))]
+                [indices.append(A[x]) for x in range(6,len(A))]
                 prior = set_prior(mz, ion, boundaries, matched_masses_b, matched_masses_y)
                 post_prob = calc_post_prob(prior, indices)
 
-                y_cluster_array.append(cluster(post_prob=post_prob, prior=prior, score=score, pid=pid, seq=seq, mz=mz, indices=indices) )
+                y_cluster_array.append(cluster(post_prob=post_prob, prior=prior, score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices) )
 
         y_sorted_clusters = sorted(y_cluster_array, key=operator.attrgetter('post_prob', 'score', 'pid', 'prior'), reverse = True)
         return y_sorted_clusters

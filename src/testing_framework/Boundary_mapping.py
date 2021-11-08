@@ -1,6 +1,5 @@
 import os
 import sys
-import cProfile
 module_path = os.path.abspath(os.path.join('..'))
 if module_path not in sys.path:
     sys.path.append(module_path)
@@ -11,9 +10,6 @@ if module_path not in sys.path:
 
 import database
 import testing_utils
-import operator
-
-import gen_spectra
 from utils import ppm_to_da
 
 #Assumptions:
@@ -43,7 +39,7 @@ print('Finished matching masses')
 
 
 print('Collecting data...')
-write_path = "/home/naco3124/jaime_hypedsearch/hypedsearch/src/testing_framework/data"
+write_path = "/home/ncol107453/jaime_hypedsearch/hypedsearch/src/testing_framework/data"
 
 with open(os.path.join(write_path, 'total_data.txt'), 'w') as d:
     d.write('')
