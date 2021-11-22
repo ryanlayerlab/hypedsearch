@@ -194,7 +194,7 @@ def find_hits(boundaries, spectrum, spec_num, matched_masses_b, matched_masses_y
         b = utils.hashable_boundaries(b)
 
         if b in matched_masses_b:
-            mz_hit_tuple = (spec_num, k)
+            mz_hit_tuple = (spec_num, k, mz)
             b_hit_set.add(mz_hit_tuple)
             for tuple in matched_masses_b[b]:
                 extended_tuple = (spec_num, mz, tuple)
