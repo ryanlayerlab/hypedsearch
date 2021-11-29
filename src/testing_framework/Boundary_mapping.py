@@ -11,6 +11,7 @@ if module_path not in sys.path:
 import database
 import testing_utils
 from utils import ppm_to_da
+import operator
 
 #Assumptions:
 max_peptide_length = 20
@@ -39,7 +40,7 @@ print('Finished matching masses')
 
 
 print('Collecting data...')
-write_path = "/home/ncol107453/jaime_hypedsearch/hypedsearch/src/testing_framework/data"
+write_path = "/home/naco3124/jaime_hypedsearch/hypedsearch/src/testing_framework/data"
 
 with open(os.path.join(write_path, 'total_data.txt'), 'w') as d:
     d.write('')
@@ -77,8 +78,8 @@ for spectrum_num, input_spectrum in enumerate(input_spectra):
     y_sorted_clusters = testing_utils.sort_clusters_by_post_prob(ion, boundaries, matched_masses_b, matched_masses_y)
     testing_utils.write_y_sorted_cluster(y_sorted_clusters)
 
-    # b_sorted_clusters = sorted(b_sorted_clusters, key=operator.attrgetter('score', 'post_prob', 'pid', 'prior'), reverse = True)
-    # y_sorted_clusters = sorted(y_sorted_clusters, key=operator.attrgetter('score', 'post_prob', 'pid', 'prior'), reverse = True)
+    b_sorted_clusters = sorted(b_sorted_clusters, key=operator.attrgetter('score', 'post_prob', 'pid', 'prior'), reverse = True)
+    y_sorted_clusters = sorted(y_sorted_clusters, key=operator.attrgetter('score', 'post_prob', 'pid', 'prior'), reverse = True)
 
     # with open(os.path.join(write_path, str(spectrum_num)+ "_data.txt"), 'a') as d:
     #     d.write(correct_sequences[spectrum_num] + '\n')

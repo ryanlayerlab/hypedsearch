@@ -96,7 +96,7 @@ def define_data():
     )
 
 
-    raw_prefix = os.path.join(root, 'home', 'ncol107453', 'jaime_hypedsearch', 'hypedsearch', 'data')
+    raw_prefix = os.path.join(root, 'home', 'naco3124', 'jaime_hypedsearch', 'hypedsearch', 'data')
 
 
     NOD2_data = Dataset(
@@ -500,18 +500,24 @@ def is_good_hit(kmer: string, ion, correct_sequence):
     #take in a kmer and ion and determine if sequence is good subsequence. Also return score based on length of kmer
     if ion == 'b':
         if (kmer[0] == correct_sequence[0]):
-            if (isSubSequence(kmer, correct_sequence, len(kmer), len(correct_sequence))):
-                return (True, len(kmer))
+            if len(kmer) > len(correct_sequence):
+                return (False,0)
             else:
-                return (False, 0)
+                for x in range(0,len(kmer)):
+                    if kmer[x] != correct_sequence[x]:
+                        return False, 0
+                return (True, len(kmer))
         else:
             return (False, 0)
     else:
         if (kmer[-1] == correct_sequence[-1]):
-            if (isSubSequence(kmer, correct_sequence, len(kmer), len(correct_sequence))):
-                return (True, len(kmer))
-            else:
+            if len(kmer) > len(correct_sequence):
                 return (False, 0)
+            else: 
+                for x in range(len(kmer)-1,0, -1):
+                    if kmer[x] != correct_sequence[x]:
+                        return False, 0
+                return (True, len(kmer))
         else:
             return (False, 0)
 
@@ -685,6 +691,79 @@ def create_clusters(ion):
                 last_pid = hit.pid
                 last_end = hit.end
 
+# def create_tuple_from_element(A):
+#     start = A[0]
+#     second = A[1]
+#     seq = A[2]
+#     mass = A[3]
+#     disallowed_characters = " ()\'"
+#     for character in disallowed_characters:
+#         start = start.replace(character, "")
+#         seq = seq.replace(character, "")
+#         mass = mass.replace(character, "")
+#     start = int(start)
+#     second = int(second)
+#     mass = float(mass)
+    
+#     target_tuple = (start, second, seq, mass)
+#     return target_tuple
+
+# def calc_post_prob(indices, ion, boundaries, matched_masses_b, matched_masses_y):
+#     post_prob_array = []
+#     post_prob = 0
+#     for element in indices:
+#         A = element.split(',')
+#         A = create_tuple_from_element(A)
+#         seq = A[2]
+#         mz = A[3]
+#         b = boundaries[mz]
+#         b = utils.hashable_boundaries(b)
+#         that_prior = set_prior(mz, ion, boundaries, matched_masses_b, matched_masses_y)
+#         if ion == 'b':
+#             that_post_prob =  1/len(seq) * that_prior
+#         else:
+#             that_post_prob =  1/len(seq) * that_prior
+#         post_prob_array.append(that_post_prob)
+#     for prob in post_prob_array:
+#         post_prob = post_prob + prob
+        
+#     return post_prob
+
+def parse_indices(index_set):
+    indices = []
+    for index in index_set:
+        string = str(index)
+        A = string.rstrip().split(',')
+        start = A[0]
+        end = A[1]
+        seq = A[2]
+        mz = A[3]
+        disallowed_characters = " ()\'"
+        for character in disallowed_characters:
+            start = start.replace(character, "")
+            end = end.replace(character, "")
+            seq = seq.replace(character, "")
+            mz = mz.replace(character, "")
+        
+        target_tuple = (int(start), int(end), seq, float(mz))
+        indices.append(target_tuple)
+    
+    
+    return indices
+
+def calc_weighted_sum(indices, matched_masses, boundaries):
+    total_sum = 0
+    for subCluster in indices:
+        mass = subCluster[3]
+        boundary = boundaries[mass]
+        boundary = utils.hashable_boundaries(boundary)
+        if len(matched_masses[boundary]) != 0:
+            total_sum = total_sum + (1/ len(matched_masses[boundary]) )
+        else:
+            total_sum = total_sum
+    return total_sum
+    
+    
 def set_prior(mz, ion, boundaries, matched_masses_b, matched_masses_y):
     # for i in range (0, len(b_sorted_clusters)):
     # prior = 1 / # of occurances
@@ -696,18 +775,6 @@ def set_prior(mz, ion, boundaries, matched_masses_b, matched_masses_y):
         P_A = 1/len(matched_masses_y[b]) # if (len(matched_masses_b[b]) !=0) else 1
     
     return P_A
-
-def calc_post_prob(prior, indices):
-    post = 0
-    current_prob = prior
-    for element in indices:
-        A = element.rstrip().split(',')
-        string = A[2]
-#         mz = (A[3])
-#         mz = mz[:-1]
-#         mz = mz[2:]
-        post = post + 1/len(string) + prior
-    return post
 
 def sort_clusters_by_post_prob(ion, boundaries, matched_masses_b, matched_masses_y):
     cluster = collections.namedtuple('cluster', 'post_prob prior score pid start end seq mz indices')
@@ -725,14 +792,14 @@ def sort_clusters_by_post_prob(ion, boundaries, matched_masses_b, matched_masses
                 indices = []
                 [indices.append(A[x]) for x in range(6,len(A))]
                 prior = set_prior(mz, ion, boundaries, matched_masses_b, matched_masses_y)
-                post_prob = calc_post_prob(prior, indices)
+                indices = parse_indices(indices)
+                post_prob = calc_weighted_sum(indices, matched_masses_b, boundaries) + prior
 
                 b_cluster_array.append(cluster(post_prob=post_prob, prior=prior, score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices) )
 
         b_sorted_clusters = sorted(b_cluster_array, key=operator.attrgetter('post_prob', 'score', 'pid', 'prior'), reverse = True)
         return b_sorted_clusters
     else:
-        # y_hits
         y_cluster_array = []
         with open('clusters.txt', 'r') as c:
             for line in c:
@@ -746,13 +813,13 @@ def sort_clusters_by_post_prob(ion, boundaries, matched_masses_b, matched_masses
                 indices = []
                 [indices.append(A[x]) for x in range(6,len(A))]
                 prior = set_prior(mz, ion, boundaries, matched_masses_b, matched_masses_y)
-                post_prob = calc_post_prob(prior, indices)
+                indices = parse_indices(indices)
+                post_prob = calc_weighted_sum(indices, matched_masses_b, boundaries) + prior
 
                 y_cluster_array.append(cluster(post_prob=post_prob, prior=prior, score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices) )
 
         y_sorted_clusters = sorted(y_cluster_array, key=operator.attrgetter('post_prob', 'score', 'pid', 'prior'), reverse = True)
         return y_sorted_clusters
-
 
 def write_b_sorted_cluster(b_sorted_clusters):
     # for cluster in b_sorted_clusters:
@@ -830,18 +897,6 @@ def test_optimized_compare_masses(
         reference = updated_reference.get('spectrum')
     
     return 
-
-def calc_post_prob(prior, indices):
-    post = 0
-    current_prob = prior
-    for element in indices:
-        A = element.rstrip().split(',')
-        string = A[2]
-#         mz = (A[3])
-#         mz = mz[:-1]
-#         mz = mz[2:]
-        post = post + 1/len(string) + prior
-    return post
 
 def modified_sort_masses_in_sorted_keys_b(db_dict_b,mz,kmer_list_b):
     kmers = db_dict_b[mz]
