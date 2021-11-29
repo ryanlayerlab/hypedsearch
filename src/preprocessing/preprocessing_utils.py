@@ -17,7 +17,7 @@ def load_spectra(
             relative_abundance_filter=relative_abundance_filter
         )
         for object in these_spectra:
-            object.mz_values.append(object.precursor_mass)
+            object.mz_values.append(object.precursor_mass * object.precursor_charge)
             object.abundance.append(100000000) #I gave it a crazy high abundance to represent precursor. Still a hack
         all_spectra += these_spectra
         # these_spectra = [these_spectra[0]]
