@@ -194,7 +194,7 @@ def find_hits(boundaries, spectrum, spec_num, matched_masses_b, matched_masses_y
         b = utils.hashable_boundaries(b)
 
         if b in matched_masses_b:
-            mz_hit_tuple = (spec_num, k)
+            mz_hit_tuple = (spec_num, k, mz)
             b_hit_set.add(mz_hit_tuple)
             for tuple in matched_masses_b[b]:
                 extended_tuple = (spec_num, mz, tuple)
@@ -833,70 +833,6 @@ def write_y_sorted_cluster(y_sorted_clusters):
         # print(non_indices) #+ '\t'+ '\t'.join([str(o) for o in cluster.indices]))
         with open("y_sorted_clusters.txt", 'w') as y:
             [y.write(str(x) + '\n') for x in y_sorted_clusters]
-
-def test_optimized_compare_masses(
-    mz_mapping,
-    bbby,
-    observed: list, 
-    reference: list, 
-    ppm_tolerance: int = 20, 
-    needs_sorted: bool = False
-    ) -> float:
-    '''Score two spectra against eachother. Simple additive scoring of ions found
-
-    :param observed: observed set of m/z values
-    :type observed: list
-    :param reference: reference set of m/z values
-    :type reference: list
-    :param ppm_tolerance: parts per million mass error allowed when matching masses. 
-        (default is 20)
-    :type ppm_tolerance: int
-    :param needs_sorted: Set to true if either the observed or reference need to 
-        be sorted. 
-        (default is False)
-    :type needs_sorted: bool
-
-    :returns: the number of matched ions
-    :rtype: int
-
-    :Example:
-
-    >>> optimized_compare_masses([1, 2, 4], [1, 3, 4], 1, False)
-    >>> 2
-    '''
-    if len(observed) == 0 or len(reference) == 0:
-        return 0.0
-
-    if needs_sorted:
-        observed.sort()
-        reference.sort()
-        
-    def boundaries(mass):
-        tol = ppm_to_da(mass, ppm_tolerance)
-        return [mass - tol, mass + tol]
-                
-    # calculate the boundaries for each of the reference masses for binary search
-    observed_boundaries = []
-    for obs in observed:
-        observed_boundaries += boundaries(obs)
-
-    obs_boundaries = []
-    for mz in observed:
-        mapped = mz_mapping[mz]
-        b = bbby[mapped]
-        obs_boundaries.append(b[0])
-        obs_boundaries.append(b[1])
-    
-    if obs_boundaries != observed_boundaries:
-        print('WRONG!')
-        
-    #hack
-    #the_type = type(reference) #python = 'dict' #cpp = 'list'
-    updated_reference = reference      
-    if isinstance(updated_reference,dict):
-        reference = updated_reference.get('spectrum')
-    
-    return 
 
 def modified_sort_masses_in_sorted_keys_b(db_dict_b,mz,kmer_list_b):
     kmers = db_dict_b[mz]
