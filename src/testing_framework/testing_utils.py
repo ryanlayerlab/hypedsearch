@@ -96,7 +96,7 @@ def define_data():
     )
 
 
-    raw_prefix = os.path.join(root, 'home', 'naco3124', 'jaime_hypedsearch', 'hypedsearch', 'data')
+    raw_prefix = os.path.join(root, 'home', 'ncol107453', 'jaime_hypedsearch', 'hypedsearch', 'data')
 
 
     NOD2_data = Dataset(
@@ -515,7 +515,7 @@ def is_good_hit(kmer: string, ion, correct_sequence):
                 return (False, 0)
             else: 
                 for x in range(len(kmer)-1,0, -1):
-                    if kmer[x] != correct_sequence[x]:
+                    if kmer[-x] != correct_sequence[-x]:
                         return False, 0
                 return (True, len(kmer))
         else:
