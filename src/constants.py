@@ -55,7 +55,7 @@ INTEGER_ORDERED_AMINO_ACIDS = {
 
 #This is the mass of water. Adding the mass of water to the sum of all the residue masses gives the mass of the peptide.
 WATER_MASS = 2 * 1.007825035 + 15.99491463 
-PROTON_MASS = 1.0072764
+PROTON_MASS = 1.007276466879
 
 SINGLY_CHARGED_Y_BASE = 3 * 1.007825035 + 15.99491463 - 0.0005486 #for the OH to turn the residue CO on the C-terminus into COOH + 1 proton to make NH into NH2 and 1 proton make positively charged
 DOUBLY_CHARGED_Y_BASE = 4 * 1.007825035 + 15.99491463 - 2 * 0.0005486 #another proton to make doubly charged
