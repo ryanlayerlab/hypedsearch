@@ -1,5 +1,6 @@
+from genericpath import exists
 import os, gzip, shutil, copy, math
-from typing import Iterable, Any
+from typing import Iterable, Any, Tuple
 from itertools import product
 import numpy as np
 from collections import namedtuple
@@ -297,7 +298,7 @@ def cosine_similarity(a: list, b: list) -> float:
 
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
-def split_hybrid(sequence: str) -> (str, str):
+def split_hybrid(sequence: str):
     '''Split a hybrid sequence into it's left and right components
     
     :param sequence: hybrid sequence with special characters [() -]
@@ -313,6 +314,13 @@ def split_hybrid(sequence: str) -> (str, str):
         left = sequence.split(')')[0].replace('(', '')
         right = sequence.split('(')[1].replace(')', '')
         return (left, right)
+
+def find_dir(filename, location):
+    filepath = os.path.join(location, filename)
+    if os.path.exists(filepath):
+        return True
+    else:
+        return False
 
 def DEV_contains_truth_parts(truth_seq: str, hybrid: bool, b_seqs: list, y_seqs: list) -> bool:
     '''DEVELOPMENT FUNCTION ONLY

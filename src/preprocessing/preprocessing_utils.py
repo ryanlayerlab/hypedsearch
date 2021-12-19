@@ -6,7 +6,6 @@ from constants import DOUBLY_CHARGED_B_BASE, DOUBLY_CHARGED_Y_BASE, PROTON_MASS,
 def make_boundaries(mz, ppm_tol):
     da_tol = ppm_to_da(mz, ppm_tol)
     return [mz - da_tol, mz + da_tol]
-
 def get_total_sum(m,z):
     total_sum = 0
     total_sum = (m * z) - (z * PROTON_MASS) - WATER_MASS
@@ -16,6 +15,13 @@ def normalize_to_two(m, z):
     normalized_b = (DOUBLY_CHARGED_B_BASE + total_sum) / 2
     normalized_y = (DOUBLY_CHARGED_Y_BASE + total_sum) / 2
     return normalized_b, normalized_y
+def reduce_database(all_spectra, these_spectra, index_list):
+    rall_spectra = []
+    rthese_spectra = []
+    for index in index_list:
+        rall_spectra.append(all_spectra[index])
+        rthese_spectra.append(these_spectra[index])
+    return rall_spectra, rthese_spectra
     
 def load_spectra(
     spectra_files: list, ppm_tol: int, peak_filter: int = 0, relative_abundance_filter: float = 0.0):
@@ -34,8 +40,8 @@ def load_spectra(
             object.abundance.append(100000000) #I gave it a crazy high abundance to represent precursor. Still a hack
             object.abundance.append(100000000) 
         all_spectra += these_spectra
-        # these_spectra = [these_spectra[0]]
-        # all_spectra = [all_spectra[0]]
+        index_list = [0,100,702] #For using a condensed databse
+        these_spectra, all_spectra = reduce_database(all_spectra, these_spectra, index_list) 
         linear_spectra += list(set([
             x for spectrum in these_spectra for x in spectrum.mz_values
         ]))
