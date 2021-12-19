@@ -2,11 +2,17 @@ from utils import hashable_boundaries, predicted_len
 from objects import Database
 import gen_spectra
 from collections import defaultdict
-from typing import Iterable
 from math import ceil
-import array as arr
-import requests
+import os
 import json
+
+def write_matched_masses(filepath, matched_masses_b, matched_masses_y, kmer_set):
+    with open(os.path.join(filepath, 'matched_masses_b.txt'), 'w') as b:
+        [b.write(str(x) + ':' + json.dumps(matched_masses_b[x]) + '\n') for x in matched_masses_b.keys()]
+    with open(os.path.join(filepath, 'matched_masses_y.txt'), 'w') as b:
+        [b.write(str(x) + ':' + json.dumps(matched_masses_y[x]) + '\n') for x in matched_masses_y.keys()]
+    with open(os.path.join(filepath, 'kmer_set.txt'), 'w') as b:
+        [b.write(str(x) + ':' + json.dumps(kmer_set[x]) + '\n') for x in kmer_set.keys()]
 
 def modified_sort_masses_in_sorted_keys_b(db_dict_b,mz,kmer_list_b):
     kmers = db_dict_b[mz]
@@ -92,14 +98,11 @@ def in_bounds(int1, interval):
 
 def modified_merge(kmers, boundaries: dict):
     matched_masses_b, matched_masses_y = defaultdict(list), defaultdict(list)
-    #Goal: b and y dictionaries mapping mz values to lists of kmers that have a mass within the tolerance
-    # kmers = make_database_set(db.proteins, max_len)
     mz_mapping = dict()
     for i,mz in enumerate(boundaries):
         mz_mapping[i] = boundaries[mz]
     boundary_index, kmer_index, starting_point = 0,0,0
     while (boundary_index < len(boundaries)) and (kmer_index < len(kmers)):
-        #idea is to increment kmer index when mass is too small for boundaries[0] and then stop when mass is too big for boundaries[1]
         target_kmer = kmers[kmer_index]
         target_boundary = mz_mapping[boundary_index]
         if in_bounds(target_kmer[0], target_boundary):
@@ -112,94 +115,74 @@ def modified_merge(kmers, boundaries: dict):
                 hashable_boundary = hashable_boundaries(target_boundary)
                 matched_masses_y[hashable_boundary].append(target_kmer)
                 kmer_index = kmer_index + 1
-            
         elif target_kmer[0] < target_boundary[0]:
             kmer_index = kmer_index + 1
             starting_point = starting_point + 1
-        else:                                            #target_kmer > target_boundary[1]
+        else:                                           
             boundary_index = boundary_index + 1
             kmer_index = starting_point
-
     return matched_masses_b, matched_masses_y
-
-# def modified_add_matched_to_matched_set(matched_masses_b_batch,matched_masses_b,kmer_set,batch_kmer_set,matched_masses_y_batch,matched_masses_y):
-#     for k, v in matched_masses_b_batch.items():
-#         matched_masses_b[k] += v 
-#         for kmer in v:
-#             kmer_set[kmer] += batch_kmer_set[kmer]
-#     for k, v in matched_masses_y_batch.items():
-#         matched_masses_y[k] += v 
-#         for kmer in v:
-#             kmer_set[kmer] += batch_kmer_set[kmer]
 
 def modified_match_masses_per_protein(kv_prots,max_len,boundaries,kmer_set):
     extended_kv_prots = [(k, entry) for (k, v) in kv_prots for entry in v]
     kmers, kmer_set = modified_make_database_set(extended_kv_prots, max_len)
     # check_for_y_kmers(kmers)
+    print("Performing Merge")
     matched_masses_b, matched_masses_y = modified_merge(kmers, boundaries)
-    # modified_add_matched_to_matched_set(matched_masses_b,kmer_set,kmers,matched_masses_y)
-
+    print("Done")
     return matched_masses_b, matched_masses_y, kmer_set
 
 def modified_match_masses(boundaries: dict, db: Database, max_pep_len: int):
-    # matched_masses_b, matched_masses_y, kmer_set = defaultdict(list), defaultdict(list), defaultdict(list) #Not sure this is needed
     max_boundary = max(boundaries.keys())
     estimated_max_len = ceil(boundaries[max_boundary][1] / 57.021464)
     max_len = min(estimated_max_len, max_pep_len)
     kv_prots = [(k, v) for k, v in db.proteins.items()]
     matched_masses_b, matched_masses_y, kmer_set = modified_match_masses_per_protein(kv_prots,max_len,boundaries,db)
+    write_matched_masses(os.path.abspath(os.path.join('src', 'intermediate_files')), matched_masses_b, matched_masses_y, kmer_set)
     return (matched_masses_b, matched_masses_y, kmer_set)
+def reformat_kmers(kstr):
+    new_list = []
+    kstr = kstr.replace("[", "")
+    A = kstr.rstrip().split('],')
+    [new_list.append(x) for x in A]
+def reformat_hits(cstr):
+    new_list = []
+    cstr = cstr.replace("[", "")
+    cstr = cstr.replace(" ", "")
+    cstr = cstr[:-2]
+    A = cstr.rstrip().split('],')
+    for block in A:
+        sublist = []
+        B = block.rstrip().split(',')
+        sublist.append(float(B[0]))
+        sublist.append(int(B[1]))
+        sublist.append(B[2][1:-1])
+        sublist.append(B[3][1:-1])
+        sublist.append(B[4][1:-1])
+        sublist.append(int(B[5]))
+        new_list.append(sublist)
 
-def get_midpoints_of_boundries(spectra_boundaries):
-    midpoints = []
-    for spectra_boundry in spectra_boundaries:
-        lower,upper = spectra_boundry
-        midpoint = lower + ((upper-lower)/2)
-        midpoints.append(midpoint)
-    return midpoints        
-
-def is_kmers_in_kmer_matches(kmers,kmer_matches):
-    contained = False
-    for kmer_match in kmer_matches:
-        if kmer_match == kmers:
-            contained = True
-            break
-    return contained
-
-def get_speactras_for_mz_value(ion_charge, mz_value, ppm_tolerance):
-    base_url = "http://hypedsearchservice.azurewebsites.net/api/proteinmatch?"
-    url = base_url + "ion_charge=" + ion_charge
-    url += "&weight=" + str(mz_value)
-    url += "&ppm_tolerance=" + str(ppm_tolerance)
-    request = requests.get(url = url)
-    protein_matches = request.json()
-    kmer_matches = []
-    proteins_matched = []
-    for protein_match in protein_matches:
-        protein_match_list = list(protein_match.values())
-        kmers = protein_match_list[1]
-        protein = protein_match_list[0]
-        proteins_matched.append(protein)
-        if is_kmers_in_kmer_matches(kmers,kmer_matches):
-            pass
-        else:
-            kmer_matches.append(kmers)
-    return kmer_matches, proteins_matched
-
-def match_masses_using_webservice(spectra_boundaries, ppm_tolerance):
-    matched_masses_b, matched_masses_y, kmer_set = defaultdict(list), defaultdict(list), defaultdict(list)
-    midpoints = get_midpoints_of_boundries(spectra_boundaries)
-    adjusted_ppm_tolerance = abs(ppm_tolerance / 1000)
-    for index, midpoint in enumerate(midpoints):
-        ion_charge = "B"
-        boundry = str(spectra_boundaries[index][0]) + '-' + str(spectra_boundaries[index][1])
-        matched_spectra,proteins_matched = get_speactras_for_mz_value(ion_charge, midpoint,adjusted_ppm_tolerance)
-        matched_masses_b[boundry].append(matched_spectra)
-        kmer_set = proteins_matched
-    for index, midpoint in enumerate(midpoints):
-        ion_charge = "Y"
-        boundry = str(spectra_boundaries[index][0]) + '-' + str(spectra_boundaries[index][1])
-        matched_spectra,proteins_matched = get_speactras_for_mz_value(ion_charge, midpoint,adjusted_ppm_tolerance)
-        kmer_set.extend(proteins_matched)
-        matched_masses_y[boundry].append(matched_spectra)
-    return (matched_masses_b, matched_masses_y, kmer_set)
+    return new_list
+def get_from_file(mb_loc, my_loc, kmer_set_loc, no_k):
+    matched_masses_b, matched_masses_y, kmer_set = defaultdict(), defaultdict(), defaultdict()
+    with open(mb_loc, 'r') as m:
+        for line in m:
+            line = line.replace("{", "")
+            line = line.replace("}", "")
+            A = line.rstrip().split(':')
+            matched_masses_b[A[0]] = reformat_hits(A[1])
+    with open(my_loc, 'r') as m:
+        for line in m:
+            line = line.replace("{", "")
+            line = line.replace("}", "")
+            A = line.rstrip().split(':')
+            matched_masses_y[A[0]] = reformat_hits(A[1])
+    if no_k != True:
+        with open(kmer_set_loc, 'r') as m:
+            for line in m:
+                line = line.replace("{", "")
+                line = line.replace("}", "")
+                A = line.rstrip().split(':')
+                kmer_set[A[0]] = reformat_kmers(A[1])
+    
+    return matched_masses_b, matched_masses_y, kmer_set

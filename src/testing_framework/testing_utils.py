@@ -33,7 +33,6 @@ kmer_set = defaultdict(list)
 
 def generate_truth_set(Dataset):
     correct_sequences = []
-    abundances = []
     with open(Dataset[1], 'r') as truth_set:
         for q, line in enumerate(truth_set):
             if q != 0:
