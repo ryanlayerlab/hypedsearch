@@ -12,7 +12,7 @@ def write_matched_masses(filepath, matched_masses_b, matched_masses_y, kmer_set)
     with open(os.path.join(filepath, 'matched_masses_y.txt'), 'w') as b:
         [b.write(str(x) + ':' + json.dumps(matched_masses_y[x]) + '\n') for x in matched_masses_y.keys()]
     with open(os.path.join(filepath, 'kmer_set.txt'), 'w') as b:
-        [b.write(str(x) + ':' + json.dumps(kmer_set[x]) + '\n') for x in kmer_set.keys()]
+        [b.write(str(x) + ':' + json.dumps(list(kmer_set[x])) + '\n') for x in kmer_set.keys()]
 
 def modified_sort_masses_in_sorted_keys_b(db_dict_b,mz,kmer_list_b):
     kmers = db_dict_b[mz]
@@ -47,7 +47,7 @@ def modified_add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set,start_location
                     r_d[mz].add((mz, protein_number, kmer_to_add, str(start_position) + '-' + str(end_position), ion, charge))
                 else:
                     r_d[mz].add((mz, protein_number, kmer_to_add, str(end_position) + '-' + str(start_position), ion, charge))
-                kmer_set[kmer_to_add].append(prot_name)
+                kmer_set[kmer_to_add].add(prot_name)
 
 def make_database_set_for_protein(i,plen,max_len,prot_entry,prot_name,db_dict_b,db_dict_y,kmer_set):
     print(f'\rOn protein {i+1}/{plen} [{int((i+1) * 100 / plen)}%]', end='')
@@ -81,7 +81,7 @@ def make_database_set_for_proteins(proteins,max_len,db_dict_b,db_dict_y,kmer_set
 def modified_make_database_set(proteins: list, max_len: int):
     db_dict_b = defaultdict(set)
     db_dict_y = defaultdict(set)
-    kmer_set = defaultdict(list)
+    kmer_set = defaultdict(set)
     make_database_set_for_proteins(proteins,max_len,db_dict_b,db_dict_y,kmer_set)
     print('\nSorting the set of protein masses...')
     kmer_list = []
@@ -145,6 +145,7 @@ def reformat_kmers(kstr):
     kstr = kstr.replace("[", "")
     A = kstr.rstrip().split('],')
     [new_list.append(x) for x in A]
+    return new_list
 def reformat_hits(cstr):
     new_list = []
     cstr = cstr.replace("[", "")
@@ -161,7 +162,6 @@ def reformat_hits(cstr):
         sublist.append(B[4][1:-1])
         sublist.append(int(B[5]))
         new_list.append(sublist)
-
     return new_list
 def get_from_file(mb_loc, my_loc, kmer_set_loc, no_k):
     matched_masses_b, matched_masses_y, kmer_set = defaultdict(), defaultdict(), defaultdict()
@@ -177,12 +177,12 @@ def get_from_file(mb_loc, my_loc, kmer_set_loc, no_k):
             line = line.replace("}", "")
             A = line.rstrip().split(':')
             matched_masses_y[A[0]] = reformat_hits(A[1])
-    if no_k != True:
-        with open(kmer_set_loc, 'r') as m:
-            for line in m:
-                line = line.replace("{", "")
-                line = line.replace("}", "")
-                A = line.rstrip().split(':')
-                kmer_set[A[0]] = reformat_kmers(A[1])
+    # if no_k != True:
+    with open(kmer_set_loc, 'r') as m:
+        for line in m:
+            line = line.replace("{", "")
+            line = line.replace("}", "")
+            A = line.rstrip().split(':')
+            kmer_set[A[0]] = reformat_kmers(A[1])
     
     return matched_masses_b, matched_masses_y, kmer_set

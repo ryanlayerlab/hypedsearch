@@ -419,7 +419,7 @@ def get_parents(
     return (get_sources(seq), None)
 
 def extend_non_hybrid(kmer, spectrum: Spectrum, ion: str, db: Database) -> list:
-    seq = kmer[2]
+    seq = kmer[2][2]
     extensions = []
     extension_len = utils.predicted_len_precursor(spectrum, seq) - len(seq)
     if extension_len <= 0:

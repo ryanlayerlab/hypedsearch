@@ -58,9 +58,9 @@ def id_spectrum(spectrum: Spectrum, db: Database, b_hits: dict, y_hits: dict,
     truth: dict = None, fall_off: dict = None, is_last: bool = False):
 
     precursor_tolerance = utils.ppm_to_da(spectrum.precursor_mass, precursor_tolerance)
-    b_intermediate = [(kmer, mass_comparisons.optimized_compare_masses(spectrum.mz_values, gen_spectra.gen_spectrum(kmer[2], ion='b'))) for kmer in b_hits]
+    b_intermediate = [(kmer, mass_comparisons.optimized_compare_masses(spectrum.mz_values, gen_spectra.gen_spectrum(kmer[2][2], ion='b'))) for kmer in b_hits]
     b_results = sorted(b_intermediate, key=lambda x: (x[1], 1/len(x[0])), reverse=True)
-    y_intermediate = [(kmer, mass_comparisons.optimized_compare_masses(spectrum.mz_values, gen_spectra.gen_spectrum(kmer[2], ion='y'))) for kmer in y_hits]
+    y_intermediate = [(kmer, mass_comparisons.optimized_compare_masses(spectrum.mz_values, gen_spectra.gen_spectrum(kmer[2][2], ion='y'))) for kmer in y_hits]
     y_results = sorted(y_intermediate, key=lambda x: (x[1], 1/len(x[0])), reverse=True)
     filtered_b, filtered_y = [], []
     max_b_score = max([x[1] for x in b_results])
@@ -270,7 +270,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     min_peptide_len: int = 5, max_peptide_len: int = 23, peak_filter: int = 0, 
     relative_abundance_filter: float = 0.0,ppm_tolerance: int = 20, 
     precursor_tolerance: int = 10, digest: str = '',cores: int = 1,
-    n: int = 5,DEBUG: bool = True, truth_set: str = "", output_dir: str = ''):
+    n: int = 5,DEBUG: bool = False, truth_set: str = "", output_dir: str = ''):
     truth = None
     if is_json(truth_set) and is_file(truth_set):
         DEV = True
@@ -280,12 +280,14 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
         filepath = os.path.abspath(os.path.join("data", "NOD2_E3_results.ssv"))
         correct_sequences = evaluation.generate_truth_set(filepath)
         correct_sequences = [correct_sequences[0], correct_sequences[100], correct_sequences[702]]
+    else:
+        correct_sequences = []
     verbose and print('Loading spectra...')
     spectra, boundaries = preprocessing_utils.load_spectra(spectra_files, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
     verbose and print('Loading spectra Done')
     location = os.path.abspath(os.path.join('src', 'intermediate_files'))
-    no_kmer_set = True
-    if DEBUG and utils.find_dir('matched_masses_b.txt', location) and utils.find_dir('matched_masses_y.txt', location) and utils.find_dir('kmer_set.txt', location):
+    no_kmer_set = False
+    if utils.find_dir('matched_masses_b.txt', location) and utils.find_dir('matched_masses_y.txt', location) and utils.find_dir('kmer_set.txt', location):
         matched_masses_b, matched_masses_y, kmer_set = merge_search.get_from_file(os.path.join(location, 'matched_masses_b.txt'), os.path.join(location, 'matched_masses_y.txt'), os.path.join(location, 'kmer_set.txt'), no_kmer_set)
     else:
         matched_masses_b, matched_masses_y, kmer_set = merge_search.modified_match_masses(boundaries, db, max_peptide_len)
