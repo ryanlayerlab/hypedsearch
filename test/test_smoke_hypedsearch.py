@@ -25,7 +25,7 @@ class Test_Main(unittest.TestCase):
             peak_filter = 25
             relative_abundance_filter = .01
             digest = ''
-            debug = True
+            debug = False
             cores = 1
             n = 5
             truth_set = ''

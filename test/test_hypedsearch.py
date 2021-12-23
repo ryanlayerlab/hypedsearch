@@ -163,15 +163,7 @@ class Test_Main(unittest.TestCase):
         precursor = precursor * 5
         charge = charge + 1 #Expected len would be 32
         self.assertEqual(utils.predicted_len(precursor, charge), 32)
-    
-    def test_predicted_len_precursor(self): 
-        #Run the predicted_len_precursor function with the sequence 'MAL' and the spectrum for 'MALWAR'. 
-        sequence = 'MAL'
-        spectrum = Spectrum(gen_spectra.gen_spectra('MALWAR'), [], 0, 0, -1, gen_spectra.get_precursor('MALWAR'), 1)
-        expected_length = 7 #Note that while "MALWAR" has a length of 6, the calculation is intentially rounded up because
-        #it is better to overshoot than undershoot
-        self.assertEqual(utils.predicted_len_precursor(spectrum, sequence), expected_length)
-    
+        
     def test_hashable_boundaries(self):
         #run the hashable_boundaries function with two lists of boundaries
         boundaries1 = [2,10] #Expected to return 2-10
@@ -287,16 +279,6 @@ class Test_Main(unittest.TestCase):
         self.assertEqual(scoring.precursor_distance(observed_precursor, reference_precursor), expected_precursor_dist)
         #test the other way
         self.assertEqual(scoring.precursor_distance(reference_precursor, observed_precursor), expected_precursor_dist)
-
-    def test_total_mass_error(self):
-        #Build spectrum
-        spectrum = Spectrum(spectrum=[70.06481170654297, 72.07975006103516, 86.09618377685547, 120.08119201660156, 129.10186767578125, 132.10205078125, 183.14903259277344, 211.14425659179688, 231.06002807617188, 302.0948181152344, 316.1502380371094, 342.23724365234375, 343.2393493652344, 344.1456298828125, 443.20904541015625, 617.3176879882812, 635.3029174804688, 665.8477783203125, 732.345458984375, 732.85546875, 1134.5634765625, 1135.568603515625, 1233.637939453125, 1316.615234375, 1463.6756591796875], abundance=[5611.4921875, 759.39697265625, 13583.19140625, 1904.96875, 377.9483947753906, 4277.7255859375, 2619.271484375, 3084.39013671875, 1280.637939453125, 413.639892578125, 1418.86376953125, 6746.6708984375, 1324.3463134765625, 2561.01708984375, 949.918212890625, 388.83099365234375, 522.100830078125, 384.86090087890625, 1058.61181640625, 387.35174560546875, 804.1146240234375, 738.4801025390625, 975.6796875, 496.6000061035156, 672.422119140625], total_intensity=53342.53186035156, ms_level=2, scan_number=256, precursor_mass=640.007114, precursor_charge=3, file_name='/home/naco3124/raw_inputs/NOD2_E3/mzml/NOD2_E3.mzML', id='NOD2_E3.20155.20196.3.pkl', other_metadata={})
-        #Test the scoring.total_mass_error function
-        #Case 1, both spectra are the exact same
-        same_spec = Spectrum(gen_spectra.gen_spectrum('DLTQLAL')['spectrum'], [], 0, 0, -1, gen_spectra.gen_spectrum('DLTQLAL')['precursor_mass'], '1')
-        self.assertEqual(0, scoring.total_mass_error(same_spec, 'DLTQLAL', 0))
-        #Case 2, spectra and ideal are different
-        self.assertEqual(scoring.total_mass_error(spectrum, 'DDVALYNFSKYFIPLL', 20), 0.011992253671792241)
 
     def test_database_dependant_functions(self):
         # Build database
