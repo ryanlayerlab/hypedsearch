@@ -1,10 +1,10 @@
 paths: 
   # full path to the spectra folder containing all spectra files
-  spectra_dir: '/home/naco3124/jaime_hypedsearch/hypedsearch/data/spectra'
+  spectra_dir: '/home/ncol107453/jaime_hypedsearch/hypedsearch/data/spectra/NOD2_E3'
   # full path to the .fasta database file
-  database_file: '/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/single_prot.fasta'
+  database_file: '/home/ncol107453/jaime_hypedsearch/hypedsearch/data/database/sample_database.fasta'
   # full path to the output directory
-  output_dir: '/home/naco3124/jaime_hypedsearch/hypedsearch/data/output'
+  output_dir: '/home/ncol107453/jaime_hypedsearch/hypedsearch/data/output'
 
 search_params:
   # minimum length peptide to look for
@@ -44,7 +44,7 @@ run_parameters:
 
 dev_params:
   # Extra extra printing options for debugging the application
-  debug: True
+  debug: False
   # "truth" set json file that has the "truth" sequence for every 
   # spectrum. Should be keyed by some id param that is extracted by the tool 
   # to check where the correct value falls off at. Format of the json is simple:
