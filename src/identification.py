@@ -285,7 +285,8 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     verbose and print('Loading spectra...')
     spectra, boundaries = preprocessing_utils.load_spectra(spectra_files, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
     verbose and print('Loading spectra Done')
-    location = os.path.abspath(os.path.join('src', 'intermediate_files'))
+    dirname = os.path.dirname(os.path.abspath(__file__))
+    location = os.path.join(dirname, 'intermediate_files')
     no_kmer_set = False
     if DEBUG and utils.find_dir('matched_masses_b.txt', location) and utils.find_dir('matched_masses_y.txt', location) and utils.find_dir('kmer_set.txt', location):
         matched_masses_b, matched_masses_y, kmer_set = merge_search.get_from_file(os.path.join(location, 'matched_masses_b.txt'), os.path.join(location, 'matched_masses_y.txt'), os.path.join(location, 'kmer_set.txt'), no_kmer_set)
