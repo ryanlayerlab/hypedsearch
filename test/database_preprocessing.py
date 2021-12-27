@@ -44,7 +44,7 @@ def database_and_spectra_preprocessing(
     
     # load all of the spectra
     verbose and print('Loading spectra...')
-    spectra, boundaries, mz_mapping = preprocessing_utils.load_spectra(
+    spectra, boundaries = preprocessing_utils.load_spectra(
         spectra_files, 
         ppm_tolerance,
         peak_filter=peak_filter, 
@@ -53,7 +53,8 @@ def database_and_spectra_preprocessing(
     verbose and print('Done')
 
     # get the boundary -> kmer mappings for b and y ions
-    matched_masses_b, matched_masses_y, db = merge_search.match_masses(boundaries, db, max_peptide_len)
+
+    matched_masses_b, matched_masses_y, db = merge_search.modified_match_masses(boundaries, db, max_peptide_len, DEBUG)
 
     # # if we only get 1 core, don't do the multiprocessing bit
     # if cores == 1:

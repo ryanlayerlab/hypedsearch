@@ -6,12 +6,12 @@ from math import ceil
 import os
 import json
 
-def write_matched_masses(filepath, matched_masses_b, matched_masses_y, kmer_set):
-    with open(os.path.join(filepath, 'matched_masses_b.txt'), 'w') as b:
+def write_matched_masses(filepath, matched_masses_b, matched_masses_y, kmer_set, debug):
+    with open(os.path.join(filepath, "matched_masses_b.txt"),"w+") as b:
         [b.write(str(x) + ':' + json.dumps(matched_masses_b[x]) + '\n') for x in matched_masses_b.keys()]
-    with open(os.path.join(filepath, 'matched_masses_y.txt'), 'w') as b:
+    with open(os.path.join(filepath, "matched_masses_y.txt"),"w+") as b:
         [b.write(str(x) + ':' + json.dumps(matched_masses_y[x]) + '\n') for x in matched_masses_y.keys()]
-    with open(os.path.join(filepath, 'kmer_set.txt'), 'w') as b:
+    with open(os.path.join(filepath, "kmer_set.txt"), 'w+') as b:
         [b.write(str(x) + ':' + json.dumps(list(kmer_set[x])) + '\n') for x in kmer_set.keys()]
 
 def modified_sort_masses_in_sorted_keys_b(db_dict_b,mz,kmer_list_b):
@@ -132,13 +132,14 @@ def modified_match_masses_per_protein(kv_prots,max_len,boundaries,kmer_set):
     print("Done")
     return matched_masses_b, matched_masses_y, kmer_set
 
-def modified_match_masses(boundaries: dict, db: Database, max_pep_len: int):
+def modified_match_masses(boundaries: dict, db: Database, max_pep_len: int, debug: bool):
     max_boundary = max(boundaries.keys())
     estimated_max_len = ceil(boundaries[max_boundary][1] / 57.021464)
     max_len = min(estimated_max_len, max_pep_len)
     kv_prots = [(k, v) for k, v in db.proteins.items()]
     matched_masses_b, matched_masses_y, kmer_set = modified_match_masses_per_protein(kv_prots,max_len,boundaries,db)
-    write_matched_masses(os.path.abspath(os.path.join('src', 'intermediate_files')), matched_masses_b, matched_masses_y, kmer_set)
+    if debug:
+        write_matched_masses(os.path.abspath(os.path.join('src', 'intermediate_files')), matched_masses_b, matched_masses_y, kmer_set, debug)
     return (matched_masses_b, matched_masses_y, kmer_set)
 def reformat_kmers(kstr):
     new_list = []
