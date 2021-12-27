@@ -104,7 +104,7 @@ def mp_id_spectrum(input_q: mp.Queue, db_copy: Database, results: dict, fall_off
             next_entry.ppm_tolerance, next_entry.precursor_tolerance,
             next_entry.n,truth, fall_off)
 def write_hits(b_hits, y_hits, location):
-    with open(os.path.join(location, "b_hits.txt"), 'w') as b:
+    with open(os.path.join(location, "b_hits.txt"), 'w+') as b:
         for x in b_hits:
             pep_id = x[0]
             w = x[1]
@@ -115,7 +115,7 @@ def write_hits(b_hits, y_hits, location):
             charge = x[2][5]
             out = [pep_id, w, prot_id, seq, loc, ion, charge]
             b.write('\t'.join([str(i) for i in out]) + '\n')
-    with open(os.path.join(location, "y_hits.txt"), 'w') as b:
+    with open(os.path.join(location, "y_hits.txt"), 'w+') as b:
         for y in y_hits:
             pep_id = y[0]
             w = y[1]
@@ -290,7 +290,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     if DEBUG and utils.find_dir('matched_masses_b.txt', location) and utils.find_dir('matched_masses_y.txt', location) and utils.find_dir('kmer_set.txt', location):
         matched_masses_b, matched_masses_y, kmer_set = merge_search.get_from_file(os.path.join(location, 'matched_masses_b.txt'), os.path.join(location, 'matched_masses_y.txt'), os.path.join(location, 'kmer_set.txt'), no_kmer_set)
     else:
-        matched_masses_b, matched_masses_y, kmer_set = merge_search.modified_match_masses(boundaries, db, max_peptide_len)
+        matched_masses_b, matched_masses_y, kmer_set = merge_search.modified_match_masses(boundaries, db, max_peptide_len, DEBUG)
     # TODO
     #matched_masses_b, matched_masses_y, kmer_set = merge_search.match_masses_using_webservice(boundaries, ppm_tolerance)
     db = db._replace(kmers=kmer_set)

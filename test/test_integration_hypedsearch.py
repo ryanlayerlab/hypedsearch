@@ -96,55 +96,6 @@ class Test_Main(unittest.TestCase):
         filename2 = 'thisfiledoesnotexist.txt'
         self.assertEqual(utils.is_file(filename), True)
         self.assertEqual(utils.is_file(filename2), False)
-     
-    def test_gen_extensions(self):
-        # test b extensions
-        seq = 'DLQTLAL'
-        ion = 'b'
-        dirname = os.path.dirname(__file__)
-        spectra_file_paths = [os.path.join(dirname, '../data/spectra/hybrid_nod2e3.mzML')]  
-        database_file_path = os.path.join(dirname, '../data/database/sample_database.fasta') 
-        # Generate spectra for some peptide. Note that we are only testing this function's ability to generate extensions
-        # from the database so the input spectrum is not relevant. 
-        spectrum = Spectrum(gen_spectra.gen_spectrum('DLQTLALWSRM'), [], 0, 0, -1, gen_spectra.get_precursor('DLQTLALWSRM'), 1, '', '', {})
-        # Import database (mouse_filtered.fasta) in NOD2_E3 and do all usual preprocessing
-        db = database_preprocessing.database_and_spectra_preprocessing(spectra_file_paths, database_file_path)
-        # Generate kmer set. This is going to be every kmer of size len(seq)
-
-        # Generate all extensions
-        b_ext = []
-        
-        b_ext += [x for x in alignment_utils.extend_non_hybrid(seq, spectrum, 'b', db)]
-        
-        # Check there are no missing extensions
-        # These extensions were found manually
-        b_test_ext = ['DLQTLALEVAQQK', 'DLQTLALEVARQK']
-        self.assertEqual(sorted(b_ext), sorted(b_test_ext))
-        #calculate extension length
-        extension_len = utils.predicted_len_precursor(spectrum, seq) - len(seq)
-
-        # test y extensions
-        ion = 'y'
-        # Generate spectra for some peptide. Note that we are only testing this function's ability to generate extensions
-        # from the database so the input spectrum is not relevant. 
-        spectrum = Spectrum(gen_spectra.gen_spectrum('DLQTLALWSRM'), [], 0, 0, -1, gen_spectra.get_precursor('DLQTLALWSRM'), 1, '', '', {})
-        # Import database (mouse_filtered.fasta) in NOD2_E3 and do all usual preprocessing
-        # db = database.build(database_file_path)
-        # Generate kmer set. This is going to be every kmer of size len(seq)
-
-        # Generate all extensions
-        y_ext = []
-        
-        y_ext += [x for x in alignment_utils.extend_non_hybrid(seq, spectrum, 'y', db)]
-        
-        # Check there are no missing extensions
-        # These extensions were found manually
-        y_test_ext = ['GGPGAGDLQTLAL', 'LGGSPGDLQTLAL']
-        self.assertEqual(sorted(y_ext), sorted(y_test_ext))
-        #calculate extension length
-        extension_len = utils.predicted_len_precursor(spectrum, seq) - len(seq)
-
-
 
 if __name__ == "__main__":
     unittest.main()
