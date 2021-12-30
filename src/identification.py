@@ -55,7 +55,7 @@ def adjust_for_truth_and_fall_off(spectrum,truth,filtered_b,filtered_y,b_results
 
 def id_spectrum(spectrum: Spectrum, db: Database, b_hits: dict, y_hits: dict,
     ppm_tolerance: int, precursor_tolerance: int,n: int,digest_type: str = '',
-    truth: dict = None, fall_off: dict = None, is_last: bool = False):
+    truth: dict = None, fall_off: dict = None):
 
     precursor_tolerance = utils.ppm_to_da(spectrum.precursor_mass, precursor_tolerance)
     b_intermediate = [(kmer, mass_comparisons.optimized_compare_masses(spectrum.mz_values, gen_spectra.gen_spectrum(kmer[2][2], ion='b'))) for kmer in b_hits]
@@ -77,7 +77,7 @@ def id_spectrum(spectrum: Spectrum, db: Database, b_hits: dict, y_hits: dict,
             return early_return        
     alignments = alignment.attempt_alignment(spectrum, db, filtered_b, filtered_y, 
         ppm_tolerance=ppm_tolerance, precursor_tolerance=precursor_tolerance,
-        n=n, truth=truth, fall_off=fall_off, is_last=is_last)
+        n=n, truth=truth, fall_off=fall_off)
     return alignments
 
 def mp_id_spectrum(input_q: mp.Queue, db_copy: Database, results: dict, fall_off: dict = None, truth: dict = None):
@@ -179,7 +179,7 @@ def align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db
         print(f'Creating alignment for spectrum {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='\r')
         b_hits,y_hits = create_hits(i,spectrum,boundaries,matched_masses_b,matched_masses_y,DEBUG,location)
         filename = "spec_" + str(i)
-        if not DEBUG:
+        if DEBUG:
             for ion in "by":
                 if not (DEBUG and utils.find_dir(filename + "_" + ion + "_clusters.txt", location)):
                     clustering.create_clusters(ion, location, i)
@@ -188,12 +188,12 @@ def align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db
                 else:
                     y_sorted_clusters = clustering.sort_clusters_by_post_prob(os.path.join(location, filename + "_" + ion + "_clusters.txt"), ion)
             merged_seqs = clustering.merge_clusters(b_sorted_clusters, y_sorted_clusters, spectrum.precursor_mass, precursor_tolerance)
-            is_last = DEBUG and i == len(spectra) - 1
+            i == len(spectra) - 1
             if DEBUG:
                 t = truth_set[i]
                 evaluation.evaluate_initial_hits(merged_seqs, t, i)
         else:
-            raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off, is_last=is_last)
+            raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off)
             results[spectrum.id]=raw_results
 
 def align_on_multi_core(cores,mp_id_spectrum,db,spectra,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
