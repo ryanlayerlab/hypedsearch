@@ -179,18 +179,19 @@ def align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db
         print(f'Creating alignment for spectrum {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='\r')
         b_hits,y_hits = create_hits(i,spectrum,boundaries,matched_masses_b,matched_masses_y,DEBUG,location)
         filename = "spec_" + str(i)
-        for ion in "by":
-            if not (DEBUG and utils.find_dir(filename + "_" + ion + "_clusters.txt", location)):
-                clustering.create_clusters(ion, location, i)
-            if ion ==  'b':
-                b_sorted_clusters = clustering.sort_clusters_by_post_prob(os.path.join(location, filename + "_" + ion + "_clusters.txt"), ion)
-            else:
-                y_sorted_clusters = clustering.sort_clusters_by_post_prob(os.path.join(location, filename + "_" + ion + "_clusters.txt"), ion)
-        merged_seqs = clustering.merge_clusters(b_sorted_clusters, y_sorted_clusters, spectrum.precursor_mass, precursor_tolerance)
-        is_last = DEBUG and i == len(spectra) - 1
-        if DEBUG:
-            t = truth_set[i]
-            evaluation.evaluate_initial_hits(merged_seqs, t, i)
+        if not DEBUG:
+            for ion in "by":
+                if not (DEBUG and utils.find_dir(filename + "_" + ion + "_clusters.txt", location)):
+                    clustering.create_clusters(ion, location, i)
+                if ion ==  'b':
+                    b_sorted_clusters = clustering.sort_clusters_by_post_prob(os.path.join(location, filename + "_" + ion + "_clusters.txt"), ion)
+                else:
+                    y_sorted_clusters = clustering.sort_clusters_by_post_prob(os.path.join(location, filename + "_" + ion + "_clusters.txt"), ion)
+            merged_seqs = clustering.merge_clusters(b_sorted_clusters, y_sorted_clusters, spectrum.precursor_mass, precursor_tolerance)
+            is_last = DEBUG and i == len(spectra) - 1
+            if DEBUG:
+                t = truth_set[i]
+                evaluation.evaluate_initial_hits(merged_seqs, t, i)
         else:
             raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off, is_last=is_last)
             results[spectrum.id]=raw_results
