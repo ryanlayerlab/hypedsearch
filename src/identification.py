@@ -175,7 +175,7 @@ def create_hits(spec_num,spectrum,matched_masses_b,matched_masses_y, DEBUG, loca
 def align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off,results,DEBUG,location,truth_set):
     for i, spectrum in enumerate(spectra):
         print(f'Creating alignment for spectrum {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='\r')
-        b_hits,y_hits = create_hits(i,spectrum,boundaries,matched_masses_b,matched_masses_y,DEBUG,location)
+        b_hits,y_hits = create_hits(i,spectrum,matched_masses_b,matched_masses_y,DEBUG,location)
         filename = "spec_" + str(i)
         if DEBUG:
             for ion in "by":
