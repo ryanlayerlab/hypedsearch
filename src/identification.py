@@ -154,21 +154,19 @@ def get_hits_from_file(bf, yf):
             out = [pep_id, w, prot_id, seq, loc, ion, charge]
             y_hits.append(out)
     return b_hits, y_hits
-def create_hits(spec_num,spectrum,boundaries,matched_masses_b,matched_masses_y, DEBUG, location):
+def create_hits(spec_num,spectrum,matched_masses_b,matched_masses_y, DEBUG, location):
     filename = "spec_" + str(spec_num) + "_"
     if DEBUG and utils.find_dir(filename + 'b_hits.txt', location) and utils.find_dir(filename + 'y_hits.txt', location):
         b_hits, y_hits = get_hits_from_file(os.path.join(location, 'b_hits.txt'), os.path.join(location, 'y_hits.txt'))
     else:
         b_hits, y_hits = [], []
         for mz in spectrum.mz_values:
-            b = boundaries[mz]
-            b = hashable_boundaries(b)
-            if b in matched_masses_b:
-                for tuple in matched_masses_b[b]:
+            if mz in matched_masses_b:
+                for tuple in matched_masses_b[mz]:
                     tup = (spec_num, mz, tuple)
                     b_hits.append(tup)
-            if b in matched_masses_y:
-                for tuple in matched_masses_y[b]:
+            if mz in matched_masses_y:
+                for tuple in matched_masses_y[mz]:
                     tup = (spec_num, mz, tuple)
                     y_hits.append(tup)
         write_hits(b_hits, y_hits, location)
@@ -292,7 +290,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     if DEBUG and utils.find_dir('matched_masses_b.txt', location) and utils.find_dir('matched_masses_y.txt', location) and utils.find_dir('kmer_set.txt', location):
         matched_masses_b, matched_masses_y, kmer_set = merge_search.get_from_file(os.path.join(location, 'matched_masses_b.txt'), os.path.join(location, 'matched_masses_y.txt'), os.path.join(location, 'kmer_set.txt'), no_kmer_set)
     else:
-        matched_masses_b, matched_masses_y, kmer_set = merge_search.modified_match_masses(boundaries, db, max_peptide_len, DEBUG)
+        matched_masses_b, matched_masses_y, kmer_set = merge_search.modified_match_masses(boundaries, db, max_peptide_len, True)
     # TODO
     #matched_masses_b, matched_masses_y, kmer_set = merge_search.match_masses_using_webservice(boundaries, ppm_tolerance)
     db = db._replace(kmers=kmer_set)
