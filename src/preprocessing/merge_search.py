@@ -100,20 +100,21 @@ def modified_merge(kmers, boundaries: dict):
     matched_masses_b, matched_masses_y = defaultdict(list), defaultdict(list)
     mz_mapping = dict()
     for i,mz in enumerate(boundaries):
-        mz_mapping[i] = boundaries[mz]
+        mz_mapping[i] = []
+        mz_mapping[i].append(mz)
+        [mz_mapping[i].append(x) for x in boundaries[mz]]
     boundary_index, kmer_index, starting_point = 0,0,0
     while (boundary_index < len(boundaries)) and (kmer_index < len(kmers)):
         target_kmer = kmers[kmer_index]
-        target_boundary = mz_mapping[boundary_index]
+        target_key = mz_mapping[boundary_index][0]
+        target_boundary = mz_mapping[boundary_index][1:]
         if in_bounds(target_kmer[0], target_boundary):
             if target_kmer[4] == 'b':
-                hashable_boundary = hashable_boundaries(target_boundary)
-                matched_masses_b[hashable_boundary].append(target_kmer)
+                matched_masses_b[target_key].append(target_kmer)
                 kmer_index = kmer_index + 1
 
             if target_kmer[4] == 'y':
-                hashable_boundary = hashable_boundaries(target_boundary)
-                matched_masses_y[hashable_boundary].append(target_kmer)
+                matched_masses_y[target_key].append(target_kmer)
                 kmer_index = kmer_index + 1
         elif target_kmer[0] < target_boundary[0]:
             kmer_index = kmer_index + 1
