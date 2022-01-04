@@ -290,7 +290,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     if DEBUG and utils.find_dir('matched_masses_b.txt', location) and utils.find_dir('matched_masses_y.txt', location) and utils.find_dir('kmer_set.txt', location):
         matched_masses_b, matched_masses_y, kmer_set = merge_search.get_from_file(os.path.join(location, 'matched_masses_b.txt'), os.path.join(location, 'matched_masses_y.txt'), os.path.join(location, 'kmer_set.txt'), no_kmer_set)
     else:
-        matched_masses_b, matched_masses_y, kmer_set = merge_search.modified_match_masses(boundaries, db, max_peptide_len, True)
+        matched_masses_b, matched_masses_y, kmer_set = merge_search.modified_match_masses(boundaries, db, max_peptide_len, DEBUG)
     # TODO
     #matched_masses_b, matched_masses_y, kmer_set = merge_search.match_masses_using_webservice(boundaries, ppm_tolerance)
     db = db._replace(kmers=kmer_set)
