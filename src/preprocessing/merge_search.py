@@ -133,14 +133,14 @@ def modified_match_masses_per_protein(kv_prots,max_len,boundaries,kmer_set):
     print("Done")
     return matched_masses_b, matched_masses_y, kmer_set
 
-def modified_match_masses(boundaries: dict, db: Database, max_pep_len: int, debug: bool):
+def modified_match_masses(boundaries: dict, db: Database, max_pep_len: int, debug: bool, write_path):
     max_boundary = max(boundaries.keys())
     estimated_max_len = ceil(boundaries[max_boundary][1] / 57.021464)
     max_len = min(estimated_max_len, max_pep_len)
     kv_prots = [(k, v) for k, v in db.proteins.items()]
     matched_masses_b, matched_masses_y, kmer_set = modified_match_masses_per_protein(kv_prots,max_len,boundaries,db)
     if debug:
-        write_matched_masses(os.path.abspath(os.path.join('src', 'intermediate_files')), matched_masses_b, matched_masses_y, kmer_set, debug)
+        write_matched_masses(write_path, matched_masses_b, matched_masses_y, kmer_set, debug)
     return (matched_masses_b, matched_masses_y, kmer_set)
 def reformat_kmers(kstr):
     new_list = []

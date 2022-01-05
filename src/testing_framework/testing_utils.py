@@ -436,29 +436,6 @@ def filter_hits(b_hits, y_hits, precursor_mass, precursor_charge):
     print(str(count), "kmers were filtered out")
     return filtered_b, filtered_y
 
-def parse_hits(b_hits, y_hits):
-    for i, x in enumerate(b_hits):
-        pep_id = x[0]
-        w = x[1][0]
-        prot_id = x[1][1]
-        seq = x[1][2]
-        loc = x[1][3]
-        write_ion = x[1][4]
-        charge = x[1][5]
-        x = [pep_id, w, prot_id, seq, loc, write_ion, charge]
-        b_hits[i] = x
-    for i, y in enumerate(y_hits):
-        pep_id = y[0]
-        w = y[1][0]
-        prot_id = y[1][1]
-        seq = y[1][2]
-        loc = y[1][3]
-        write_ion = y[1][4]
-        charge = y[1][5]
-        y = [pep_id, w, prot_id, seq, loc, write_ion, charge]
-        y_hits[i] = y
-    return b_hits, y_hits
-
 def isSubSequence(string1, string2, m, n):
     # Base Cases
     if m == 0:
@@ -622,73 +599,61 @@ def write_hits(b_hits, y_hits):
             y_file.write('\t'.join([str(i) for i in out]) + '\n')
     print('Done')
 
-def parse_hits(Hit, file_name):
-    hits = []
-    for l in open(file_name):
-            A = l.rstrip().split('\t')
-            pid = int(A[2])
-            start = int(A[4].split('-')[0])
-            end = int(A[4].split('-')[1])
-            seq = A[3]
-            mz = A[1]
+# def create_clusters(ion):
+#     Hit = collections.namedtuple('Hit', 'pid start end seq mz')
 
-            hits.append( Hit(pid=pid, start=start, end=end, seq=seq, mz=mz) )
-    return hits
-def create_clusters(ion):
-    Hit = collections.namedtuple('Hit', 'pid start end seq mz')
+#     if ion == 'b':
+#         file_name = 'b_hits.txt'
+#         # file_name = sys.argv[1]
 
-    if ion == 'b':
-        file_name = 'b_hits.txt'
-        # file_name = sys.argv[1]
+#         hits = parse_hits(Hit, file_name)
 
-        hits = parse_hits(Hit, file_name)
+#         sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
 
-        sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
+#         last_pid = None
+#         last_start = None
 
-        last_pid = None
-        last_start = None
+#         cluster = []
 
-        cluster = []
+#         with open('clusters.txt', 'w') as c:
+#             c.write('')
 
-        with open('clusters.txt', 'w') as c:
-            c.write('')
-
-        if ion == 'b':
-            for hit in sorted_hits:
-                if last_pid == hit.pid and last_start == hit.start:
-                    cluster.append(hit)
-                else:
-                    write_cluster(cluster)
-                    cluster = [hit]
-                last_pid = hit.pid
-                last_start = hit.start
+#         if ion == 'b':
+#             for hit in sorted_hits:
+#                 if last_pid == hit.pid and last_start == hit.start:
+#                     cluster.append(hit)
+#                 else:
+#                     write_cluster(cluster)
+#                     cluster = [hit]
+#                 last_pid = hit.pid
+#                 last_start = hit.start
     
-    else:
-        file_name = 'y_hits.txt'
-        # file_name = sys.argv[1]
+#     else:
+#         file_name = 'y_hits.txt'
+#         # file_name = sys.argv[1]
 
-        hits = parse_hits(Hit, file_name)
+#         hits = parse_hits(Hit, file_name)
 
-        sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'end', 'start'))
+#         sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'end', 'start'))
 
-        last_pid = None
-        last_start = None
+#         last_pid = None
+#         last_start = None
 
-        cluster = []
+#         cluster = []
 
-        with open('clusters.txt', 'w') as c:
-            c.write('')
+#         with open('clusters.txt', 'w') as c:
+#             c.write('')
 
 
-        if ion == 'y':
-            for hit in sorted_hits:
-                if last_pid == hit.pid and last_end == hit.end:
-                    cluster.append(hit)
-                else:
-                    write_cluster(cluster)
-                    cluster = [hit]
-                last_pid = hit.pid
-                last_end = hit.end
+#         if ion == 'y':
+#             for hit in sorted_hits:
+#                 if last_pid == hit.pid and last_end == hit.end:
+#                     cluster.append(hit)
+#                 else:
+#                     write_cluster(cluster)
+#                     cluster = [hit]
+#                 last_pid = hit.pid
+#                 last_end = hit.end
 
 # def create_tuple_from_element(A):
 #     start = A[0]
@@ -976,3 +941,174 @@ def modified_match_masses(boundaries: dict, db: Database, max_pep_len: int):
     kv_prots = [(k, v) for k, v in db.proteins.items()]
     matched_masses_b, matched_masses_y, kmer_set = modified_match_masses_per_protein(kv_prots,max_len,boundaries,db)
     return (matched_masses_b, matched_masses_y, kmer_set)
+
+def write_cluster(cluster):
+    if len(cluster) == 0 : return None
+    O = []
+    O.append(len(cluster))
+    O.append(cluster[0].pid)
+    max_len = 0
+    max_hit = None
+    for hit in cluster:
+        l = hit.end - hit.start + 1
+        if l > max_len:
+            max_len = l
+            max_hit = hit
+    O.append(max_hit.seq)
+    O.append(max_hit.mz)
+    O.append(max_hit.start)
+    O.append(max_hit.end)
+    for hit in cluster:
+        O.append( (hit.start, hit.end, hit.seq, hit.mz) ) 
+    return O
+def parse_hits(Hit, all_hits):
+    hits = []
+    for A in all_hits:
+        pid = int(A[2][1])
+        start = int(A[2][3].split('-')[0])
+        end = int(A[2][3].split('-')[1])
+        seq = A[2][2]
+        mz = A[1]
+
+        hits.append( Hit(pid=pid, start=start, end=end, seq=seq, mz=mz) )
+    return hits
+
+def get_unique_matched_masses(boundaries, matched_masses_b, matched_masses_y):
+    unique_b,unique_y = dict(), dict()
+    for mz in boundaries.keys():
+        unique_b[mz],unique_y[mz] = [],[]
+        for x in matched_masses_b[mz]:
+            seq = x[2]
+            charge = x[5]
+            if seq not in unique_b[mz]:
+                unique_b[mz].append(seq)
+        for x in matched_masses_y[mz]:
+            seq = x[2]
+            charge = x[5]
+            if seq not in unique_y[mz]:
+                unique_y[mz].append(seq)
+    return unique_b, unique_y
+    
+def create_clusters(ion, b_hits, y_hits):
+    clusters = []
+    Hit = collections.namedtuple('Hit', 'pid start end seq mz')
+    if ion == 'b':
+        hits = parse_hits(Hit, b_hits)
+        sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
+        last_pid = None
+        last_start = None
+        cluster = []
+        if ion == 'b':
+            for hit in sorted_hits:
+                if last_pid == hit.pid and last_start == hit.start:
+                    cluster.append(hit)
+                else:
+                    if cluster != []:
+                        clusters.append(write_cluster(cluster))
+                    cluster = [hit]
+                last_pid = hit.pid
+                last_start = hit.start
+    else:
+        hits = parse_hits(Hit, y_hits)
+        sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'end', 'start'))
+        last_pid = None
+        last_start = None
+        cluster = []
+        if ion == 'y':
+            for hit in sorted_hits:
+                if last_pid == hit.pid and last_end == hit.end:
+                    cluster.append(hit)
+                else:
+                    if cluster != []:
+                        clusters.append(write_cluster(cluster))
+                    cluster = [hit]
+                last_pid = hit.pid
+                last_end = hit.end
+    return clusters
+
+def calc_mass_given_other_explanations(unique_m, seq, mz):
+    oEXPnum = (len(unique_m[mz]) - 1)/ len(unique_m[mz])
+    if oEXPnum == 0:
+        return 0
+    else:
+        p = 0
+        for i, seq2 in enumerate(unique_m[mz]):
+            if seq == seq2:
+                continue
+            else:
+                p = p + 1/len(seq2)
+        return p
+
+def Bayes_given_mass(pH, seq, mz, unique_m):
+    pEH = 1/len(seq)
+    pnH = 1-pH
+    pEnH = calc_mass_given_other_explanations(unique_m, seq, mz)
+    prob = (pH * pEH)/((pH*pEH)+(pnH*pEnH))
+#     print(seq,pH,pEH,(pH*pEH),(pnH*pEnH),pnH,pEnH)
+    return prob
+def Bayes(seq, mz, unique_m, indices):
+    pH = 1/len(unique_m[mz])
+    for index in reversed(indices):
+        prob = Bayes_given_mass(pH, seq, mz, unique_m)
+        pH = prob
+    return prob
+
+def parse_indices(index_set):
+    indices = []
+    for index in index_set:
+        string = str(index)
+        A = string.rstrip().split(',')
+        start = A[0]
+        end = A[1]
+        seq = A[2]
+        mz = A[3]
+        disallowed_characters = " ()\'"
+        for character in disallowed_characters:
+            start = start.replace(character, "")
+            end = end.replace(character, "")
+            seq = seq.replace(character, "")
+            mz = mz.replace(character, "")
+        
+        target_tuple = (int(start), int(end), seq, float(mz))
+        indices.append(target_tuple)
+    
+    
+    return indices
+
+def Bayes_clusters(ion, clusters, unique_b, unique_y):
+    cluster = collections.namedtuple('cluster', 'prob score pid start end seq mz indices')
+    if ion == 'b':
+        b_cluster_array = []
+        for A in clusters:
+            score = A[0]
+            pid = int(A[1])
+            seq = A[2]
+            mz = float(A[3])
+            start = int(A[4])
+            end = int(A[5])
+            indices = A[6:]
+            prob = Bayes(seq, mz, unique_b, indices)
+            prob = 1-prob
+            target_cluster = cluster(prob=prob, score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
+
+            b_cluster_array.append(target_cluster)
+
+        b_sorted_clusters = sorted(b_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
+        return b_sorted_clusters
+    else:
+        y_cluster_array = []
+        for A in clusters:
+            score = A[0]
+            pid = int(A[1])
+            seq = A[2]
+            mz = float(A[3])
+            start = int(A[4])
+            end = int(A[5])
+            indices = A[6:]
+            prob = Bayes(seq, mz, unique_y, indices)
+            prob = 1-prob
+            target_cluster = cluster(prob=prob, score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
+            y_cluster_array.append(target_cluster)
+
+        y_sorted_clusters = sorted(y_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
+        return y_sorted_clusters
