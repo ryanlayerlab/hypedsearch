@@ -95,7 +95,7 @@ def define_data():
     )
 
 
-    raw_prefix = os.path.join(root, 'home', 'ncol107453', 'jaime_hypedsearch', 'hypedsearch', 'data')
+    raw_prefix = os.path.join(root, 'home', 'naco3124', 'jaime_hypedsearch', 'hypedsearch', 'data')
 
 
     NOD2_data = Dataset(
@@ -490,7 +490,7 @@ def is_good_hit(kmer: string, ion, correct_sequence):
             if len(kmer) > len(correct_sequence):
                 return (False, 0)
             else: 
-                for x in range(len(kmer)-1,0, -1):
+                for x in range(len(kmer),0, -1):
                     if kmer[-x] != correct_sequence[-x]:
                         return False, 0
                 return (True, len(kmer))
@@ -977,16 +977,18 @@ def get_unique_matched_masses(boundaries, matched_masses_b, matched_masses_y):
     unique_b,unique_y = dict(), dict()
     for mz in boundaries.keys():
         unique_b[mz],unique_y[mz] = [],[]
-        for x in matched_masses_b[mz]:
-            seq = x[2]
-            charge = x[5]
-            if seq not in unique_b[mz]:
-                unique_b[mz].append(seq)
-        for x in matched_masses_y[mz]:
-            seq = x[2]
-            charge = x[5]
-            if seq not in unique_y[mz]:
-                unique_y[mz].append(seq)
+        if mz in matched_masses_b:
+            for x in matched_masses_b[mz]:
+                seq = x[2]
+                charge = x[5]
+                if seq not in unique_b[mz]:
+                    unique_b[mz].append(seq)
+        if mz in matched_masses_y:
+            for x in matched_masses_y[mz]:
+                seq = x[2]
+                charge = x[5]
+                if seq not in unique_y[mz]:
+                    unique_y[mz].append(seq)
     return unique_b, unique_y
     
 def create_clusters(ion, b_hits, y_hits):
@@ -1046,8 +1048,9 @@ def Bayes_given_mass(pH, seq, mz, unique_m):
     prob = (pH * pEH)/((pH*pEH)+(pnH*pEnH))
 #     print(seq,pH,pEH,(pH*pEH),(pnH*pEnH),pnH,pEnH)
     return prob
-def Bayes(seq, mz, unique_m, indices):
-    pH = 1/len(unique_m[mz])
+
+def Bayes(seq, mz, unique_m, indices, kmer_set):
+    pH = len(seq)/len(kmer_set)
     for index in reversed(indices):
         prob = Bayes_given_mass(pH, seq, mz, unique_m)
         pH = prob
@@ -1075,7 +1078,7 @@ def parse_indices(index_set):
     
     return indices
 
-def Bayes_clusters(ion, clusters, unique_b, unique_y):
+def Bayes_clusters(ion, clusters,  path, kmer_set, unique_m):
     cluster = collections.namedtuple('cluster', 'prob score pid start end seq mz indices')
     if ion == 'b':
         b_cluster_array = []
@@ -1087,8 +1090,7 @@ def Bayes_clusters(ion, clusters, unique_b, unique_y):
             start = int(A[4])
             end = int(A[5])
             indices = A[6:]
-            prob = Bayes(seq, mz, unique_b, indices)
-            prob = 1-prob
+            prob = Bayes(seq, mz, unique_m, indices, kmer_set)
             target_cluster = cluster(prob=prob, score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
 
             b_cluster_array.append(target_cluster)
@@ -1105,8 +1107,7 @@ def Bayes_clusters(ion, clusters, unique_b, unique_y):
             start = int(A[4])
             end = int(A[5])
             indices = A[6:]
-            prob = Bayes(seq, mz, unique_y, indices)
-            prob = 1-prob
+            prob = Bayes(seq, mz, unique_m, indices, kmer_set)
             target_cluster = cluster(prob=prob, score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
             y_cluster_array.append(target_cluster)
 

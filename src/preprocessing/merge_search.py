@@ -172,13 +172,13 @@ def get_from_file(mb_loc, my_loc, kmer_set_loc, no_k):
             line = line.replace("{", "")
             line = line.replace("}", "")
             A = line.rstrip().split(':')
-            matched_masses_b[A[0]] = reformat_hits(A[1])
+            matched_masses_b[float(A[0])] = reformat_hits(A[1])
     with open(my_loc, 'r') as m:
         for line in m:
             line = line.replace("{", "")
             line = line.replace("}", "")
             A = line.rstrip().split(':')
-            matched_masses_y[A[0]] = reformat_hits(A[1])
+            matched_masses_y[float(A[0])] = reformat_hits(A[1])
     # if no_k != True:
     with open(kmer_set_loc, 'r') as m:
         for line in m:

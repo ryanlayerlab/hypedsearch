@@ -1,12 +1,10 @@
 import matplotlib.pyplot as plt
 import os
 import sys
-module_path = os.path.abspath(os.path.join('..'))
+module_path = os.path.abspath(os.path.join('../..'))
 if module_path not in sys.path:
     sys.path.append(module_path)
-module_path = os.path.abspath(os.path.join('..', 'hypedsearch', 'src'))
-if module_path not in sys.path:
-    sys.path.append(module_path)
+
 
 def check_for_second_score(rank, GoB, second_to_good, second_to_bad, score):
     if rank == 1:
@@ -144,7 +142,7 @@ prev_spectrum = None
 prev_ion = None
 GoB = False
 # filepath = os.path.join('..', 'hypedsearch', 'src', 'testing_framework', 'data', 'total_data.txt') #For running locally
-filepath = os.path.join('data', 'total_data.txt') #For running virtually
+filepath = os.path.join(module_path, 'intermediate_files', 'total_data.txt') #For running virtually
 with open(filepath, 'r') as d:
     for i, line in enumerate(d):
         A = line.rstrip().split('\t')
