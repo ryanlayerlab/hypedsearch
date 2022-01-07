@@ -1113,3 +1113,53 @@ def Bayes_clusters(ion, clusters,  path, kmer_set, unique_m):
 
         y_sorted_clusters = sorted(y_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
         return y_sorted_clusters
+
+def min_info(cluster):
+    return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.seq)
+
+def bsearch(key, Y):
+        lo = -1
+        hi = len(Y)
+        mid = -1
+        while (hi - lo > 1):
+            mid = int((hi+lo) / 2)
+            if Y[mid].start < key:
+                lo = mid
+            else:
+                hi = mid
+        return hi
+
+def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
+    merge_seqs = []
+
+    B = {}
+    for c in b_sorted_clusters:
+        if c.pid not in B:
+            B[c.pid] = []
+        B[c.pid].append(c)
+
+    Y = {}
+    for c in y_sorted_clusters:
+        if c.pid not in Y:
+            Y[c.pid] = []
+        Y[c.pid].append(c)
+
+    for pid in B:
+        if pid not in Y:
+            continue
+
+        sorted_B = sorted(B[pid], key=operator.attrgetter('pid', 'start', 'end'))
+        sorted_Y = sorted(Y[pid], key=operator.attrgetter('pid', 'start', 'end'))
+
+        for b in sorted_B:
+            y_i = bsearch(b.start, sorted_Y)
+
+            if y_i >= len(sorted_Y): break
+
+            y = sorted_Y[y_i]
+
+            while y_i < len(sorted_Y) and y.start - b.end < 10:
+                y = sorted_Y[y_i]
+                merge_seqs.append((b.prob * y.prob, b.end - y.start, y.end-b.start,min_info(b), min_info(y)))
+                y_i += 1
+    return merge_seqs
