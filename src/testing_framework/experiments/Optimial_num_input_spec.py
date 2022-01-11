@@ -1,6 +1,5 @@
 import os
 import sys
-import operator
 # module_path = os.path.abspath(os.path.join('..', 'hypedsearch', 'src'))
 # if module_path not in sys.path:
 #     sys.path.append(module_path)
@@ -18,11 +17,11 @@ import utils
 ppm_tolerance = 20
 precursor_tolerance = 10
 max_peptide_length = 23
-peak_filter = 25
 relative_abundance_filter = 0.1
 size_lim = 10
 cap_size = 20
 get = True
+
 
 
 import matplotlib.pyplot as plt
@@ -108,47 +107,35 @@ def filter_by_precursor(merged_sequences, ppm_tolerance, target_precursor, corre
             new_m.append(m_seq)
     return new_m
 
-input_spectra, boundaries, correct_sequences, db = get_spectra_and_db(ppm_tolerance, peak_filter, relative_abundance_filter)
+current_max = 0
+for peak_filter in range(25,200):
+    print("On spec num", peak_filter)
+    input_spectra, boundaries, correct_sequences, db = get_spectra_and_db(ppm_tolerance, peak_filter, relative_abundance_filter)
 
-write_path = os.path.abspath(os.path.join(module_path, 'intermediate_files'))
-if get:
-    matched_masses_b, matched_masses_y, kmer_set = merge_search.get_from_file(os.path.join(write_path, 'matched_masses_b.txt'), os.path.join(write_path, 'matched_masses_y.txt'), os.path.join(write_path, 'kmer_set.txt'), False)
-else:
+    write_path = os.path.abspath(os.path.join(module_path, 'intermediate_files'))
     matched_masses_b, matched_masses_y, kmer_set = merge_search.modified_match_masses(boundaries, db, max_peptide_length, True, write_path)
-print('Finished matching masses')
-print('Getting unique matched masses...')
-unique_b, unique_y = testing_utils.get_unique_matched_masses(boundaries, matched_masses_b, matched_masses_y)
-print('Done')
+    unique_b, unique_y = testing_utils.get_unique_matched_masses(boundaries, matched_masses_b, matched_masses_y)
 
-hit_seqs = []
-top_c, top_10c, top_50c = [],[],[]
-for spectrum_num,input_spectrum in enumerate(input_spectra):
-    correct_sequence = correct_sequences[spectrum_num]
-    b_hits,y_hits = identification.create_hits(spectrum_num, input_spectrum, matched_masses_b, matched_masses_y, False, write_path)
-    for ion in 'by':
-        clusters = testing_utils.create_clusters(ion, b_hits, y_hits)
-        if ion == 'b':
-            b_sorted_clusters = testing_utils.Bayes_clusters(ion, clusters, write_path, kmer_set, unique_b)
-        else:
-            y_sorted_clusters = testing_utils.Bayes_clusters(ion, clusters, write_path, kmer_set, unique_y)
-    m = testing_utils.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
-    m.sort(key = lambda x: x[0]) 
-    # m = filter_by_precursor(m, precursor_tolerance, input_spectrum.precursor_mass, correct_sequence)
-    top, top_10, top_50 = get_top_data(m, correct_sequence)
-    if top == True:
-        top_c.append(spectrum_num)
-        top_10c.append(spectrum_num)
-        top_50c.append(spectrum_num)
-    elif top_10 == True:
-        top_10c.append(spectrum_num)
-        top_50c.append(spectrum_num)
-    elif top_50 == True:
-        top_50c.append(spectrum_num)
-    if not top_10:
-        with open(os.path.join(write_path, str(spectrum_num)+"_"+ str(peak_filter)+"_merged_clusters.txt"), 'w+') as w:
-            [w.write(str(x) + '\n') for x in m]
+    hit_seqs = []
+    top_c, top_10c, top_50c = [],[],[]
+    for spectrum_num,input_spectrum in enumerate(input_spectra):
+        correct_sequence = correct_sequences[spectrum_num]
+        b_hits,y_hits = identification.create_hits(spectrum_num, input_spectrum, matched_masses_b, matched_masses_y, False, write_path)
+        for ion in 'by':
+            clusters = testing_utils.create_clusters(ion, b_hits, y_hits)
+            if ion == 'b':
+                b_sorted_clusters = testing_utils.Bayes_clusters(ion, clusters, write_path, kmer_set, unique_b)
+            else:
+                y_sorted_clusters = testing_utils.Bayes_clusters(ion, clusters, write_path, kmer_set, unique_y)
+        m = testing_utils.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
+        m.sort(key = lambda x: x[0]) 
+        # m = filter_by_precursor(m, precursor_tolerance, input_spectrum.precursor_mass, correct_sequence)
+        top, top_10, top_50 = get_top_data(m, correct_sequence)
+        if top_10 == True:
+            top_10c.append(spectrum_num)
 
-print("Hit was the bottom hit ", len(top_c), " times")
-print("Hit was in the bottom 10 ", len(top_10c), " times")
-print(top_10c)
-print("Hit was in the bottom 50 ", len(top_50c), " times")
+    if current_max < len(top_10c):
+        best_num = peak_filter
+        current_max = len(top_10c)
+
+print("Best peak filter is:", peak_filter, "at", current_max, "number of spectra in the top 10")
