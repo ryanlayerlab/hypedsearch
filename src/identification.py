@@ -185,11 +185,13 @@ def align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db
                     b_sorted_clusters = clustering.sort_clusters_by_post_prob(os.path.join(location, filename + "_" + ion + "_clusters.txt"), ion)
                 else:
                     y_sorted_clusters = clustering.sort_clusters_by_post_prob(os.path.join(location, filename + "_" + ion + "_clusters.txt"), ion)
-            merged_seqs = clustering.merge_clusters(b_sorted_clusters, y_sorted_clusters, spectrum.precursor_mass, precursor_tolerance)
+            merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
             i == len(spectra) - 1
             if DEBUG:
                 t = truth_set[i]
                 evaluation.evaluate_initial_hits(merged_seqs, t, i)
+                seq_results = merged_seqs[0:10]
+                results[spectrum.id] = seq_results
         else:
             raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off)
             results[spectrum.id]=raw_results
