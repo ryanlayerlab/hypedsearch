@@ -9,9 +9,11 @@ if module_path not in sys.path:
     sys.path.append(module_path)
 
 from testing_framework import testing_utils
-from preprocessing import preprocessing_utils, merge_search, clustering
+from preprocessing import preprocessing_utils, merge_search
 import identification
 import database
+import gen_spectra
+import utils
 
 ppm_tolerance = 20
 precursor_tolerance = 10
@@ -41,48 +43,70 @@ def remove_duplicates(merged_seqs):
     [new_seqs.add(x) for x in merged_seqs]
     return new_seqs
 
-def get_top_data(b_c, y_c, correct_sequence):
+def get_top_data(merged_seqs, correct_sequence):
     top, top10, top50 = False, False, False
 
-    c = b_c[0]
-    seq = c.seq
-    assessment, _ = testing_utils.is_good_hit(seq, 'b', correct_sequence)
+    m_seq = merged_seqs[0]
+    b_seq = m_seq[3][4]
+    y_seq = m_seq[4][4]
+    assessment, _ = testing_utils.is_good_hit(b_seq, 'b', correct_sequence)
     if assessment == True:
-        c = y_c[0]
-        seq = c.seq
-        assessment, _ = testing_utils.is_good_hit(seq, 'y', correct_sequence)
+        assessment, _ = testing_utils.is_good_hit(y_seq, 'y', correct_sequence)
         if assessment == True:
             top = True
             top10 = True
             top50 = True
             return top, top10, top50
     for i in range(1,10):
-        c = b_c[i]
-        seq = c.seq
-        assessment, _ = testing_utils.is_good_hit(seq, 'b', correct_sequence)
+        m_seq = merged_seqs[i]
+        b_seq = m_seq[3][4]
+        y_seq = m_seq[4][4]
+        assessment, _ = testing_utils.is_good_hit(b_seq, 'b', correct_sequence)
         if assessment == True:
-            c = y_c[i]
-            seq = c.seq
-            assessment, _ = testing_utils.is_good_hit(seq, 'y', correct_sequence)
+            assessment, _ = testing_utils.is_good_hit(y_seq, 'y', correct_sequence)
             if assessment == True:
                 top10 = True
                 top50 = True
                 return top, top10, top50
     for i in range(10,50):
-        c = b_c[i]
-        seq = c.seq
-        assessment, _ = testing_utils.is_good_hit(seq, 'b', correct_sequence)
+        m_seq = merged_seqs[i]
+        b_seq = m_seq[3][4]
+        y_seq = m_seq[4][4]
+        assessment, _ = testing_utils.is_good_hit(b_seq, 'b', correct_sequence)
         if assessment == True:
-            c = y_c[i]
-            seq = c.seq
-            assessment, _ = testing_utils.is_good_hit(seq, 'y', correct_sequence)
+            assessment, _ = testing_utils.is_good_hit(y_seq, 'y', correct_sequence)
             if assessment == True:
                 top50 = True
                 return top, top10, top50
 
-    return top,top10,top50
+    return False, False, False
 
-
+def filter_by_precursor(merged_sequences, ppm_tolerance, target_precursor, correct_sequence):
+    new_m = []
+    for m_seq in merged_sequences:
+        b_seq = m_seq[3][4]
+        y_seq = m_seq[4][4]
+        b_end = m_seq[3][2]
+        b_start = m_seq[3][1]
+        y_start = m_seq[4][1]
+        y_end = m_seq[4][2]
+        if b_seq == y_seq:
+            new_seq = b_seq
+        elif (y_end >= b_end) and (y_start <= b_start):
+            new_seq = y_seq
+        elif (b_end >= y_end) and (b_start <= y_start):
+            new_seq = b_seq
+        elif (b_end >= y_start) and (b_start <= y_start):
+            new_b_end = b_end - y_start
+            new_seq = b_seq[0:len(b_seq)-new_b_end-1] + y_seq
+        else:
+            new_seq = b_seq + y_seq
+        tol = utils.ppm_to_da(target_precursor, ppm_tolerance)
+        if gen_spectra.get_precursor(new_seq, 2) > target_precursor + tol:
+            continue
+        else:
+            new_m.append(m_seq)
+    return new_m
 
 input_spectra, boundaries, correct_sequences, db = get_spectra_and_db(ppm_tolerance, peak_filter, relative_abundance_filter)
 
@@ -107,9 +131,10 @@ for spectrum_num,input_spectrum in enumerate(input_spectra):
             b_sorted_clusters = testing_utils.Bayes_clusters(ion, clusters, write_path, kmer_set, unique_b)
         else:
             y_sorted_clusters = testing_utils.Bayes_clusters(ion, clusters, write_path, kmer_set, unique_y)
-    b_sorted_clusters = sorted(b_sorted_clusters, key=operator.attrgetter('prob','score','pid'))
-    y_sorted_clusters = sorted(y_sorted_clusters, key=operator.attrgetter('prob','score','pid'))
-    top, top_10, top_50 = get_top_data(b_sorted_clusters, y_sorted_clusters, correct_sequence)
+    m = testing_utils.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
+    m.sort(key = lambda x: x[0]) 
+    # m = filter_by_precursor(m, precursor_tolerance, input_spectrum.precursor_mass, correct_sequence)
+    top, top_10, top_50 = get_top_data(m, correct_sequence)
     if top == True:
         top_c.append(spectrum_num)
         top_10c.append(spectrum_num)
@@ -119,7 +144,11 @@ for spectrum_num,input_spectrum in enumerate(input_spectra):
         top_50c.append(spectrum_num)
     elif top_50 == True:
         top_50c.append(spectrum_num)
+    if not top_10:
+        with open(os.path.join(write_path, str(spectrum_num)+"_"+ str(peak_filter)+"_merged_clusters.txt"), 'w+') as w:
+            [w.write(str(x) + '\n') for x in m]
 
 print("Hit was the bottom hit ", len(top_c), " times")
 print("Hit was in the bottom 10 ", len(top_10c), " times")
+print(top_10c)
 print("Hit was in the bottom 50 ", len(top_50c), " times")
