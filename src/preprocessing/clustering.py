@@ -4,7 +4,7 @@ import os
 from utils import ppm_to_da
 from gen_spectra import get_precursor
 
-def write_cluster(cluster, filepath, spec_num, ion):
+def write_cluster(cluster):
     if len(cluster) == 0 : return None
     O = []
     O.append(len(cluster))
@@ -21,10 +21,8 @@ def write_cluster(cluster, filepath, spec_num, ion):
     O.append(max_hit.start)
     O.append(max_hit.end)
     for hit in cluster:
-        O.append( (hit.start, hit.end, hit.seq, hit.mz) )    # b_hits
-    with open(os.path.join(filepath, "spec_" + str(spec_num) + "_" + ion + '_clusters.txt'), 'a') as c:
-        c.write( '\t'.join( [str(o) for o in O] ) )
-        c.write('\n')
+        O.append( (hit.start, hit.end, hit.seq, hit.mz) ) 
+    return O
 
 def parse_hits(Hit, file_name):
     hits = []
@@ -39,38 +37,43 @@ def parse_hits(Hit, file_name):
             hits.append( Hit(pid=pid, start=start, end=end, seq=seq, mz=mz) )
     return hits
 
-def create_clusters(ion, filepath, spec_num):
+def create_clusters(ion, b_hits, y_hits):
+    clusters = []
     Hit = collections.namedtuple('Hit', 'pid start end seq mz')
     if ion == 'b':
-        file_name = os.path.join(filepath, 'b_hits.txt')
-        hits = parse_hits(Hit, file_name)
+        hits = parse_hits(Hit, b_hits)
         sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
         last_pid = None
         last_start = None
         cluster = []
-        for hit in sorted_hits:
-            if last_pid == hit.pid and last_start == hit.start:
-                cluster.append(hit)
-            else:
-                write_cluster(cluster, filepath, spec_num, ion)
-                cluster = [hit]
-            last_pid = hit.pid
-            last_start = hit.start
+        if ion == 'b':
+            for hit in sorted_hits:
+                if last_pid == hit.pid and last_start == hit.start:
+                    cluster.append(hit)
+                else:
+                    if cluster != []:
+                        clusters.append(write_cluster(cluster))
+                    cluster = [hit]
+                last_pid = hit.pid
+                last_start = hit.start
     else:
-        file_name = os.path.join(filepath, 'y_hits.txt')
-        hits = parse_hits(Hit, file_name)
+        hits = parse_hits(Hit, y_hits)
         sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'end', 'start'))
         last_pid = None
         last_start = None
         cluster = []
-        for hit in sorted_hits:
-            if last_pid == hit.pid and last_end == hit.end:
-                cluster.append(hit)
-            else:
-                write_cluster(cluster, filepath, spec_num, ion)
-                cluster = [hit]
-            last_pid = hit.pid
-            last_end = hit.end
+        if ion == 'y':
+            for hit in sorted_hits:
+                if last_pid == hit.pid and last_end == hit.end:
+                    cluster.append(hit)
+                else:
+                    if cluster != []:
+                        clusters.append(write_cluster(cluster))
+                    cluster = [hit]
+                last_pid = hit.pid
+                last_end = hit.end
+    return clusters
+
 
 def parse_indices(index_set):
     indices = []
@@ -90,43 +93,36 @@ def parse_indices(index_set):
         target_tuple = (int(start), int(end), seq, float(mz))
         indices.append(target_tuple)
     return indices
-def sort_clusters_by_post_prob(cluster_filepath, ion):
-    cluster = collections.namedtuple('cluster', 'score pid start end seq mz indices')
+def Score_clusters(ion, clusters):
+    cluster = collections.namedtuple('cluster', 'prob score pid start end seq mz indices')
     if ion == 'b':
         b_cluster_array = []
-        with open(cluster_filepath, 'r') as c:
-            for line in c:
-                A = line.rstrip().split('\t')
-                score = int(A[0])
-                pid = int(A[1])
-                seq = A[2]
-                mz = float(A[3])
-                start = int(A[4])
-                end = int(A[5])
-                indices = []
-                [indices.append(A[x]) for x in range(6,len(A))]
-                indices = parse_indices(indices)
+        for A in clusters:
+            score = A[0]
+            pid = int(A[1])
+            seq = A[2]
+            mz = float(A[3])
+            start = int(A[4])
+            end = int(A[5])
+            indices = A[6:]
+            target_cluster = cluster(score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
 
-                b_cluster_array.append(cluster(score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices) )
+            b_cluster_array.append(target_cluster)
 
         b_sorted_clusters = sorted(b_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
         return b_sorted_clusters
     else:
         y_cluster_array = []
-        with open(cluster_filepath, 'r') as c:
-            for line in c:
-                A = line.rstrip().split('\t')
-                score = int(A[0])
-                pid = int(A[1])
-                seq = A[2]
-                mz = float(A[3])
-                start = int(A[4])
-                end = int(A[5])
-                indices = []
-                [indices.append(A[x]) for x in range(6,len(A))]
-                indices = parse_indices(indices)
-
-                y_cluster_array.append(cluster(score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices) )
+        for A in clusters:
+            score = A[0]
+            pid = int(A[1])
+            seq = A[2]
+            mz = float(A[3])
+            start = int(A[4])
+            end = int(A[5])
+            indices = A[6:]
+            target_cluster = cluster(score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
+            y_cluster_array.append(target_cluster)
 
         y_sorted_clusters = sorted(y_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
         return y_sorted_clusters
@@ -212,7 +208,7 @@ def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
 
             while y_i < len(sorted_Y) and y.start - b.end < 10:
                 y = sorted_Y[y_i]
-                merge_seqs.append((b.score + y.score , b.end - y.start, y.end-b.start,min_info(b), min_info(y)))
+                merge_seqs.append((b.score + y.score, b.end - y.start, y.end-b.start,min_info(b), min_info(y)))
                 y_i += 1
     return merge_seqs
 # def get_top_X(b_clusters, y_clusters, top_num):
