@@ -180,11 +180,11 @@ def align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db
         if DEBUG:
             for ion in "by":
                 if not (DEBUG and utils.find_dir(filename + "_" + ion + "_clusters.txt", location)):
-                    clustering.create_clusters(ion, location, i)
+                   clusters = clustering.create_clusters(ion, location, i)
                 if ion ==  'b':
-                    b_sorted_clusters = clustering.sort_clusters_by_post_prob(os.path.join(location, filename + "_" + ion + "_clusters.txt"), ion)
+                    b_sorted_clusters = clustering.Score_clusters(ion, clusters)
                 else:
-                    y_sorted_clusters = clustering.sort_clusters_by_post_prob(os.path.join(location, filename + "_" + ion + "_clusters.txt"), ion)
+                    y_sorted_clusters = clustering.Score_clusters(ion, clusters)
             merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
             i == len(spectra) - 1
             if DEBUG:
