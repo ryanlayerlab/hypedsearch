@@ -172,27 +172,33 @@ def create_hits(spec_num,spectrum,matched_masses_b,matched_masses_y, DEBUG, loca
         write_hits(b_hits, y_hits, location)
     return b_hits, y_hits
 
+def get_seqs_from_merged_seq(merged_seqs):
+    b_hits, y_hits = []
+    
+    return b_hits, y_hits
+
 def align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off,results,DEBUG,location,truth_set):
     for i, spectrum in enumerate(spectra):
         print(f'Creating alignment for spectrum {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='\r')
         b_hits,y_hits = create_hits(i,spectrum,matched_masses_b,matched_masses_y,DEBUG,location)
         filename = "spec_" + str(i)
+        for ion in "by":
+            if DEBUG and utils.find_dir(filename + "_" + ion + "_clusters.txt", location):
+                clustering.create_clusters(ion, location, i)
+            if ion ==  'b':
+                b_sorted_clusters = clustering.sort_clusters_by_post_prob(os.path.join(location, filename + "_" + ion + "_clusters.txt"), ion)
+            else:
+                y_sorted_clusters = clustering.sort_clusters_by_post_prob(os.path.join(location, filename + "_" + ion + "_clusters.txt"), ion)
+        merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
+        b_hits, y_hits = get_seqs_from_merged_seq(merged_seqs)
+        i == len(spectra) - 1
         if DEBUG:
-            for ion in "by":
-                if not (DEBUG and utils.find_dir(filename + "_" + ion + "_clusters.txt", location)):
-                    clustering.create_clusters(ion, location, i)
-                if ion ==  'b':
-                    b_sorted_clusters = clustering.sort_clusters_by_post_prob(os.path.join(location, filename + "_" + ion + "_clusters.txt"), ion)
-                else:
-                    y_sorted_clusters = clustering.sort_clusters_by_post_prob(os.path.join(location, filename + "_" + ion + "_clusters.txt"), ion)
-            merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
-            i == len(spectra) - 1
-            if DEBUG:
-                t = truth_set[i]
-                evaluation.evaluate_initial_hits(merged_seqs, t, i)
-                seq_results = merged_seqs[0:10]
-                results[spectrum.id] = seq_results
+            t = truth_set[i]
+            evaluation.evaluate_initial_hits(merged_seqs, t, i)
+            seq_results = merged_seqs[0:10]
+            results[spectrum.id] = seq_results
         else:
+            #hit = (spec_num, obs_mass, (mass, pid, seq, index, ion, charge))
             raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off)
             results[spectrum.id]=raw_results
 
@@ -289,7 +295,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     dirname = os.path.dirname(os.path.abspath(__file__))
     location = os.path.join(dirname, 'intermediate_files')
     no_kmer_set = False
-    if DEBUG and utils.find_dir('matched_masses_b.txt', location) and utils.find_dir('matched_masses_y.txt', location) and utils.find_dir('kmer_set.txt', location):
+    if utils.find_dir('matched_masses_b.txt', location) and utils.find_dir('matched_masses_y.txt', location) and utils.find_dir('kmer_set.txt', location):
         matched_masses_b, matched_masses_y, kmer_set = merge_search.get_from_file(os.path.join(location, 'matched_masses_b.txt'), os.path.join(location, 'matched_masses_y.txt'), os.path.join(location, 'kmer_set.txt'), no_kmer_set)
     else:
         matched_masses_b, matched_masses_y, kmer_set = merge_search.modified_match_masses(boundaries, db, max_peptide_len, DEBUG, location)
