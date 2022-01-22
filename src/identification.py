@@ -179,7 +179,8 @@ def align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db
             else:
                 y_sorted_clusters = clustering.Score_clusters(ion, clusters)
         merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
-        merged_seqs.sort(key = lambda x: x[0])
+        merged_seqs.sort(key = lambda x: x[0], reverse = True)
+        b_hits, y_hits = get_seqs_from_merged_seq(merged_seqs)
 
         raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off)
         results[spectrum.id]=raw_results
