@@ -173,24 +173,16 @@ def align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db
         b_hits,y_hits = create_hits(i,spectrum,matched_masses_b,matched_masses_y,DEBUG,location)
         filename = "spec_" + str(i)
         for ion in "by":
-            clustering.create_clusters(ion, location, i)
+            clusters = clustering.create_clusters(ion, location, i)
             if ion ==  'b':
-                b_sorted_clusters = clustering.sort_clusters_by_post_prob(os.path.join(location, filename + "_" + ion + "_clusters.txt"), ion)
+                b_sorted_clusters = clustering.Score_clusters(ion, clusters)
             else:
-                y_sorted_clusters = clustering.sort_clusters_by_post_prob(os.path.join(location, filename + "_" + ion + "_clusters.txt"), ion)
-        merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
-        merged_seqs.sort(key = lambda x: x[0], reverse=True) 
-        b_hits, y_hits = get_seqs_from_merged_seq(merged_seqs)
-        # if DEBUG:
-        #     i == len(spectra) - 1
-        #     t = truth_set[i]
-        #     evaluation.evaluate_initial_hits(merged_seqs, t, i)
-        #     seq_results = merged_seqs[0:10]
-        #     results[spectrum.id] = seq_results
-        # else:
-        #hit = (spec_num, obs_mass, (mass, pid, seq, index, ion, charge))
-        raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off)
-        results[spectrum.id]=raw_results
+                y_sorted_clusters = clustering.Score_clusters(ion, clusters)
+            merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
+            merged_seqs.sort(key = lambda x: x[0])
+
+            raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off)
+            results[spectrum.id]=raw_results
 
 def align_on_multi_core(cores,mp_id_spectrum,db,spectra,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
     print('Initializing other processors...')

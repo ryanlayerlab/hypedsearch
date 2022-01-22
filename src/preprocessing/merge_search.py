@@ -179,12 +179,12 @@ def get_from_file(mb_loc, my_loc, kmer_set_loc, no_k):
             line = line.replace("}", "")
             A = line.rstrip().split(':')
             matched_masses_y[float(A[0])] = reformat_hits(A[1])
-    # if no_k != True:
-    with open(kmer_set_loc, 'r') as m:
-        for line in m:
-            line = line.replace("{", "")
-            line = line.replace("}", "")
-            A = line.rstrip().split(':')
-            kmer_set[A[0]] = reformat_kmers(A[1])
+    if no_k == False:
+        with open(kmer_set_loc, 'r') as m:
+            for line in m:
+                line = line.replace("{", "")
+                line = line.replace("}", "")
+                A = line.rstrip().split(':')
+                kmer_set[A[0]] = reformat_kmers(A[1])
     
     return matched_masses_b, matched_masses_y, kmer_set
