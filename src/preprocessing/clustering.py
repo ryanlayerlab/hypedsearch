@@ -177,7 +177,7 @@ def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
 
             while y_i < len(sorted_Y) and y.start - b.end < 10:
                 y = sorted_Y[y_i]
-                merge_seqs.append((b.prob * y.prob, b.end - y.start, y.end-b.start,min_info(b), min_info(y)))
+                merge_seqs.append((b.score * y.score, b.end - y.start, y.end-b.start,min_info(b), min_info(y)))
                 y_i += 1
     return merge_seqs
 
