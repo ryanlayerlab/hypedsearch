@@ -24,17 +24,16 @@ def write_cluster(cluster):
         O.append( (hit.start, hit.end, hit.seq, hit.mz) ) 
     return O
 
-def parse_hits(Hit, file_name):
+def parse_hits(Hit, all_hits):
     hits = []
-    for l in open(file_name):
-            A = l.rstrip().split('\t')
-            pid = int(A[2])
-            start = int(A[4].split('-')[0])
-            end = int(A[4].split('-')[1])
-            seq = A[3]
-            mz = float(A[1])
+    for A in all_hits:
+        pid = int(A[2][1])
+        start = int(A[2][3].split('-')[0])
+        end = int(A[2][3].split('-')[1])
+        seq = A[2][2]
+        mz = A[1]
 
-            hits.append( Hit(pid=pid, start=start, end=end, seq=seq, mz=mz) )
+        hits.append( Hit(pid=pid, start=start, end=end, seq=seq, mz=mz) )
     return hits
 
 def create_clusters(ion, b_hits, y_hits):
@@ -94,7 +93,7 @@ def parse_indices(index_set):
         indices.append(target_tuple)
     return indices
 def Score_clusters(ion, clusters):
-    cluster = collections.namedtuple('cluster', 'prob score pid start end seq mz indices')
+    cluster = collections.namedtuple('cluster', 'score pid start end seq mz indices')
     if ion == 'b':
         b_cluster_array = []
         for A in clusters:
