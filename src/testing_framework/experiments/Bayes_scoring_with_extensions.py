@@ -9,7 +9,7 @@ if module_path not in sys.path:
     sys.path.append(module_path)
 
 from testing_framework import testing_utils
-from preprocessing import preprocessing_utils, merge_search
+from preprocessing import preprocessing_utils, merge_search, clustering
 import identification
 import database
 import gen_spectra
@@ -131,8 +131,8 @@ for spectrum_num,input_spectrum in enumerate(input_spectra):
             b_sorted_clusters = testing_utils.Bayes_clusters(ion, clusters, write_path, kmer_set, unique_b)
         else:
             y_sorted_clusters = testing_utils.Bayes_clusters(ion, clusters, write_path, kmer_set, unique_y)
-    m = testing_utils.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
-    m.sort(key = lambda x: x[0]) 
+    m = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
+    m.sort(key = lambda x: x[0], reverse = True) 
     # m = filter_by_precursor(m, precursor_tolerance, input_spectrum.precursor_mass, correct_sequence)
     top, top_10, top_50 = get_top_data(m, correct_sequence)
     if top == True:
