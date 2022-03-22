@@ -1,3 +1,4 @@
+from audioop import reverse
 import os
 import sys
 
@@ -54,6 +55,12 @@ def filter_matched_masses(masses, matched_masses_b, matched_masses_y):
 def get_top_comb(pure_seqs, hybrid_seqs):
     merged_top = []
     pure_index, hybrid_index = 0,0
+    if len(hybrid_seqs) == 0:
+        [merged_top.append(pure_seqs[i]) for i in range(0,10)]
+        return merged_top
+    if len(pure_seqs) == 0:
+        [merged_top.append(hybrid_seqs[i]) for i in range(0,10)]
+        return merged_top
     while len(merged_top) < 50:
         pure = pure_seqs[pure_index]
         hybrid = hybrid_seqs[hybrid_index]
@@ -148,6 +155,71 @@ def filter_by_missing_mass(mseqs, obs_prec, precursor_tol, charge):
                 
     return filtered_seqs
 
+def modified_find_next_mass(cluster, ion):
+    if ion == 'b':
+        target_index = cluster[2]
+    else:
+        target_index = cluster[1]
+    target_prot = cluster[0]
+    for i, prot_name in enumerate(db.proteins):
+        if i == target_prot:
+            protein = db.proteins[prot_name]
+            prot_seq = protein[0][1]
+            to_add = prot_seq[target_index] if target_index < len(prot_seq) else ''
+                        
+    return to_add
+
+def make_merge(b, y, b_seq, y_seq):
+    new_b = (b[0], b[1], b[2], b[3], b_seq)
+    new_y = (y[0], y[1], y[2], y[3], y_seq)
+    print("Added new_seqs")
+    return (b[3] + y[3], b[1] - y[2], y[2]-b[1], new_b, new_y)
+
+def add_amino_acids(alignment_list, missing_mass, b_cluster, y_cluster, comb_seq, b_seq, y_seq, precursor_charge, prec_mass, tol):
+    #This function recursively adds in amino acids    
+    if abs(get_precursor(b_seq + y_seq, precursor_charge) - prec_mass) <= tol:
+        alignment_list.append(make_merge(b_cluster, y_cluster, b_seq, y_seq))
+        return
+    
+    if get_precursor(b_seq + y_seq, precursor_charge) > prec_mass + tol:
+        return
+    
+    next_b = modified_find_next_mass(b_cluster, 'b')
+    next_y = modified_find_next_mass(y_cluster, 'y')
+    
+    if get_precursor(b_seq + y_seq, precursor_charge) < prec_mass - tol and (next_b != ""):
+        mod_b = b_seq + next_b
+        add_amino_acids(alignment_list, missing_mass, b_cluster, y_cluster, comb_seq, mod_b, y_seq, precursor_charge, prec_mass, tol)
+    if get_precursor(b_seq + y_seq, precursor_charge) < prec_mass - tol and (next_y != ""):
+        mod_y = next_y + y_seq
+        add_amino_acids(alignment_list, missing_mass, b_cluster, y_cluster, comb_seq, b_seq, mod_y, precursor_charge, prec_mass, tol)
+        
+    return
+
+        
+def find_alignments(merged_seqs, obs_prec, prec_charge, tol):
+    alignments = []
+#     for comb_seq in merged_seqs:
+    comb_seq = merged_seqs[4760]
+    print(comb_seq)
+    b_cluster = comb_seq[3]
+    y_cluster = comb_seq[4]
+    b_seq = comb_seq[3][4]
+    y_seq = comb_seq[4][4]
+    if b_seq != y_seq:
+        new_seq = b_seq + y_seq
+        missing_mass = obs_prec - get_precursor(new_seq, prec_charge)
+        print(missing_mass)
+        new_seqs = add_amino_acids(alignments, missing_mass, b_cluster, y_cluster, comb_seq, b_seq, y_seq, prec_charge, obs_prec, tol)            
+    else:
+        print('Code shouldnt be here')
+        new_seq = b_seq
+        if (abs(get_precursor(new_seq, prec_charge) - obs_prec) <= tol):
+            print('Code shouldnt be here')
+            alignments.append(comb_seq)
+            
+    return alignments
+
 # def evaluate_top_merges()
 
 
@@ -167,6 +239,8 @@ print('Finished matching masses')
 
 top_count, top_10_count, top_50_count = False, False, False
 for spectrum_num,input_spectrum in enumerate(input_spectra):
+    spectrum_num = 5
+    input_spectrum = input_spectra[spectrum_num]
     print(f'Getting seeds for {spectrum_num+1}/{len(input_spectra)} [{to_percent(spectrum_num+1, len(input_spectra))}%]', end='\r')
     correct_sequence = correct_sequences[spectrum_num]
     filtered_mm_b, filtered_mm_y = filter_matched_masses(input_spectrum.mz_values, matched_masses_b, matched_masses_y)
@@ -181,11 +255,15 @@ for spectrum_num,input_spectrum in enumerate(input_spectra):
     merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
     merged_seqs.sort(key = lambda x: x[0], reverse = True)
     merged_seqs = filter_by_precursor(merged_seqs, input_spectrum.precursor_mass, precursor_tolerance, input_spectrum.precursor_charge)
-    hybrid_merged = clustering.get_hybrid_matches(input_spectrum, b_sorted_clusters, y_sorted_clusters, precursor_tolerance)
+    hybrid_merged = clustering.get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, input_spectrum.precursor_mass, precursor_tolerance, input_spectrum.precursor_charge)
     hybrid_merged = filter_by_precursor(hybrid_merged, input_spectrum.precursor_mass, precursor_tolerance, input_spectrum.precursor_charge)
     hybrid_merged = filter_by_missing_mass(hybrid_merged, input_spectrum.precursor_mass, precursor_tolerance, input_spectrum.precursor_charge)  
 
     merged_top = get_top_comb(merged_seqs, hybrid_merged)
+
+    tol = utils.ppm_to_da(input_spectrum.precursor_mass, precursor_tolerance)
+    alignments = find_alignments(hybrid_merged, input_spectrum.precursor_mass, input_spectrum.precursor_charge, tol)
+    print(alignments)
     # top, top_10, top_50 = evaluate_top_merges(merged_top, correct_sequence)
 
     # if top == True:
