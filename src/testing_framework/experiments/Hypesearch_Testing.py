@@ -23,7 +23,7 @@ peak_filter = 25
 relative_abundance_filter = 0.1
 size_lim = 10
 cap_size = 20
-get = True
+get = False
 no_k = True
 
 def get_spectra_and_db(ppm_tolerance, peak_filter, relative_abundance_filter):
@@ -156,71 +156,69 @@ def filter_by_missing_mass(mseqs, obs_prec, precursor_tol, charge):
 
 def modified_find_next_mass(cluster, ion):
     if ion == 'b':
-        target_index = cluster[2]
+        target_index = cluster[2] + 1
     else:
-        target_index = cluster[1]
+        target_index = cluster[1]-1
     target_prot = cluster[0]
     for i, prot_name in enumerate(db.proteins):
         if i == target_prot:
             protein = db.proteins[prot_name]
             prot_seq = protein[0][1]
-            to_add = prot_seq[target_index] if target_index < len(prot_seq) else ''
+            to_add = prot_seq[target_index] if (target_index < len(prot_seq) and target_index > 0) else ''
                         
     return to_add
 
 def make_merge(b, y, b_seq, y_seq):
     new_b = (b[0], b[1], b[2], b[3], b_seq)
     new_y = (y[0], y[1], y[2], y[3], y_seq)
-    print("Added new_seqs")
     return (b[3] + y[3], b[1] - y[2], y[2]-b[1], new_b, new_y)
 
-def add_amino_acids(alignment_list, missing_mass, b_cluster, y_cluster, comb_seq, b_seq, y_seq, precursor_charge, prec_mass, tol):
+def add_amino_acids(alignment_list, missing_mass, b_c, y_c, comb_seq, b_seq, y_seq, precursor_charge, prec_mass, tol):
     #This function recursively adds in amino acids    
     if abs(get_precursor(b_seq + y_seq, precursor_charge) - prec_mass) <= tol:
-        alignment_list.append(make_merge(b_cluster, y_cluster, b_seq, y_seq))
+        alignment_list.add(make_merge(b_c, y_c, b_seq, y_seq))
         return
     
     if get_precursor(b_seq + y_seq, precursor_charge) > prec_mass + tol:
         return
     
-    next_b = modified_find_next_mass(b_cluster, 'b')
-    next_y = modified_find_next_mass(y_cluster, 'y')
+    next_b = modified_find_next_mass(b_c, 'b')
+    next_y = modified_find_next_mass(y_c, 'y')
     
     if get_precursor(b_seq + y_seq, precursor_charge) < prec_mass - tol and (next_b != ""):
         mod_b = b_seq + next_b
-        add_amino_acids(alignment_list, missing_mass, b_cluster, y_cluster, comb_seq, mod_b, y_seq, precursor_charge, prec_mass, tol)
+        mod_b_c = (b_c[0], b_c[1], b_c[2]+1, b_c[3], mod_b)
+        add_amino_acids(alignment_list, missing_mass, mod_b_c, y_c, comb_seq, mod_b, y_seq, precursor_charge, prec_mass, tol)
     if get_precursor(b_seq + y_seq, precursor_charge) < prec_mass - tol and (next_y != ""):
         mod_y = next_y + y_seq
-        add_amino_acids(alignment_list, missing_mass, b_cluster, y_cluster, comb_seq, b_seq, mod_y, precursor_charge, prec_mass, tol)
+        mod_y_c = (y_c[0], y_c[1]-1, y_c[2], y_c[3], mod_y)
+        add_amino_acids(alignment_list, missing_mass, b_c, mod_y_c, comb_seq, b_seq, mod_y, precursor_charge, prec_mass, tol)
         
     return
 
         
 def find_alignments(merged_seqs, obs_prec, prec_charge, tol):
-    alignments = []
-#     for comb_seq in merged_seqs:
-    comb_seq = merged_seqs[4760]
-    print(comb_seq)
-    b_cluster = comb_seq[3]
-    y_cluster = comb_seq[4]
-    b_seq = comb_seq[3][4]
-    y_seq = comb_seq[4][4]
-    if b_seq != y_seq:
-        new_seq = b_seq + y_seq
-        missing_mass = obs_prec - get_precursor(new_seq, prec_charge)
-        print(missing_mass)
-        new_seqs = add_amino_acids(alignments, missing_mass, b_cluster, y_cluster, comb_seq, b_seq, y_seq, prec_charge, obs_prec, tol)            
-    else:
-        print('Code shouldnt be here')
-        new_seq = b_seq
-        if (abs(get_precursor(new_seq, prec_charge) - obs_prec) <= tol):
-            print('Code shouldnt be here')
-            alignments.append(comb_seq)
+    alignments = set()
+    for comb_seq in merged_seqs:
+        b_cluster = comb_seq[3]
+        y_cluster = comb_seq[4]
+        b_seq = comb_seq[3][4]
+        y_seq = comb_seq[4][4]
+        if b_seq != y_seq:
+            new_seq = b_seq + y_seq
+            missing_mass = obs_prec - get_precursor(new_seq, prec_charge)
+            add_amino_acids(alignments, missing_mass, b_cluster, y_cluster, comb_seq, b_seq, y_seq, prec_charge, obs_prec, tol)            
+        else:
+            new_seq = b_seq
+            if (abs(get_precursor(new_seq, prec_charge) - obs_prec) <= tol):
+                alignments.add(comb_seq)
             
     return alignments
 
+def write_clusters(clusters, filepath):
+    with open(os.path.join(filepath, "clusters.txt"), 'w') as c:
+        [c.write(str(x) + '\n') for x in clusters]
 # def evaluate_top_merges()
-
 
 input_spectra, boundaries, correct_sequences, db = get_spectra_and_db(ppm_tolerance, peak_filter, relative_abundance_filter)
 
@@ -247,6 +245,7 @@ for spectrum_num,input_spectrum in enumerate(input_spectra):
     b_hits,y_hits = identification.create_hits(spectrum_num, input_spectrum, filtered_mm_b, filtered_mm_y, False, write_path)
     for ion in "by":
             clusters = clustering.create_clusters(ion, b_hits, y_hits)
+            write_clusters(clusters, write_path)
             if ion ==  'b':
                 b_sorted_clusters = clustering.Score_clusters(ion, clusters)
             else:
@@ -261,7 +260,8 @@ for spectrum_num,input_spectrum in enumerate(input_spectra):
     merged_top = get_top_comb(merged_seqs, hybrid_merged)
 
     tol = utils.ppm_to_da(input_spectrum.precursor_mass, precursor_tolerance)
-    alignments = find_alignments(hybrid_merged, input_spectrum.precursor_mass, input_spectrum.precursor_charge, tol)
+    sample_merged_seqs = [(8, 0, 0, (0, 59, 62, 2, 'DPQV'), (0, 59, 74, 6, 'DPQVAQLELGGGPGAG'))]
+    alignments = find_alignments(sample_merged_seqs, input_spectrum.precursor_mass, input_spectrum.precursor_charge, tol)
     print(alignments)
     # top, top_10, top_50 = evaluate_top_merges(merged_top, correct_sequence)
 
