@@ -1,3 +1,4 @@
+from sqlalchemy import false
 from utils import hashable_boundaries, predicted_len
 from objects import Database
 import gen_spectra
@@ -165,7 +166,7 @@ def reformat_hits(cstr):
         sublist.append(int(B[5]))
         new_list.append(sublist)
     return new_list
-def get_from_file(mb_loc, my_loc, kmer_set_loc):
+def get_from_file(mb_loc, my_loc, kmer_set_loc, no_k):
     matched_masses_b, matched_masses_y, kmer_set = defaultdict(), defaultdict(), defaultdict()
     with open(mb_loc, 'r') as m:
         for line in m:
@@ -178,12 +179,13 @@ def get_from_file(mb_loc, my_loc, kmer_set_loc):
             line = line.replace("{", "")
             line = line.replace("}", "")
             A = line.rstrip().split(':')
-            matched_masses_y[float(A[0])] = reformat_hits(A[1])
-    with open(kmer_set_loc, 'r') as m:
-        for line in m:
-            line = line.replace("{", "")
-            line = line.replace("}", "")
-            A = line.rstrip().split(':')
-            kmer_set[A[0]] = reformat_kmers(A[1])
+            matched_masses_y[float(A[0])] = reformat_hits(A[1])      
+    if no_k == False:
+        with open(kmer_set_loc, 'r') as m:
+            for line in m:
+                line = line.replace("{", "")
+                line = line.replace("}", "")
+                A = line.rstrip().split(':')
+                kmer_set[A[0]] = reformat_kmers(A[1])
     
     return matched_masses_b, matched_masses_y, kmer_set

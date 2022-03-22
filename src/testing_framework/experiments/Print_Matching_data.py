@@ -1,12 +1,13 @@
+from audioop import reverse
 import os
 import sys
-
-module_path = os.path.abspath(os.path.join('..', 'hypedsearch', 'src'))
-if module_path not in sys.path:
-    sys.path.append(module_path)
-# module_path = os.path.abspath(os.path.join('../..'))
+import operator
+# module_path = os.path.abspath(os.path.join('..', 'hypedsearch', 'src'))
 # if module_path not in sys.path:
 #     sys.path.append(module_path)
+module_path = os.path.abspath(os.path.join('../..'))
+if module_path not in sys.path:
+    sys.path.append(module_path)
 
 from testing_framework import testing_utils
 from preprocessing import preprocessing_utils, merge_search, clustering
@@ -51,10 +52,12 @@ def filter_matched_masses(masses, matched_masses_b, matched_masses_y):
             filtered_y[mass] = matched_masses_y[mass]
     return filtered_b, filtered_y
 
-def get_top_comb(pure_seqs, hybrid_seqs):
+def evaluate_non_hybrids(pure_seqs, hybrid_seqs):
     merged_top = []
     pure_index, hybrid_index = 0,0
-    while len(merged_top) < 50:
+    if len(hybrid_seqs) == 0:
+        merged_top = pure_seqs[:10]
+    while len(merged_top) < 10:
         pure = pure_seqs[pure_index]
         hybrid = hybrid_seqs[hybrid_index]
         if pure[0] >= hybrid[0]: #We give ties to the non-hybrid sequences
@@ -63,6 +66,10 @@ def get_top_comb(pure_seqs, hybrid_seqs):
         else:
             merged_top.append(hybrid)
             hybrid_index = hybrid_index + 1
+            if hybrid_index >= len(hybrid_seqs):
+                while len(merged_top) < 10:
+                    merged_top.append(pure_seqs[pure_index])
+                    pure_index = pure_index + 1
     return merged_top
 
 def filter_by_precursor(mseqs, obs_prec, precursor_tol, charge):
@@ -82,74 +89,6 @@ def filter_by_precursor(mseqs, obs_prec, precursor_tol, charge):
 def to_percent(index, total):
     return int(100 * (index)/total)
 
-def get_overlapping_sequence(b_seq, y_seq, b_start, b_end, y_start):
-    seq = ''
-    if y_start > b_end:
-        return b_seq + y_seq
-    else:
-        for i in range(b_start, y_start):
-            seq = seq + b_seq[i]
-        return seq
-def overlap(comb_seq):
-    b_seq = comb_seq[3][4]
-    y_seq = comb_seq[4][4]
-    b_pid = comb_seq[3][0]
-    y_pid = comb_seq[4][0]
-    if b_pid == y_pid:
-        y_start = comb_seq[4][1]
-        b_end = comb_seq[3][2]
-        if (y_start - b_end > 0) & (y_start - b_end < 10):
-            b_start = comb_seq[3][1]
-            return get_overlapping_sequence(b_seq, y_seq, b_start, b_end, y_start)
-        else:
-            return b_seq + y_seq
-    else:
-        return b_seq + y_seq
-
-def find_next_mass(comb_seq, ion):
-    if ion == 'b':
-        b_tup = comb_seq[3]
-        target_index = b_tup[2]
-        target_prot = b_tup[0]
-        for i, prot_name in enumerate(db.proteins):
-            if i == target_prot:
-                protein = db.proteins[prot_name]
-                prot_seq = protein[0][1]
-                to_add = prot_seq[target_index] if target_index < len(prot_seq) else ''
-                    
-    else:
-        y_tup = comb_seq[4]
-        target_index = y_tup[1]
-        target_prot = y_tup[0]
-        for i, prot_name in enumerate(db.proteins):
-            if i == target_prot:
-                protein = db.proteins[prot_name]
-                prot_seq = protein[0][1]
-                to_add = prot_seq[target_index] if target_index < len(prot_seq) else ''
-    
-    return to_add
-
-def filter_by_missing_mass(mseqs, obs_prec, precursor_tol, charge):
-    filtered_seqs = []
-    for comb_seq in mseqs:
-        new_seq = overlap(comb_seq)
-        tol = utils.ppm_to_da(obs_prec, precursor_tol)
-        if abs(obs_prec - get_precursor(new_seq, charge)) <= tol:
-            filtered_seqs.append(comb_seq)
-        else:
-            next_b = find_next_mass(comb_seq, 'b')
-            b_seq = comb_seq[3][4]
-            y_seq = comb_seq[4][4]
-            b_dif = obs_prec + tol - get_precursor(b_seq + next_b + y_seq, charge)
-            next_y = find_next_mass(comb_seq, 'y')
-            y_dif = obs_prec + tol - get_precursor(b_seq + next_y + y_seq, charge)
-            if b_dif >= 0 and y_dif >= 0:
-                filtered_seqs.append(comb_seq)
-                
-    return filtered_seqs
-
-# def evaluate_top_merges()
-
 
 input_spectra, boundaries, correct_sequences, db = get_spectra_and_db(ppm_tolerance, peak_filter, relative_abundance_filter)
 
@@ -165,7 +104,8 @@ print('Finished matching masses')
 # unique_b, unique_y = testing_utils.get_unique_matched_masses(boundaries, matched_masses_b, matched_masses_y)
 # print('Done')
 
-top_count, top_10_count, top_50_count = False, False, False
+with open(os.path.join(write_path, 'Hit_data.txt'), 'w') as r:
+    r.write('')
 for spectrum_num,input_spectrum in enumerate(input_spectra):
     print(f'Getting seeds for {spectrum_num+1}/{len(input_spectra)} [{to_percent(spectrum_num+1, len(input_spectra))}%]', end='\r')
     correct_sequence = correct_sequences[spectrum_num]
@@ -182,15 +122,10 @@ for spectrum_num,input_spectrum in enumerate(input_spectra):
     merged_seqs.sort(key = lambda x: x[0], reverse = True)
     merged_seqs = filter_by_precursor(merged_seqs, input_spectrum.precursor_mass, precursor_tolerance, input_spectrum.precursor_charge)
     hybrid_merged = clustering.get_hybrid_matches(input_spectrum, b_sorted_clusters, y_sorted_clusters, precursor_tolerance)
-    hybrid_merged = filter_by_precursor(hybrid_merged, input_spectrum.precursor_mass, precursor_tolerance, input_spectrum.precursor_charge)
-    hybrid_merged = filter_by_missing_mass(hybrid_merged, input_spectrum.precursor_mass, precursor_tolerance, input_spectrum.precursor_charge)  
+    hybrid_merged = filter_by_precursor(hybrid_merged[:50], input_spectrum.precursor_mass, precursor_tolerance, input_spectrum.precursor_charge)
 
-    merged_top = get_top_comb(merged_seqs, hybrid_merged)
-    # top, top_10, top_50 = evaluate_top_merges(merged_top, correct_sequence)
+    top_10 = evaluate_non_hybrids(merged_seqs, hybrid_merged)
 
-    # if top == True:
-    #     top_count = top_count + 1
-    # if top_10 == True:
-    #     top_10_count = top_10_count + 1
-    # if top_50 == True:
-    #     top_50_count = top_50_count + 1
+    with open(os.path.join(write_path, 'Hit_data.txt'), 'a') as r:
+        r.write(correct_sequence + '\n')
+        [r.write(str(i+1)+': '+str(hit) + '\n') for i, hit in enumerate(top_10)]
