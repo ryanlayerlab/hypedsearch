@@ -975,7 +975,7 @@ def parse_hits(Hit, all_hits):
 
 def get_unique_matched_masses(boundaries, matched_masses_b, matched_masses_y):
     unique_b,unique_y = dict(), dict()
-    for mz in boundaries.keys():
+    for mz in boundaries:
         unique_b[mz],unique_y[mz] = [],[]
         if mz in matched_masses_b:
             for x in matched_masses_b[mz]:

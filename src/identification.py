@@ -280,7 +280,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     if utils.find_dir('matched_masses_b.txt', location) and utils.find_dir('matched_masses_y.txt', location) and utils.find_dir('kmer_set.txt', location):
         print("getting matched_masses from file...")
         start = time.time()
-        matched_masses_b, matched_masses_y, kmer_set = merge_search.get_from_file(os.path.join(location, 'matched_masses_b.txt'), os.path.join(location, 'matched_masses_y.txt'), os.path.join(location, 'kmer_set.txt'))
+        matched_masses_b, matched_masses_y, kmer_set = merge_search.get_from_file(os.path.join(location, 'matched_masses_b.txt'), os.path.join(location, 'matched_masses_y.txt'), os.path.join(location, 'kmer_set.txt'), False)
         print(time.time() - start)
         print("getting matched_masses from file Done")
     else:

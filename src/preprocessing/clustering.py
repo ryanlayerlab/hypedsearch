@@ -3,6 +3,7 @@ import operator
 import os
 from utils import ppm_to_da
 from gen_spectra import get_precursor
+from constants import WATER_MASS, PROTON_MASS
 
 def write_cluster(cluster):
     if len(cluster) == 0 : return None
@@ -141,41 +142,6 @@ def bsearch(key, Y):
                 hi = mid
         return hi
 
-# def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
-#     merge_seqs = []
-
-#     B = {}
-#     for c in b_sorted_clusters:
-#         if c.pid not in B:
-#             B[c.pid] = []
-#         B[c.pid].append(c)
-
-#     Y = {}
-#     for c in y_sorted_clusters:
-#         if c.pid not in Y:
-#             Y[c.pid] = []
-#         Y[c.pid].append(c)
-
-#     for pid in B:
-#         if pid not in Y:
-#             continue
-
-#         sorted_B = sorted(B[pid], key=operator.attrgetter('pid', 'start', 'end'))
-#         sorted_Y = sorted(Y[pid], key=operator.attrgetter('pid', 'start', 'end'))
-
-#         for b in sorted_B:
-#             y_i = bsearch(b.start, sorted_Y)
-
-#             if y_i >= len(sorted_Y): break
-
-#             y = sorted_Y[y_i]
-
-#             while y_i < len(sorted_Y) and y.start - b.end < 10:
-#                 y = sorted_Y[y_i]
-#                 merge_seqs.append((b.score * y.score, b.end - y.start, y.end-b.start,min_info(b), min_info(y)))
-#                 y_i += 1
-#     return merge_seqs
-
 def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
     merge_seqs = []
 
@@ -210,79 +176,80 @@ def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
                 merge_seqs.append((b.score + y.score, b.end - y.start, y.end-b.start,min_info(b), min_info(y)))
                 y_i += 1
     return merge_seqs
-# def get_top_X(b_clusters, y_clusters, top_num):
-#     filtered_b = []
-#     filtered_y = []
-#     b_len = top_num if len(b_clusters) >= top_num else len(b_clusters)
-#     y_len = top_num if len(y_clusters) >= top_num else len(y_clusters)
-#     for x in range(0,b_len):
-#         filtered_b.append(b_clusters[x])
-#     for x in range(0,y_len):
-#         filtered_y.append(y_clusters[x])
-#     return filtered_b, filtered_y
 
-# def combine(b_cluster, y_cluster):
-#     b_start, b_end, y_start, y_end = b_cluster.start, b_cluster.end, y_cluster.start, y_cluster.end
-#     if b_cluster.pid == y_cluster.pid:
-#         score_add = 2
-#         hybrid = False
-#         if  (b_end <= y_end) and (b_start <= y_start) and (b_end >= y_start): #overlap
-#             overlap = True
-#             score_add = 2
-#             seq = b_cluster.seq
-#             rem_chars = y_start - b_end
-#             while (rem_chars >= 0):
-#                 seq = seq + y_cluster.seq[len(y_cluster.seq)-1 - rem_chars]
-#                 rem_chars = rem_chars - 1
-#         else:                                                                #no overlap
-#             hybrid = False
-#             overlap = False
-#             score_add = 2
-#             seq = b_cluster.seq + '-' + y_cluster.seq
-#     else:                                                                    #hybrid
-#         hybrid = True
-#         overlap = False
-#         score_add = 0
-#         seq = b_cluster.seq + '-' + y_cluster.seq
-#     return seq, score_add, hybrid, overlap
+def check_for_hybrid_overlap(b_seq, y_seq, ion):
+    match = True
+    print('code got here')
+    if ion == 'b':
+        for i, char in enumerate(b_seq):
+            if char == y_seq[0]:
+                k = 0
+                for j in range(i, len(b_seq) + 1):
+                    if b_seq[j] != y_seq[k]:
+                        match = False
+                        break
+        if match == True:
+            print('Match was true for', b_seq)
+            modified_seq = b_seq[:i]
+    else:
+        for i, char in enumerate(y_seq):
+            if char == y_seq[0]:
+                k = 0
+                for j in range(i, len(b_seq) + 1):
+                    if b_seq[j] != y_seq[k]:
+                        match = False
+                        break
+        if match == True:
+            print('Match was true for', b_seq)
+            modified_seq = b_seq[:i]
+    return match, modified_seq
 
-# def filter_by_validity(b_cluster, y_cluster):
-#     valid = True
-#     for b in b_cluster.indices:
-#         for y in y_cluster.indices:
-#             if b[3] == y[3]:
-#                 valid = False
-#     return valid
+def grab_matches(b,indexed_clusters, target_val, ion):
+    #Given a cluster we want to find everything that it can pair with
+    # It can pair with anything up to a certain mass 
+    current_index = 0
+    matches = []
+    for key in indexed_clusters.keys():
+        if key<=target_val: #if key is a valid key
+            for y in indexed_clusters[key]:
+                if ion == 'b':
+                    matches.append((b.score + y.score, b.end - y.start, y.end-b.start,min_info(b), min_info(y)))
+                else:
+                    matches.append((b.score + y.score, b.end - y.start, y.end-b.start,min_info(y), min_info(b)))
+        else:
+#             match, modified_seq = check_for_hybrid_overlap()
+            break            
+    return matches
+    
+def index_by_precursor_mass(sorted_clusters, pc):
+    indexed = dict()
+    for y in sorted_clusters:
+        if get_precursor(y.seq, pc) not in indexed.keys():
+            indexed[get_precursor(y.seq, pc)] = []
+        indexed[get_precursor(y.seq, pc)].append(y)
+    indexed = collections.OrderedDict(sorted(indexed.items(),key=lambda t: t[0]))
+    return indexed
+    
+def get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, obs_prec, precursor_tol, charge):
+    merged_seqs = []
+    ind_b, ind_y = index_by_precursor_mass(b_sorted_clusters, charge),index_by_precursor_mass(y_sorted_clusters, charge)
+    for i, cluster in enumerate(b_sorted_clusters[:10]):
+        cluster_seq = cluster.seq
+        cluster_mass = get_precursor(cluster_seq, charge)
+        tol = ppm_to_da(obs_prec, precursor_tol)
+        if not (cluster_mass > obs_prec + tol):
+            diff = obs_prec + tol - cluster_mass + (charge * PROTON_MASS) + WATER_MASS
+            merges = grab_matches(cluster,ind_y, diff, 'b')
+            [merged_seqs.append(x) for x in merges]
+    for i, cluster in enumerate(y_sorted_clusters[:10]):
+        cluster_seq = cluster.seq
+        cluster_mass = get_precursor(cluster_seq, charge)
+        tol = ppm_to_da(obs_prec, precursor_tol)
+        if not (cluster_mass > obs_prec + tol):
+            diff = obs_prec + tol - cluster_mass + (charge * PROTON_MASS) + WATER_MASS
+#             print(get_precursor(cluster_seq + 'DL', charge), obs_prec + tol)
+            merges = grab_matches(cluster,ind_b, diff, 'y')
+            [merged_seqs.append(x) for x in merges]
 
-# def filter_by_precursor(seq, pc, overlap, obs_prec, precursor_tolerance):
-#     new_seq = seq.replace("-", "") if overlap == False else seq
-#     tol = ppm_to_da(obs_prec, precursor_tolerance)
-#     if get_precursor(new_seq, charge=pc) > obs_prec + tol:
-#         return False
-#     else:
-#         return True
-
-# def filter_by_dist(b, y, x):
-#     if y.start - b.end > x:
-#         return False
-#     else:
-#         return True
-
-# def merge_clusters(b_sorted_clusters, y_sorted_clusters, target_precursor, precursor_tolerance):
-#     # filtered_b, filtered_y = get_top_X(b_sorted_clusters, y_sorted_clusters, 50)
-#     #Start with printing overlapping. Then will incorportate boundary overlaps between last of b and first of y
-#     interesting_combos = []
-#     for b_cluster in b_sorted_clusters:
-#         for y_cluster in y_sorted_clusters:
-#             if b_cluster.start <= y_cluster.end:
-#                 # b_indices = parse_indices(b_cluster.indices)
-#                 # y_indices = parse_indices(y_cluster.indices)
-#                 if filter_by_validity(b_cluster, y_cluster):
-#                     comb_seq, score_add, hybrid, overlap = combine(b_cluster, y_cluster)
-#                     if filter_by_precursor(comb_seq, 2, overlap, target_precursor, precursor_tolerance):
-#                         if filter_by_dist(b_cluster, y_cluster, 10):
-#                             tup = (comb_seq, b_cluster.score + y_cluster.score + score_add, overlap)
-#                             interesting_combos.append(tup)
-
-#     interesting_combos.sort(key=lambda a: a[1], reverse=True)
-#     return interesting_combos
+    merged_seqs.sort(key=lambda a: a[0], reverse=True)
+    return merged_seqs
