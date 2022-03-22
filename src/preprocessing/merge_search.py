@@ -1,4 +1,3 @@
-from sqlalchemy import false
 from utils import hashable_boundaries, predicted_len
 from objects import Database
 import gen_spectra
