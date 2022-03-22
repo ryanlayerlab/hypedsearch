@@ -100,7 +100,7 @@ def define_data():
 
     NOD2_data = Dataset(
         os.path.join(raw_prefix, 'spectra', 'NOD2_E3'),
-        os.path.join(raw_prefix, 'NOD2_E3_results.ssv'),
+        os.path.join(raw_prefix, 'truth_table', 'NOD2_E3_results.ssv'),
         os.path.join(raw_prefix, 'database', 'sample_database.fasta'),
         os.path.join(raw_prefix) + os.path.sep,
         ''
