@@ -95,7 +95,7 @@ def define_data():
     )
 
 
-    raw_prefix = os.path.join(root, 'home', 'naco3124', 'jaime_hypedsearch', 'hypedsearch', 'data')
+    raw_prefix = os.path.join(root, 'home', 'ncol107453', 'jaime_hypedsearch', 'hypedsearch', 'data')
 
 
     NOD2_data = Dataset(
@@ -1078,7 +1078,7 @@ def parse_indices(index_set):
     
     return indices
 
-def Bayes_clusters(ion, clusters,  path, kmer_set, unique_m):
+def Bayes_clusters(ion, clusters, path, kmer_set, unique_m):
     cluster = collections.namedtuple('cluster', 'prob score pid start end seq mz indices')
     if ion == 'b':
         b_cluster_array = []
