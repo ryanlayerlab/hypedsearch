@@ -38,8 +38,8 @@ def modified_add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set,start_location
             if isinstance(pre_spec,dict):
                 spec = pre_spec.get('spectrum')
             for i, mz in enumerate(spec):
-                start_position = start_location if ion == 'b' else end_location - 1
-                end_position = start_position + i if ion == 'b' else end_location - i - 1
+                start_position = start_location if ion == 'b' else end_location
+                end_position = start_position + i if ion == 'b' else end_location - i
                 kmer_to_add = kmer[:i+1] if ion == 'b' else kmer[-i-1:]
                 r_d = db_dict_b if ion == 'b' else db_dict_y
                 # r_d[mz].add(kmer_to_add)
@@ -63,7 +63,7 @@ def make_database_set_for_protein(i,plen,max_len,prot_entry,prot_name,db_dict_b,
     for j in range(start, stop):
         kmer = prot_entry.sequence[j:j+max_len]
         start_position = j
-        end_position = j + max_len
+        end_position = j + max_len - 1
         modified_add_all(kmer, prot_name, db_dict_b,db_dict_y,kmer_set,start_position, end_position, i)
     start = len(prot_entry.sequence) - max_len
     stop = len(prot_entry.sequence)

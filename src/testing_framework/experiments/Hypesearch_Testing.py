@@ -1,5 +1,8 @@
+from ctypes import alignment
 import os
 import sys
+
+from sympy import true
 
 module_path = os.path.abspath(os.path.join('..', 'hypedsearch', 'src'))
 if module_path not in sys.path:
@@ -55,10 +58,10 @@ def get_top_comb(pure_seqs, hybrid_seqs):
     merged_top = []
     pure_index, hybrid_index = 0,0
     if len(hybrid_seqs) == 0:
-        [merged_top.append(pure_seqs[i]) for i in range(0,10)]
+        [merged_top.append(pure_seqs[i]) for i in range(0,min(50,len(hybrid_seqs)))]
         return merged_top
     if len(pure_seqs) == 0:
-        [merged_top.append(hybrid_seqs[i]) for i in range(0,10)]
+        [merged_top.append(hybrid_seqs[i]) for i in range(0,min(50,len(pure_seqs)))]
         return merged_top
     while len(merged_top) < 50:
         pure = pure_seqs[pure_index]
@@ -218,7 +221,75 @@ def find_alignments(merged_seqs, obs_prec, prec_charge, tol):
 def write_clusters(clusters, filepath):
     with open(os.path.join(filepath, "clusters.txt"), 'w') as c:
         [c.write(str(x) + '\n') for x in clusters]
-# def evaluate_top_merges()
+
+def check_merged_top(merged_top, correct_sequence):
+    for comb_seq in merged_top:
+        b_seq = comb_seq[3][4]
+        y_seq = comb_seq[4][4]
+        if (correct_sequence[:len(b_seq)-1] == b_seq) and (correct_sequence[len(y_seq) - 1:] == y_seq):
+            return True
+    
+    return False
+
+def find_total_score(sequence, i_spectrum, ppm_tol):
+    total_score = 0
+    spectrum = gen_spectrum(sequence)
+    masses = sorted(spectrum['spectrum'])
+    o_ctr, t_ctr = 0, 0
+    observed = i_spectrum[o_ctr]
+    theoretical = masses[t_ctr]
+    tol = utils.ppm_to_da(observed, ppm_tol)
+    while (o_ctr < len(i_spectrum) and t_ctr < len(masses)):
+        if theoretical < observed - tol:
+            t_ctr = t_ctr + 1
+            if t_ctr < len(masses):
+                theoretical = masses[t_ctr]
+        elif observed + tol < theoretical:
+            o_ctr = o_ctr + 1
+            if o_ctr < len(i_spectrum):
+                observed = i_spectrum[o_ctr]
+            tol = utils.ppm_to_da(observed, ppm_tol)
+        elif observed - tol <= theoretical and observed + tol >= theoretical:
+            total_score = total_score + 1
+            o_ctr = o_ctr + 1
+            t_ctr = t_ctr + 1
+            if o_ctr < len(i_spectrum) and t_ctr < len(masses):
+                observed = i_spectrum[o_ctr]
+                theoretical = masses[t_ctr]
+                tol = utils.ppm_to_da(observed, ppm_tol)
+        
+    return(total_score)
+
+def second_scoring(merged_seqs, i_spectrum, ppm_tol, in_merged_top):
+    new_list = []
+    for comb_seq in merged_seqs:
+        b_seq = comb_seq[3][4]
+        y_seq = comb_seq[4][4]
+        if b_seq != y_seq:
+            new_seq = b_seq + y_seq
+        else:
+            new_seq = b_seq
+        score = find_total_score(new_seq, i_spectrum, ppm_tol)
+        new_list.append((score, comb_seq, in_merged_top))
+        
+    new_list.sort(key=lambda a: a[0], reverse = True)
+    return new_list
+
+def evaluate_top_merges(aligned_merges, correct_sequence):
+    for i, comb_seq in enumerate(aligned_merges):
+        b_seq = comb_seq[3][4]
+        y_seq = comb_seq[4][4]
+        if b_seq != y_seq:
+            new_seq = b_seq + y_seq
+        else:
+            new_seq = b_seq
+        if new_seq == correct_sequence:
+            if i == 0:
+                return True, True, True
+            elif i <= 10:
+                return False, True, True
+            else:
+                return False, False, False
 
 input_spectra, boundaries, correct_sequences, db = get_spectra_and_db(ppm_tolerance, peak_filter, relative_abundance_filter)
 
@@ -234,7 +305,8 @@ print('Finished matching masses')
 # unique_b, unique_y = testing_utils.get_unique_matched_masses(boundaries, matched_masses_b, matched_masses_y)
 # print('Done')
 
-top_count, top_10_count, top_50_count = False, False, False
+top_count, top_10_count, top_50_count = 0, 0, 0
+top_array, top_10_array, top_50_array, missed_array, missed_but_top = [], [], [], [], []
 for spectrum_num,input_spectrum in enumerate(input_spectra):
     spectrum_num = 5
     input_spectrum = input_spectra[spectrum_num]
@@ -260,14 +332,28 @@ for spectrum_num,input_spectrum in enumerate(input_spectra):
     merged_top = get_top_comb(merged_seqs, hybrid_merged)
 
     tol = utils.ppm_to_da(input_spectrum.precursor_mass, precursor_tolerance)
-    sample_merged_seqs = [(8, 0, 0, (0, 59, 62, 2, 'DPQV'), (0, 59, 74, 6, 'DPQVAQLELGGGPGAG'))]
-    alignments = find_alignments(sample_merged_seqs, input_spectrum.precursor_mass, input_spectrum.precursor_charge, tol)
-    print(alignments)
-    # top, top_10, top_50 = evaluate_top_merges(merged_top, correct_sequence)
 
-    # if top == True:
-    #     top_count = top_count + 1
-    # if top_10 == True:
-    #     top_10_count = top_10_count + 1
-    # if top_50 == True:
-    #     top_50_count = top_50_count + 1
+    in_merged_top = check_merged_top(merged_top, correct_sequence)
+    alignments = find_alignments(merged_top, input_spectrum.precursor_mass, input_spectrum.precursor_charge, tol)
+    rescored_alignments = second_scoring(alignments, input_spectrum, ppm_tolerance, in_merged_top)
+    top, top_10, top_50 = evaluate_top_merges(rescored_alignments, correct_sequence)
+
+    if top == True:
+        top_count = top_count + 1
+        top_array.append(spectrum_num)
+    if top_10 == True:
+        top_10_count = top_10_count + 1
+        top_10_array.append(spectrum_num)
+    if top_50 == True:
+        top_50_count = top_50_count + 1
+        top_50_array.append(spectrum_num)
+    if (top == False) and (top_10 == False) and (top_50 == False):
+        missed_array.append(spectrum_num)
+        if in_merged_top == True:
+            missed_but_top.append(spectrum_num)
+
+print("Number of correct top_alignments:", len(top_array), top_array)
+print("Number of top_10 alignments:", len(top_10_array), top_10_array)
+print("Number of top_50 alignments:", len(top_50_array), top_50_array)
+print("Number of missed alignments:", len(missed_array), missed_array)
+print("Number of times alignments function was wrong:", len(missed_but_top), missed_but_top)
