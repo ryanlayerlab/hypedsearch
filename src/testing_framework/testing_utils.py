@@ -4,7 +4,6 @@ import collections
 import operator
 from pyteomics import fasta
 import os
-import time
 import pandas as pd
 from collections import defaultdict
 
@@ -19,11 +18,8 @@ from objects import Database
 import gen_spectra, utils
 
 from collections import defaultdict
-from typing import Iterable
 from utils import ppm_to_da, hashable_boundaries
-import array as arr
 from math import ceil, trunc
-from posixpath import split
 
 BATCH_SIZE = 300
 
