@@ -41,7 +41,7 @@ $> git clone https://github.com/ryanlayerlab/hypedsearch.git
 
 ```
 ## Usage
-There are two ways to use hypedsearch: command line arguments or the param file
+Hypedsearch is run via the command line or through an IDE.
 
 **command line arguments**
 To run, open up the config.yaml and edit the filepaths and parameters in the file.
@@ -100,6 +100,12 @@ optional arguments:
 --n N                 The number of alignments to keep per spectrum.
                         Default=5
 ```
+
+**IDE**
+1. Open up your IDE of choice
+2. Go to config.yaml and edit the chosen filepaths
+3. Open up src.main and click the run file button in your IDE of choice
+
 ## References
 
 ### Diabetes
