@@ -36,162 +36,162 @@ digests = json.load(open(digest_file, 'r'))
 #     y_score = mass_comparisons.optimized_compare_masses(pepspec, kmerspec_y, ppm_tolerance=ppm_tolerance)
 #     return (b_score, y_score)
 
-def score_sequence(
-    observed: list, 
-    theoretical: list, 
-    ppm_tolerance: int = 20, 
-    needs_sorted: bool = False
-    ) -> float:
-    '''Score a mass spectrum to a substring of tagged amino acids
+# def score_sequence(
+#     observed: list, 
+#     theoretical: list, 
+#     ppm_tolerance: int = 20, 
+#     needs_sorted: bool = False
+#     ) -> float:
+#     '''Score a mass spectrum to a substring of tagged amino acids
 
-    :param observed: observed set of m/z values
-    :type observed: list
-    :param reference: reference set of m/z values
-    :type reference: list
-    :param ppm_tolerance: parts per million mass error allowed when matching masses. 
-        (default is 20)
-    :type ppm_tolerance: int
-    :param needs_sorted: Set to true if either the observed or reference need to 
-        be sorted. 
-        (default is False)
-    :type needs_sorted: bool
+#     :param observed: observed set of m/z values
+#     :type observed: list
+#     :param reference: reference set of m/z values
+#     :type reference: list
+#     :param ppm_tolerance: parts per million mass error allowed when matching masses. 
+#         (default is 20)
+#     :type ppm_tolerance: int
+#     :param needs_sorted: Set to true if either the observed or reference need to 
+#         be sorted. 
+#         (default is False)
+#     :type needs_sorted: bool
 
-    :returns: the number of matched ions
-    :rtype: int
+#     :returns: the number of matched ions
+#     :rtype: int
 
-    :Example:
+#     :Example:
 
-    >>> score_sequence([1, 2, 4], [1, 3, 4], 1, False)
-    >>> 2
-    '''
+#     >>> score_sequence([1, 2, 4], [1, 3, 4], 1, False)
+#     >>> 2
+#     '''
 
-    return mass_comparisons.optimized_compare_masses(
-        observed, 
-        theoretical, 
-        ppm_tolerance=ppm_tolerance, 
-        needs_sorted=needs_sorted
-    )
-
-
+#     return mass_comparisons.optimized_compare_masses(
+#         observed, 
+#         theoretical, 
+#         ppm_tolerance=ppm_tolerance, 
+#         needs_sorted=needs_sorted
+#     )
 
 
-def hybrid_score(
-    observed: Spectrum, 
-    hybrid_seq: str, 
-    ppm_tolerance: int, 
-    lesser_point: float = .5, 
-    greater_point: float = 1.0
-    ) -> float:
-    '''A score for hybrid sequences. b ions found to the left of the hybrid 
-    junction and y ions found to the right of the hybrid junctions will be 
-    rewarded a point of value *lesser_point*. b ions found to the right of the 
-    hybrid junction and y ions found to the left of hybrid junction will be 
-    awarded a point of value *greater_point*.
 
-    :param observed: observed spectrum
-    :type observed: Spectrum
-    :param hybrid_seq: hybrid string sequence
-    :type hybrid_seq: str
-    :param ppm_tolerance: mass error allowed in parts per million when matching masses 
-    :type ppm_tolerance: int
-    :param lesser_point: point awarded to ions found on their respective side of 
-        the hybrid junction. 
-        (default is .5)
-    :type lesser_point: float
-    :param greater_point: point awarded to ions found on their non respective side 
-        of the hybrid junction. 
-        (default is 1.0)
-    :type greater_point: float
 
-    :returns: the score 
-    :rtype: float 
+# def hybrid_score(
+#     observed: Spectrum, 
+#     hybrid_seq: str, 
+#     ppm_tolerance: int, 
+#     lesser_point: float = .5, 
+#     greater_point: float = 1.0
+#     ) -> float:
+#     '''A score for hybrid sequences. b ions found to the left of the hybrid 
+#     junction and y ions found to the right of the hybrid junctions will be 
+#     rewarded a point of value *lesser_point*. b ions found to the right of the 
+#     hybrid junction and y ions found to the left of hybrid junction will be 
+#     awarded a point of value *greater_point*.
 
-    :Example: 
+#     :param observed: observed spectrum
+#     :type observed: Spectrum
+#     :param hybrid_seq: hybrid string sequence
+#     :type hybrid_seq: str
+#     :param ppm_tolerance: mass error allowed in parts per million when matching masses 
+#     :type ppm_tolerance: int
+#     :param lesser_point: point awarded to ions found on their respective side of 
+#         the hybrid junction. 
+#         (default is .5)
+#     :type lesser_point: float
+#     :param greater_point: point awarded to ions found on their non respective side 
+#         of the hybrid junction. 
+#         (default is 1.0)
+#     :type greater_point: float
 
-    >>> hybrid_seq = 'ABC-DEF'
-    >>> lesser_point = .5
-    >>> greater_point = 1.0
-    >>> # say our b ions found are A, C, E
-    >>> # and y ions found are D, A
-    >>> # our scoring then works like
-    >>> # .5(bA) + .5(bC) + 1(bE) + .5 (yD) + 1(yA) 
-    >>> hybrid_score(spectrum, hybrid_seq, 20, lesser_point, greater_point)
-    >>> 3.5
-    '''
+#     :returns: the score 
+#     :rtype: float 
 
-    if '-' not in hybrid_seq and '(' not in hybrid_seq and ')' not in hybrid_seq:
-        return 0
+#     :Example: 
 
-    score = 0
+#     >>> hybrid_seq = 'ABC-DEF'
+#     >>> lesser_point = .5
+#     >>> greater_point = 1.0
+#     >>> # say our b ions found are A, C, E
+#     >>> # and y ions found are D, A
+#     >>> # our scoring then works like
+#     >>> # .5(bA) + .5(bC) + 1(bE) + .5 (yD) + 1(yA) 
+#     >>> hybrid_score(spectrum, hybrid_seq, 20, lesser_point, greater_point)
+#     >>> 3.5
+#     '''
 
-    # get a non hybrid for scoring purposes
-    non_hyb = hybrid_seq.replace('-', '').replace('(', '').replace(')', '')
+#     if '-' not in hybrid_seq and '(' not in hybrid_seq and ')' not in hybrid_seq:
+#         return 0
 
-    # get the index to the left of which b ions will only get .5 points
-    b_split = hybrid_seq.index('-') if '-' in hybrid_seq else hybrid_seq.index('(')
+#     score = 0
 
-    # get the index to the right of which y ions will only get .5 points
-    y_split = len(hybrid_seq) - hybrid_seq.index('-') if '-' in hybrid_seq else len(hybrid_seq) - hybrid_seq.index(')') 
+#     # get a non hybrid for scoring purposes
+#     non_hyb = hybrid_seq.replace('-', '').replace('(', '').replace(')', '')
 
-    # generate b and y separately to be sure
-    b_spec = sorted(gen_spectra.gen_spectrum(non_hyb, ion='b')['spectrum'])
-    y_spec = sorted(gen_spectra.gen_spectrum(non_hyb, ion='y')['spectrum'])
+#     # get the index to the left of which b ions will only get .5 points
+#     b_split = hybrid_seq.index('-') if '-' in hybrid_seq else hybrid_seq.index('(')
 
-    # convert the spectra into lists of tuples
-    gen_range = lambda x: (x - ppm_to_da(x, ppm_tolerance), x + ppm_to_da(x, ppm_tolerance))
-    b_ranges = [gen_range(x) for x in b_spec]
-    y_ranges = [gen_range(x) for x in y_spec]
+#     # get the index to the right of which y ions will only get .5 points
+#     y_split = len(hybrid_seq) - hybrid_seq.index('-') if '-' in hybrid_seq else len(hybrid_seq) - hybrid_seq.index(')') 
 
-    # do a merge search where we linearly search each mass in the observed twice
-    b_range_i = 0
-    observed_i = 0
-    while b_range_i < len(b_ranges) and observed_i < len(observed.mz_values):
+#     # generate b and y separately to be sure
+#     b_spec = sorted(gen_spectra.gen_spectrum(non_hyb, ion='b')['spectrum'])
+#     y_spec = sorted(gen_spectra.gen_spectrum(non_hyb, ion='y')['spectrum'])
 
-        # if observed is larger than the range, increment range
-        if observed.mz_values[observed_i] > b_ranges[b_range_i][1]:
-            b_range_i += 1
+#     # convert the spectra into lists of tuples
+#     gen_range = lambda x: (x - ppm_to_da(x, ppm_tolerance), x + ppm_to_da(x, ppm_tolerance))
+#     b_ranges = [gen_range(x) for x in b_spec]
+#     y_ranges = [gen_range(x) for x in y_spec]
 
-        # if observed is smaller than the range, increment observed
-        elif observed.mz_values[observed_i] < b_ranges[b_range_i][0]:
-            observed_i += 1
+#     # do a merge search where we linearly search each mass in the observed twice
+#     b_range_i = 0
+#     observed_i = 0
+#     while b_range_i < len(b_ranges) and observed_i < len(observed.mz_values):
 
-        # otherwise its in the range, see what to increment score by, and increment observed
-        else:
-            score += 1 if b_range_i >= b_split else .5
-            observed_i += 1
+#         # if observed is larger than the range, increment range
+#         if observed.mz_values[observed_i] > b_ranges[b_range_i][1]:
+#             b_range_i += 1
 
-    y_range_i = 0
-    observed_i = 0
-    while y_range_i < len(y_ranges) and observed_i < len(observed.mz_values):
+#         # if observed is smaller than the range, increment observed
+#         elif observed.mz_values[observed_i] < b_ranges[b_range_i][0]:
+#             observed_i += 1
 
-        # if observed is larger than the range, increment range
-        if observed.mz_values[observed_i] > y_ranges[y_range_i][1]:
-            y_range_i += 1
+#         # otherwise its in the range, see what to increment score by, and increment observed
+#         else:
+#             score += 1 if b_range_i >= b_split else .5
+#             observed_i += 1
 
-        # if observed is smaller than the range, increment observed
-        elif observed.mz_values[observed_i] < y_ranges[y_range_i][0]:
-            observed_i += 1
+#     y_range_i = 0
+#     observed_i = 0
+#     while y_range_i < len(y_ranges) and observed_i < len(observed.mz_values):
 
-        # otherwise its in the range, see what to increment score by, and increment observed
-        else:
-            score += 1 if y_range_i >= y_split else .5
-            observed_i += 1
+#         # if observed is larger than the range, increment range
+#         if observed.mz_values[observed_i] > y_ranges[y_range_i][1]:
+#             y_range_i += 1
 
-    return score
+#         # if observed is smaller than the range, increment observed
+#         elif observed.mz_values[observed_i] < y_ranges[y_range_i][0]:
+#             observed_i += 1
 
-def precursor_distance(observed_precursor: float, reference_precursor: float) -> float:
-    '''The absolute distance between the observed precursor and reference precursor
+#         # otherwise its in the range, see what to increment score by, and increment observed
+#         else:
+#             score += 1 if y_range_i >= y_split else .5
+#             observed_i += 1
 
-    :param observed_precursor: the observed precursor mass
-    :type observed_precursor: float
-    :param reference_precursor: the precursor mass of the reference sequence
-    :type reference_precursor: float
+#     return score
 
-    :returns: the absolute value of the difference between the two
-    :rtype: float
-    '''
+# def precursor_distance(observed_precursor: float, reference_precursor: float) -> float:
+#     '''The absolute distance between the observed precursor and reference precursor
 
-    return abs(observed_precursor - reference_precursor)
+#     :param observed_precursor: the observed precursor mass
+#     :type observed_precursor: float
+#     :param reference_precursor: the precursor mass of the reference sequence
+#     :type reference_precursor: float
+
+#     :returns: the absolute value of the difference between the two
+#     :rtype: float
+#     '''
+
+#     return abs(observed_precursor - reference_precursor)
 
 
 # def xcorr(observed: np.ndarray, reference: np.ndarray, value=50) -> float:
@@ -267,223 +267,273 @@ def precursor_distance(observed_precursor: float, reference_precursor: float) ->
             
 #     return score
 
-def total_mass_error(observed: Spectrum, alignment: str, tolerance: int) -> float:
-    '''The sum of all of the mass errors for every matched mass between the 
-    observed and the alignment.
+# def total_mass_error(observed: Spectrum, alignment: str, tolerance: int) -> float:
+#     '''The sum of all of the mass errors for every matched mass between the 
+#     observed and the alignment.
     
-    :param observed: observed spectrum
-    :type observed: Spectrum
-    :param alignment: the string alignment
-    :type alignment: str
-    :param tolerance: parts per million tolerance allowed when matching masses
-    :type tolerance: int
+#     :param observed: observed spectrum
+#     :type observed: Spectrum
+#     :param alignment: the string alignment
+#     :type alignment: str
+#     :param tolerance: parts per million tolerance allowed when matching masses
+#     :type tolerance: int
 
-    :returns: sum of the absolute values of all mass errors
-    :rtype: float
-    '''
+#     :returns: sum of the absolute values of all mass errors
+#     :rtype: float
+#     '''
 
-    # clean the input alignment
-    sequence = alignment.replace('-', '').replace(')', '').replace('(', '')
+#     # clean the input alignment
+#     sequence = alignment.replace('-', '').replace(')', '').replace('(', '')
 
-    # generate the spectrum
-    alignment_spectrum = gen_spectra.gen_spectrum(sequence)['spectrum']
+#     # generate the spectrum
+#     alignment_spectrum = gen_spectra.gen_spectrum(sequence)['spectrum']
 
-    # sort them both
-    sorted_observed = sorted(observed.mz_values)
-    sorted_alignment = sorted(alignment_spectrum)
+#     # sort them both
+#     sorted_observed = sorted(observed.mz_values)
+#     sorted_alignment = sorted(alignment_spectrum)
 
-    # i is for observed, j for the str alignment
-    i, j = 0, 0
+#     # i is for observed, j for the str alignment
+#     i, j = 0, 0
 
-    # keep track of total error
-    total_error = 0
+#     # keep track of total error
+#     total_error = 0
 
-    while i < len(sorted_observed) and j < len(sorted_alignment):
+#     while i < len(sorted_observed) and j < len(sorted_alignment):
 
-        # see if the mass at j is +- the mass at i
-        da_tol = ppm_to_da(sorted_alignment[j], tolerance)
+#         # see if the mass at j is +- the mass at i
+#         da_tol = ppm_to_da(sorted_alignment[j], tolerance)
 
-        # if alignment < observed - tolerance, increment alignment
-        if sorted_alignment[j] < sorted_observed[i] - da_tol:
-            j += 1
+#         # if alignment < observed - tolerance, increment alignment
+#         if sorted_alignment[j] < sorted_observed[i] - da_tol:
+#             j += 1
 
-        # if alignment > observed + tolerance, increment observed
-        elif sorted_alignment[j] > sorted_observed[i] + da_tol:
-            i += 1
+#         # if alignment > observed + tolerance, increment observed
+#         elif sorted_alignment[j] > sorted_observed[i] + da_tol:
+#             i += 1
 
-        # finally ad tot total error and increment both
-        else:
-            total_error += abs(sorted_alignment[j] - sorted_observed[i])
-            i+= 1
-            j += 1
+#         # finally ad tot total error and increment both
+#         else:
+#             total_error += abs(sorted_alignment[j] - sorted_observed[i])
+#             i+= 1
+#             j += 1
 
-    return total_error
+#     return total_error
 
 
-def digest_score(sequence: str, db: Database, digest_type: str) -> int:
-    '''The additional points *sequence* gets if it follows the digest rules of 
-    the specified digest type
+# def digest_score(sequence: str, db: Database, digest_type: str) -> int:
+    # '''The additional points *sequence* gets if it follows the digest rules of 
+    # the specified digest type
 
-    :param sequence: hybrid or non hybrid sequence to analyze
-    :type sequence: str
-    :param db: source proteins
-    :type db: Database
-    :param digest_type: what kind of digest was performed
-    :type digest_type: str
+    # :param sequence: hybrid or non hybrid sequence to analyze
+    # :type sequence: str
+    # :param db: source proteins
+    # :type db: Database
+    # :param digest_type: what kind of digest was performed
+    # :type digest_type: str
 
-    :returns: additional points the sequence gets by following the digest
-    :rtype: int
-    '''
+    # :returns: additional points the sequence gets by following the digest
+    # :rtype: int
+    # '''
 
-    # if the digest type is not in digests, return 0
-    if digest_type not in digests:
-        return 0
+    # # if the digest type is not in digests, return 0
+    # if digest_type not in digests:
+    #     return 0
 
-    digest = digests[digest_type]
+    # digest = digests[digest_type]
 
-    # if left digest cuts left and sequence [0] matches, give it a point
-    left_point = 1 \
-        if any(
-            [x['amino_acid'] == sequence[0] for x in digest['start'] \
-            and x['cut_position'] == 'left']
-        ) else 0
+    # # if left digest cuts left and sequence [0] matches, give it a point
+    # left_point = 1 \
+    #     if any(
+    #         [x['amino_acid'] == sequence[0] for x in digest['start'] \
+    #         and x['cut_position'] == 'left']
+    #     ) else 0
 
-    # if right digest cuts right and sequence[-1] matches, give it a point
-    right_point = 1 \
-        if any(
-            [x['amino_acid'] == sequence[-1] for x in digest['end'] \
-            and x['cut_position'] == 'right']
-        ) else 0
+    # # if right digest cuts right and sequence[-1] matches, give it a point
+    # right_point = 1 \
+    #     if any(
+    #         [x['amino_acid'] == sequence[-1] for x in digest['end'] \
+    #         and x['cut_position'] == 'right']
+    #     ) else 0
 
-    if left_point + right_point == 2:
-        return 2
+    # if left_point + right_point == 2:
+    #     return 2
 
-    # check to see if its a hybrid sequence
-    if utils.HYBRID_ALIGNMENT_PATTERN.findall(sequence):
+    # # check to see if its a hybrid sequence
+    # if utils.HYBRID_ALIGNMENT_PATTERN.findall(sequence):
 
-        # get the left and right halves
-        left, right = utils.split_hybrid(sequence)
+    #     # get the left and right halves
+    #     left, right = utils.split_hybrid(sequence)
 
-        # well first check to see if we can assign a point to left
-        # before even looking at the source proteins. If we just look 
-        # at the first amino acid and it follows the digest rule, bam we 
-        # golden
-        left_point = 1 \
-            if left_point == 1 or any(
-                [x['amino_acid'] == left[0] for x in digest['start'] and x['cut_position'] == 'left']
-            ) else 0
+    #     # well first check to see if we can assign a point to left
+    #     # before even looking at the source proteins. If we just look 
+    #     # at the first amino acid and it follows the digest rule, bam we 
+    #     # golden
+    #     left_point = 1 \
+    #         if left_point == 1 or any(
+    #             [x['amino_acid'] == left[0] for x in digest['start'] and x['cut_position'] == 'left']
+    #         ) else 0
 
-        # do the same for the right
-        right_point = 1 \
-            if right_point == 1 or any(
-                [x['amino_acid'] == sequence[-1] for x in digest['end'] and x['cut_position'] == 'right']  
-            ) else 0
+    #     # do the same for the right
+    #     right_point = 1 \
+    #         if right_point == 1 or any(
+    #             [x['amino_acid'] == sequence[-1] for x in digest['end'] and x['cut_position'] == 'right']  
+    #         ) else 0
 
-        if left_point == 0:
+    #     if left_point == 0:
 
-            # find source proteins
-            left_source_proteins = database.get_proteins_with_subsequence_ion(
-                db, left, 'b'
-            )
+    #         # find source proteins
+    #         left_source_proteins = database.get_proteins_with_subsequence_ion(
+    #             db, left, 'b'
+    #         )
 
-            # look to see if there is any source protein where the amino acid
-            # to the left of our amino acid follows the digest rule
-            for lsp in left_source_proteins:
+    #         # look to see if there is any source protein where the amino acid
+    #         # to the left of our amino acid follows the digest rule
+    #         for lsp in left_source_proteins:
 
-                for entry in database.get_entry_by_name(db, lsp):
+    #             for entry in database.get_entry_by_name(db, lsp):
 
-                    # if entry.sequence at index of left has amino acid 
-                    # to left, add point
-                    indices = [m.start() for m in re.finditer(left, entry.sequence)]
+    #                 # if entry.sequence at index of left has amino acid 
+    #                 # to left, add point
+    #                 indices = [m.start() for m in re.finditer(left, entry.sequence)]
 
-                    for i in indices:
+    #                 for i in indices:
 
-                        # see if any of the right cut start match sequence[i-1]
-                        if i == 0:
-                            continue
+    #                     # see if any of the right cut start match sequence[i-1]
+    #                     if i == 0:
+    #                         continue
 
-                        left_point = 1 if any(
-                            [x['amino_acid'] == entry.sequence[i-1] for x in \
-                            digest['start'] and x['cut_position'] == 'right']
-                        ) else 0 
+    #                     left_point = 1 if any(
+    #                         [x['amino_acid'] == entry.sequence[i-1] for x in \
+    #                         digest['start'] and x['cut_position'] == 'right']
+    #                     ) else 0 
 
-                        if left_point == 1:
-                            break 
+    #                     if left_point == 1:
+    #                         break 
 
-                    if left_point == 1:
-                        break 
+    #                 if left_point == 1:
+    #                     break 
 
-                if left_point == 1: 
-                    break 
+    #             if left_point == 1: 
+    #                 break 
 
-        if right_point == 0:
+    #     if right_point == 0:
 
-            # get source proteins
-            right_source_proteins = database.get_proteins_with_subsequence_ion(
-                db, right, 'y'
-            )
+    #         # get source proteins
+    #         right_source_proteins = database.get_proteins_with_subsequence_ion(
+    #             db, right, 'y'
+    #         )
 
-            for rsp in right_source_proteins:
+    #         for rsp in right_source_proteins:
 
-                for entry in database.get_entry_by_name(db, rsp):
+    #             for entry in database.get_entry_by_name(db, rsp):
 
-                    indices = [m.start() + len(right) for \
-                        m in re.finditer(right, entry.sequence)]
+    #                 indices = [m.start() + len(right) for \
+    #                     m in re.finditer(right, entry.sequence)]
 
-                    for i in indices:
+    #                 for i in indices:
                         
-                        if i == len(entry.sequence) - 1:
-                            continue
+    #                     if i == len(entry.sequence) - 1:
+    #                         continue
 
-                        right_point = 1 if any(
-                            [x['amino_acid'] == entry.sequence[i] for x in \
-                            digest['end'] and x['cut_position'] == 'left']
-                        ) else 0
+    #                     right_point = 1 if any(
+    #                         [x['amino_acid'] == entry.sequence[i] for x in \
+    #                         digest['end'] and x['cut_position'] == 'left']
+    #                     ) else 0
 
-                        if right_point == 1:
-                            break 
+    #                     if right_point == 1:
+    #                         break 
 
-                    if right_point == 1:
-                        break 
+    #                 if right_point == 1:
+    #                     break 
 
-                if right_point == 1:
-                    break 
+    #             if right_point == 1:
+    #                 break 
 
-        return right_point + left_point
+    #     return right_point + left_point
 
-    else:
-        # find source proteins
-        source_proteins = database.get_proteins_with_subsequence(
-            db, sequence
-        )
+    # else:
+    #     # find source proteins
+    #     source_proteins = database.get_proteins_with_subsequence(
+    #         db, sequence
+    #     )
 
-        for sp in source_proteins:
+    #     for sp in source_proteins:
 
-            for entry in database.get_entry_by_name(db, sp):
+    #         for entry in database.get_entry_by_name(db, sp):
 
-                # if entry.sequence at index of left has amino acid 
-                # to left, add point
-                indices = [m.start() for m in re.finditer(sequence, entry.sequence)]
+    #             # if entry.sequence at index of left has amino acid 
+    #             # to left, add point
+    #             indices = [m.start() for m in re.finditer(sequence, entry.sequence)]
 
-                for i in indices:
+    #             for i in indices:
 
-                    if i == 0:
-                        continue
+    #                 if i == 0:
+    #                     continue
                     
-                    # make left point 1 if already 1 or if the amino acid 
-                    # to the left of our sequence follows a right cut in the 
-                    # digest
-                    left_point = 1 if left_point == 1 or any(
-                        [x['amino_acid'] == entry.sequence[i-1] for x in \
-                        digest['start'] and x['cut_position'] == 'right']
-                    ) else 0 
+    #                 # make left point 1 if already 1 or if the amino acid 
+    #                 # to the left of our sequence follows a right cut in the 
+    #                 # digest
+    #                 left_point = 1 if left_point == 1 or any(
+    #                     [x['amino_acid'] == entry.sequence[i-1] for x in \
+    #                     digest['start'] and x['cut_position'] == 'right']
+    #                 ) else 0 
 
-                    # make right point 1 if already 1 or if the amino acid
-                    # to the right of our sequence follows a left cut in 
-                    # the digest
-                    right_point = 1 if right_point == 1 or any(
-                        [x['amino_acid'] == entry.sequence[i+len(sequence)] \
-                        for x in digest['end'] and x['cut_position'] == 'left']
-                    ) else 0
+    #                 # make right point 1 if already 1 or if the amino acid
+    #                 # to the right of our sequence follows a left cut in 
+    #                 # the digest
+    #                 right_point = 1 if right_point == 1 or any(
+    #                     [x['amino_acid'] == entry.sequence[i+len(sequence)] \
+    #                     for x in digest['end'] and x['cut_position'] == 'left']
+    #                 ) else 0
 
-        return left_point + right_point
+    #     return left_point + right_point
+
+def score_by_dist(comb_seq, obs_prec, charge):
+    b_seq = comb_seq[3][4]
+    y_seq = comb_seq[4][4]
+    if b_seq != y_seq:
+        new_seq = b_seq + y_seq
+    else:
+        new_seq = b_seq
+    dist = abs(gen_spectra.get_precursor(new_seq, charge) - obs_prec)
+    return dist
+
+def rescore(comb_seq, input_masses, tol):
+    total_score = 0
+    b_seq = comb_seq[3][4]
+    y_seq = comb_seq[4][4]
+    if b_seq == y_seq:
+        sequence = b_seq
+    else:
+        sequence = b_seq + y_seq
+    spectrum = gen_spectra.gen_spectrum(sequence)
+    masses = sorted(spectrum['spectrum'])
+    o_ctr, t_ctr = 0, 0
+    observed = input_masses[o_ctr]
+    theoretical = masses[t_ctr]
+    while (o_ctr < len(input_masses) and t_ctr < len(masses)):
+        if theoretical < observed - tol:
+            t_ctr = t_ctr + 1
+            if t_ctr < len(masses):
+                theoretical = masses[t_ctr]
+        elif observed + tol < theoretical:
+            o_ctr = o_ctr + 1
+            if o_ctr < len(input_masses):
+                observed = input_masses[o_ctr]
+        elif observed - tol <= theoretical and observed + tol >= theoretical:
+            total_score = total_score + 1
+            o_ctr = o_ctr + 1
+            t_ctr = t_ctr + 1
+            if o_ctr < len(input_masses) and t_ctr < len(masses):
+                observed = input_masses[o_ctr]
+                theoretical = masses[t_ctr]
+        
+    return(total_score)
+
+def second_scoring(alignments, input_spectrum, tol):
+    new_merges = []
+    for comb_seq in alignments:
+        dist = score_by_dist(comb_seq, input_spectrum.precursor_mass, input_spectrum.precursor_charge)
+        score = rescore(comb_seq, input_spectrum.mz_values, tol)
+        new_merges.append((score, 1/dist, comb_seq))
+    return new_merges

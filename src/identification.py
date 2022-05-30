@@ -1,10 +1,12 @@
 from collections import defaultdict
+from heapq import merge
+from postprocessing.postprocessing_utils import postprocessing
 from objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry
-import gen_spectra
+from gen_spectra import get_precursor
 from alignment import alignment
 from utils import ppm_to_da, to_percent, hashable_boundaries, is_json, is_file
 import utils
-from scoring import scoring, mass_comparisons
+from scoring import scoring
 from preprocessing import digestion, merge_search, preprocessing_utils, clustering, evaluation
 import database
 from file_io import JSON
@@ -155,22 +157,10 @@ def create_hits(spec_num,spectrum,matched_masses_b,matched_masses_y, DEBUG, loca
         write_hits(b_hits, y_hits, location)
     return b_hits, y_hits
 
-def get_seqs_from_merged_seq(merged_seqs):
-    b_hits, y_hits = set(), set()
-    for i in range(0,50):
-        comb_seq = merged_seqs[i]
-        # (1, -8, 8, (274, 22, 22, 1, 'T'), (274, 30, 30, 1, 'L'))
-        b_hit = comb_seq[3][4]
-        y_hit = comb_seq[4][4]
-        b_hits.add(b_hit)
-        y_hits.add(y_hit)
-
-    return b_hits, y_hits
-
 def align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,n,digest,truth,fall_off,results,DEBUG,location,truth_set):
-    for i, spectrum in enumerate(spectra):
+    for i, input_spectrum in enumerate(spectra):
         print(f'Creating alignment for spectrum {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='\r')
-        b_hits,y_hits = create_hits(i,spectrum,matched_masses_b,matched_masses_y,DEBUG,location)
+        b_hits,y_hits = create_hits(i,input_spectrum,matched_masses_b,matched_masses_y,DEBUG,location)
 
         for ion in "by":
             clusters = clustering.create_clusters(ion, b_hits, y_hits)
@@ -178,12 +168,27 @@ def align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db
                 b_sorted_clusters = clustering.Score_clusters(ion, clusters)
             else:
                 y_sorted_clusters = clustering.Score_clusters(ion, clusters)
+    
         merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
         merged_seqs.sort(key = lambda x: x[0], reverse = True)
-        b_hits, y_hits = get_seqs_from_merged_seq(merged_seqs)
+        tol = utils.ppm_to_da(input_spectrum.precursor_mass, precursor_tolerance)
+        merged_seqs = clustering.filter_by_precursor(merged_seqs, input_spectrum.precursor_mass, tol, input_spectrum.precursor_charge)
+        merged_seqs = clustering.filter_by_missing_mass(db, merged_seqs, input_spectrum.precursor_mass, tol, input_spectrum.precursor_charge)
+        
+        hybrid_merged = clustering.get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, input_spectrum.precursor_mass, tol, input_spectrum.precursor_charge)
+        hybrid_merged = clustering.filter_by_precursor(hybrid_merged, input_spectrum.precursor_mass, tol, input_spectrum.precursor_charge)
+        hybrid_merged = clustering.filter_by_missing_mass(db, hybrid_merged, input_spectrum.precursor_mass, tol, input_spectrum.precursor_charge)
 
-        raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off)
-        results[spectrum.id]=raw_results
+        merged_top = clustering.combine_merges(merged_seqs, hybrid_merged, 50)
+        
+        alignments = alignment.find_alignments(merged_top, input_spectrum.precursor_mass, input_spectrum.precursor_charge, tol, db)
+
+        rescored_alignments = scoring.second_scoring(alignments, input_spectrum, tol)
+        rescored_alignments = sorted(rescored_alignments, key = lambda x: (x[0], x[1]), reverse=True)
+        
+        postprocessed_alignments = postprocessing(rescored_alignments, db)
+        # raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off)
+        results[input_spectrum.id]=postprocessed_alignments
 
 def align_on_multi_core(cores,mp_id_spectrum,db,spectra,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,n,digest):
     print('Initializing other processors...')
@@ -279,9 +284,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     location = os.path.join(dirname, 'intermediate_files')
     if utils.find_dir('matched_masses_b.txt', location) and utils.find_dir('matched_masses_y.txt', location) and utils.find_dir('kmer_set.txt', location):
         print("getting matched_masses from file...")
-        start = time.time()
         matched_masses_b, matched_masses_y, kmer_set = merge_search.get_from_file(os.path.join(location, 'matched_masses_b.txt'), os.path.join(location, 'matched_masses_y.txt'), os.path.join(location, 'kmer_set.txt'), False)
-        print(time.time() - start)
         print("getting matched_masses from file Done")
     else:
         start = time.time()

@@ -58,7 +58,7 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
         precursor_charge = content['precursorMz'][0]['precursorCharge']
 
         # get the id
-        _id = content.get('id', '')
+        id = content.get('id', '')
 
         ms_level = content['msLevel']
         scan_number = content['num']
@@ -69,14 +69,10 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
         spectra.append(Spectrum(
             masses,
             abundances,
-            ti,
-            ms_level,
-            scan_number,
             precursor,
             precursor_charge,
             filename, 
-            _id, 
-            other_metadata
+            id
         ))
 
     return spectra

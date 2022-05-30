@@ -65,7 +65,7 @@ def main(args: object) -> None:
     output_dir = arguments['output_dir']
     print('\nFinished search. Writting results to {}...'.format(output_dir))
     summary.generate_to_txt(matched_spectras, output_dir)
-    summary.generate(matched_spectras, output_dir)
+    # summary.generate(matched_spectras, output_dir)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Tool for identifying proteins, both hybrid and non hybrid from MS/MS data')
