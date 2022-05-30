@@ -1,6 +1,8 @@
 from scoring import scoring
 from objects import Spectrum, SequenceAlignment, HybridSequenceAlignment, Database, Alignments, DEVFallOffEntry
 from alignment import alignment_utils, hybrid_alignment
+from gen_spectra import get_precursor
+from preprocessing.clustering import modified_find_next_mass
 import objects
 import utils
 import database
@@ -386,4 +388,50 @@ def attempt_alignment(spectrum: Spectrum, db: Database, b_hits: list,y_hits: lis
         return alignments
     else:
         return attempt_alignment_second_pass(spectrum,db,n,ppm_tolerance,precursor_tolerance,digest_type,truth,fall_off,DEV,OBJECTIFY_COUNT,OBJECTIFY_TIME,a,non_hybrid_alignments)
-   
+
+def make_merge(b, y, b_seq, y_seq):
+    new_b = (b[0], b[1], b[2], b[3], b_seq)
+    new_y = (y[0], y[1], y[2], y[3], y_seq)
+    return (b[3] + y[3], b[1] - y[2], y[2]-b[1], new_b, new_y)    
+
+def add_amino_acids(alignment_list, missing_mass, b_c, y_c, comb_seq, b_seq, y_seq, precursor_charge, prec_mass, tol, stop_b, db):
+    #This function recursively adds in amino acids    
+    if abs(get_precursor(b_seq + y_seq, precursor_charge) - prec_mass) <= tol:
+        alignment_list.append(make_merge(b_c, y_c, b_seq, y_seq))
+        return
+    
+    if get_precursor(b_seq + y_seq, precursor_charge) > prec_mass + tol:
+        return
+    
+    next_b = modified_find_next_mass(b_c, 'b', db)
+    next_y = modified_find_next_mass(y_c, 'y', db)
+    
+    if get_precursor(b_seq + y_seq, precursor_charge) < prec_mass - tol and (next_b != "") and stop_b == False:
+        mod_b = b_seq + next_b
+        mod_b_c = (b_c[0], b_c[1], b_c[2]+1, b_c[3], mod_b)
+        add_amino_acids(alignment_list, missing_mass, mod_b_c, y_c, comb_seq, mod_b, y_seq, precursor_charge, prec_mass, tol, stop_b, db)
+    stop_b = True
+    if get_precursor(b_seq + y_seq, precursor_charge) < prec_mass - tol and (next_y != ""):
+        mod_y = next_y + y_seq
+        mod_y_c = (y_c[0], y_c[1]-1, y_c[2], y_c[3], mod_y)
+        add_amino_acids(alignment_list, missing_mass, b_c, mod_y_c, comb_seq, b_seq, mod_y, precursor_charge, prec_mass, tol, stop_b, db)
+        
+    return
+
+def find_alignments(merged_seqs, obs_prec, prec_charge, tol, db):
+    alignments = []
+    for comb_seq in merged_seqs:
+        b_cluster = comb_seq[3]
+        y_cluster = comb_seq[4]
+        b_seq = comb_seq[3][4]
+        y_seq = comb_seq[4][4]
+        if b_seq != y_seq:
+            new_seq = b_seq + y_seq
+            missing_mass = obs_prec - get_precursor(new_seq, prec_charge)
+            add_amino_acids(alignments, missing_mass, b_cluster, y_cluster, comb_seq, b_seq, y_seq, prec_charge, obs_prec, tol, False, db)           
+        else:
+            new_seq = b_seq
+            if (abs(get_precursor(new_seq, prec_charge) - obs_prec) <= tol):
+                alignments.append(comb_seq)
+            
+    return alignments

@@ -43,36 +43,22 @@ def text_file(results: dict, output_dir: str) -> None:
     #         target_entry = dictified[x]
     #         target_alignments = target_entry['alignments']
 
+# label, left_protein, right_protein, sequence, b_score, y_score, total_score, precursor_distance, alignment
     with open(txt_file_name, 'w') as t:
         for i, x in enumerate(results):
-            result = results[x]
-            target_alignments = result.alignments
+            target_alignments = results[x]
             for alignment in target_alignments:
-                alignment_type = type(alignment)
-                if str(alignment_type) == "<class 'objects.SequenceAlignment'>":
-                    spec_num = str(i)
-                    non_hybrid = 'Non_hybrid'
-                    proteins = str(alignment.proteins)
-                    sequence = str(alignment.sequence)
-                    b_score = str(alignment.b_score)
-                    y_score = str(alignment.y_score)
-                    total_score = str(alignment.total_score)
-                    precursor_distance = str(alignment.precursor_distance)
-                    total_mass_error = str(alignment.total_mass_error)
-                    t.write(spec_num + '\t' + non_hybrid + '\t' + proteins + '\t' + sequence + '\t' + b_score + '\t' + y_score + '\t' + total_score + '\t' + precursor_distance + '\t' + total_mass_error + '\n')
-                else:
-                    spec_num = str(i)
-                    hybrid = 'Hybrid'
-                    left_protein = str(alignment.left_proteins)
-                    right_protein = str(alignment.right_proteins)
-                    sequence = str(alignment.sequence)
-                    hybrid_sequence = str(alignment.hybrid_sequence)
-                    b_score = str(alignment.b_score)
-                    y_score = str(alignment.y_score)
-                    total_score = str(alignment.total_score)
-                    precursor_distance = str(alignment.precursor_distance)
-                    total_mass_error = str(alignment.total_mass_error)
-                    t.write(spec_num + '\t' + hybrid + '\t' + left_protein + '\t' + right_protein + '\t' + sequence + '\t' + hybrid_sequence + '\t' + b_score + '\t' + y_score + '\t' + total_score + '\t' + precursor_distance + '\t' + total_mass_error + '\n')
+                spec_num = str(i)
+                hybrid = alignment[0]
+                left_protein = alignment[1]
+                right_protein = alignment[2]
+                sequence = alignment[3]
+                b_score = str(alignment[4])
+                y_score = str(alignment[5])
+                total_score = str(alignment[6])
+                precursor_distance = str(alignment[7])
+                
+                t.write(spec_num + '\t' + hybrid + '\t' + sequence + '\t' + precursor_distance + '\t' + left_protein + '\t' + right_protein + '\t' + b_score + '\t' + y_score + '\t' + total_score + '\n')
 
 def tsv_file(results: dict, output_dir: str) -> None:
     '''

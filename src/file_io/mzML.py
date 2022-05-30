@@ -64,7 +64,7 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
             precursor_charge = int(content['precursorList']['precursor'][0]['selectedIonList']['selectedIon'][0]['charge state'])
 
         # get the id
-        id_ = content.get('id', '')
+        id = content.get('id', '')
 
         spectra.append(
             Spectrum(
@@ -73,7 +73,7 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
             precursor,
             precursor_charge,
             filename, 
-            id_
+            id
         ))
 
     return spectra

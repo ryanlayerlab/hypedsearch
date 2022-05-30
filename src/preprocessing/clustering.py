@@ -177,9 +177,107 @@ def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
                 y_i += 1
     return merge_seqs
 
+def filter_by_precursor(mseqs, obs_prec, tol, charge):
+    filtered_seqs = []
+    for comb_seq in mseqs:
+        b_seq = comb_seq[3][4]
+        y_seq = comb_seq[4][4]
+        if b_seq != y_seq:
+            new_seq = b_seq + y_seq
+        else:
+            new_seq = b_seq
+        if not (get_precursor(new_seq, charge) > obs_prec + tol):
+            filtered_seqs.append(comb_seq)
+    return filtered_seqs
+
+def get_overlapping_sequence(b_seq, y_seq, b_start, b_end, y_start):
+    seq = ''
+    if y_start > b_end:
+        return b_seq + y_seq
+    else:
+        for i in range(b_start, y_start):
+            seq = seq + b_seq[i]
+        return seq
+    
+def overlap(comb_seq):
+    b_seq = comb_seq[3][4]
+    y_seq = comb_seq[4][4]
+    b_pid = comb_seq[3][0]
+    y_pid = comb_seq[4][0]
+    if b_pid == y_pid:
+        y_start = comb_seq[4][1]
+        b_end = comb_seq[3][2]
+        if (y_start - b_end > 0) & (y_start - b_end < 10):
+            b_start = comb_seq[3][1]
+            return get_overlapping_sequence(b_seq, y_seq, b_start, b_end, y_start)
+        else:
+            return b_seq + y_seq
+    else:
+        return b_seq + y_seq
+
+def modified_find_next_mass(cluster, ion, db):
+    if ion == 'b':
+        target_index = cluster[2] + 1
+    else:
+        target_index = cluster[1]-1
+    target_prot = cluster[0]
+    for i, prot_name in enumerate(db.proteins):
+        if i == target_prot:
+            protein = db.proteins[prot_name]
+            prot_seq = protein[0][1]
+            to_add = prot_seq[target_index] if (target_index < len(prot_seq) and target_index > 0) else ''
+            break
+    
+    return to_add
+
+def filter_by_missing_mass(db, mseqs, obs_prec, tol, charge):
+    filtered_seqs = []
+    for comb_seq in mseqs:
+        new_seq = overlap(comb_seq)
+        dif = obs_prec + tol - get_precursor(new_seq, charge)
+        if dif <= 1: #tol can vary but i'm not sure how much. Tol is .05 for spec 4 Other hacks are 2*tol
+            filtered_seqs.append(comb_seq)
+        else:
+            next_b = modified_find_next_mass(comb_seq[3], 'b', db)
+            b_seq = comb_seq[3][4]
+            y_seq = comb_seq[4][4]
+            b_dif = obs_prec + tol - get_precursor(b_seq + next_b + y_seq, charge)
+            next_y = modified_find_next_mass(comb_seq[4], 'y', db)
+            y_dif = obs_prec + tol - get_precursor(b_seq + next_y + y_seq, charge)
+            if b_dif >= 0 or y_dif >= 0:
+                filtered_seqs.append(comb_seq)
+                
+    return filtered_seqs
+
+def combine_merges(pure_seqs, hybrid_seqs, target_num): #TODO
+    merged_top = []
+    pure_index, hybrid_index = 0,0
+    if len(hybrid_seqs) == 0:
+        return pure_seqs[:50]
+    if len(pure_seqs) == 0:
+        return hybrid_seqs[:50]
+    while len(merged_top) < target_num:
+        if len(pure_seqs) < pure_index:
+            [merged_top.append(hybrid_seqs(x)) for x in hybrid_seqs[:min(target_num, len(hybrid_seqs))]]
+            return merged_top
+        if len(hybrid_seqs) < hybrid_index:
+            [merged_top.append(pure_seqs(x)) for x in pure_seqs[:min(target_num, len(hybrid_seqs))]]
+            return merged_top
+        pure = pure_seqs[pure_index]
+        hybrid = hybrid_seqs[hybrid_index]
+        if pure[0] >= hybrid[0]: #We give ties to the non-hybrid sequences
+            merged_top.append(pure)
+            pure_index = pure_index + 1
+        else:
+            merged_top.append(hybrid)
+            hybrid_index = hybrid_index + 1
+    return merged_top
+
+def min_info(cluster):
+    return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.seq)
+
 def check_for_hybrid_overlap(b_seq, y_seq, ion):
     match = True
-    print('code got here')
     if ion == 'b':
         for i, char in enumerate(b_seq):
             if char == y_seq[0]:
