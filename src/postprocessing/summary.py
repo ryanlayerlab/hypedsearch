@@ -58,7 +58,7 @@ def text_file(results: dict, output_dir: str) -> None:
                 total_score = str(alignment[6])
                 precursor_distance = str(alignment[7])
                 
-                t.write(spec_num + '\t' + hybrid + '\t' + sequence + '\t' + precursor_distance + '\t' + left_protein + '\t' + right_protein + '\t' + b_score + '\t' + y_score + '\t' + total_score + '\n')
+                t.write(spec_num + '\t' + hybrid + '\t' + sequence + '\t' + total_score + '\t' + precursor_distance + '\t' + left_protein + '\t' + right_protein + '\t' + b_score + '\t' + y_score + '\n')
 
 def tsv_file(results: dict, output_dir: str) -> None:
     '''

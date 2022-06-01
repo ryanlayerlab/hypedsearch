@@ -171,19 +171,19 @@ def align_on_single_core(spectra,boundaries,matched_masses_b,matched_masses_y,db
     
         merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
         merged_seqs.sort(key = lambda x: x[0], reverse = True)
-        tol = utils.ppm_to_da(input_spectrum.precursor_mass, precursor_tolerance)
-        merged_seqs = clustering.filter_by_precursor(merged_seqs, input_spectrum.precursor_mass, tol, input_spectrum.precursor_charge)
-        merged_seqs = clustering.filter_by_missing_mass(db, merged_seqs, input_spectrum.precursor_mass, tol, input_spectrum.precursor_charge)
+        prec_tol = utils.ppm_to_da(input_spectrum.precursor_mass, precursor_tolerance)
+        merged_seqs = clustering.filter_by_precursor(merged_seqs, input_spectrum.precursor_mass, prec_tol, input_spectrum.precursor_charge)
+        merged_seqs = clustering.filter_by_missing_mass(db, merged_seqs, input_spectrum.precursor_mass, prec_tol, input_spectrum.precursor_charge)
         
-        hybrid_merged = clustering.get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, input_spectrum.precursor_mass, tol, input_spectrum.precursor_charge)
-        hybrid_merged = clustering.filter_by_precursor(hybrid_merged, input_spectrum.precursor_mass, tol, input_spectrum.precursor_charge)
-        hybrid_merged = clustering.filter_by_missing_mass(db, hybrid_merged, input_spectrum.precursor_mass, tol, input_spectrum.precursor_charge)
+        hybrid_merged = clustering.get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, input_spectrum.precursor_mass, prec_tol, input_spectrum.precursor_charge)
+        hybrid_merged = clustering.filter_by_precursor(hybrid_merged, input_spectrum.precursor_mass, prec_tol, input_spectrum.precursor_charge)
+        hybrid_merged = clustering.filter_by_missing_mass(db, hybrid_merged, input_spectrum.precursor_mass, prec_tol, input_spectrum.precursor_charge)
 
         merged_top = clustering.combine_merges(merged_seqs, hybrid_merged, 50)
         
-        alignments = alignment.find_alignments(merged_top, input_spectrum.precursor_mass, input_spectrum.precursor_charge, tol, db)
+        alignments = alignment.find_alignments(merged_top, input_spectrum.precursor_mass, input_spectrum.precursor_charge, prec_tol, db)
 
-        rescored_alignments = scoring.second_scoring(alignments, input_spectrum, tol)
+        rescored_alignments = scoring.second_scoring(alignments, input_spectrum, ppm_tolerance)
         rescored_alignments = sorted(rescored_alignments, key = lambda x: (x[0], x[1]), reverse=True)
         
         postprocessed_alignments = postprocessing(rescored_alignments, db)
