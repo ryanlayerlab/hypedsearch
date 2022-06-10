@@ -539,3 +539,32 @@ def second_scoring(alignments, input_spectrum, tol):
         score = rescore(comb_seq, input_spectrum.mz_values, tol)
         new_merges.append((score, 1/dist, comb_seq))
     return new_merges
+
+
+def Ryan_rescore(sequence, input_masses, ppm_tolerance):
+    total_score = 0
+    spectrum = gen_spectra.gen_spectrum(sequence)
+    masses = sorted(spectrum['spectrum'])
+    input_masses = sorted(input_masses)
+    o_ctr, t_ctr = 0, 0
+    observed = input_masses[o_ctr]
+    theoretical = masses[t_ctr]
+    while (o_ctr < len(input_masses) and t_ctr < len(masses)):
+        tol = ppm_to_da(observed, ppm_tolerance)
+        if theoretical < observed - tol:
+            t_ctr = t_ctr + 1
+            if t_ctr < len(masses):
+                theoretical = masses[t_ctr]
+        elif observed + tol < theoretical: #The bug is with 810 around here
+            o_ctr = o_ctr + 1
+            if o_ctr < len(input_masses):
+                observed = input_masses[o_ctr]
+        elif abs(observed-theoretical) <= tol:
+            total_score = total_score + 1
+            o_ctr = o_ctr + 1
+            t_ctr = t_ctr + 1
+            if o_ctr < len(input_masses) and t_ctr < len(masses):
+                observed = input_masses[o_ctr]
+                theoretical = masses[t_ctr]
+        
+    return(total_score)
