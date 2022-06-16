@@ -59,9 +59,8 @@ Alignments = namedtuple(
 
 MPSpectrumID = namedtuple(
     'MPSpectrumID', 
-    ['b_hits', 'y_hits', 'spectrum', 'ppm_tolerance', 'precursor_tolerance', 
-        'n', 'digest_type'],
-    defaults=[[], [], None, -1, 0, 0, '']
+    ['b_hits', 'y_hits', 'spectrum', 'ppm_tolerance', 'precursor_tolerance'],
+    defaults=[[], [], None, -1, 0]
 )
 
 DEVFallOffEntry = namedtuple(
