@@ -4,6 +4,7 @@ import os
 from utils import ppm_to_da
 from gen_spectra import get_precursor
 from constants import WATER_MASS, PROTON_MASS
+from scoring.scoring import calc_bayes_score
 
 def write_cluster(cluster):
     if len(cluster) == 0 : return None
@@ -93,6 +94,43 @@ def parse_indices(index_set):
         target_tuple = (int(start), int(end), seq, float(mz))
         indices.append(target_tuple)
     return indices
+
+def Bayes_Score_clusters(ion, clusters, kmer_set):
+    cluster = collections.namedtuple('cluster', 'prob score pid start end seq mz indices')
+    if ion == 'b':
+        b_cluster_array = []
+        for A in clusters:
+            score = A[0]
+            pid = int(A[1])
+            seq = A[2]
+            mz = float(A[3])
+            start = int(A[4])
+            end = int(A[5])
+            indices = A[6:]
+            prob = calc_bayes_score(seq, mz, indices, kmer_set)
+            target_cluster = cluster(prob=prob, score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
+
+            b_cluster_array.append(target_cluster)
+
+        b_sorted_clusters = sorted(b_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
+        return b_sorted_clusters
+    else:
+        y_cluster_array = []
+        for A in clusters:
+            score = A[0]
+            pid = int(A[1])
+            seq = A[2]
+            mz = float(A[3])
+            start = int(A[4])
+            end = int(A[5])
+            indices = A[6:]
+            prob = calc_bayes_score(seq, mz, indices, kmer_set)
+            target_cluster = cluster(prob=prob, score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
+            y_cluster_array.append(target_cluster)
+
+        y_sorted_clusters = sorted(y_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
+        return y_sorted_clusters
+    
 def Score_clusters(ion, clusters):
     cluster = collections.namedtuple('cluster', 'score pid start end seq mz indices')
     if ion == 'b':

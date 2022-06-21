@@ -1074,7 +1074,7 @@ def parse_indices(index_set):
     
     return indices
 
-def Bayes_clusters(ion, clusters, path, kmer_set, unique_m):
+def Bayes_clusters(ion, clusters, kmer_set, unique_m):
     cluster = collections.namedtuple('cluster', 'prob score pid start end seq mz indices')
     if ion == 'b':
         b_cluster_array = []
