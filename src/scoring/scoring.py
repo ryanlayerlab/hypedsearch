@@ -487,7 +487,56 @@ digests = json.load(open(digest_file, 'r'))
     #                 ) else 0
 
     #     return left_point + right_point
+def calc_mass_given_other_explanations(unique_m, seq, mz):
+    oEXPnum = (len(unique_m[mz]) - 1)/ len(unique_m[mz])
+    if oEXPnum == 0:
+        return 0
+    else:
+        p = 0
+        for i, seq2 in enumerate(unique_m[mz]):
+            if seq == seq2:
+                continue
+            else:
+                p = p + 1/len(seq2)
+        return p
 
+def Bayes_given_mass(pH, seq, mz, unique_m):
+    pEH = 1/len(seq)
+    pnH = 1-pH
+    pEnH = calc_mass_given_other_explanations(unique_m, seq, mz)
+    prob = (pH * pEH)/((pH*pEH)+(pnH*pEnH))
+#     print(seq,pH,pEH,(pH*pEH),(pnH*pEnH),pnH,pEnH)
+    return prob
+
+def calc_bayes_score(seq, mz, unique_m, indices, kmer_set):
+    pH = len(seq)/len(kmer_set)
+    for index in reversed(indices):
+        prob = Bayes_given_mass(pH, seq, mz, unique_m)
+        pH = prob
+    return prob
+
+def parse_indices(index_set):
+    indices = []
+    for index in index_set:
+        string = str(index)
+        A = string.rstrip().split(',')
+        start = A[0]
+        end = A[1]
+        seq = A[2]
+        mz = A[3]
+        disallowed_characters = " ()\'"
+        for character in disallowed_characters:
+            start = start.replace(character, "")
+            end = end.replace(character, "")
+            seq = seq.replace(character, "")
+            mz = mz.replace(character, "")
+        
+        target_tuple = (int(start), int(end), seq, float(mz))
+        indices.append(target_tuple)
+    
+    
+    return indices
+    
 def score_by_dist(comb_seq, obs_prec, charge):
     b_seq = comb_seq[3][4]
     y_seq = comb_seq[4][4]
