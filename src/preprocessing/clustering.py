@@ -22,8 +22,9 @@ def write_cluster(cluster):
     O.append(max_hit.mz)
     O.append(max_hit.start)
     O.append(max_hit.end)
+    O.append(max_hit.o_num)
     for hit in cluster:
-        O.append( (hit.start, hit.end, hit.seq, hit.mz) ) 
+        O.append( (hit.start, hit.end, hit.seq, hit.mz, hit.o_num) ) 
     return O
 
 def parse_hits(Hit, all_hits):
@@ -34,45 +35,44 @@ def parse_hits(Hit, all_hits):
         end = int(A[2][3].split('-')[1])
         seq = A[2][2]
         mz = A[1]
+        occurance_num = A[3]
 
-        hits.append( Hit(pid=pid, start=start, end=end, seq=seq, mz=mz) )
+        hits.append( Hit(pid=pid, start=start, end=end, seq=seq, mz=mz, o_num = occurance_num) )
     return hits
 
 def create_clusters(ion, b_hits, y_hits):
     clusters = []
-    Hit = collections.namedtuple('Hit', 'pid start end seq mz')
+    Hit = collections.namedtuple('Hit', 'pid start end seq mz o_num')
     if ion == 'b':
         hits = parse_hits(Hit, b_hits)
         sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
         last_pid = None
         last_start = None
         cluster = []
-        if ion == 'b':
-            for hit in sorted_hits:
-                if last_pid == hit.pid and last_start == hit.start:
-                    cluster.append(hit)
-                else:
-                    if cluster != []:
-                        clusters.append(write_cluster(cluster))
-                    cluster = [hit]
-                last_pid = hit.pid
-                last_start = hit.start
+        for hit in sorted_hits:
+            if last_pid == hit.pid and last_start == hit.start:
+                cluster.append(hit)
+            else:
+                if cluster != []:   
+                    clusters.append(write_cluster(cluster))
+                cluster = [hit]
+            last_pid = hit.pid
+            last_start = hit.start
     else:
         hits = parse_hits(Hit, y_hits)
         sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'end', 'start'))
         last_pid = None
         last_start = None
         cluster = []
-        if ion == 'y':
-            for hit in sorted_hits:
-                if last_pid == hit.pid and last_end == hit.end:
-                    cluster.append(hit)
-                else:
-                    if cluster != []:
-                        clusters.append(write_cluster(cluster))
-                    cluster = [hit]
-                last_pid = hit.pid
-                last_end = hit.end
+        for hit in sorted_hits:
+            if last_pid == hit.pid and last_end == hit.end:
+                cluster.append(hit)
+            else:
+                if cluster != []:
+                    clusters.append(write_cluster(cluster))
+                cluster = [hit]
+            last_pid = hit.pid
+            last_end = hit.end
     return clusters
 
 
@@ -132,7 +132,7 @@ def Bayes_Score_clusters(ion, clusters, kmer_set):
         return y_sorted_clusters
     
 def Score_clusters(ion, clusters):
-    cluster = collections.namedtuple('cluster', 'score pid start end seq mz indices')
+    cluster = collections.namedtuple('cluster', 'score pid start end seq mz o_num indices')
     if ion == 'b':
         b_cluster_array = []
         for A in clusters:
@@ -142,8 +142,9 @@ def Score_clusters(ion, clusters):
             mz = float(A[3])
             start = int(A[4])
             end = int(A[5])
-            indices = A[6:]
-            target_cluster = cluster(score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
+            o_num = int(A[6])
+            indices = A[7:]
+            target_cluster = cluster(score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, o_num=o_num, indices=indices)
 
             b_cluster_array.append(target_cluster)
 
@@ -158,15 +159,16 @@ def Score_clusters(ion, clusters):
             mz = float(A[3])
             start = int(A[4])
             end = int(A[5])
-            indices = A[6:]
-            target_cluster = cluster(score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
+            o_num = int(A[6])
+            indices = A[7:]
+            target_cluster = cluster(score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, o_num=o_num, indices=indices)
             y_cluster_array.append(target_cluster)
 
         y_sorted_clusters = sorted(y_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
         return y_sorted_clusters
 
 def min_info(cluster):
-    return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.seq)
+    return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.seq, cluster.o_num)
 
 def bsearch(key, Y):
         lo = -1
@@ -311,9 +313,6 @@ def combine_merges(pure_seqs, hybrid_seqs, target_num): #TODO
             hybrid_index = hybrid_index + 1
     return merged_top
 
-def min_info(cluster):
-    return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.seq)
-
 def check_for_hybrid_overlap(b_seq, y_seq, ion):
     match = True
     if ion == 'b':
@@ -389,3 +388,4 @@ def get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, obs_prec, precursor
 
     merged_seqs.sort(key=lambda a: a[0], reverse=True)
     return merged_seqs
+

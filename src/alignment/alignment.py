@@ -428,7 +428,7 @@ def find_alignments(merged_seqs, obs_prec, prec_charge, tol, db):
         if b_seq != y_seq:
             new_seq = b_seq + y_seq
             missing_mass = obs_prec - get_precursor(new_seq, prec_charge)
-            add_amino_acids(alignments, missing_mass, b_cluster, y_cluster, comb_seq, b_seq, y_seq, prec_charge, obs_prec, tol, False, db)           
+            add_amino_acids(alignments, missing_mass, b_cluster, y_cluster, comb_seq, b_seq, y_seq, prec_charge, obs_prec, tol, False, db)
         else:
             new_seq = b_seq
             if (abs(get_precursor(new_seq, prec_charge) - obs_prec) <= tol):

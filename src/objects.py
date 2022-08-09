@@ -14,6 +14,7 @@ DatabaseEntry = namedtuple(
 
 Spectrum = namedtuple(
     'Spectrum', [
+        'num',
         'mz_values',
         'abundance',
         'precursor_mass',
@@ -22,7 +23,7 @@ Spectrum = namedtuple(
         'id', 
         'other_metadata'
     ],
-    defaults=[[], [], 0, '', '', '', {}]
+    defaults=[-1,[], [], 0, '', '', '', {}]
 )
 
 SequenceAlignment = namedtuple(
