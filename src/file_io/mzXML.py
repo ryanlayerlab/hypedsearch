@@ -1,3 +1,4 @@
+from pyrsistent import s
 from utils import file_exists
 from objects import Spectrum
 from preprocessing import spectra_filtering
@@ -28,7 +29,7 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
     filecontents = mzxml.read(filename)
 
     content: dict
-    for content in filecontents:
+    for spec_num, content in enumerate(filecontents):
 
         masses = list(content['m/z array'])
         abundances = list(content['intensity array'])
@@ -67,6 +68,7 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
         other_metadata = content['scanOrigin']
 
         spectra.append(Spectrum(
+            spec_num,
             masses,
             abundances,
             precursor,

@@ -12,7 +12,7 @@ def write_matched_masses(filepath, matched_masses_b, matched_masses_y, kmer_set,
     with open(os.path.join(filepath, "matched_masses_y.txt"),"w+") as b:
         [b.write(str(x) + ':' + json.dumps(matched_masses_y[x]) + '\n') for x in matched_masses_y.keys()]
     with open(os.path.join(filepath, "kmer_set.txt"), 'w+') as b:
-        [b.write(str(x) + ':' + json.dumps(list(kmer_set[x])) + '\n') for x in kmer_set.keys()]
+        [b.write(x + ':' + json.dumps(list(kmer_set[x])) + '\n') for x in kmer_set.keys()]
 
 def modified_sort_masses_in_sorted_keys_b(db_dict_b,mz,kmer_list_b):
     kmers = db_dict_b[mz]
@@ -145,8 +145,11 @@ def modified_match_masses(boundaries: dict, db: Database, max_pep_len: int, debu
 def reformat_kmers(kstr):
     new_list = []
     kstr = kstr.replace("[", "")
-    A = kstr.rstrip().split('],')
-    [new_list.append(x) for x in A]
+    kstr = kstr.replace("]", "")
+    kstr = kstr.replace(" ", "")
+    kstr = kstr.replace("\"", "")
+    A = kstr.rstrip().split(',')
+    [new_list.append(str(x)) for x in A]
     return new_list
 def reformat_hits(cstr):
     new_list = []
@@ -165,7 +168,7 @@ def reformat_hits(cstr):
         sublist.append(int(B[5]))
         new_list.append(sublist)
     return new_list
-def get_from_file(mb_loc, my_loc, kmer_set_loc, no_k):
+def get_from_file(mb_loc, my_loc, kmer_set_loc, kmer):
     matched_masses_b, matched_masses_y, kmer_set = defaultdict(), defaultdict(), defaultdict()
     with open(mb_loc, 'r') as m:
         for line in m:
@@ -179,7 +182,7 @@ def get_from_file(mb_loc, my_loc, kmer_set_loc, no_k):
             line = line.replace("}", "")
             A = line.rstrip().split(':')
             matched_masses_y[float(A[0])] = reformat_hits(A[1])      
-    if no_k == False:
+    if kmer == True:
         with open(kmer_set_loc, 'r') as m:
             for line in m:
                 line = line.replace("{", "")

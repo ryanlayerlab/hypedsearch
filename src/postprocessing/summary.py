@@ -46,7 +46,7 @@ def text_file(results: dict, output_dir: str) -> None:
 # label, left_protein, right_protein, sequence, b_score, y_score, total_score, precursor_distance, alignment
     with open(txt_file_name, 'w') as t:
         for i, x in enumerate(results):
-            target_alignments = results[x]
+            target_alignments = x
             for alignment in target_alignments:
                 spec_num = str(i)
                 hybrid = alignment[0]
