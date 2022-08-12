@@ -243,49 +243,13 @@ class Test_Main(unittest.TestCase):
         self.assertEqual(mass_comparisons.optimized_compare_masses([1, 2, 4], [1, 3, 4], 1000000, False), 3)
         #test the optimized compare masses function with some input spectra and a database of hybrids
 
-    def test_score_sequence(self):
-        #Test the scoring.score_sequence function
-        #easy test case:
-        self.assertEqual(scoring.score_sequence([1, 2, 4], [1, 3, 4], 1, False), 2)
-        #testing tolerance:
-        self.assertEqual(scoring.score_sequence([1, 2, 4], [1, 3, 4], 1000000, False), 3)
-
-    def test_hybrid_score(self):
-        #Test the scoring.hybrid_score function
-        # say our b ions found are A, C, E
-        # and y ions found are D, A
-        # our scoring then works like
-        # .5(bA) + .5(bC) + 1(bE) + .5 (yD) + 1(yA) 
-        hybrid_seq = 'ABC-DEF'
-        lesser_point = .5
-        greater_point = 1.0
-        #Building spectrum
-        hits = []
-        hits.append(max(gen_spectra.b_ions('A', 1))) #bA
-        hits.append(max(gen_spectra.b_ions('ABC', 1))) #bC
-        hits.append(max(gen_spectra.b_ions('ABCDE', 1))) #bE
-        hits.append(max(gen_spectra.y_ions('DEF', 1))) #yD
-        hits.append(max(gen_spectra.y_ions('ABCDEF', 1))) #yA
-        sample_spectrum = Spectrum(hits)
-        expected = 3.5
-        actual = scoring.hybrid_score(sample_spectrum, hybrid_seq, 20, lesser_point, greater_point)
-        self.assertEqual(actual, expected)
-
-    def test_precursor_distance(self):
-        #Test the scoring.precursor_distance function
-        observed_precursor = 10
-        reference_precursor = 15
-        expected_precursor_dist = 5
-        self.assertEqual(scoring.precursor_distance(observed_precursor, reference_precursor), expected_precursor_dist)
-        #test the other way
-        self.assertEqual(scoring.precursor_distance(reference_precursor, observed_precursor), expected_precursor_dist)
-
     def test_database_dependant_functions(self):
         # Build database
         dirname = os.path.dirname(__file__)
         spectra_file_paths = [os.path.join(dirname, '../data/spectra/hybrid_nod2e3.mzML')]  
         database_file_path = os.path.join(dirname, '../data/database/sample_database.fasta')
-        db = database_preprocessing.database_and_spectra_preprocessing(spectra_file_paths, database_file_path)
+        intermediate_file_path = os.path.join(dirname, '../src/intermediate_files')
+        db = database_preprocessing.database_and_spectra_preprocessing(spectra_file_paths, database_file_path, intermediate_file_path)
 
         def test_digest_score(self):
             #Test the scoring.digest_score function
