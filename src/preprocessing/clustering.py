@@ -297,10 +297,10 @@ def combine_merges(pure_seqs, hybrid_seqs, target_num): #TODO
     if len(pure_seqs) == 0:
         return hybrid_seqs[:50]
     while len(merged_top) < target_num:
-        if len(pure_seqs) <= pure_index:
+        if len(pure_seqs) < pure_index:
             [merged_top.append(hybrid_seqs[x]) for x in hybrid_seqs[:min(target_num, len(hybrid_seqs))]]
             return merged_top
-        if len(hybrid_seqs) <= hybrid_index:
+        if len(hybrid_seqs) < hybrid_index:
             [merged_top.append(pure_seqs[x]) for x in pure_seqs[:min(target_num, len(hybrid_seqs))]]
             return merged_top
         pure = pure_seqs[pure_index]
