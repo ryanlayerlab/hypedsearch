@@ -22,6 +22,7 @@ TOP_X = 50
 def database_and_spectra_preprocessing(
     spectra_files: str, 
     database_file: str, 
+    write_path: str,
     verbose: bool = True, 
     min_peptide_len: int = 5, 
     max_peptide_len: int = 20, 
@@ -54,7 +55,7 @@ def database_and_spectra_preprocessing(
 
     # get the boundary -> kmer mappings for b and y ions
 
-    matched_masses_b, matched_masses_y, db = merge_search.modified_match_masses(boundaries, db, max_peptide_len, DEBUG)
+    matched_masses_b, matched_masses_y, db = merge_search.modified_match_masses(boundaries, db, max_peptide_len, DEBUG, write_path)
 
     # # if we only get 1 core, don't do the multiprocessing bit
     # if cores == 1:

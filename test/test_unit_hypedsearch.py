@@ -50,14 +50,6 @@ class Test_Main(unittest.TestCase):
         charge = charge + 1 #Expected len would be 32
         self.assertEqual(utils.predicted_len(precursor, charge), 32)
     
-    def test_predicted_len_precursor(self): 
-        #Run the predicted_len_precursor function with the sequence 'MAL' and the spectrum for 'MALWAR'. 
-        sequence = 'MAL'
-        spectrum = Spectrum(gen_spectra.gen_spectra('MALWAR'), [], gen_spectra.get_precursor('MALWAR'), 1)
-        expected_length = 7 #Note that while "MALWAR" has a length of 6, the calculation is intentially rounded up because
-        #it is better to overshoot than undershoot
-        self.assertEqual(utils.predicted_len_precursor(spectrum, sequence), expected_length)
-    
     def test_hashable_boundaries(self):
         #run the hashable_boundaries function with two lists of boundaries
         boundaries1 = [2,10] #Expected to return 2-10
