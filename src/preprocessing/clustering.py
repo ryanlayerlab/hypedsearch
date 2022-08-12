@@ -291,26 +291,23 @@ def filter_by_missing_mass(db, mseqs, obs_prec, tol, charge):
 
 def combine_merges(pure_seqs, hybrid_seqs, target_num): #TODO
     merged_top = []
-    pure_index, hybrid_index = 0,0
-    if len(hybrid_seqs) == 0:
-        return pure_seqs[:50]
-    if len(pure_seqs) == 0:
-        return hybrid_seqs[:50]
-    while len(merged_top) < target_num:
-        if len(pure_seqs) <= pure_index:
-            [merged_top.append(hybrid_seqs[x]) for x in hybrid_seqs[:min(target_num, len(hybrid_seqs))]]
-            return merged_top
-        if len(hybrid_seqs) <= hybrid_index:
-            [merged_top.append(pure_seqs[x]) for x in pure_seqs[:min(target_num, len(hybrid_seqs))]]
-            return merged_top
+    pure_index, hybrid_index = 0, 0
+    while len(merged_top) < target_num and pure_index < len(pure_seqs) and hybrid_index < len(hybrid_seqs):
         pure = pure_seqs[pure_index]
         hybrid = hybrid_seqs[hybrid_index]
         if pure[0] >= hybrid[0]: #We give ties to the non-hybrid sequences
             merged_top.append(pure)
-            pure_index = pure_index + 1
+            pure_index += 1
         else:
             merged_top.append(hybrid)
-            hybrid_index = hybrid_index + 1
+            hybrid_index += 1
+    while len(merged_top) < target_num and pure_index < len(pure_seqs):
+        merged_top.append(pure_seqs[pure_index])
+        pure_index += 1
+    while len(merged_top) < target_num and hybrid_index < len(hybrid_seqs):
+        merged_top.append(hybrid_seqs[hybrid_index])
+        hybrid_index += 1
+
     return merged_top
 
 def check_for_hybrid_overlap(b_seq, y_seq, ion):
