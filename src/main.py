@@ -5,6 +5,7 @@ from objects import Database
 import utils, runner, database
 from config_loader import Config
 from postprocessing import summary, review
+from memory_profiler import profile
 
 def string_to_bool(s: str) -> bool:
     s = str(s)
@@ -59,6 +60,7 @@ def set_args(args) -> dict:
         'relative_abundance_filter': relative_abundance_filter,'digest': digest, 'DEBUG': debug, 
         'cores': cores,'n': n,'truth_set': truth_set}
 
+@profile
 def main(args: object) -> None:
     arguments = set_args(args)
     matched_spectras = runner.run(arguments)
