@@ -50,8 +50,7 @@ def modified_add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set,start_location
                 kmer_set[kmer_to_add].add(prot_name)
 
 def make_database_set_for_protein(i,plen,max_len,prot_entry,prot_name,db_dict_b,db_dict_y,kmer_set):
-    print(f'On protein {i+1}/{plen} [{int((i+1) * 100 / plen)}%]', end='')
-    print(f', prot len = {len(prot_entry.sequence)}')
+    print(f'\rOn protein {i+1}/{plen} [{int((i+1) * 100 / plen)}%]', end='')
     start = 0
     stop = max_len
     for j in range(start, stop):
@@ -73,7 +72,6 @@ def make_database_set_for_protein(i,plen,max_len,prot_entry,prot_name,db_dict_b,
         start_position = j
         end_position = len(prot_entry.sequence)
         modified_add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set,start_position, end_position, i)
-    print(f'db_dict_b = {len(db_dict_b)}, db_dict_y = {len(db_dict_y)}, kmer_set = {len(kmer_set)}')
 
 def make_database_set_for_proteins(proteins,max_len,db_dict_b,db_dict_y,kmer_set):
     plen = len(proteins)
