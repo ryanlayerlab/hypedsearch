@@ -1,8 +1,8 @@
 paths: 
   # full path to the spectra folder containing all spectra files
-  spectra_dir: '/home/naco3124/jaime_hypedsearch/hypedsearch/data/spectra/Lab_Data'
+  spectra_dir: '/home/naco3124/jaime_hypedsearch/hypedsearch/data/spectra/NOD2_E3'
   # full path to the .fasta database file
-  database_file: '/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/mouse_database.fasta'
+  database_file: '/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/prot_274.fasta'
   # full path to the output directory
   output_dir: '/home/naco3124/jaime_hypedsearch/hypedsearch/data/output'
 
