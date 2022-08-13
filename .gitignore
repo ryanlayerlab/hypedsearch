@@ -129,14 +129,13 @@ dmypy.json
 .pyre/
 timelog.txt
 .DS_Store
-src/config.yaml
 data/.DS_Store
 .DS_Store
-data/output/hybrid_summary.tsv
-data/output/summary.json
-data/output/summary.tsv
-data/output/summary.json
-data/output/summary.tsv
+
+# Ignored
+src/config.yaml
+data/output
+src/intermediate_files
 
 .fake
 .ionide
