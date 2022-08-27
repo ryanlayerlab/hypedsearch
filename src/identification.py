@@ -1,5 +1,6 @@
 from collections import defaultdict
 from heapq import merge
+from pickle import TRUE
 from typing import Dict
 from multiprocessing import Pool, set_start_method
 from postprocessing.postprocessing_utils import postprocessing
@@ -11,6 +12,7 @@ import utils
 from scoring import scoring
 from preprocessing import digestion, merge_search, preprocessing_utils, clustering, evaluation
 import database
+from sqlite import database_file
 from file_io import JSON
 import objects
 import time
@@ -61,8 +63,8 @@ def adjust_for_truth_and_fall_off(spectrum,truth,filtered_b,filtered_y,b_results
         handle_DEV_truth(filtered_b,filtered_y,b_results,keep_b_count,y_results,keep_y_count,fall_off,_id,is_hybrid,truth_seq,spectrum)
         return Alignments(spectrum, [])
 
-def id_spectrum(spec_num, input_spectrum: Spectrum, db: Database, matched_masses_b, matched_masses_y, ppm_tolerance, precursor_tolerance, location, kmer_set):
-    b_hits,y_hits = create_hits(spec_num,input_spectrum,matched_masses_b,matched_masses_y,False,location, kmer_set)
+def id_spectrum(spec_num, input_spectrum: Spectrum, db: Database, matched_masses_b, matched_masses_y, ppm_tolerance, precursor_tolerance, location):
+    b_hits,y_hits = create_hits(spec_num,input_spectrum,matched_masses_b,matched_masses_y,False,location)
     for ion in "by":
         clusters = clustering.create_clusters(ion, b_hits, y_hits)
         if ion ==  'b':
@@ -164,7 +166,7 @@ def get_hits_from_file(bf, yf):
             out = [pep_id, w, prot_id, seq, loc, ion, charge]
             y_hits.append(out)
     return b_hits, y_hits
-def create_hits(spec_num,spectrum,matched_masses_b,matched_masses_y,DEBUG,location,kmer_set):
+def create_hits(spec_num,spectrum,matched_masses_b,matched_masses_y,DEBUG,location):
 
     if DEBUG:
         filename = "spec_" + str(spec_num) + "_"
@@ -175,11 +177,11 @@ def create_hits(spec_num,spectrum,matched_masses_b,matched_masses_y,DEBUG,locati
         for mz in spectrum.mz_values:
             if mz in matched_masses_b:
                 for tuple in matched_masses_b[mz]:
-                    tup = (spec_num, mz, tuple, len(kmer_set[tuple[2]]))
+                    tup = (spec_num, mz, tuple)
                     b_hits.append(tup)
             if mz in matched_masses_y:
                 for tuple in matched_masses_y[mz]:
-                    tup = (spec_num, mz, tuple, len(kmer_set[tuple[2]]))
+                    tup = (spec_num, mz, tuple)
                     y_hits.append(tup)
         write_hits(b_hits, y_hits, location)
     return b_hits, y_hits
@@ -252,7 +254,7 @@ def handle_DEV_result(output_dir,fall_off,cores):
         )          
 
 class alignment_info:
-    def __init__(self, matched_masses_b, matched_masses_y, location, precursor_tolerance, database, ppm_tolerance, results_len, kmer_set): #This is like the named tuple
+    def __init__(self, matched_masses_b, matched_masses_y, location, precursor_tolerance, database, ppm_tolerance, results_len): #This is like the named tuple
         self.mb = matched_masses_b
         self.my = matched_masses_y
         self.write_path = location
@@ -260,11 +262,10 @@ class alignment_info:
         self.ppm_tol = ppm_tolerance
         self.db = database
         self.results_len = results_len
-        self.kmer_set = kmer_set
     
     def __call__(self, spectrum):
         print(f'\rCreating an alignment for {spectrum.num}/{self.results_len} [{to_percent(spectrum.num, self.results_len)}%]', end='')
-        b_hits,y_hits = create_hits(spectrum.num,spectrum,self.mb,self.my,True,self.write_path,self.kmer_set)
+        b_hits,y_hits = create_hits(spectrum.num,spectrum,self.mb,self.my,True,self.write_path)
         for ion in "by":
             clusters = clustering.create_clusters(ion, b_hits, y_hits)
             if ion ==  'b':
@@ -293,18 +294,30 @@ class alignment_info:
         # raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off)
         return postprocessed_alignments
 
-def align(numcores, spectra, matched_masses_b, matched_masses_y, location, precursor_tolerance, db, ppm_tolerance, kmer_set):
+def align(numcores, spectra, matched_masses_b, matched_masses_y, location, precursor_tolerance, db, ppm_tolerance):
     set_start_method('forkserver')
     p = Pool(numcores)
     y, spec_nums = [], []
     now = time.time()
     [spec_nums.append(i) for i in range(0, len(spectra))]
-    x = alignment_info(matched_masses_b,matched_masses_y,location,precursor_tolerance,db,ppm_tolerance,len(spectra),kmer_set)
+    x = alignment_info(matched_masses_b,matched_masses_y,location,precursor_tolerance,db,ppm_tolerance,len(spectra))
     y = p.map(x, spectra) #function can only take 1 input so make object
     p.close()
     p.join()
     print("On 16 cores", time.time() - now)
     return y
+
+def make_database_file(numcores, max_len, db):
+    proteins = [(k, v) for k, v in db.proteins.items()]
+    set_start_method('forkserver')
+    p = Pool(numcores)
+    now = time.time()
+    df = database_file(max_len)
+    y = p.map(df, proteins) #function can only take 1 input so make object
+    p.close()
+    p.join()
+    print("On 16 cores", time.time() - now)
+    return
 
 def id_spectra(spectra_files: list, db: database, verbose: bool = True, 
     min_peptide_len: int = 5, max_peptide_len: int = 23, peak_filter: int = 0, 
@@ -327,20 +340,28 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     verbose and print('Loading spectra Done')
     dirname = os.path.dirname(os.path.abspath(__file__))
     location = os.path.join(dirname, 'intermediate_files')
-    if utils.find_dir('matched_masses_b.txt', location) and utils.find_dir('matched_masses_y.txt', location) and utils.find_dir('kmer_set.txt', location):
-        print("getting matched_masses from file...")
-        matched_masses_b, matched_masses_y, kmer_set = merge_search.get_from_file(os.path.join(location, 'matched_masses_b.txt'), os.path.join(location, 'matched_masses_y.txt'), os.path.join(location, 'kmer_set.txt'), True)
-        print("getting matched_masses from file Done")
-    else:
-        matched_masses_b, matched_masses_y, kmer_set = merge_search.modified_match_masses(boundaries, db, max_peptide_len, True, location)
+    # if utils.find_dir('matched_masses_b.txt', location) and utils.find_dir('matched_masses_y.txt', location):
+    #     print("getting matched_masses from file...")
+    #     matched_masses_b, matched_masses_y = merge_search.get_from_file(os.path.join(location, 'matched_masses_b.txt'), os.path.join(location, 'matched_masses_y.txt'), True)
+    #     print("getting matched_masses from file Done")
+    # else:
+    # if TRUE:
+    #     merge_search.make_database_file(cores, max_peptide_len, db)
+    for spectrum in spectra:
+        input_list = spectrum.mz_values
+        matched_masses_b, matched_masses_y = merge_search.modified_match_masses(boundaries, input_list, db, max_peptide_len, True, location, ppm_tolerance)
+    # build whole database of all mass -> list of tuples of (info)
+    # query for input mass?
+    # input mass -> list of tuples of (info)
+    #input_mass -> [(relevent info), ...]
+    
     # TODO
-    #matched_masses_b, matched_masses_y, kmer_set = merge_search.match_masses_using_webservice(boundaries, ppm_tolerance)
-    db = db._replace(kmers=kmer_set)
+    #matched_masses_b, matched_masses_y = merge_search.match_masses_using_webservice(boundaries, ppm_tolerance)
     results = {}
     DEV = False
     if DEV:
         handle_DEV_setup(truth)
-    results = align(cores,spectra,matched_masses_b,matched_masses_y,location,precursor_tolerance,db,ppm_tolerance,kmer_set)
+    results = align(cores,spectra,matched_masses_b,matched_masses_y,location,precursor_tolerance,db,ppm_tolerance)
     # if cores == 1:
     #     align_on_single_core(spectra,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,results,DEBUG,location)
     # else:

@@ -52,7 +52,7 @@ def max_mass(seqeunce: str, ion: str, charge: int):
         total += sum([AMINO_ACIDS[aa] for aa in seqeunce])
         mz = total / charge
         return mz
-    if ion == 'b':
+    else:
         total = SINGLY_CHARGED_B_BASE if charge == 1 else DOUBLY_CHARGED_B_BASE
         total += sum([AMINO_ACIDS[aa] for aa in seqeunce])
     mz = total / charge

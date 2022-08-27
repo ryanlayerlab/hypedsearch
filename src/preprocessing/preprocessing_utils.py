@@ -40,8 +40,8 @@ def load_spectra(
             object.abundance.append(100000000) #I gave it a crazy high abundance to represent precursor. Still a hack
             object.abundance.append(100000000) 
         all_spectra += these_spectra
-        # index_list = [0] #For using a condensed database
-        # these_spectra, all_spectra = reduce_database(all_spectra, these_spectra, index_list) 
+        index_list = [816] #For using a condensed database
+        these_spectra, all_spectra = reduce_database(all_spectra, these_spectra, index_list) 
         linear_spectra += list(set([
             x for spectrum in these_spectra for x in spectrum.mz_values
         ]))
