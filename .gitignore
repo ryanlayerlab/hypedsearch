@@ -140,3 +140,4 @@ src/intermediate_files
 .fake
 .ionide
 .txt
+*.db
