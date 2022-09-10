@@ -81,7 +81,7 @@ def get_data(kmer, start, end, protein_num):
         for charge in [1,2]:
             mass = gen_spectra.max_mass(kmer, ion=ion, charge=charge)
             ion_int = 0 if ion == 'b' else 1
-            input_tuple = (mass, kmer, start, end, ion_int, charge, protein_num)
+            input_tuple = (mass, start, end, ion_int, charge, protein_num)
             data_list.append(input_tuple)
 
     return data_list
@@ -132,10 +132,11 @@ def modified_make_database_set(proteins: list, max_len: int, db):
     
     #kmer -> list of proteins where it occurs
     #kmer list: list of tuples (kmer, mass, location, ion, charge)
+    print('\nBeginning insertions')
     db_make_database_set_for_proteins(proteins,max_len, db)
-    db.read() #Only for debugging
+    # db.read() #Only for debugging
     print('\nIndexing the set of kmers based on mass, ion')
-    db.index_mass_ion()
+    db.index_ion_mass()
     
     
     # print('\nSorting the set of protein masses...')
@@ -179,32 +180,30 @@ def modified_merge(kmers, boundaries: dict):
             kmer_index = starting_point
     return matched_masses_b, matched_masses_y
 
-def modified_match_masses_per_protein(kv_prots,max_len,input_masses,ppm_tolerance):
+def modified_match_masses(input_masses: list, db: Database, max_len: int, ppm_tolerance):
+    # max_boundary = max(boundaries.keys())
+    # estimated_max_len = ceil(boundaries[max_boundary][1] / 57.021464)
+    # max_len = min(estimated_max_len, max_pep_len)
+    kv_prots = [(k, v) for k, v in db.proteins.items()]    
     extended_kv_prots = [(k, entry) for (k, v) in kv_prots for entry in v]
-    db = database_file(10)
-    modified_make_database_set(extended_kv_prots, max_len, db)
+    db = database_file(max_len)
+    # modified_make_database_set(extended_kv_prots, max_len, db)
     
     matched_masses_b, matched_masses_y = dict(), dict()
+    
     for input_mass in input_masses:
         tol = ppm_to_da(input_mass, ppm_tolerance)
         # ion_int = 0 if ion == 'b' else 1
-        matched_masses_b[input_mass] = db.query_mass_ion(input_mass, tol, 0)
-        print(input_mass, 'b', matched_masses_b[input_mass])
-        matched_masses_y[input_mass] = db.query_mass_ion(input_mass, tol, 1)
-        print(input_mass, 'y', matched_masses_y[input_mass])
+        matched_masses_b[input_mass] = db.query_ion_mass(input_mass, tol, 0) #same place: location start, protein_num
+        # print(input_mass, 'b', matched_masses_b[input_mass])
+        matched_masses_y[input_mass] = db.query_ion_mass(input_mass, tol, 1)
+        # print(input_mass, 'y', matched_masses_y[input_mass])
         
     print("Done")
-    return matched_masses_b, matched_masses_y
+        # if debug:
+        # write_matched_masses(write_path, matched_masses_b, matched_masses_y, kmer_set, debug)
 
-def modified_match_masses(boundaries: dict, input_masses: list, db: Database, max_pep_len: int, debug: bool, write_path, ppm_tolerance):
-    max_boundary = max(boundaries.keys())
-    estimated_max_len = ceil(boundaries[max_boundary][1] / 57.021464)
-    max_len = min(estimated_max_len, max_pep_len)
-    kv_prots = [(k, v) for k, v in db.proteins.items()]
-    matched_masses_b, matched_masses_y, kmer_set = modified_match_masses_per_protein(kv_prots,max_len,input_masses,ppm_tolerance)
-    # if debug:
-    #     write_matched_masses(write_path, matched_masses_b, matched_masses_y, kmer_set, debug)
-    return (matched_masses_b, matched_masses_y, kmer_set)
+    return matched_masses_b, matched_masses_y
 def reformat_kmers(kstr):
     new_list = []
     kstr = kstr.replace("[", "")

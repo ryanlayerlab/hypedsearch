@@ -306,21 +306,9 @@ def align(numcores, spectra, matched_masses_b, matched_masses_y, location, precu
     p.join()
     print("On 16 cores", time.time() - now)
     return y
-
-def make_database_file(numcores, max_len, db):
-    proteins = [(k, v) for k, v in db.proteins.items()]
-    set_start_method('forkserver')
-    p = Pool(numcores)
-    now = time.time()
-    df = database_file(max_len)
-    y = p.map(df, proteins) #function can only take 1 input so make object
-    p.close()
-    p.join()
-    print("On 16 cores", time.time() - now)
-    return
-
+    
 def id_spectra(spectra_files: list, db: database, verbose: bool = True, 
-    min_peptide_len: int = 5, max_peptide_len: int = 23, peak_filter: int = 0, 
+    min_peptide_len: int = 5, max_peptide_len: int = 10, peak_filter: int = 0, 
     relative_abundance_filter: float = 0.0,ppm_tolerance: int = 20, 
     precursor_tolerance: int = 10, digest: str = '',cores: int = 1,
     n: int = 5,DEBUG: bool = False, truth_set: str = "", output_dir: str = ''):
@@ -347,9 +335,10 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     # else:
     # if TRUE:
     #     merge_search.make_database_file(cores, max_peptide_len, db)
+    
     for spectrum in spectra:
         input_list = spectrum.mz_values
-        matched_masses_b, matched_masses_y = merge_search.modified_match_masses(boundaries, input_list, db, max_peptide_len, True, location, ppm_tolerance)
+        matched_masses_b, matched_masses_y = merge_search.modified_match_masses(input_list, db, max_peptide_len, ppm_tolerance)
     # build whole database of all mass -> list of tuples of (info)
     # query for input mass?
     # input mass -> list of tuples of (info)
