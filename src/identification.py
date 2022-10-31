@@ -273,7 +273,7 @@ class alignment_info:
         # hit_time = time.time()
         b_hits,y_hits = create_hits(spectrum.num,spectrum,matched_masses_b,matched_masses_y,True,self.write_path)
         # hit_time = time.time()-hit_time
-        print("hits took:", hit_time)
+        # print("hits took:", hit_time)
         for ion in "by":
             clusters = clustering.create_clusters(ion, b_hits, y_hits)
             if ion ==  'b':
