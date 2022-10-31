@@ -37,7 +37,8 @@ def get_sequence(alignment):
 def find_parent_protein(alignment, db_mapping):
     b_c, y_c = alignment[2][3], alignment[2][4]
     left_num, right_num = b_c[0], y_c[0]
-    left_parent, right_parent = db_mapping[left_num], db_mapping[right_num]
+    get_name = lambda x: x.split('|')[-1].split()[0]
+    left_parent, right_parent = get_name(db_mapping[left_num].description), get_name(db_mapping[right_num].description)
     return left_parent, right_parent
 
 # spec_num, non_hybrid, proteins, sequence, b_score, y_score, total_score, precursor_distance, total_mass_error

@@ -7,6 +7,7 @@ from constants import WATER_MASS, PROTON_MASS
 from scoring.scoring import calc_bayes_score
 
 def write_cluster(cluster):
+    #returns cluster of the form (score, pid, mz, start, end)
     if len(cluster) == 0 : return None
     O = []
     O.append(len(cluster))
@@ -18,31 +19,28 @@ def write_cluster(cluster):
         if l > max_len:
             max_len = l
             max_hit = hit
-    O.append(max_hit.seq)
     O.append(max_hit.mz)
     O.append(max_hit.start)
     O.append(max_hit.end)
-    O.append(max_hit.o_num)
     for hit in cluster:
-        O.append( (hit.start, hit.end, hit.seq, hit.mz, hit.o_num) ) 
+        O.append( (hit.start, hit.end, hit.mz) ) 
     return O
 
 def parse_hits(Hit, all_hits):
     hits = []
+    #Matched masses data is of form (mass, start, end, ion_int, charge, protein_num)
     for A in all_hits:
-        pid = int(A[2][1])
-        start = int(A[2][3].split('-')[0])
-        end = int(A[2][3].split('-')[1])
-        seq = A[2][2]
+        pid = int(A[2][5])
+        start = int(A[2][1])
+        end = int(A[2][2])
         mz = A[1]
-        occurance_num = A[3]
 
-        hits.append( Hit(pid=pid, start=start, end=end, seq=seq, mz=mz, o_num = occurance_num) )
+        hits.append( Hit(pid=pid, start=start, end=end, mz=mz) )
     return hits
 
 def create_clusters(ion, b_hits, y_hits):
     clusters = []
-    Hit = collections.namedtuple('Hit', 'pid start end seq mz o_num')
+    Hit = collections.namedtuple('Hit', 'pid start end mz')
     if ion == 'b':
         hits = parse_hits(Hit, b_hits)
         sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
@@ -95,56 +93,62 @@ def parse_indices(index_set):
         indices.append(target_tuple)
     return indices
 
-def Bayes_Score_clusters(ion, clusters, kmer_set):
-    cluster = collections.namedtuple('cluster', 'prob score pid start end seq mz indices')
-    if ion == 'b':
-        b_cluster_array = []
-        for A in clusters:
-            score = A[0]
-            pid = int(A[1])
-            seq = A[2]
-            mz = float(A[3])
-            start = int(A[4])
-            end = int(A[5])
-            indices = A[6:]
-            prob = calc_bayes_score(seq, mz, indices, kmer_set)
-            target_cluster = cluster(prob=prob, score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
+# def Bayes_Score_clusters(ion, clusters, kmer_set):
+#     cluster = collections.namedtuple('cluster', 'prob score pid start end seq mz indices')
+#     if ion == 'b':
+#         b_cluster_array = []
+#         for A in clusters:
+#             score = A[0]
+#             pid = int(A[1])
+#             seq = A[2]
+#             mz = float(A[3])
+#             start = int(A[4])
+#             end = int(A[5])
+#             indices = A[6:]
+#             prob = calc_bayes_score(seq, mz, indices, kmer_set)
+#             target_cluster = cluster(prob=prob, score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
 
-            b_cluster_array.append(target_cluster)
+#             b_cluster_array.append(target_cluster)
 
-        b_sorted_clusters = sorted(b_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
-        return b_sorted_clusters
-    else:
-        y_cluster_array = []
-        for A in clusters:
-            score = A[0]
-            pid = int(A[1])
-            seq = A[2]
-            mz = float(A[3])
-            start = int(A[4])
-            end = int(A[5])
-            indices = A[6:]
-            prob = calc_bayes_score(seq, mz, indices, kmer_set)
-            target_cluster = cluster(prob=prob, score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
-            y_cluster_array.append(target_cluster)
+#         b_sorted_clusters = sorted(b_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
+#         return b_sorted_clusters
+#     else:
+#         y_cluster_array = []
+#         for A in clusters:
+#             score = A[0]
+#             pid = int(A[1])
+#             seq = A[2]
+#             mz = float(A[3])
+#             start = int(A[4])
+#             end = int(A[5])
+#             indices = A[6:]
+#             prob = calc_bayes_score(seq, mz, indices, kmer_set)
+#             target_cluster = cluster(prob=prob, score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
+#             y_cluster_array.append(target_cluster)
 
-        y_sorted_clusters = sorted(y_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
-        return y_sorted_clusters
+#         y_sorted_clusters = sorted(y_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
+#         return y_sorted_clusters
+
+def find_sequence(pid, start_ind, end_ind, proteins):
+    for count, protein in enumerate(proteins):
+        if count == pid:
+            prot_seq = protein[1]
+            target = prot_seq[start_ind: end_ind]
+            return target
     
-def Score_clusters(ion, clusters):
-    cluster = collections.namedtuple('cluster', 'score pid start end seq mz o_num indices')
+def Score_clusters(ion, clusters, proteins):
+    cluster = collections.namedtuple('cluster', 'score pid start end seq mz indices')
     if ion == 'b':
         b_cluster_array = []
         for A in clusters:
             score = A[0]
             pid = int(A[1])
-            seq = A[2]
-            mz = float(A[3])
-            start = int(A[4])
-            end = int(A[5])
-            o_num = int(A[6])
-            indices = A[7:]
-            target_cluster = cluster(score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, o_num=o_num, indices=indices)
+            mz = float(A[2])
+            start = int(A[3])
+            end = int(A[4])
+            seq = find_sequence(pid, start, end, proteins)
+            indices = A[5:]
+            target_cluster = cluster(score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
 
             b_cluster_array.append(target_cluster)
 
@@ -155,20 +159,20 @@ def Score_clusters(ion, clusters):
         for A in clusters:
             score = A[0]
             pid = int(A[1])
-            seq = A[2]
-            mz = float(A[3])
-            start = int(A[4])
-            end = int(A[5])
-            o_num = int(A[6])
-            indices = A[7:]
-            target_cluster = cluster(score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, o_num=o_num, indices=indices)
+            mz = float(A[2])
+            start = int(A[3])
+            end = int(A[4])
+            seq = find_sequence(pid, start, end, proteins)
+            indices = A[5:]
+            target_cluster = cluster(score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
+
             y_cluster_array.append(target_cluster)
 
         y_sorted_clusters = sorted(y_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
         return y_sorted_clusters
 
 def min_info(cluster):
-    return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.seq, cluster.o_num)
+    return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.seq)
 
 def bsearch(key, Y):
         lo = -1
@@ -245,13 +249,16 @@ def overlap(comb_seq):
     b_pid = comb_seq[3][0]
     y_pid = comb_seq[4][0]
     if b_pid == y_pid:
-        y_start = comb_seq[4][1]
-        b_end = comb_seq[3][2]
-        if (y_start - b_end > 0) & (y_start - b_end < 10):
-            b_start = comb_seq[3][1]
-            return get_overlapping_sequence(b_seq, y_seq, b_start, b_end, y_start)
+        if b_seq == y_seq:
+            return b_seq
         else:
-            return b_seq + y_seq
+            y_start = comb_seq[4][1]
+            b_end = comb_seq[3][2]
+            if (y_start - b_end > 0) and (y_start - b_end < 10):
+                b_start = comb_seq[3][1]
+                return get_overlapping_sequence(b_seq, y_seq, b_start, b_end, y_start)
+            else:
+                return b_seq + y_seq
     else:
         return b_seq + y_seq
 
@@ -261,9 +268,8 @@ def modified_find_next_mass(cluster, ion, db):
     else:
         target_index = cluster[1]-1
     target_prot = cluster[0]
-    for i, prot_name in enumerate(db.proteins):
+    for i, protein in enumerate(db.proteins):
         if i == target_prot:
-            protein = db.proteins[prot_name]
             prot_seq = protein[0][1]
             to_add = prot_seq[target_index] if (target_index < len(prot_seq) and target_index > 0) else ''
             break

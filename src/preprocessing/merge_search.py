@@ -1,12 +1,17 @@
+from xmlrpc.client import Boolean
+
+from pytz import country_names
 from sqlite import database_file
 from utils import hashable_boundaries, ppm_to_da, predicted_len
 from objects import Database
-import sqlite3
+import sys
+import shutil
 import gen_spectra
 from collections import defaultdict
 from math import ceil
 import os
 import json
+import time
 
 def write_matched_masses(filepath, matched_masses_b, matched_masses_y, kmer_set, debug):
     with open(os.path.join(filepath, "matched_masses_b.txt"),"w+") as b:
@@ -86,40 +91,47 @@ def get_data(kmer, start, end, protein_num):
 
     return data_list
             
-def db_make_set_for_protein(i,prot,max_len, db):
-    seq_len = len(prot.sequence)
-    all_data = []
-    for size in range(1, max_len + 1):
-        # size -> [1, max_len]
+def db_make_set_for_protein(i,prot,max_len, dbf, data):
+    seq_len = len(prot)
+    count_max = 1000000
+    for size in range(2, max_len + 1):
+        # size -> [2, max_len]
         for start in range(0, seq_len - size + 1):
             end = start + size
-            kmer = prot.sequence[start:end]
+            kmer = prot[start:end]
             # last_index = seq - size 6, end = start + size - 1 = 7
             # [data.append(x) for x in get_data(kmer, start, end)]
-            data = get_data(kmer, start, end, i)
+            data_list = get_data(kmer, start, end, i)
+            data.extend(data_list)
             # insertion code
-            db.insert(data)
-            
-            
-            # all_data.append(data)
+            if len(data) > count_max:
+                dbf.insert(data)
+                data.clear()
             
     return
-            # start -> [0, ]
-    start = 0
-    stop = len(prot_entry.sequence) - max_len
-    for j in range(start, stop):
-        kmer = prot_entry.sequence[j:j+max_len]
-        start_position = j
-        end_position = j + max_len - 1
-        modified_add_all(kmer, prot_name, db_dict_b,db_dict_y,kmer_set,start_position, end_position, i)
 
-def db_make_database_set_for_proteins(proteins,max_len, db):
+def db_make_database_set_for_proteins(proteins,max_len,dbf):
     plen = len(proteins)
-    for i, (prot_name, prot_entry) in enumerate(proteins):
-        # print(f'\rOn protein {i+1}/{plen} [{int((i+1) * 100 / plen)}%]', end='')
-        db_make_set_for_protein(i,prot_entry,max_len, db)
+    last_percent = 0
+    data = []
+    
+    for i, (_, prot_entry) in enumerate(proteins):
+        percent = int((i+1) * 100 / plen)
+        print(f'\rOn protein {i+1}/{plen} [{int((i+1) * 100 / plen)}%]', end='')
+        if percent != last_percent:
+            # print(f'\rInserting {percent}%', end='')
+            last_percent = percent
+            free = shutil.disk_usage('/')[2]
+            free = free/(1024**3)
+            if free < 10:
+                print("\nUsed too much space, Space available =", free, "GB" )
+                sys.exit(1)
+        db_make_set_for_protein(i,prot_entry,max_len, dbf, data)
         
-def modified_make_database_set(proteins: list, max_len: int, db):    
+    if len(data) != 0:
+        dbf.insert(data)
+        
+def modified_make_database_set(proteins: list, max_len: int, dbf):    
     # final data structure: dict-> called mass_kmers
     # input_masses -> list of tuples
     # mass_kmers[mass] -> list of tuples
@@ -132,11 +144,15 @@ def modified_make_database_set(proteins: list, max_len: int, db):
     
     #kmer -> list of proteins where it occurs
     #kmer list: list of tuples (kmer, mass, location, ion, charge)
-    print('\nBeginning insertions')
-    db_make_database_set_for_proteins(proteins,max_len, db)
+    print("\nBeginning Insertions")
+    start = time.time()
+    db_make_database_set_for_proteins(proteins,max_len, dbf)
+    duration = time.time() - start
+    print("Insertion took: ", duration)
     # db.read() #Only for debugging
     print('\nIndexing the set of kmers based on mass, ion')
-    db.index_ion_mass()
+    dbf.index_ion_mass()
+    print('Done making database')
     
     
     # print('\nSorting the set of protein masses...')
@@ -180,26 +196,30 @@ def modified_merge(kmers, boundaries: dict):
             kmer_index = starting_point
     return matched_masses_b, matched_masses_y
 
-def modified_match_masses(input_masses: list, db: Database, max_len: int, ppm_tolerance):
+def modified_match_masses(input_masses: list, db: Database, max_len: int, ppm_tolerance, make_new):
     # max_boundary = max(boundaries.keys())
     # estimated_max_len = ceil(boundaries[max_boundary][1] / 57.021464)
     # max_len = min(estimated_max_len, max_pep_len)
-    kv_prots = [(k, v) for k, v in db.proteins.items()]    
-    extended_kv_prots = [(k, entry) for (k, v) in kv_prots for entry in v]
-    db = database_file(max_len)
-    # modified_make_database_set(extended_kv_prots, max_len, db)
+    
+    dbf = database_file(max_len, make_new)
+    if make_new:
+        kv_prots = [(k, v) for k, v in db.proteins]    
+        # extended_kv_prots = [(k, entry) for (k, v) in kv_prots for entry in v]
+        modified_make_database_set(kv_prots, max_len, dbf)
     
     matched_masses_b, matched_masses_y = dict(), dict()
     
+    start = time.time()
     for input_mass in input_masses:
         tol = ppm_to_da(input_mass, ppm_tolerance)
         # ion_int = 0 if ion == 'b' else 1
-        matched_masses_b[input_mass] = db.query_ion_mass(input_mass, tol, 0) #same place: location start, protein_num
+        matched_masses_b[input_mass] = dbf.query_ion_mass(input_mass, tol, 0) #same place: location start, protein_num
         # print(input_mass, 'b', matched_masses_b[input_mass])
-        matched_masses_y[input_mass] = db.query_ion_mass(input_mass, tol, 1)
+        matched_masses_y[input_mass] = dbf.query_ion_mass(input_mass, tol, 1)
         # print(input_mass, 'y', matched_masses_y[input_mass])
         
-    print("Done")
+    end = time.time() - start
+    print("Done, queries took:", end)
         # if debug:
         # write_matched_masses(write_path, matched_masses_b, matched_masses_y, kmer_set, debug)
 
