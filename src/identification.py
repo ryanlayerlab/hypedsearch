@@ -1,8 +1,11 @@
 from collections import defaultdict
+from hashlib import new
 from heapq import merge
 from pickle import TRUE
 from typing import Dict
 from multiprocessing import Pool, set_start_method
+
+from sqlalchemy import false
 from postprocessing.postprocessing_utils import postprocessing
 from objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry
 from gen_spectra import get_precursor
@@ -121,22 +124,20 @@ def write_hits(b_hits, y_hits, location):
             pep_id = x[0]
             w = x[1]
             prot_id = x[2][1]
-            seq = x[2][2]
-            loc = x[2][3]
-            ion = x[2][4]
-            charge = x[2][5]
-            out = [pep_id, w, prot_id, seq, loc, ion, charge]
+            loc = x[2][2]
+            ion = x[2][3]
+            charge = x[2][4]
+            out = [pep_id, w, prot_id, loc, ion, charge]
             b.write('\t'.join([str(i) for i in out]) + '\n')
     with open(os.path.join(location, "y_hits.txt"), 'w+') as b:
         for y in y_hits:
             pep_id = y[0]
             w = y[1]
             prot_id = y[2][1]
-            seq = y[2][2]
-            loc = y[2][3]
-            ion = y[2][4]
-            charge = y[2][5]
-            out = [pep_id, w, prot_id, seq, loc, ion, charge]
+            loc = y[2][2]
+            ion = y[2][3]
+            charge = y[2][4]
+            out = [pep_id, w, prot_id, loc, ion, charge]
             b.write('\t'.join([str(i) for i in out]) + '\n')
 
 def get_hits_from_file(bf, yf):
@@ -183,7 +184,7 @@ def create_hits(spec_num,spectrum,matched_masses_b,matched_masses_y,DEBUG,locati
                 for tuple in matched_masses_y[mz]:
                     tup = (spec_num, mz, tuple)
                     y_hits.append(tup)
-        write_hits(b_hits, y_hits, location)
+        # write_hits(b_hits, y_hits, location)
     return b_hits, y_hits
 
 def align_on_single_core(spectra,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,results,DEBUG,location):
@@ -254,24 +255,31 @@ def handle_DEV_result(output_dir,fall_off,cores):
         )          
 
 class alignment_info:
-    def __init__(self, matched_masses_b, matched_masses_y, location, precursor_tolerance, database, ppm_tolerance, results_len): #This is like the named tuple
-        self.mb = matched_masses_b
-        self.my = matched_masses_y
+    def __init__(self, max_peptide_len, location, precursor_tolerance, database, ppm_tolerance, results_len, new): #This is like the named tuple
+        self.max_pep_len = max_peptide_len
         self.write_path = location
         self.prec_tol = precursor_tolerance
         self.ppm_tol = ppm_tolerance
         self.db = database
         self.results_len = results_len
+        self.make_new = new
     
     def __call__(self, spectrum):
         print(f'\rCreating an alignment for {spectrum.num}/{self.results_len} [{to_percent(spectrum.num, self.results_len)}%]', end='')
-        b_hits,y_hits = create_hits(spectrum.num,spectrum,self.mb,self.my,True,self.write_path)
+        input_list = spectrum.mz_values
+        matched_masses_b, matched_masses_y = merge_search.modified_match_masses(input_list, self.db, self.max_pep_len, self.ppm_tol, self.make_new)
+        
+        #Matched masses data is of form (mass, start, end, ion_int, charge, protein_num)
+        # hit_time = time.time()
+        b_hits,y_hits = create_hits(spectrum.num,spectrum,matched_masses_b,matched_masses_y,True,self.write_path)
+        # hit_time = time.time()-hit_time
+        print("hits took:", hit_time)
         for ion in "by":
             clusters = clustering.create_clusters(ion, b_hits, y_hits)
             if ion ==  'b':
-                b_sorted_clusters = clustering.Score_clusters(ion, clusters)
+                b_sorted_clusters = clustering.Score_clusters(ion, clusters, self.db.proteins)
             else:
-                y_sorted_clusters = clustering.Score_clusters(ion, clusters)
+                y_sorted_clusters = clustering.Score_clusters(ion, clusters, self.db.proteins)
 
         merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
         merged_seqs.sort(key = lambda x: x[0], reverse = True)
@@ -294,13 +302,13 @@ class alignment_info:
         # raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off)
         return postprocessed_alignments
 
-def align(numcores, spectra, matched_masses_b, matched_masses_y, location, precursor_tolerance, db, ppm_tolerance):
+def align(numcores, spectra, location, precursor_tolerance, db, ppm_tolerance, max_peptide_len,new):
     set_start_method('forkserver')
     p = Pool(numcores)
     y, spec_nums = [], []
     now = time.time()
     [spec_nums.append(i) for i in range(0, len(spectra))]
-    x = alignment_info(matched_masses_b,matched_masses_y,location,precursor_tolerance,db,ppm_tolerance,len(spectra))
+    x = alignment_info(max_peptide_len,location,precursor_tolerance,db,ppm_tolerance,len(spectra),new)
     y = p.map(x, spectra) #function can only take 1 input so make object
     p.close()
     p.join()
@@ -317,6 +325,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
         DEV = True
         truth = json.load(open(truth_set, 'r'))
     fall_off = None
+    make_new = False
     if DEBUG:
         filepath = os.path.abspath(os.path.join("data", "NOD2_E3_results.ssv"))
         correct_sequences = evaluation.generate_truth_set(filepath)
@@ -332,13 +341,9 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     #     print("getting matched_masses from file...")
     #     matched_masses_b, matched_masses_y = merge_search.get_from_file(os.path.join(location, 'matched_masses_b.txt'), os.path.join(location, 'matched_masses_y.txt'), True)
     #     print("getting matched_masses from file Done")
-    # else:
-    # if TRUE:
-    #     merge_search.make_database_file(cores, max_peptide_len, db)
-    
-    for spectrum in spectra:
-        input_list = spectrum.mz_values
-        matched_masses_b, matched_masses_y = merge_search.modified_match_masses(input_list, db, max_peptide_len, ppm_tolerance)
+    # If needed:
+        # merge_search.make_database_file #No file with that name yet    
+        
     # build whole database of all mass -> list of tuples of (info)
     # query for input mass?
     # input mass -> list of tuples of (info)
@@ -350,7 +355,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     DEV = False
     if DEV:
         handle_DEV_setup(truth)
-    results = align(cores,spectra,matched_masses_b,matched_masses_y,location,precursor_tolerance,db,ppm_tolerance)
+    results = align(cores,spectra,location,precursor_tolerance,db,ppm_tolerance,max_peptide_len,make_new)
     # if cores == 1:
     #     align_on_single_core(spectra,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,results,DEBUG,location)
     # else:

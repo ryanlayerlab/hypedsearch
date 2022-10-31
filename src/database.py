@@ -30,11 +30,13 @@ def build(fasta_file: str) -> Database:
     '''
 
     db = Database(fasta_file)
-    prots = defaultdict(list)
-    get_name = lambda x: x.split('|')[-1].split()[0]
+    prots = []
+    # prots = defaultdict(list)
+    # get_name = lambda x: x.split('|')[-1].split()[0]
     for entry in fasta.read(fasta_file):
-        p_name = get_name(entry.description)
-        prots[p_name].append(entry)
+        # p_name = get_name(entry.description)
+        # prots[p_name].append(entry)
+        prots.append(entry)
     db = db._replace(proteins=prots)
     return db
 

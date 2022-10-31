@@ -4,7 +4,7 @@ import time
 from matplotlib.pyplot import connect
 
 class database_file:
-    def __init__(self, max_len, reset=True): #This is like the named tuple
+    def __init__(self, max_len, reset=True):
         self.connection = sqlite3.connect("kmers.db")
         self.cursor = self.connection.cursor()
         self.max_len = max_len
@@ -20,22 +20,17 @@ class database_file:
                                 )''')
         
     def insert(self,data):
-        # print(data)
         self.cursor.executemany('INSERT INTO kmers VALUES(?, ?, ?, ?, ?, ?)', data)
-        # print(self.connection.total_changes)
         self.connection.commit()
         
     def read(self):
         rows = self.cursor.execute("SELECT * FROM kmers").fetchall()
-        # print(rows)
+        print(rows)
     
     def query_ion_mass(self, mass, tol, ion):
         upper = mass + tol
         lower = mass - tol
-        qtime = time.time()
         rows = self.cursor.execute("SELECT * FROM kmers where ion = ? and mass between ? and ?", (ion, lower, upper)).fetchall()
-        print("Query time:", time.time() - qtime)
-        # print(mass, ion, rows)
         return rows
             
     def index_ion_mass(self):
@@ -59,3 +54,6 @@ class database_file:
         print("Query time:", time.time() - qtime)
         print(mass, ion, rows)
         return rows
+
+    def check_indices():
+        pass
