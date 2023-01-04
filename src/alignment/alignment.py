@@ -2,11 +2,12 @@ from scoring import scoring
 from objects import Spectrum, SequenceAlignment, HybridSequenceAlignment, Database, Alignments, DEVFallOffEntry
 from alignment import alignment_utils, hybrid_alignment
 from gen_spectra import get_precursor
-from preprocessing.clustering import modified_find_next_mass
+from preprocessing.clustering import calc_from_sequences
 import objects
 import utils
 import database
 import gen_spectra
+from sqlite import database_file
 
 import math
 import re
@@ -392,46 +393,79 @@ def attempt_alignment(spectrum: Spectrum, db: Database, b_hits: list,y_hits: lis
 def make_merge(b, y, b_seq, y_seq):
     new_b = (b[0], b[1], b[2], b[3], b_seq)
     new_y = (y[0], y[1], y[2], y[3], y_seq)
-    return (b[3] + y[3], b[1] - y[2], y[2]-b[1], new_b, new_y)    
+    return (b[3] + y[3], b[1] - y[2], y[2]-b[1], new_b, new_y)
 
-def add_amino_acids(alignment_list, missing_mass, b_c, y_c, comb_seq, b_seq, y_seq, precursor_charge, prec_mass, tol, stop_b, db):
-    #This function recursively adds in amino acids    
-    if abs(get_precursor(b_seq + y_seq, precursor_charge) - prec_mass) <= tol:
-        alignment_list.append(make_merge(b_c, y_c, b_seq, y_seq))
-        return
-    
-    if get_precursor(b_seq + y_seq, precursor_charge) > prec_mass + tol:
-        return
-    
-    next_b = modified_find_next_mass(b_c, 'b', db)
-    next_y = modified_find_next_mass(y_c, 'y', db)
-    
-    if get_precursor(b_seq + y_seq, precursor_charge) < prec_mass - tol and (next_b != "") and stop_b == False:
-        mod_b = b_seq + next_b
-        mod_b_c = (b_c[0], b_c[1], b_c[2]+1, b_c[3], mod_b)
-        add_amino_acids(alignment_list, missing_mass, mod_b_c, y_c, comb_seq, mod_b, y_seq, precursor_charge, prec_mass, tol, stop_b, db)
-    stop_b = True
-    if get_precursor(b_seq + y_seq, precursor_charge) < prec_mass - tol and (next_y != ""):
-        mod_y = next_y + y_seq
-        mod_y_c = (y_c[0], y_c[1]-1, y_c[2], y_c[3], mod_y)
-        add_amino_acids(alignment_list, missing_mass, b_c, mod_y_c, comb_seq, b_seq, mod_y, precursor_charge, prec_mass, tol, stop_b, db)
-        
-    return
+def natural_get_extensions(obs_prec,prec_charge,pid,y_mass,y_start,y_end,y_charge,b_charge,precursor_tolerance,extended_b,b_score,y_score):
+    extensions = []
+    for b in extended_b:
+        if b[2]-1 == y_start:
+            total_precursor = gen_spectra.calc_precursor_as_disjoint(b[0], y_mass, b_charge, y_charge, prec_charge)
+            if abs(total_precursor - obs_prec) < precursor_tolerance:
+                extensions.append((extended_b[0] + (b_score,), (y_mass, y_start, y_end, 1, y_charge, pid, y_score)))
+    return extensions
 
-def find_alignments(merged_seqs, obs_prec, prec_charge, tol, db):
-    alignments = []
-    for comb_seq in merged_seqs:
-        b_cluster = comb_seq[3]
-        y_cluster = comb_seq[4]
-        b_seq = comb_seq[3][4]
-        y_seq = comb_seq[4][4]
-        if b_seq != y_seq:
-            new_seq = b_seq + y_seq
-            missing_mass = obs_prec - get_precursor(new_seq, prec_charge)
-            add_amino_acids(alignments, missing_mass, b_cluster, y_cluster, comb_seq, b_seq, y_seq, prec_charge, obs_prec, tol, False, db)
-        else:
-            new_seq = b_seq
-            if (abs(get_precursor(new_seq, prec_charge) - obs_prec) <= tol):
-                alignments.append(comb_seq)
+def get_extensions(precursor_mass, precursor_charge, b_pid, b_start, extended_b, y_pid, y_end, extended_y, prec_tol, y_start, y_charge, b_end, b_charge, b_mz, y_mz, b_score, y_score):
+    tol = utils.ppm_to_da(precursor_mass, prec_tol)
+    extensions = []
+
+    for b in extended_b:
+        for y in extended_y:
+            b_mass, y_mass = b[0], y[0]
+            this_prec = gen_spectra.calc_precursor_as_disjoint(b_mass, y_mass, 2, 2, precursor_charge)
+            if this_prec > precursor_mass + tol:
+                break
+            elif abs(this_prec - precursor_mass) <= tol:
+                extensions.append((b + (b_score,), y + (y_score,)))
+    # elif len(extended_b) == 0: #want to make sure we consider y extensions even if there are no b extensions 
+    #     for y in extended_y:
+    #         y_mass = y[0]
+    #         this_prec = gen_spectra.calc_precursor_as_disjoint(0, y_mass, b_charge, 2, precursor_charge)
+    #         if abs(this_prec - precursor_mass) <= tol:
+    #             extensions.append(((b_mz, b_start, b_end, 1, b_charge, b_pid, b_score), y + (y_score,)))
+    # else:
+    #     for b in extended_b:
+    #         b_mass = b[0]
+    #         this_b_charge = b[4]
+    #         this_prec = gen_spectra.calc_precursor_as_disjoint(0, b_mass, this_b_charge, y_charge, precursor_charge)
+    #         if abs(this_prec - precursor_mass) <= tol:
+    #             extensions.append((b + (b_score,), (y_mz, y_start, y_end, 1, y_charge, y_pid, y_score)))
             
-    return alignments
+    return extensions
+
+def find_alignments(natural_merged, hybrid_merged, obs_prec, prec_charge, tol, max_len, prec_tol):
+    natural_alignments, hybrid_alignments = [], []
+    for i, comb_seq in enumerate(natural_merged):
+        # if i == 1141:
+        #     print("here")
+        pid = comb_seq[3][0]
+        b_start, b_end = comb_seq[3][1], comb_seq[3][2]
+        y_start, y_end = comb_seq[4][1], comb_seq[4][2]
+        b_charge, y_charge = comb_seq[3][5], comb_seq[4][5]
+        b_score, y_score = comb_seq[3][3], comb_seq[4][3]
+        b_mass = comb_seq[3][4]
+        y_mass = comb_seq[4][4]
+        b_extensions, y_extensions = comb_seq[3][6], comb_seq[4][6]
+        if y_start >= b_end: #no overlap but b before y
+            natural_alignments = natural_alignments + natural_get_extensions(obs_prec, prec_charge, pid, y_mass, y_start, y_end, y_charge, b_charge, prec_tol, b_extensions, b_score, y_score) #THERE IS A BUG HERE
+        elif b_start <= y_start and b_end <= y_end and y_start < b_end: #some overlap
+            combined_precursor = calc_from_sequences(b_start, y_end, pid, max_len, prec_charge)
+            if abs(combined_precursor - obs_prec) < tol:
+                natural_alignments.append(((b_mass, b_start, b_end, 1, b_charge, pid, b_score),(y_mass, y_start, y_end, 1, y_charge, pid, y_score)))
+        else:
+            hybrid_alignments = hybrid_alignments + get_extensions(obs_prec, prec_charge, pid, b_start, b_extensions, pid, y_end, y_extensions, prec_tol, y_start, y_charge, b_end, b_charge, b_mass, y_mass, b_score, y_score)
+
+    total_extension_time = 0
+    for i, comb_seq in enumerate(hybrid_merged):
+        b_pid, y_pid = comb_seq[3][0], comb_seq[4][0]
+        b_start, b_end = comb_seq[3][1], comb_seq[3][2]
+        y_start, y_end = comb_seq[4][1], comb_seq[4][2]
+        b_charge, y_charge = comb_seq[3][5], comb_seq[4][5]
+        b_score, y_score = comb_seq[3][3], comb_seq[3][4]
+        b_mass = comb_seq[3][4]
+        y_mass = comb_seq[4][4]
+        b_extensions, y_extensions = comb_seq[3][6], comb_seq[4][6]
+        extension_time = time.time()
+        hybrid_alignments = hybrid_alignments + get_extensions(obs_prec, prec_charge, b_pid, b_start, b_extensions, y_pid, y_end, y_extensions, prec_tol, y_start, y_charge, b_end, b_charge, b_mass, y_mass, b_score, y_score)     
+        total_extension_time = total_extension_time + (time.time() - extension_time)
+    print("\n Average extension time:",total_extension_time/len(hybrid_merged))
+    return natural_alignments, hybrid_alignments

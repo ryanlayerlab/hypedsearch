@@ -39,7 +39,7 @@ def calc_masses(sequence: str, charge: int =None, ion: str = None):
     for i in range(length):
         total +=  AMINO_ACIDS[sequence[i]]
     pre_mz_charge = 2 if charge is None else charge
-    pre_mz = (total+pre_mz_charge*PROTON_MASS)/pre_mz_charge   
+    pre_mz = (total+pre_mz_charge*PROTON_MASS)/pre_mz_charge
     if ion is None or ion == 'b': 
         masses += b_ions(sequence, charge=charge)
     if ion is None or ion == 'y': 
@@ -58,11 +58,67 @@ def max_mass(seqeunce: str, ion: str, charge: int):
     mz = total / charge
     return mz
 
+def get_total_sum(precursor_mass,precursor_charge):
+    total_sum = 0
+    total_sum = (precursor_mass * precursor_charge) - (precursor_charge * PROTON_MASS) - WATER_MASS
+    return total_sum    
+
+def convert_precursor_to_ion(precursor_mass, precursor_charge):
+    total_sum = get_total_sum(precursor_mass, precursor_charge)
+    normalized_b = (DOUBLY_CHARGED_B_BASE + total_sum) / 2
+    normalized_y = (DOUBLY_CHARGED_Y_BASE + total_sum) / 2
+    return normalized_b, normalized_y
+
+def normalize_to_two(b_mass, y_mass):
+    normalized_b = (DOUBLY_CHARGED_B_BASE + b_mass) / 2
+    normalized_y = (DOUBLY_CHARGED_Y_BASE + y_mass) / 2
+    return normalized_b, normalized_y
+    
+def get_sum_from_ion(b_mass, y_mass, b_charge, y_charge):
+    b_sum, y_sum = get_raw_mass(b_mass, 0, b_charge), get_raw_mass(y_mass, 1, y_charge)
+    return b_sum, y_sum
+    
+def get_converted_missing_mass(precursor_mass, precursor_charge, b_mass, y_mass, b_charge, y_charge):
+    precursor_total_sum = get_total_sum(precursor_mass, precursor_charge)
+    b_sum, y_sum = get_sum_from_ion(b_mass, y_mass, b_charge, y_charge)
+    b_missing_sum = precursor_total_sum - b_sum
+    y_missing_sum = precursor_total_sum - y_sum
+    normalized_b, normalized_y = normalize_to_two(b_missing_sum, y_missing_sum)
+    return normalized_b, normalized_y
+    
 def get_precursor(sequence: str, charge: int = 1):
     total = WATER_MASS
     for aa in sequence:
         total +=  AMINO_ACIDS[aa]
-    return (total + charge * PROTON_MASS) / charge 
+    return (total + charge * PROTON_MASS) / charge
+
+def get_raw_mass(mass, ion, charge):
+    if ion == 0:
+        if charge == 1:
+            raw_mass = (mass * charge) - SINGLY_CHARGED_B_BASE
+        else:
+            raw_mass = (mass * charge) - DOUBLY_CHARGED_B_BASE
+    else:
+        if charge == 1:
+            raw_mass = (mass * charge) - SINGLY_CHARGED_Y_BASE
+        else:
+            raw_mass = (mass * charge) - DOUBLY_CHARGED_Y_BASE
+        
+    return raw_mass    
+
+def convert_ion_to_precursor(mass, ion, charge, prec_charge):
+    total = get_raw_mass(mass, ion, charge)
+    return (total + WATER_MASS + (prec_charge * PROTON_MASS)) / prec_charge
+
+def convert_raw_to_precursor(total, charge):
+    return (total + WATER_MASS + (charge * PROTON_MASS)) / charge
+
+def calc_precursor_as_disjoint(b_mass, y_mass, b_charge, y_charge, precursor_charge):
+    b_sequence_mass = get_raw_mass(b_mass, 0, b_charge)
+    y_sequence_mass = get_raw_mass(y_mass, 1, y_charge)
+    total_sequence_mass = b_sequence_mass + y_sequence_mass
+    precursor = convert_raw_to_precursor(total_sequence_mass, precursor_charge)
+    return precursor
 
 def gen_spectrum(sequence: str, charge: int = None, ion: str = None):
     this_entry = {}
