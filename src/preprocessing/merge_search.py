@@ -118,6 +118,8 @@ def db_make_database_set_for_proteins(proteins,max_len,dbf):
     for i, (_, prot_entry) in enumerate(proteins):
         percent = int((i+1) * 100 / plen)
         print(f'\rOn protein {i+1}/{plen} [{int((i+1) * 100 / plen)}%]', end='')
+        if i == 256:
+            continue
         if percent != last_percent:
             # print(f'\rInserting {percent}%', end='')
             last_percent = percent
@@ -152,6 +154,10 @@ def modified_make_database_set(proteins: list, max_len: int, dbf):
     # db.read() #Only for debugging
     print('\nIndexing the set of kmers based on mass, ion')
     dbf.index_ion_mass()
+    print('\nIndexing the set of kmers based on protein, start position, end position')
+    dbf.index_ion_mass_b()
+    print('\nIndexing the set of kmers based on protein, end position, start position')
+    dbf.index_ion_mass_y()
     print('Done making database')
     
     
@@ -213,13 +219,13 @@ def modified_match_masses(input_masses: list, db: Database, max_len: int, ppm_to
     for input_mass in input_masses:
         tol = ppm_to_da(input_mass, ppm_tolerance)
         # ion_int = 0 if ion == 'b' else 1
-        matched_masses_b[input_mass] = dbf.query_ion_mass(input_mass, tol, 0) #same place: location start, protein_num
+        matched_masses_b[input_mass], matched_masses_y[input_mass] = dbf.query_mass(input_mass, tol) #same place: location start, protein_num
         # print(input_mass, 'b', matched_masses_b[input_mass])
-        matched_masses_y[input_mass] = dbf.query_ion_mass(input_mass, tol, 1)
         # print(input_mass, 'y', matched_masses_y[input_mass])
         
     end = time.time() - start
-    print("Done, queries took:", end)
+    with open('Timing_data.txt', 'w') as t:
+        t.write("Queries took:" + '\t' + str(end) + "\n")       
         # if debug:
         # write_matched_masses(write_path, matched_masses_b, matched_masses_y, kmer_set, debug)
 

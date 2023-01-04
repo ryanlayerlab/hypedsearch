@@ -1,3 +1,5 @@
+from preprocessing import clustering
+
 
 def make_db_mapping(db):
     name_list = []
@@ -10,33 +12,37 @@ def make_db_mapping(db):
     return num_to_prot_name
 
 def label_alignments(alignment):
-    b_c, y_c = alignment[2][3], alignment[2][4]
-    if b_c[2]==y_c[1]-1 or b_c[4] == y_c[4]:
-        label = "Natural"
-    else:
+    #b_mass, b_start, b_end, 1, b_charge, b_pid, b_score
+    type = alignment[3]
+    if type:
         label = "Hybrid"
+    else:
+        label = "Natural"
     return label
 
 def get_score(alignment):
-    b_c, y_c = alignment[2][3], alignment[2][4]
-    return b_c[3], y_c[3]
+    b_c, y_c = alignment[2][0], alignment[2][1]
+    return b_c[6], y_c[6]
 
 def get_precursor_dist(alignment):
-    return 1/alignment[1]
+    return alignment[1]
 
-def get_sequence(alignment):
-    b_c, y_c = alignment[2][3], alignment[2][4]
-    b_seq = b_c[4]
-    y_seq = y_c[4]
-    if b_seq == y_seq:
-        total_seq = b_seq
+def get_sequence(alignment, proteins):
+    hybrid = alignment[3]
+    b_c, y_c = alignment[2][0], alignment[2][1]
+    b_pid, y_pid = b_c[5], y_c[5]
+    b_start, y_start = b_c[1], y_c[1]
+    b_end, y_end = b_c[2], y_c[2]
+    if hybrid:
+        total_sequence = clustering.find_sequence(b_pid, b_start, b_end, proteins) + '-' + clustering.find_sequence(y_pid, y_start, y_end, proteins)
     else:
-        total_seq = b_seq +'-'+ y_seq
-    return total_seq
+        total_sequence = clustering.find_sequence(b_pid, b_start, y_end, proteins)
+
+    return total_sequence
 
 def find_parent_protein(alignment, db_mapping):
-    b_c, y_c = alignment[2][3], alignment[2][4]
-    left_num, right_num = b_c[0], y_c[0]
+    b_c, y_c = alignment[2][0], alignment[2][1]
+    left_num, right_num = b_c[5], y_c[5]
     get_name = lambda x: x.split('|')[-1].split()[0]
     left_parent, right_parent = get_name(db_mapping[left_num].description), get_name(db_mapping[right_num].description)
     return left_parent, right_parent
@@ -48,7 +54,7 @@ def postprocessing(alignments, db):
     for alignment in alignments[:min(10, len(alignments))]:
         label = label_alignments(alignment)
         left_protein, right_protein = find_parent_protein(alignment, db_mapping)
-        sequence = get_sequence(alignment)
+        sequence = get_sequence(alignment, db.proteins)
         b_score, y_score = get_score(alignment)
         total_score = alignment[0]
         precursor_distance = get_precursor_dist(alignment)

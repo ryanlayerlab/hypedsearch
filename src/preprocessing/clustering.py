@@ -2,9 +2,9 @@ import collections
 import operator
 import os
 from utils import ppm_to_da
-from gen_spectra import get_precursor
+import gen_spectra
 from constants import WATER_MASS, PROTON_MASS
-from scoring.scoring import calc_bayes_score
+from sqlite import database_file
 
 def write_cluster(cluster):
     #returns cluster of the form (score, pid, mz, start, end)
@@ -22,8 +22,8 @@ def write_cluster(cluster):
     O.append(max_hit.mz)
     O.append(max_hit.start)
     O.append(max_hit.end)
-    for hit in cluster:
-        O.append( (hit.start, hit.end, hit.mz) ) 
+    O.append(max_hit.charge)
+
     return O
 
 def parse_hits(Hit, all_hits):
@@ -34,13 +34,16 @@ def parse_hits(Hit, all_hits):
         start = int(A[2][1])
         end = int(A[2][2])
         mz = A[1]
+        charge = A[2][4]
+        if charge != 1 and charge != 2:
+            print("Bug with charge")
 
-        hits.append( Hit(pid=pid, start=start, end=end, mz=mz) )
+        hits.append( Hit(pid=pid, start=start, end=end, mz=mz, charge=charge) )
     return hits
 
 def create_clusters(ion, b_hits, y_hits):
     clusters = []
-    Hit = collections.namedtuple('Hit', 'pid start end mz')
+    Hit = collections.namedtuple('Hit', 'pid start end mz charge')
     if ion == 'b':
         hits = parse_hits(Hit, b_hits)
         sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
@@ -130,14 +133,14 @@ def parse_indices(index_set):
 #         return y_sorted_clusters
 
 def find_sequence(pid, start_ind, end_ind, proteins):
-    for count, protein in enumerate(proteins):
-        if count == pid:
-            prot_seq = protein[1]
-            target = prot_seq[start_ind: end_ind]
-            return target
+    protein = proteins[pid]
+    prot_seq = protein[1]
+    target = prot_seq[start_ind: end_ind]
+    return target
     
-def Score_clusters(ion, clusters, proteins):
-    cluster = collections.namedtuple('cluster', 'score pid start end seq mz indices')
+def Score_clusters(ion, clusters, max_len, conv_prec):
+    cluster = collections.namedtuple('cluster', 'score pid start end mz charge extensions')
+    db = database_file(max_len, False)
     if ion == 'b':
         b_cluster_array = []
         for A in clusters:
@@ -146,9 +149,11 @@ def Score_clusters(ion, clusters, proteins):
             mz = float(A[2])
             start = int(A[3])
             end = int(A[4])
-            seq = find_sequence(pid, start, end, proteins)
-            indices = A[5:]
-            target_cluster = cluster(score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
+            # indices = A[5:]
+            charge = A[5]
+            qid = db.query_extensions_b(conv_prec, pid, start, end, 0)
+            extensions = db.query_fetchall(qid)
+            target_cluster = cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions)
 
             b_cluster_array.append(target_cluster)
 
@@ -162,9 +167,11 @@ def Score_clusters(ion, clusters, proteins):
             mz = float(A[2])
             start = int(A[3])
             end = int(A[4])
-            seq = find_sequence(pid, start, end, proteins)
-            indices = A[5:]
-            target_cluster = cluster(score=score, pid=pid, start=start, end=end, seq=seq, mz=mz, indices=indices)
+            # indices = A[5:]
+            charge = A[5]
+            qid = db.query_extensions_y(conv_prec, pid, end, start, 1)
+            extensions = db.query_fetchall(qid)
+            target_cluster = cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions)
 
             y_cluster_array.append(target_cluster)
 
@@ -172,7 +179,7 @@ def Score_clusters(ion, clusters, proteins):
         return y_sorted_clusters
 
 def min_info(cluster):
-    return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.seq)
+    return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.mz, cluster.charge, cluster.extensions)
 
 def bsearch(key, Y):
         lo = -1
@@ -221,16 +228,51 @@ def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
                 y_i += 1
     return merge_seqs
 
-def filter_by_precursor(mseqs, obs_prec, tol, charge):
+def calc_from_total_overlap(side, b_mass, b_charge, y_mass, y_charge, prec_charge):
+    if side: #b overlaps y
+        precursor = gen_spectra.convert_ion_to_precursor(b_mass, 0, b_charge, prec_charge)
+    else: #y overlaps b
+        precursor = gen_spectra.convert_ion_to_precursor(y_mass, 1, y_charge, prec_charge)
+    return precursor
+
+def calc_from_sequences(start, y_end, pid, max_len, prec_charge):
+    db = database_file(max_len, False)
+    entries = db.query_sequence(pid, start, y_end)
+    if entries == []:
+        return 0
+    else:
+        entry = entries.pop()
+        precursor = gen_spectra.convert_ion_to_precursor(entry[0], entry[3], entry[4], prec_charge)
+        return precursor
+    
+def total_overlap(b_pid, y_pid, b_start, y_start, b_end, y_end):
+    if b_pid == y_pid:
+        if b_start == y_start:
+            if b_end <= y_end:
+                return True, False
+        if b_end == y_end:
+            if b_start <= y_start:
+                return True, True
+    return False, False
+
+def filter_by_precursor(mseqs, obs_prec, tol, precursor_charge, max_len):
     filtered_seqs = []
     for comb_seq in mseqs:
-        b_seq = comb_seq[3][4]
-        y_seq = comb_seq[4][4]
-        if b_seq != y_seq:
-            new_seq = b_seq + y_seq
+        b_pid, y_pid = comb_seq[3][0], comb_seq[4][0]
+        b_start, b_end = comb_seq[3][1], comb_seq[3][2]
+        y_start, y_end = comb_seq[4][1], comb_seq[4][2]
+        b_charge, y_charge = comb_seq[3][5], comb_seq[4][5]
+        b_mass, y_mass = comb_seq[3][4], comb_seq[4][4]
+        # checking cases
+        full, side = total_overlap(b_pid, y_pid, b_start, y_start, b_end, y_end)
+        if full:
+            combined_precursor = calc_from_total_overlap(side, b_mass, b_charge, y_mass, y_charge, precursor_charge)
+        elif b_start <= y_start and b_end <= y_end and y_start < b_end:
+            combined_precursor = calc_from_sequences(b_start, y_end, b_pid, max_len, precursor_charge)
         else:
-            new_seq = b_seq
-        if not (get_precursor(new_seq, charge) > obs_prec + tol):
+            combined_precursor = gen_spectra.calc_precursor_as_disjoint(b_mass, y_mass, b_charge, y_charge, precursor_charge)
+
+        if not (combined_precursor > obs_prec + tol):
             filtered_seqs.append(comb_seq)
     return filtered_seqs
 
@@ -268,32 +310,22 @@ def modified_find_next_mass(cluster, ion, db):
     else:
         target_index = cluster[1]-1
     target_prot = cluster[0]
-    for i, protein in enumerate(db.proteins):
-        if i == target_prot:
-            prot_seq = protein[0][1]
-            to_add = prot_seq[target_index] if (target_index < len(prot_seq) and target_index > 0) else ''
-            break
-    
+    protein = db.proteins[target_prot]
+    prot_seq = protein[1]
+    to_add = prot_seq[target_index] if (target_index < len(prot_seq) and target_index > 0) else ''
     return to_add
 
-def filter_by_missing_mass(db, mseqs, obs_prec, tol, charge):
-    filtered_seqs = []
-    for comb_seq in mseqs:
-        new_seq = overlap(comb_seq)
-        dif = obs_prec + tol - get_precursor(new_seq, charge)
-        if dif <= 1: #tol can vary but i'm not sure how much. Tol is .05 for spec 4 Other hacks are 2*tol
-            filtered_seqs.append(comb_seq)
-        else:
-            next_b = modified_find_next_mass(comb_seq[3], 'b', db)
-            b_seq = comb_seq[3][4]
-            y_seq = comb_seq[4][4]
-            b_dif = obs_prec + tol - get_precursor(b_seq + next_b + y_seq, charge)
-            next_y = modified_find_next_mass(comb_seq[4], 'y', db)
-            y_dif = obs_prec + tol - get_precursor(b_seq + next_y + y_seq, charge)
-            if b_dif >= 0 or y_dif >= 0:
-                filtered_seqs.append(comb_seq)
-                
-    return filtered_seqs
+# def filter_by_structure(natural_merges, hybrid_merges):
+#     for merge in natural_merges:
+#         pid = merge[3][0]
+#         b_start, b_end = comb_seq[3][1], comb_seq[3][2]
+#         y_start, y_end = comb_seq[4][1], comb_seq[4][2]
+#         b_charge, y_charge = comb_seq[3][5], comb_seq[4][5]
+#         b_score, y_score = comb_seq[3][3], comb_seq[3][4]
+#         b_mass = comb_seq[3][4]
+#         y_mass = comb_seq[4][4]
+        
+#         if (b_start )
 
 def combine_merges(pure_seqs, hybrid_seqs, target_num): #TODO
     merged_top = []
@@ -359,32 +391,31 @@ def grab_matches(b,indexed_clusters, target_val, ion):
             break            
     return matches
     
-def index_by_precursor_mass(sorted_clusters, pc):
+def index_by_precursor_mass(sorted_clusters, pc, ion):
     indexed = dict()
     for y in sorted_clusters:
-        if get_precursor(y.seq, pc) not in indexed.keys():
-            indexed[get_precursor(y.seq, pc)] = []
-        indexed[get_precursor(y.seq, pc)].append(y)
+        converted_precursor = gen_spectra.convert_ion_to_precursor(y.mz,ion,y.charge,pc)
+        if converted_precursor not in indexed.keys():
+            indexed[converted_precursor] = []
+        indexed[converted_precursor].append(y)
     indexed = collections.OrderedDict(sorted(indexed.items(),key=lambda t: t[0]))
     return indexed
     
-def get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, obs_prec, precursor_tol, charge):
+def get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, obs_prec, precursor_tol, prec_charge):
     merged_seqs = []
-    ind_b, ind_y = index_by_precursor_mass(b_sorted_clusters, charge),index_by_precursor_mass(y_sorted_clusters, charge)
-    for i, cluster in enumerate(b_sorted_clusters[:10]):
-        cluster_seq = cluster.seq
-        cluster_mass = get_precursor(cluster_seq, charge)
+    ind_b, ind_y = index_by_precursor_mass(b_sorted_clusters, prec_charge, 0),index_by_precursor_mass(y_sorted_clusters, prec_charge, 1)
+    for cluster in b_sorted_clusters[:10]:
+        cluster_mass = gen_spectra.convert_ion_to_precursor(cluster.mz, 0, cluster.charge, prec_charge)
         tol = ppm_to_da(obs_prec, precursor_tol)
         if not (cluster_mass > obs_prec + tol):
-            diff = obs_prec + tol - cluster_mass + (charge * PROTON_MASS) + WATER_MASS
+            diff = obs_prec + tol - cluster_mass + (prec_charge * PROTON_MASS) + WATER_MASS
             merges = grab_matches(cluster,ind_y, diff, 'b')
             [merged_seqs.append(x) for x in merges]
-    for i, cluster in enumerate(y_sorted_clusters[:10]):
-        cluster_seq = cluster.seq
-        cluster_mass = get_precursor(cluster_seq, charge)
+    for cluster in y_sorted_clusters[:10]:
+        cluster_mass = gen_spectra.convert_ion_to_precursor(cluster.mz, 1, cluster.charge, prec_charge)
         tol = ppm_to_da(obs_prec, precursor_tol)
         if not (cluster_mass > obs_prec + tol):
-            diff = obs_prec + tol - cluster_mass + (charge * PROTON_MASS) + WATER_MASS
+            diff = obs_prec + tol - cluster_mass + (prec_charge * PROTON_MASS) + WATER_MASS
 #             print(get_precursor(cluster_seq + 'DL', charge), obs_prec + tol)
             merges = grab_matches(cluster,ind_b, diff, 'y')
             [merged_seqs.append(x) for x in merges]

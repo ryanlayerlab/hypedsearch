@@ -1,28 +1,19 @@
-from collections import defaultdict
-from hashlib import new
-from heapq import merge
-from pickle import TRUE
-from typing import Dict
 from multiprocessing import Pool, set_start_method
 
-from sqlalchemy import false
 from postprocessing.postprocessing_utils import postprocessing
 from objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry
-from gen_spectra import get_precursor
 from alignment import alignment
-from utils import ppm_to_da, to_percent, hashable_boundaries, is_json, is_file
+from utils import ppm_to_da, to_percent, is_json, is_file
 import utils
-from scoring import scoring
-from preprocessing import digestion, merge_search, preprocessing_utils, clustering, evaluation
+from preprocessing import merge_search, preprocessing_utils, clustering, evaluation
 import database
-from sqlite import database_file
 from file_io import JSON
 import objects
 import time
 import multiprocessing as mp
-import copy
 import json
 import os
+from gen_spectra import convert_precursor_to_ion, calc_masses
 from scoring.scoring import second_scoring
 from alignment.alignment import find_alignments
 
@@ -66,58 +57,6 @@ def adjust_for_truth_and_fall_off(spectrum,truth,filtered_b,filtered_y,b_results
         handle_DEV_truth(filtered_b,filtered_y,b_results,keep_b_count,y_results,keep_y_count,fall_off,_id,is_hybrid,truth_seq,spectrum)
         return Alignments(spectrum, [])
 
-def id_spectrum(spec_num, input_spectrum: Spectrum, db: Database, matched_masses_b, matched_masses_y, ppm_tolerance, precursor_tolerance, location):
-    b_hits,y_hits = create_hits(spec_num,input_spectrum,matched_masses_b,matched_masses_y,False,location)
-    for ion in "by":
-        clusters = clustering.create_clusters(ion, b_hits, y_hits)
-        if ion ==  'b':
-            b_sorted_clusters = clustering.Score_clusters(ion, clusters)
-        else:
-            y_sorted_clusters = clustering.Score_clusters(ion, clusters)
-
-    merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
-    merged_seqs.sort(key = lambda x: x[0], reverse = True)
-    prec_tol = utils.ppm_to_da(input_spectrum.precursor_mass, precursor_tolerance)
-    merged_seqs = clustering.filter_by_precursor(merged_seqs, input_spectrum.precursor_mass, prec_tol, input_spectrum.precursor_charge)
-    merged_seqs = clustering.filter_by_missing_mass(db, merged_seqs, input_spectrum.precursor_mass, prec_tol, input_spectrum.precursor_charge)
-    
-    hybrid_merged = clustering.get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, input_spectrum.precursor_mass, prec_tol, input_spectrum.precursor_charge)
-    hybrid_merged = clustering.filter_by_precursor(hybrid_merged, input_spectrum.precursor_mass, prec_tol, input_spectrum.precursor_charge)
-    hybrid_merged = clustering.filter_by_missing_mass(db, hybrid_merged, input_spectrum.precursor_mass, prec_tol, input_spectrum.precursor_charge)
-
-    merged_top = clustering.combine_merges(merged_seqs, hybrid_merged, 50)
-    
-    alignments = alignment.find_alignments(merged_top, input_spectrum.precursor_mass, input_spectrum.precursor_charge, prec_tol, db)
-
-    rescored_alignments = scoring.second_scoring(alignments, input_spectrum, ppm_tolerance)
-    rescored_alignments = sorted(rescored_alignments, key = lambda x: (x[0], x[1]), reverse=True)
-    
-    postprocessed_alignments = postprocessing(rescored_alignments, db)
-    # raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off)
-    return postprocessed_alignments
-
-def mp_id_spectrum(input_q: mp.Queue, db_copy: Database, results: dict, fall_off: dict = None, truth: dict = None):
-    while True:
-        next_entry = input_q.get(True)
-        if next_entry == 'exit':
-            return 
-        if truth is not None and fall_off is not None:
-            _id = next_entry.spectrum.id 
-            truth_seq = truth[_id]['sequence']
-            is_hybrid = truth[_id]['hybrid']
-            if not utils.DEV_contains_truth_parts(truth_seq, is_hybrid, next_entry.b_hits, next_entry.y_hits):
-                metadata = {
-                    'initial_b_candidates': next_entry.b_hits, 
-                    'initial_y_candidates': next_entry.y_hits
-                }
-                fall_off[_id] = DEVFallOffEntry(
-                    is_hybrid, truth_seq, 'mass_matching', metadata
-                )
-                results[_id] = Alignments(next_entry.spectrum, [])
-                continue
-        results[next_entry.spectrum.id] = id_spectrum(next_entry.spectrum, 
-            db_copy, next_entry.b_hits, next_entry.y_hits, 
-            next_entry.ppm_tolerance, next_entry.precursor_tolerance)
 def write_hits(b_hits, y_hits, location):
     with open(os.path.join(location, "b_hits.txt"), 'w+') as b:
         for x in b_hits:
@@ -168,7 +107,6 @@ def get_hits_from_file(bf, yf):
             y_hits.append(out)
     return b_hits, y_hits
 def create_hits(spec_num,spectrum,matched_masses_b,matched_masses_y,DEBUG,location):
-
     if DEBUG:
         filename = "spec_" + str(spec_num) + "_"
         if utils.find_dir(filename + 'b_hits.txt', location) and utils.find_dir(filename + 'y_hits.txt', location):
@@ -186,51 +124,6 @@ def create_hits(spec_num,spectrum,matched_masses_b,matched_masses_y,DEBUG,locati
                     y_hits.append(tup)
         # write_hits(b_hits, y_hits, location)
     return b_hits, y_hits
-
-def align_on_single_core(spectra,matched_masses_b,matched_masses_y,db,ppm_tolerance,precursor_tolerance,results,DEBUG,location):
-    for i, input_spectrum in enumerate(spectra):
-        print(f'Creating alignment for spectrum {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='\r')
-        results[input_spectrum.id]=id_spectrum(i,input_spectrum, db, matched_masses_b, matched_masses_y, ppm_tolerance, precursor_tolerance, location)
-
-def align_on_multi_core(cores,mp_id_spectrum,db,spectra,boundaries,matched_masses_b,matched_masses_y,ppm_tolerance,precursor_tolerance,results,DEBUG,location):
-    print('Initializing other processors...')
-    results = mp.Manager().dict()
-    q = mp.Manager().Queue()
-    num_processes = cores
-    ps = [ #This code makes the subprocesses and is what takes a while with spinning up the cores
-        mp.Process(
-            target=mp_id_spectrum, 
-            args=(q, copy.deepcopy(db), results)
-        ) for _ in range(num_processes) 
-    ]
-
-    for p in ps: #starts process and runs first line of mp_id_spectrum
-        p.start()    
-    print('start each of the process Done.')
-    for i, input_spectrum in enumerate(spectra):
-        print(f'\rStarting job for {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='')
-        b_hits,y_hits = create_hits(i,input_spectrum,matched_masses_b,matched_masses_y,DEBUG,location)
-
-        o = MPSpectrumID(
-            b_hits, 
-            y_hits, 
-            input_spectrum, 
-            ppm_tolerance, 
-            precursor_tolerance
-        )
-        
-        q.put(o)
-
-    while len(results) < len(spectra):
-        print(f'\rCreating an alignment for {len(results)}/{len(spectra)} [{to_percent(len(results), len(spectra))}%]', end='')
-        time.sleep(1)
-
-    [q.put('exit') for _ in range(num_processes)]
-
-    for p in ps:
-        p.join()
-        
-    return results
 
 def handle_DEV_setup(truth):
     truth = mp.Manager().dict(truth)
@@ -252,8 +145,88 @@ def handle_DEV_result(output_dir,fall_off,cores):
         average_hybrid_refinement_time = sum(alignment.Hybrid_refine_times)/len(alignment.Hybrid_refine_times),
         average_hybrid_scoring_time = sum(alignment.hybrid_scoring_times)/len(alignment.hybrid_scoring_times),
         average_alignment_time = sum(alignment_times)/len(alignment_times)
-        )          
+        )
+        
+def check_duplicates(merged_seqs, hybrid_seqs):
+    merged_set = set(merged_seqs)
+    hybrid_set = set(hybrid_seqs)
+    print(len(merged_set), len(merged_seqs))
+    print(len(hybrid_set), len(hybrid_seqs))
 
+def check_duplicates_cross(merged_seqs, hybrid_seqs):
+    overlapped_seqs = []
+    for seq in merged_seqs:
+        if seq in hybrid_seqs:
+            overlapped_seqs.append(seq)
+    [print(x) for x in overlapped_seqs]
+    
+def check_top_location(top_naturals, top_hybrids, natural_seqs, hybrid_seqs):
+    top_natural, top_hybrid = top_naturals[0], top_hybrids[0]
+    top_natural_cluster, top_hybrid_cluster = top_natural[2], top_hybrid[2]
+    top_nat_location, top_hyb_location = -1, -1
+    for i,seq in enumerate(natural_seqs):
+        b_cluster, target_b_cluster = seq[3], top_natural_cluster[0]
+        y_cluster, target_y_cluster = seq[4], top_natural_cluster[1]
+        if (b_cluster[0] == target_b_cluster[5]) and (b_cluster[1] == target_b_cluster[1]) and (y_cluster[2] == target_y_cluster[2]) and (b_cluster[2] <= target_b_cluster[2]) and (y_cluster[1] >= target_y_cluster[1]):
+            top_nat_location = i
+            break
+    
+    for i,seq in enumerate(hybrid_seqs):
+        b_cluster, target_b_cluster = seq[3], top_hybrid_cluster[0]
+        y_cluster, target_y_cluster = seq[4], top_hybrid_cluster[1]
+        if (b_cluster[0] == target_b_cluster[5]) and (y_cluster[0] == target_y_cluster[5]):
+            if (y_cluster[2] == target_y_cluster[2]) and (b_cluster[1] == target_b_cluster[1]):
+                if (b_cluster[2] <= target_b_cluster[2]) and (y_cluster[1] >= target_y_cluster[1]):
+                    top_hyb_location = i
+                    break
+    
+    if top_hyb_location == -1:
+        for i,seq in enumerate(natural_seqs):
+            b_cluster, target_b_cluster = seq[3], top_hybrid_cluster[0]
+            y_cluster, target_y_cluster = seq[4], top_hybrid_cluster[1]
+            if (b_cluster[0] == target_b_cluster[5]) and (b_cluster[1] == target_b_cluster[1]) and (y_cluster[2] == target_y_cluster[2]) and (b_cluster[2] <= target_b_cluster[2]) and (y_cluster[1] >= target_y_cluster[1]):
+                top_hyb_location = i
+                break
+    
+    with open("locations.txt", 'a') as l:
+        l.write(str(top_nat_location) + '\t' + str(top_hyb_location) + '\n')
+            
+    return
+    
+def find_sequence(b_sequence, y_sequence, b_pid, y_pid, protein_list):
+    b_prot_sequence = protein_list[b_pid][1]
+    b_target_starts, y_target_ends = [],[]
+    for i in range(0,len(b_prot_sequence)-len(b_sequence)+1):
+        testing_b = b_prot_sequence[i:i+len(b_sequence)]
+        if testing_b == b_sequence:
+            b_target_starts.append(i)
+    y_prot_sequence = protein_list[y_pid][1]
+    for i in range(0, len(y_prot_sequence)-len(y_sequence)+1):
+        testing_y = y_prot_sequence[i:i+len(y_sequence)]
+        if testing_y == y_sequence:
+            y_target_ends.append(i+len(y_sequence))
+            break
+            
+    return b_target_starts, y_target_ends
+    
+def find_target_clusters(b_sorted_clusters, y_sorted_clusters, b_sequence, y_sequence, b_pid, y_pid, protein_list):
+    #want code that takes in sequences and tells me where this sequence lives in the sorted clusters
+    b_target_starts, y_target_ends = find_sequence(b_sequence, y_sequence, b_pid, y_pid, protein_list)
+    print("\n")
+    
+    print("For b:")
+    for i, cluster in enumerate(b_sorted_clusters):
+        # if cluster[2] in b_target_starts: #for debugging
+        #     print(i, cluster)
+        if cluster[1] == b_pid and cluster[2] in b_target_starts: #need to check which dictates start position
+            print(i, cluster)
+    print("\n For y:")
+    for i, cluster in enumerate(y_sorted_clusters):
+        # if cluster[2] in b_target_starts: #for debugging
+        #     print(i, cluster)
+        if cluster[1] == y_pid and cluster[3] in y_target_ends: 
+            print(i, cluster)
+    
 class alignment_info:
     def __init__(self, max_peptide_len, location, precursor_tolerance, database, ppm_tolerance, results_len, new): #This is like the named tuple
         self.max_pep_len = max_peptide_len
@@ -266,40 +239,106 @@ class alignment_info:
     
     def __call__(self, spectrum):
         print(f'\rCreating an alignment for {spectrum.num}/{self.results_len} [{to_percent(spectrum.num, self.results_len)}%]', end='')
+        total_time = time.time()
         input_list = spectrum.mz_values
         matched_masses_b, matched_masses_y = merge_search.modified_match_masses(input_list, self.db, self.max_pep_len, self.ppm_tol, self.make_new)
-        
+                
         #Matched masses data is of form (mass, start, end, ion_int, charge, protein_num)
-        # hit_time = time.time()
+        hit_time = time.time()
         b_hits,y_hits = create_hits(spectrum.num,spectrum,matched_masses_b,matched_masses_y,True,self.write_path)
-        # hit_time = time.time()-hit_time
-        # print("hits took:", hit_time)
+        hit_time = time.time()-hit_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Hits took:" + '\t' + str(hit_time) + "\n")
+        converted_b, converted_y = convert_precursor_to_ion(spectrum.precursor_mass, spectrum.precursor_charge)
         for ion in "by":
+            cluster_time = time.time()
             clusters = clustering.create_clusters(ion, b_hits, y_hits)
+            cluster_time = time.time() - cluster_time
+            with open('Timing_data.txt', 'a') as t:
+                t.write("Clusters took:" + '\t' + str(cluster_time) + "\n")
             if ion ==  'b':
-                b_sorted_clusters = clustering.Score_clusters(ion, clusters, self.db.proteins)
+                cluster_time = time.time()
+                b_sorted_clusters = clustering.Score_clusters(ion, clusters, self.max_pep_len, converted_b)
+                cluster_time = time.time() - cluster_time
+                with open('Timing_data.txt', 'a') as t:
+                    t.write("Scoring b clusters took:" + '\t' + str(cluster_time) + "\n")
             else:
-                y_sorted_clusters = clustering.Score_clusters(ion, clusters, self.db.proteins)
+                cluster_time = time.time()
+                y_sorted_clusters = clustering.Score_clusters(ion, clusters, self.max_pep_len, converted_y)
+                cluster_time = time.time() - cluster_time
+                with open('Timing_data.txt', 'a') as t:
+                    t.write("Scoring y clusters took:" + '\t' + str(cluster_time) + "\n")
 
+
+        # find_target_clusters(b_sorted_clusters, y_sorted_clusters, "DLKIIWNKTKH", "DLKIIWNKTKH", 140, 140, self.db.proteins)
+
+
+        start_time = time.time()
         merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
         merged_seqs.sort(key = lambda x: x[0], reverse = True)
+        end_time = time.time() - start_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Ryan merging and sorting took:" + '\t' + str(end_time) + "\n")
         prec_tol = ppm_to_da(spectrum.precursor_mass, self.prec_tol)
-        merged_seqs = clustering.filter_by_precursor(merged_seqs, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
-        merged_seqs = clustering.filter_by_missing_mass(self.db, merged_seqs, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
+        start_time = time.time()
+        merged_seqs = clustering.filter_by_precursor(merged_seqs, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, self.max_pep_len)
+        end_time = time.time() - start_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Precursor filtering took:" + '\t' + str(end_time) + "\n")
+        # start_time = time.time()
+        # merged_seqs = clustering.filter_by_missing_mass(self.db, merged_seqs, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
+        # end_time = time.time() - start_time
+        # with open('Timing_data.txt', 'a') as t:
+        #     t.write("Missing mass filtering took:" + '\t' + str(end_time) + "\n")
         
+        start_time = time.time()
         hybrid_merged = clustering.get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
-        hybrid_merged = clustering.filter_by_precursor(hybrid_merged, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
-        hybrid_merged = clustering.filter_by_missing_mass(self.db, hybrid_merged, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
+        end_time = time.time() - start_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Finding hybrid merges took:" + '\t' + str(end_time) + "\n")
+        start_time = time.time()
+        hybrid_merged = clustering.filter_by_precursor(hybrid_merged, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, self.max_pep_len)
+        end_time = time.time() - start_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Filtering hybrids by precursor masss took:" + '\t' + str(end_time) + "\n")
 
-        merged_top = clustering.combine_merges(merged_seqs, hybrid_merged, 50)
-        
-        alignments = find_alignments(merged_top, spectrum.precursor_mass, spectrum.precursor_charge, prec_tol, self.db)
 
-        rescored_alignments = second_scoring(alignments, spectrum, self.ppm_tol)
-        rescored_alignments = sorted(rescored_alignments, key = lambda x: (x[0], x[1]), reverse=True)
+        # check_duplicates(merged_seqs, hybrid_merged)
+        # check_duplicates_cross(merged_seqs, hybrid_merged)
+        # print("Naturals:")
+        # [print(x) for x in merged_seqs[-10:]]
+        # [print(x) for x in merged_seqs[:10]]
+        # print("Hybrids:")
+        # [print(x) for x in hybrid_merged[-10:]]
+        # [print(x) for x in hybrid_merged[:10]]
         
+        start_time = time.time()
+        natural_alignments, hybrid_alignments = find_alignments(merged_seqs, hybrid_merged, spectrum.precursor_mass, spectrum.precursor_charge, prec_tol, self.db, self.prec_tol)
+        end_time = time.time() - start_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Making alignments took:" + '\t' + str(end_time) + "\n")
+
+        start_time = time.time()
+        rescored_naturals, rescored_hybrids = second_scoring(natural_alignments, hybrid_alignments, spectrum, self.ppm_tol, self.db.proteins, self.max_pep_len)
+        rescored_naturals = sorted(rescored_naturals, key = lambda x: (x[0], x[1]), reverse=True)
+        rescored_hybrids = sorted(rescored_hybrids, key = lambda x: (x[0], x[1]), reverse=True)
+        end_time = time.time() - start_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Second round of scoring and sorting took:" + '\t' + str(end_time) + "\n")
+            
+        # check_top_location(rescored_naturals[0], rescored_hybrids[0], merged_seqs, hybrid_merged)
+        
+        rescored_alignments = sorted(rescored_naturals + rescored_hybrids, key = lambda x: (x[0], x[1]), reverse = True)
+        
+        start_time = time.time()
         postprocessed_alignments = postprocessing(rescored_alignments, self.db)
+        end_time = time.time() - start_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Postprocessing took:" + '\t' + str(end_time) + "\n")
         # raw_results = id_spectrum(spectrum, db, b_hits, y_hits, ppm_tolerance, precursor_tolerance,n,digest_type=digest,truth=truth, fall_off=fall_off)
+        total_time = time.time() - total_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Analysis of spectrum " + str(spectrum.num) +  " took:" + "\t" + str(total_time) + "\n")
         return postprocessed_alignments
 
 def align(numcores, spectra, location, precursor_tolerance, db, ppm_tolerance, max_peptide_len,new):
@@ -309,7 +348,7 @@ def align(numcores, spectra, location, precursor_tolerance, db, ppm_tolerance, m
     now = time.time()
     [spec_nums.append(i) for i in range(0, len(spectra))]
     x = alignment_info(max_peptide_len,location,precursor_tolerance,db,ppm_tolerance,len(spectra),new)
-    y = p.map(x, spectra) #function can only take 1 input so make object
+    y = p.map(x, spectra)
     p.close()
     p.join()
     print("On 16 cores", time.time() - now)
