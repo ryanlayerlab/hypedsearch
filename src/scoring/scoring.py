@@ -602,7 +602,7 @@ def rescore(comb_seq, input_masses, ppm_tolerance, hybrid, proteins):
             t_ctr = t_ctr + 1
             if t_ctr < len(masses):
                 theoretical = masses[t_ctr]
-        elif observed + tol < theoretical: #The bug is with 810 around here
+        elif observed + tol < theoretical:
             o_ctr = o_ctr + 1
             if o_ctr < len(input_masses):
                 observed = input_masses[o_ctr]
