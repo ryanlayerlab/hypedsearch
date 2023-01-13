@@ -1,8 +1,6 @@
 import sqlite3
 import time
 
-from matplotlib.pyplot import connect
-
 class database_file:
     def __init__(self, max_len, reset=True):
         self.connection = sqlite3.connect("kmers.db")

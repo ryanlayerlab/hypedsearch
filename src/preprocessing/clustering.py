@@ -5,6 +5,8 @@ from utils import ppm_to_da
 import gen_spectra
 from constants import WATER_MASS, PROTON_MASS
 from sqlite import database_file
+import time
+from constants import AMINO_ACIDS
 
 def write_cluster(cluster):
     #returns cluster of the form (score, pid, mz, start, end)
@@ -137,10 +139,38 @@ def find_sequence(pid, start_ind, end_ind, proteins):
     prot_seq = protein[1]
     target = prot_seq[start_ind: end_ind]
     return target
+
+def find_extensions(pid, start, end, mass, ion, protein_list, charge, prec):
+    prot_seq = protein_list[pid][1]
+    current_mass = mass
+    extensions = []
+    if ion == 0: #b ion
+        raw_b_mass = gen_spectra.get_raw_mass(mass, ion, charge)
+        current_position = end
+        while current_mass < prec:
+            if current_position < len(prot_seq):
+                next_AA = prot_seq[current_position]
+            else: break
+            raw_b_mass = raw_b_mass + AMINO_ACIDS[next_AA]
+            current_mass = gen_spectra.calc_combined_mass(raw_b_mass, 0)
+            tup = (current_mass, start, current_position, 0, 2, pid)
+            extensions.append(tup)
+            current_position = current_position + 1
+    else: #y ion
+        raw_y_mass = gen_spectra.get_raw_mass(mass, ion, charge)
+        current_position = start-1
+        while current_mass < prec:
+            next_AA = prot_seq[current_position]
+            raw_y_mass = raw_y_mass + AMINO_ACIDS[next_AA]
+            current_mass = gen_spectra.calc_combined_mass(raw_y_mass, 1)
+            tup = (current_mass, end, current_position, 1, 2, pid)
+            extensions.append(tup)
+            current_position = current_position - 1
+    return(extensions)
     
-def Score_clusters(ion, clusters, max_len, conv_prec):
+    
+def Score_clusters(ion, clusters, conv_prec, protein_list):
     cluster = collections.namedtuple('cluster', 'score pid start end mz charge extensions')
-    db = database_file(max_len, False)
     if ion == 'b':
         b_cluster_array = []
         for A in clusters:
@@ -151,11 +181,14 @@ def Score_clusters(ion, clusters, max_len, conv_prec):
             end = int(A[4])
             # indices = A[5:]
             charge = A[5]
-            qid = db.query_extensions_b(conv_prec, pid, start, end, 0)
-            extensions = db.query_fetchall(qid)
+            query_time = time.time()
+            extensions = find_extensions(pid, start, end, mz, 0, protein_list, charge, conv_prec)
             target_cluster = cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions)
+            # print("Time:", time.time() - query_time, "End-Start", end-start)
 
             b_cluster_array.append(target_cluster)
+            with open('b_clusters.txt', 'a') as b:
+                b.write(str(score) + '\t' + str(pid) + '\t' + str(start) + '\t' + str(end) + '\t' + str(mz) + '\t' + str(charge) + '\t' + str(extensions) + '\n')
 
         b_sorted_clusters = sorted(b_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
         return b_sorted_clusters
@@ -169,11 +202,12 @@ def Score_clusters(ion, clusters, max_len, conv_prec):
             end = int(A[4])
             # indices = A[5:]
             charge = A[5]
-            qid = db.query_extensions_y(conv_prec, pid, end, start, 1)
-            extensions = db.query_fetchall(qid)
+            extensions = find_extensions(pid, start, end, mz, 0, protein_list, charge, conv_prec)
             target_cluster = cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions)
 
             y_cluster_array.append(target_cluster)
+            with open('y_clusters.txt', 'a') as b:
+                b.write(str(score) + '\t' + str(pid) + '\t' + str(start) + '\t' + str(end) + '\t' + str(mz) + '\t' + str(charge) + '\t' + str(extensions) + '\n')
 
         y_sorted_clusters = sorted(y_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
         return y_sorted_clusters

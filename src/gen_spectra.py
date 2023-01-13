@@ -59,7 +59,6 @@ def max_mass(seqeunce: str, ion: str, charge: int):
     return mz
 
 def get_total_sum(precursor_mass,precursor_charge):
-    total_sum = 0
     total_sum = (precursor_mass * precursor_charge) - (precursor_charge * PROTON_MASS) - WATER_MASS
     return total_sum    
 
@@ -136,4 +135,9 @@ def gen_min_ordering(sequence: str):
         return []
     return middle
 
-   
+def calc_combined_mass(total_raw, target_ion):
+    if target_ion == 0:
+        converted = (DOUBLY_CHARGED_B_BASE + total_raw) / 2
+    else:
+        converted = (DOUBLY_CHARGED_Y_BASE + total_raw) / 2
+    return converted

@@ -118,8 +118,6 @@ def db_make_database_set_for_proteins(proteins,max_len,dbf):
     for i, (_, prot_entry) in enumerate(proteins):
         percent = int((i+1) * 100 / plen)
         print(f'\rOn protein {i+1}/{plen} [{int((i+1) * 100 / plen)}%]', end='')
-        if i == 256:
-            continue
         if percent != last_percent:
             # print(f'\rInserting {percent}%', end='')
             last_percent = percent
