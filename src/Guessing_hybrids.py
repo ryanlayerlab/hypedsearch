@@ -159,5 +159,5 @@ with open("hybrid_indices.txt", "r") as f:
             
 with open("missed_indices.txt", "w") as h:
     for entry in missed_seqs:
-        h.write(entry + "\n")
+        h.write(entry)
         
