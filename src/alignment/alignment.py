@@ -434,7 +434,7 @@ def get_extensions(precursor_mass, precursor_charge, b_pid, b_start, extended_b,
 
 def find_alignments(natural_merged, hybrid_merged, obs_prec, prec_charge, tol, max_len, prec_tol):
     natural_alignments, hybrid_alignments = [], []
-    for i, comb_seq in enumerate(natural_merged):
+    for i, comb_seq in enumerate(natural_merged): #Maybe read the top 50 of these, look for matches and go until we find something
         # if i == 1141:
         #     print("here")
         pid = comb_seq[3][0]
@@ -445,6 +445,7 @@ def find_alignments(natural_merged, hybrid_merged, obs_prec, prec_charge, tol, m
         b_mass = comb_seq[3][4]
         y_mass = comb_seq[4][4]
         b_extensions, y_extensions = comb_seq[3][6], comb_seq[4][6]
+        # print("Natural", i)
         if y_start >= b_end: #no overlap but b before y
             natural_alignments = natural_alignments + natural_get_extensions(obs_prec, prec_charge, pid, y_mass, y_start, y_end, y_charge, b_charge, prec_tol, b_extensions, b_score, y_score) #THERE IS A BUG HERE
         elif b_start <= y_start and b_end <= y_end and y_start < b_end: #some overlap
@@ -465,7 +466,8 @@ def find_alignments(natural_merged, hybrid_merged, obs_prec, prec_charge, tol, m
         y_mass = comb_seq[4][4]
         b_extensions, y_extensions = comb_seq[3][6], comb_seq[4][6]
         extension_time = time.time()
+        # print("Hybrid",i)
         hybrid_alignments = hybrid_alignments + get_extensions(obs_prec, prec_charge, b_pid, b_start, b_extensions, y_pid, y_end, y_extensions, prec_tol, y_start, y_charge, b_end, b_charge, b_mass, y_mass, b_score, y_score)     
         total_extension_time = total_extension_time + (time.time() - extension_time)
-    print("\n Average extension time:",total_extension_time/len(hybrid_merged))
+    # print("\n Average extension time:",total_extension_time/len(hybrid_merged))
     return natural_alignments, hybrid_alignments

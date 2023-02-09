@@ -1,17 +1,14 @@
-from xmlrpc.client import Boolean
-
-from pytz import country_names
 from sqlite import database_file
-from utils import hashable_boundaries, ppm_to_da, predicted_len
+from utils import ppm_to_da
 from objects import Database
 import sys
 import shutil
 import gen_spectra
 from collections import defaultdict
-from math import ceil
 import os
 import json
 import time
+from constants import ENCODED
 
 def write_matched_masses(filepath, matched_masses_b, matched_masses_y, kmer_set, debug):
     with open(os.path.join(filepath, "matched_masses_b.txt"),"w+") as b:
@@ -37,48 +34,15 @@ def handle_sorting_keys(db_dict_b, db_dict_y, kmer_list):
     for mz in sorted_y_keys:
         modified_sort_masses_in_sorted_keys_y(db_dict_y,mz,kmer_list)
 
-# def modified_add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set,start_location,end_location,protein_number):
-#     for ion in 'by':
-#         for charge in [1, 2]:
-#             pre_spec = gen_spectra.gen_spectrum(kmer, ion=ion, charge=charge)
-#             spec = pre_spec
-#             if isinstance(pre_spec,dict):
-#                 spec = pre_spec.get('spectrum')
-#             for i, mz in enumerate(spec):
-#                 start_position = start_location if ion == 'b' else end_location
-#                 end_position = start_position + i if ion == 'b' else end_location - i
-#                 kmer_to_add = kmer[:i+1] if ion == 'b' else kmer[-i-1:]
-#                 r_d = db_dict_b if ion == 'b' else db_dict_y
-#                 # r_d[mz].add(kmer_to_add)
-#                 if ion == 'b':
-#                     r_d[mz].add((mz, protein_number, kmer_to_add, str(start_position) + '-' + str(end_position), ion, charge))
-#                 else:
-#                     r_d[mz].add((mz, protein_number, kmer_to_add, str(end_position) + '-' + str(start_position), ion, charge))
-#                 kmer_set[kmer_to_add].add(prot_name)
-
-# def make_database_set_for_protein(i,plen,max_len,prot_entry,prot_name,db_dict_b,db_dict_y,kmer_set):
-#     print(f'\rOn protein {i+1}/{plen} [{int((i+1) * 100 / plen)}%]', end='')
-#     start = 0
-#     stop = max_len
-#     for j in range(start, stop):
-#         kmer = prot_entry.sequence[:j+1]
-#         start_position = start
-#         end_position = j
-#         modified_add_all(kmer, prot_name, db_dict_b,db_dict_y,kmer_set, start_position, end_position, i)
-#     start = 0
-#     stop = len(prot_entry.sequence) - max_len
-#     for j in range(start, stop):
-#         kmer = prot_entry.sequence[j:j+max_len]
-#         start_position = j
-#         end_position = j + max_len - 1
-#         modified_add_all(kmer, prot_name, db_dict_b,db_dict_y,kmer_set,start_position, end_position, i)
-#     start = len(prot_entry.sequence) - max_len
-#     stop = len(prot_entry.sequence)
-#     for j in range(start, stop):
-#         kmer = prot_entry.sequence[j:]
-#         start_position = j
-#         end_position = len(prot_entry.sequence)
-#         modified_add_all(kmer, prot_name,db_dict_b,db_dict_y,kmer_set,start_position, end_position, i)
+# def encode_kmer(kmer):
+#     # code = ''
+#     # for char in kmer:
+#     #     encoded = ENCODED[char]
+#     #     code = code + encoded
+#     # code = int(code)
+#     mBytes = kmer.encode("utf-8")
+#     code = int.from_bytes(mBytes, byteorder="big")
+#     return code
 
 def get_data(kmer, start, end, protein_num):
     data_list = []
@@ -86,7 +50,8 @@ def get_data(kmer, start, end, protein_num):
         for charge in [1,2]:
             mass = gen_spectra.max_mass(kmer, ion=ion, charge=charge)
             ion_int = 0 if ion == 'b' else 1
-            input_tuple = (mass, start, end, ion_int, charge, protein_num)
+            # code = encode_kmer(kmer)
+            input_tuple = (mass, start, end, ion_int, charge, protein_num) #change this to code for larger databases when we need an encoding
             data_list.append(input_tuple)
 
     return data_list
@@ -99,14 +64,17 @@ def db_make_set_for_protein(i,prot,max_len, dbf, data):
         for start in range(0, seq_len - size + 1):
             end = start + size
             kmer = prot[start:end]
+            bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
+            if not any (x in bad_chars for x in kmer):
+                
             # last_index = seq - size 6, end = start + size - 1 = 7
             # [data.append(x) for x in get_data(kmer, start, end)]
-            data_list = get_data(kmer, start, end, i)
-            data.extend(data_list)
-            # insertion code
-            if len(data) > count_max:
-                dbf.insert(data)
-                data.clear()
+                data_list = get_data(kmer, start, end, i)
+                data.extend(data_list)
+                # insertion code
+                if len(data) > count_max:
+                    dbf.insert(data)
+                    data.clear()
             
     return
 
@@ -200,17 +168,12 @@ def modified_merge(kmers, boundaries: dict):
             kmer_index = starting_point
     return matched_masses_b, matched_masses_y
 
-def modified_match_masses(input_masses: list, db: Database, max_len: int, ppm_tolerance, make_new):
+def modified_match_masses(input_masses: list, db: Database, max_len: int, ppm_tolerance, b_prec, y_prec):
     # max_boundary = max(boundaries.keys())
     # estimated_max_len = ceil(boundaries[max_boundary][1] / 57.021464)
     # max_len = min(estimated_max_len, max_pep_len)
     
-    dbf = database_file(max_len, make_new)
-    if make_new:
-        kv_prots = [(k, v) for k, v in db.proteins]    
-        # extended_kv_prots = [(k, entry) for (k, v) in kv_prots for entry in v]
-        modified_make_database_set(kv_prots, max_len, dbf)
-    
+    dbf = database_file(max_len, False)
     matched_masses_b, matched_masses_y = dict(), dict()
     
     start = time.time()
@@ -220,6 +183,10 @@ def modified_match_masses(input_masses: list, db: Database, max_len: int, ppm_to
         matched_masses_b[input_mass], matched_masses_y[input_mass] = dbf.query_mass(input_mass, tol) #same place: location start, protein_num
         # print(input_mass, 'b', matched_masses_b[input_mass])
         # print(input_mass, 'y', matched_masses_y[input_mass])
+    tol = ppm_to_da(b_prec, ppm_tolerance)
+    matched_masses_b[b_prec], _ = dbf.query_mass(b_prec, tol)
+    tol = ppm_to_da(y_prec, ppm_tolerance)
+    _, matched_masses_y[y_prec] = dbf.query_mass(y_prec, tol)
         
     end = time.time() - start
     with open('Timing_data.txt', 'w') as t:
@@ -228,6 +195,7 @@ def modified_match_masses(input_masses: list, db: Database, max_len: int, ppm_to
         # write_matched_masses(write_path, matched_masses_b, matched_masses_y, kmer_set, debug)
 
     return matched_masses_b, matched_masses_y
+
 def reformat_kmers(kstr):
     new_list = []
     kstr = kstr.replace("[", "")
