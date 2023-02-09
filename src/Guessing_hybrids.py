@@ -55,7 +55,7 @@ def overlap_scoring(sequence, ppm_tol, input_masses):
     return(total_score)
 
 #Set your filepaths to the database and the spectra folder
-prot_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/sample_database.fasta'
+prot_path = '/home/karo9276/HypedSearch/hypedsearch/data/database/sample_database.fasta'
 proteins = database.build(prot_path)
 
 dbf = database_file(max_pep_len, make_new_db)
@@ -64,14 +64,14 @@ if make_new_db:
     kv_prots = [(k, v) for k, v in proteins.proteins]    
     merge_search.modified_make_database_set(kv_prots, max_pep_len, dbf)
 
-spectra_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/spectra/NOD2_E3'
+spectra_path = '/home/karo9276/HypedSearch/hypedsearch/data/spectra/NOD2_E3'
 spectra_file = get_spectra_files(spectra_path)[0]
 
 #Loads in the spectra as a list of spectrum objects
 spectra = preprocessing_utils.load_spectra(spectra_file, ppm_tolerance, peak_filter, relative_abundance_filter)
 
 #Loading in the truth set from SpectraMill
-truth_set_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/truth_table/NOD2_E3_results.ssv'
+truth_set_path = '/home/karo9276/HypedSearch/hypedsearch/data/truth_table/NOD2_E3_results.ssv'
 specmill_seqs = first_pass_truth_set(truth_set_path)
 
 #See which specmill seqs have len < 25
@@ -87,6 +87,10 @@ for seq in specmill_seqs:
 #container stores result of if a spectrum is hybrid or not 
 is_hybrid = list()
 
+#container to store number of precursor matches for each spectrum
+b_precursor_matches = list()
+y_precursor_matches = list()
+
 #This loop checks each spectrum to determine if it is a hybrid peptide
 for i,spectrum in enumerate(spectra):
     #This matches every mz in a spectrum with a list of kmers it can match to. Format is (m/z, location_start, location_end, ion, charge, parent_protein)
@@ -100,6 +104,10 @@ for i,spectrum in enumerate(spectra):
     #Getting everything that matched the precursor weights
     all_b_hits, all_y_hits = matched_masses_b[b_precursor], matched_masses_y[y_precursor]
 
+    #save number of precursor match hits
+    b_precursor_matches.append(len(all_b_hits))
+    y_precursor_matches.append(len(all_y_hits))
+    
     #Loop over all precursor weight hits and score each one 
     b_scores, y_scores = list(), list()
     seq_set = set()
@@ -139,6 +147,17 @@ print(" out of: ")
 print(len(is_hybrid))
 
 with open("hybrid_indices.txt", "w") as h:
-    for index in is_hybrid:
-        if index != 0:
-            h.write(str(index) + "\n")
+    for i,entry in enumerate(is_hybrid):
+        if entry != 0:
+            h.write(str(i) + "\n")
+
+missed_seqs = list()
+with open("hybrid_indices.txt", "r") as f:
+    for line in f:
+        if(len(specmill_seqs[int(line)]) <= 25):
+            missed_seqs.append(line)
+            
+with open("missed_indices.txt", "w") as h:
+    for entry in missed_seqs:
+        h.write(entry + "\n")
+        
