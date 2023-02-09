@@ -1,6 +1,8 @@
 from preprocessing import preprocessing_utils, clustering, merge_search
 from scoring import scoring
+import gen_spectra
 from main import get_spectra_files
+from utils import ppm_to_da
 import database
 from constants import WATER_MASS, PROTON_MASS, AMINO_ACIDS
 from sqlite import database_file
@@ -14,8 +16,46 @@ prec_tol = 10
 max_pep_len = 25 
 make_new_db = False
 
+def first_pass_truth_set(filepath):
+    correct_sequences = []
+    with open(filepath, 'r') as truth_set:
+        for q, line in enumerate(truth_set):
+            if q != 0:
+                split_line = line.split(';')
+                correct_sequences.append(split_line[9])
+
+    return correct_sequences
+
+def overlap_scoring(sequence, ppm_tol, input_masses):
+    total_score = 0
+    spectrum = gen_spectra.gen_spectrum(sequence)
+    masses = sorted(spectrum['spectrum'])
+    input_masses = sorted(input_masses)
+    o_ctr, t_ctr = 0, 0
+    observed = input_masses[o_ctr]
+    theoretical = masses[t_ctr]
+    while (o_ctr < len(input_masses) and t_ctr < len(masses)):
+        tol = ppm_to_da(observed, ppm_tol)
+        if theoretical < observed - tol:
+            t_ctr = t_ctr + 1
+            if t_ctr < len(masses):
+                theoretical = masses[t_ctr]
+        elif observed + tol < theoretical: #The bug is with 810 around here
+            o_ctr = o_ctr + 1
+            if o_ctr < len(input_masses):
+                observed = input_masses[o_ctr]
+        elif abs(observed-theoretical) <= tol:
+            total_score = total_score + 1
+            o_ctr = o_ctr + 1
+            t_ctr = t_ctr + 1
+            if o_ctr < len(input_masses) and t_ctr < len(masses):
+                observed = input_masses[o_ctr]
+                theoretical = masses[t_ctr]
+                
+    return(total_score)
+
 #Set your filepaths to the database and the spectra folder
-prot_path = '/home/karo9276/Hybrid-Testing/Hybrid-Testing/data/database/sample_database.fasta'
+prot_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/sample_database.fasta'
 proteins = database.build(prot_path)
 
 dbf = database_file(max_pep_len, make_new_db)
@@ -24,15 +64,15 @@ if make_new_db:
     kv_prots = [(k, v) for k, v in proteins.proteins]    
     merge_search.modified_make_database_set(kv_prots, max_pep_len, dbf)
 
-spectra_path = '/home/karo9276/Hybrid-Testing/Hybrid-Testing/data/spectra/NOD2_E3'
-spectra_files = get_spectra_files(spectra_path)
+spectra_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/spectra/NOD2_E3'
+spectra_file = get_spectra_files(spectra_path)[0]
 
 #Loads in the spectra as a list of spectrum objects
-spectra = preprocessing_utils.load_spectra(spectra_files, ppm_tolerance, peak_filter, relative_abundance_filter)
+spectra = preprocessing_utils.load_spectra(spectra_file, ppm_tolerance, peak_filter, relative_abundance_filter)
 
 #Loading in the truth set from SpectraMill
-truth_set_path = '/home/karo9276/Hybrid-Testing/Hybrid-Testing/data/NOD2_E3_results.ssv'
-specmill_seqs = preprocessing_utils.first_pass_truth_set(truth_set_path)
+truth_set_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/truth_table/NOD2_E3_results.ssv'
+specmill_seqs = first_pass_truth_set(truth_set_path)
 
 #See which specmill seqs have len < 25
 ctr = 0
@@ -50,7 +90,8 @@ is_hybrid = list()
 #This loop checks each spectrum to determine if it is a hybrid peptide
 for i,spectrum in enumerate(spectra):
     #This matches every mz in a spectrum with a list of kmers it can match to. Format is (m/z, location_start, location_end, ion, charge, parent_protein)
-    matched_masses_b, matched_masses_y = merge_search.modified_match_masses(spectrum.mz_values, proteins, max_pep_len, ppm_tolerance, dbf)
+    b_prec, y_prec = gen_spectra.convert_precursor_to_ion(spectrum.precursor_mass, spectrum.precursor_charge)
+    matched_masses_b, matched_masses_y = merge_search.modified_match_masses(spectrum.mz_values, proteins, max_pep_len, ppm_tolerance, b_prec, y_prec)
 
     #FIRST ROUTE TO CHECK IF HYBRID - CHECK PRECURSOR WEIGHT MATCHES 
     #Get precursor mass
@@ -67,11 +108,11 @@ for i,spectrum in enumerate(spectra):
         seq = preprocessing_utils.find_sequence(hit, proteins.proteins)
         seq_set.add(seq)
         #Score the hit - score = number of peaks matched (out of 25)
-        b_scores.append(scoring.overlap_scoring(seq, ppm_tolerance, spectrum.mz_values))
+        b_scores.append(overlap_scoring(seq, ppm_tolerance, spectrum.mz_values))
     for hit in all_y_hits: 
         seq = preprocessing_utils.find_sequence(hit, proteins.proteins)
         seq_set.add(seq)
-        y_scores.append(scoring.overlap_scoring(seq, ppm_tolerance, spectrum.mz_values))
+        y_scores.append(overlap_scoring(seq, ppm_tolerance, spectrum.mz_values))
     
     #If SpecMill sequence is found in our precursor match sequences anywhere, not hybrid? 
     #What if seq_set is empty?
