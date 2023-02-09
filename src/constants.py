@@ -19,10 +19,31 @@ AMINO_ACIDS={
     "U": 150.95363,
     "W": 186.079313,
     "Y": 163.06332,
-    "V": 99.068414,
-    "X": 0, # added to ignore. TODO: figure out what to do with it
-    "B": 113.084064, # added to ignore. TODO: figure out what to do with it
-    "Z": 0, # added to ignore. TODO: figure out what to do with it
+    "V": 99.068414
+}
+
+ENCODED = {
+    "A": '01',
+    "R": '02',
+    "N": '03',
+    "D": '04',
+    "C": '05',
+    "E": '06',
+    "Q": '07',
+    "G": '08',
+    "H": '09',
+    "I": '10',
+    "L": '11',
+    "K": '12',
+    "M": '13',
+    "F": '14',
+    "P": '15',
+    "S": '16',
+    "T": '17',
+    "U": '18',
+    "W": '19',
+    "Y": '20',
+    "V": '21'
 }
 
 # used for the minimum correct ordering of a sequence. Order is by mass

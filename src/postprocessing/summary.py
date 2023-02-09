@@ -30,20 +30,8 @@ def json_file(results: dict, output_dir: str) -> None:
     JSON.save_dict(json_file_name, dictified)
 
 
-def text_file(results: dict, output_dir: str) -> None:
-    txt_file_name = os.path.join(output_dir, f'{SUMMARY_NAME}.txt')
-    # dictified = {}
-    # for name, alignment in results.items():
-    #     dictified[name] = {
-    #         'spectrum': alignment.spectrum._asdict(),
-    #         'alignments': [x._asdict() for x in alignment.alignments]
-    #    }
-    # with open(txt_file_name, 'w') as o:
-    #     for i, x in enumerate(dictified.keys()):
-    #         target_entry = dictified[x]
-    #         target_alignments = target_entry['alignments']
+def text_file(results: dict, txt_file_name: str) -> None:
 
-# label, left_protein, right_protein, sequence, b_score, y_score, total_score, precursor_distance, alignment
     with open(txt_file_name, 'w') as t:
         for i, x in enumerate(results):
             target_alignments = x
@@ -125,9 +113,12 @@ def generate(alignments: dict, output_dir='./') -> None:
     json_file(alignments, output_dir)
     tsv_file(alignments, output_dir)
 
-def generate_to_txt(alignments: dict, output_dir='./') -> None:
+def generate_to_txt(matched_spectra, spectra_files, output_dir) -> None:
 
-    # output_dir = make_valid_dir_string(output_dir)
-    # make_dir(output_dir)
-
-    text_file(alignments, output_dir)
+    for i, file in enumerate(spectra_files):
+        alignments = matched_spectra[i]
+        filename = os.path.basename(file)
+        A = filename.split(".")
+        base_file = A[0] + ".txt"
+        output_file = os.path.join(output_dir, base_file)
+        text_file(alignments, output_file)

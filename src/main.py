@@ -66,7 +66,7 @@ def main(args: object) -> None:
     matched_spectras = runner.run(arguments)
     output_dir = arguments['output_dir']
     print('\nFinished search. Writting results to {}...'.format(output_dir))
-    summary.generate_to_txt(matched_spectras, output_dir)
+    summary.generate_to_txt(matched_spectras, arguments["spectra_files"], output_dir)
     # summary.generate(matched_spectras, output_dir)
 
 if __name__ == '__main__':

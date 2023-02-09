@@ -8,27 +8,41 @@ relative_abundance_filter = .1
 prec_tol = 10
 max_pep_len = 10
 
-dataset_id = 'BMEM_AspN_Fxn4'
+dataset_id = 'BMEM_searches'    
 
 
 prot_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/UniProt_mouse.fasta'
 proteins = database.build(prot_path)
 
+# alphabet = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+# for char in alphabet:
+#     found = False
+#     for protein in proteins.proteins:
+#         prot_seq = protein[1]
+#         if char in prot_seq:
+#             print("We found a", char, protein[0])
+#             found = True
+#             break
+#     if not found:
+#         print("There are no", char, "in the database")
 
-spectra_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/spectra/Lab_Data'
-spectra_files = get_spectra_files(spectra_path)
-spectra, _ = load_spectra(spectra_files, ppm_tolerance, peak_filter, relative_abundance_filter)
+
+# spectra_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/spectra/Lab_Data'
+# spectra_files = get_spectra_files(spectra_path)
+# spectra = load_spectra(spectra_files, ppm_tolerance, peak_filter, relative_abundance_filter)
 
 def build_specmill_table(filepath):
     sequences, ids = [], []
     with open(filepath, 'r') as t:
         for line in t:
             A = line.split('\t')
-            seq = A[7]
-            id = A[12][:-1]
+            seq = A[22]
+            id = A[15].strip('\"')
+            if "BMEM" in id:
+                print(A)
             sequences.append(seq)
             ids.append(id)
-    return sequences[1:], ids[1:]
+    return sequences, ids
     
 truth_set_pathway = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/truth_table/' + dataset_id + '.txt'
 specmill_sequences, seq_ids = build_specmill_table(truth_set_pathway)
@@ -37,12 +51,22 @@ specmill_sequences, seq_ids = build_specmill_table(truth_set_pathway)
 def get_proteins(protein_list, seq_ids, sequences):
     proteins = []
     for i, id in enumerate(seq_ids):
+        found = False
         for protein in protein_list:
             description = protein[0]
-            if id in description: #check for hybrid as well
+            if id in description:
                 if sequences[i] in protein[1]:
                     proteins.append(protein)
+                    found = True
                     continue
+        if 'HYBRID' in id:
+            print(id) #these need to be added manually
+            continue
+            #Ex: HYBRID: mouse ins1C PQVEQLELGGSPGDLQTLAL-DSDKGQQDGFEATTEGPRPQ mouse chgA'
+        elif not found:
+            print("Not found at", i)
+
+                
     
     print(len(seq_ids), len(proteins))
     new_proteins = set(proteins)
@@ -55,13 +79,12 @@ all_proteins = get_proteins(proteins.proteins, seq_ids, specmill_sequences)
 database_pathway = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/' + dataset_id + '_database.fasta'
 with open(database_pathway, 'w') as d:
     for protein in all_proteins:
-        d.write(protein[0] + '\n')
+        d.write('>' + protein[0] + '\n')
         prot_seq = protein[1]
         seq_len = len(prot_seq)
         curr_write = 0
-        while seq_len >= 50:
-            d.write(prot_seq[curr_write:curr_write+50] + '\n')
-            seq_len = seq_len-50
-            curr_write = curr_write + 50
-        d.write(prot_seq[curr_write:seq_len] + '\n')
-        d.write('\n')
+        while seq_len >= 70:
+            d.write(prot_seq[curr_write:curr_write+70] + '\n')
+            seq_len = seq_len-70
+            curr_write = curr_write + 70
+        d.write(prot_seq[curr_write:seq_len]+'\n')

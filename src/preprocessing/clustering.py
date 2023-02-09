@@ -144,76 +144,205 @@ def find_extensions(pid, start, end, mass, ion, protein_list, charge, prec):
     prot_seq = protein_list[pid][1]
     current_mass = mass
     extensions = []
+    bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
     if ion == 0: #b ion
         raw_b_mass = gen_spectra.get_raw_mass(mass, ion, charge)
         current_position = end
         while current_mass < prec:
-            if current_position < len(prot_seq):
-                next_AA = prot_seq[current_position]
-            else: break
-            raw_b_mass = raw_b_mass + AMINO_ACIDS[next_AA]
-            current_mass = gen_spectra.calc_combined_mass(raw_b_mass, 0)
-            tup = (current_mass, start, current_position, 0, 2, pid)
-            extensions.append(tup)
-            current_position = current_position + 1
+            if current_position > len(prot_seq)-1:
+                break
+            next_AA = prot_seq[current_position]
+            if not any (x in bad_chars for x in next_AA):
+                raw_b_mass = raw_b_mass + AMINO_ACIDS[next_AA]
+                current_mass = gen_spectra.calc_combined_mass(raw_b_mass, 0)
+                tup = (current_mass, start, current_position, 0, 2, pid)
+                extensions.append(tup)
+                current_position = current_position + 1
+            else:
+                break
     else: #y ion
         raw_y_mass = gen_spectra.get_raw_mass(mass, ion, charge)
         current_position = start-1
         while current_mass < prec:
+            if current_position < 0:
+                break
             next_AA = prot_seq[current_position]
-            raw_y_mass = raw_y_mass + AMINO_ACIDS[next_AA]
-            current_mass = gen_spectra.calc_combined_mass(raw_y_mass, 1)
-            tup = (current_mass, end, current_position, 1, 2, pid)
-            extensions.append(tup)
-            current_position = current_position - 1
+            if not any (x in bad_chars for x in next_AA):
+                raw_y_mass = raw_y_mass + AMINO_ACIDS[next_AA]
+                current_mass = gen_spectra.calc_combined_mass(raw_y_mass, 1)
+                tup = (current_mass, current_position, end, 1, 2, pid)
+                extensions.append(tup)
+                current_position = current_position - 1
+            else:
+                break
     return(extensions)
+
+def get_all_extensions(all_side, ion, protein_list, prec):
+    all_tuples = []
+    for hit in all_side:
+        score = hit[0]
+        pid = hit[1]
+        mz = hit[2]
+        start = int(hit[3])
+        end = int(hit[4])
+        charge = hit[5]
+        
+        extensions = find_extensions(pid, start, end, mz, ion, protein_list, charge, prec)
+        all_tuples.append((pid, start, end, score, mz, charge, extensions))
+    return all_tuples
+
+def get_unique_merged(merged, dict_b, dict_y, protein_list, b_prec, y_prec):
+    #Problem with uniqueness at the moment since combinations can still have multiple pieces in common
+    #Need to do extensions on each unique piece that shows up and then substitute them into existing merges    
+    #Make a mapping between each unique cluster and all of it's extended replacements
+    unique_left, unique_right = set(), set()
+    b_indices, y_indices = dict(), dict()
+    mb_dict = dict()
+    for m in merged:
+        unique_left.add(m[1])        
+        unique_right.add(m[2])
+        
+    for m in unique_left:
+        left_score = m[3]
+        left_mz = m[4]
+        left_len = m[2]-m[1]
+        left_key = (left_score, left_len, left_mz)
+        all_left = dict_b[left_key]
+        extended_unique_left = get_all_extensions(all_left, 0, protein_list, b_prec)
+        if m not in b_indices.keys():
+            b_indices[m] = []
+        [b_indices[m].append(x) for x in extended_unique_left]
+        if m not in mb_dict.keys():
+            mb_dict[m] = []
+        mb_dict[m].append(m[2]) #m[2] is made from unique_left where we actually want the corresponding right. Does this live in any of our dicts?
     
+    for m in unique_right:
+        right_score = m[3]
+        right_mz = m[4]
+        right_len = m[2] - m[1]
+        right_key = (right_score, right_len, right_mz)
+        all_right = dict_y[right_key]
+        extended_unique_right = get_all_extensions(all_right, 1, protein_list, y_prec)
+        if m not in y_indices.keys():
+            y_indices[m] = []
+        [y_indices[m].append(x) for x in extended_unique_right]
+        
     
-def Score_clusters(ion, clusters, conv_prec, protein_list):
-    cluster = collections.namedtuple('cluster', 'score pid start end mz charge extensions')
-    if ion == 'b':
-        b_cluster_array = []
-        for A in clusters:
-            score = A[0]
-            pid = int(A[1])
-            mz = float(A[2])
-            start = int(A[3])
-            end = int(A[4])
-            # indices = A[5:]
-            charge = A[5]
-            query_time = time.time()
-            extensions = find_extensions(pid, start, end, mz, 0, protein_list, charge, conv_prec)
-            target_cluster = cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions)
-            # print("Time:", time.time() - query_time, "End-Start", end-start)
+    #now want a dictionary mapping each index to the unique place where they occur
 
-            b_cluster_array.append(target_cluster)
-            with open('b_clusters.txt', 'a') as b:
-                b.write(str(score) + '\t' + str(pid) + '\t' + str(start) + '\t' + str(end) + '\t' + str(mz) + '\t' + str(charge) + '\t' + str(extensions) + '\n')
+    return b_indices, y_indices, mb_dict
 
-        b_sorted_clusters = sorted(b_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
-        return b_sorted_clusters
-    else:
-        y_cluster_array = []
-        for A in clusters:
-            score = A[0]
-            pid = int(A[1])
-            mz = float(A[2])
-            start = int(A[3])
-            end = int(A[4])
-            # indices = A[5:]
-            charge = A[5]
-            extensions = find_extensions(pid, start, end, mz, 0, protein_list, charge, conv_prec)
-            target_cluster = cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions)
+def check_unique(merges):
+    for m in merges:
+        if merges.count(m) > 1:
+            print(m,"has a count of", merges.count(m))
+            return True
+    return False
 
-            y_cluster_array.append(target_cluster)
-            with open('y_clusters.txt', 'a') as b:
-                b.write(str(score) + '\t' + str(pid) + '\t' + str(start) + '\t' + str(end) + '\t' + str(mz) + '\t' + str(charge) + '\t' + str(extensions) + '\n')
+def check_keys_unique(key_list):
+    check_list = []
+    for key in key_list:
+        check_list.append(key)
+    return check_unique(check_list)
 
-        y_sorted_clusters = sorted(y_cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
-        return y_sorted_clusters
+def expand_clusters(merged, dict_b, dict_y, protein_list, b_prec, y_prec):
+    merges = []
+    b_dict, y_dict, mapping_b_dict = get_unique_merged(merged, dict_b, dict_y, protein_list, b_prec, y_prec)
+    
+    print("Merges are not unique:",check_unique(merged))
+    
+    for i,left_part in enumerate(mapping_b_dict):
+        all_extended_left = b_dict[left_part]
+        
+        all_extended_right = []
+        for x in mapping_b_dict[left_part]:
+            extended_right = y_dict[x]
+            [all_extended_right.append(x) for x in extended_right]
+        
+        print("b_dict keys are not unique:", check_keys_unique(b_dict.keys()))
+        print("y_dict keys are not unique:", check_keys_unique(y_dict.keys()))
+        print("mapping_b_dict keys are not unique:", check_keys_unique(mapping_b_dict.keys()))
+        print("all_extended_left keys are not unique:", check_keys_unique(all_extended_left.keys()))
+        print("all_extended_right keys are not unique:", check_keys_unique(all_extended_right.keys()))
+        
+        for left in all_extended_left: # These lines are not unique
+            for right in all_extended_right:
+                #left_score + right_score, b.end - y.start, y.end-b.start
+                merges.append((left[3] + right[3], left[2]-right[1], right[2]-left[1], left, right))
+        
+        if check_unique(merges):
+            print("Entry", i, "is not unique")
+        else:
+            print("Entry", i, "is unique")
+            
+        
+    return merges
+    
+def get_unique_clusters(clusters):
+    # Want to determine uniqueness by the size and the mass matched to
+    # Load them into dictionary
+    cluster = collections.namedtuple('cluster', 'score pid start end mz charge')
+    cluster_mapping = dict()
+    unique_clusters = []
+    for A in clusters:
+        score = A[0]
+        pid = int(A[1])
+        mz = float(A[2])
+        charge = A[5]
+            
+        start = int(A[3])
+        end = int(A[4])
+
+        size = end-start
+        key_tuple = (score, size, mz)
+        if key_tuple not in cluster_mapping.keys():
+            cluster_mapping[key_tuple] = []
+        cluster_mapping[key_tuple].append(A)
+        
+    for key in cluster_mapping:
+        first_cluster = cluster_mapping[key][0]
+        score = first_cluster[0]
+        pid = first_cluster[1]
+        mz = first_cluster[2]
+        start = first_cluster[3]
+        end = first_cluster[4]
+        charge = first_cluster[5]
+        
+        target_cluster = cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge)
+
+        unique_clusters.append(target_cluster)
+        
+    sorted_clusters = sorted(unique_clusters, key=operator.attrgetter('score', 'pid'), reverse = True)
+        
+    return cluster_mapping, sorted_clusters
+    
+# def old_score_clusters(ion, clusters, conv_prec, protein_list):
+#     #Wants a sorted list of all unique cluster objects where uniqueness is determined by the length and 
+#     cluster = collections.namedtuple('cluster', 'score pid start end mz charge extensions')
+#     cluster_array = []
+#     with open('clusters.txt', 'a') as b:
+#         for i, A in enumerate(clusters):
+#             score = A[0]
+#             pid = int(A[1])
+#             mz = float(A[2])
+#             start = int(A[3])
+#             end = int(A[4])
+#             charge = A[5]
+#             # query_time = time.time()
+#             extensions = find_extensions(pid, start, end, mz, ion, protein_list, charge, conv_prec)
+#             target_cluster = cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions)
+#             # print("Time:", time.time() - query_time, "End-Start", end-start)
+
+#             cluster_array.append(target_cluster)
+            
+#             b.write(str(score) + '\t' + str(pid) + '\t' + str(start) + '\t' + str(end) + '\t' + str(mz) + '\t' + str(charge) + '\t' + str(extensions) + '\n')
+
+#         sorted_clusters = sorted(cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
+
+#         return sorted_clusters
 
 def min_info(cluster):
-    return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.mz, cluster.charge, cluster.extensions)
+    return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.mz, cluster.charge)
 
 def bsearch(key, Y):
         lo = -1
@@ -222,6 +351,18 @@ def bsearch(key, Y):
         while (hi - lo > 1):
             mid = int((hi+lo) / 2)
             if Y[mid].start < key:
+                lo = mid
+            else:
+                hi = mid
+        return hi
+
+def ysearch(key, B):
+        lo = -1
+        hi = len(B)
+        mid = -1
+        while (hi - lo > 1):
+            mid = int((hi+lo) / 2)
+            if B[mid].start < key:
                 lo = mid
             else:
                 hi = mid
@@ -242,12 +383,17 @@ def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
             Y[c.pid] = []
         Y[c.pid].append(c)
 
-    for pid in B:
+    for i, pid in enumerate(B):
         if pid not in Y:
             continue
 
         sorted_B = sorted(B[pid], key=operator.attrgetter('pid', 'start', 'end'))
         sorted_Y = sorted(Y[pid], key=operator.attrgetter('pid', 'start', 'end'))
+        
+        if i == 23:
+            for merge in merge_seqs:
+                if merge==(4, (1, 182, 187, 3, 349.1622619628906, 2), (1, 182, 187, 1, 358.1739196777344, 2)):
+                    print("target merge already exists")
 
         for b in sorted_B:
             y_i = bsearch(b.start, sorted_Y)
@@ -258,8 +404,33 @@ def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
 
             while y_i < len(sorted_Y) and y.start - b.end < 10:
                 y = sorted_Y[y_i]
-                merge_seqs.append((b.score + y.score, b.end - y.start, y.end-b.start,min_info(b), min_info(y)))
+                merge_seqs.append((b.score + y.score, min_info(b), min_info(y)))
                 y_i += 1
+                # if not check_unique(merge_seqs):
+                #     print("b part added unique merge in",b.score + y.score, min_info(b), min_info(y))
+        
+        # if i == 23:
+        #     for merge in merge_seqs:
+        #         if merge==(4, (1, 182, 187, 3, 349.1622619628906, 2), (1, 182, 187, 1, 358.1739196777344, 2)):
+        #             print("target merge inserted in the b part")
+                    
+        for y in sorted_Y:
+            b_i = ysearch(y.start, sorted_B) #(4, (1, 182, 187, 3, 349.1622619628906, 2), (1, 182, 187, 1, 358.1739196777344, 2)) has a count of 2
+
+            if b_i >= len(sorted_B): break
+
+            b = sorted_B[b_i]
+
+            while b_i < len(sorted_B) and y.start - b.end < 10:
+                b = sorted_B[b_i]
+                merge_seqs.append((b.score + y.score, min_info(b), min_info(y)))
+                b_i += 1
+                # if not check_unique(merge_seqs):
+                #     print("y part added unique merge in",b.score + y.score, min_info(b), min_info(y))
+        # if i == 23:
+        #     for merge in merge_seqs:
+        #         if merge==(4, (1, 182, 187, 3, 349.1622619628906, 2), (1, 182, 187, 1, 358.1739196777344, 2)):
+        #             print("target merge inserted in y part")
     return merge_seqs
 
 def calc_from_total_overlap(side, b_mass, b_charge, y_mass, y_charge, prec_charge):
@@ -292,11 +463,11 @@ def total_overlap(b_pid, y_pid, b_start, y_start, b_end, y_end):
 def filter_by_precursor(mseqs, obs_prec, tol, precursor_charge, max_len):
     filtered_seqs = []
     for comb_seq in mseqs:
-        b_pid, y_pid = comb_seq[3][0], comb_seq[4][0]
-        b_start, b_end = comb_seq[3][1], comb_seq[3][2]
-        y_start, y_end = comb_seq[4][1], comb_seq[4][2]
-        b_charge, y_charge = comb_seq[3][5], comb_seq[4][5]
-        b_mass, y_mass = comb_seq[3][4], comb_seq[4][4]
+        b_pid, y_pid = comb_seq[1][0], comb_seq[2][0]
+        b_start, b_end = comb_seq[1][1], comb_seq[1][2]
+        y_start, y_end = comb_seq[2][1], comb_seq[2][2]
+        b_charge, y_charge = comb_seq[1][5], comb_seq[2][5]
+        b_mass, y_mass = comb_seq[1][4], comb_seq[2][4]
         # checking cases
         full, side = total_overlap(b_pid, y_pid, b_start, y_start, b_end, y_end)
         if full:
@@ -411,15 +582,14 @@ def check_for_hybrid_overlap(b_seq, y_seq, ion):
 def grab_matches(b,indexed_clusters, target_val, ion):
     #Given a cluster we want to find everything that it can pair with
     # It can pair with anything up to a certain mass 
-    current_index = 0
     matches = []
     for key in indexed_clusters.keys():
         if key<=target_val: #if key is a valid key
             for y in indexed_clusters[key]:
                 if ion == 'b':
-                    matches.append((b.score + y.score, b.end - y.start, y.end-b.start,min_info(b), min_info(y)))
+                    matches.append((b.score + y.score, min_info(b), min_info(y)))
                 else:
-                    matches.append((b.score + y.score, b.end - y.start, y.end-b.start,min_info(y), min_info(b)))
+                    matches.append((b.score + y.score, min_info(y), min_info(b)))
         else:
 #             match, modified_seq = check_for_hybrid_overlap()
             break            
