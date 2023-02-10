@@ -210,20 +210,15 @@ def find_sequence(b_sequence, y_sequence, b_pid, y_pid, protein_list):
     return b_target_starts, y_target_ends
     
 def find_target_clusters(b_sorted_clusters, y_sorted_clusters, b_sequence, y_sequence, b_pid, y_pid, protein_list):
-    #want code that takes in sequences and tells me where this sequence lives in the sorted clusters
     b_target_starts, y_target_ends = find_sequence(b_sequence, y_sequence, b_pid, y_pid, protein_list)
     print("\n")
     
     print("For b:")
     for i, cluster in enumerate(b_sorted_clusters):
-        # if cluster[2] in b_target_starts: #for debugging
-        #     print(i, cluster)
         if cluster[1] == b_pid and cluster[2] in b_target_starts: #need to check which dictates start position
             print(i, cluster)
     print("\n For y:")
     for i, cluster in enumerate(y_sorted_clusters):
-        # if cluster[2] in b_target_starts: #for debugging
-        #     print(i, cluster)
         if cluster[1] == y_pid and cluster[3] in y_target_ends: 
             print(i, cluster)
     
