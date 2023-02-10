@@ -238,6 +238,91 @@ class alignment_info:
     
     def __call__(self, spectrum):
         print(f'\rCreating an alignment for {spectrum.num + 1}/{self.results_len} [{to_percent(spectrum.num + 1, self.results_len)}%]', end='')
+        total_time, converted_b, converted_y, b_cluster_dict, b_sorted_clusters, y_cluster_dict, y_sorted_clusters = self.method_01(spectrum)
+        merged_seqs, prec_tol = self.method_02(spectrum, b_sorted_clusters, y_sorted_clusters)
+        hybrid_merged = self.method_03(spectrum, b_sorted_clusters, y_sorted_clusters, prec_tol)
+        merged_seqs = self.method_04(converted_b, converted_y, b_cluster_dict, y_cluster_dict, merged_seqs)
+        hybrid_merged = self.method_05(converted_b, converted_y, b_cluster_dict, y_cluster_dict, hybrid_merged)
+        natural_alignments, hybrid_alignments = self.method_06(spectrum, merged_seqs, prec_tol, hybrid_merged)
+        rescored_naturals, rescored_hybrids = self.method_07(spectrum, natural_alignments, hybrid_alignments)
+        return_value = self.method_08(spectrum, total_time, rescored_naturals, rescored_hybrids)
+        return return_value
+
+    def method_08(self, spectrum, total_time, rescored_naturals, rescored_hybrids):
+        rescored_alignments = sorted(rescored_naturals + rescored_hybrids, key = lambda x: (x[0], x[1]), reverse = True)
+        start_time = time.time()
+        postprocessed_alignments = postprocessing(rescored_alignments, self.db)
+        end_time = time.time() - start_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Postprocessing took:" + '\t' + str(end_time) + "\n")
+        total_time = time.time() - total_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Analysis of spectrum " + str(spectrum.num) +  " took:" + "\t" + str(total_time) + "\n")
+        return postprocessed_alignments
+
+    def method_07(self, spectrum, natural_alignments, hybrid_alignments):
+        start_time = time.time()
+        rescored_naturals, rescored_hybrids = second_scoring(natural_alignments, hybrid_alignments, spectrum, self.ppm_tol, self.db.proteins, self.max_pep_len)
+        rescored_naturals = sorted(rescored_naturals, key = lambda x: (x[0], x[1]), reverse=True)
+        rescored_hybrids = sorted(rescored_hybrids, key = lambda x: (x[0], x[1]), reverse=True)
+        end_time = time.time() - start_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Second round of scoring and sorting took:" + '\t' + str(end_time) + "\n")
+        return rescored_naturals,rescored_hybrids
+
+    def method_06(self, spectrum, merged_seqs, prec_tol, hybrid_merged):
+        start_time = time.time()
+        natural_alignments, hybrid_alignments = find_alignments(merged_seqs, hybrid_merged, spectrum.precursor_mass, spectrum.precursor_charge, prec_tol, self.db, self.prec_tol)
+        end_time = time.time() - start_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Making alignments took:" + '\t' + str(end_time) + "\n")
+        return natural_alignments,hybrid_alignments
+
+    def method_05(self, converted_b, converted_y, b_cluster_dict, y_cluster_dict, hybrid_merged):
+        start_time = time.time()
+        hybrid_merged = clustering.expand_clusters(hybrid_merged, b_cluster_dict, y_cluster_dict, self.db.proteins, converted_b, converted_y)
+        end_time = time.time() - start_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Expanding natural merges:" + '\t' + str(end_time) + "\n")
+        return hybrid_merged
+
+    def method_04(self, converted_b, converted_y, b_cluster_dict, y_cluster_dict, merged_seqs):
+        start_time = time.time()
+        merged_seqs = clustering.expand_clusters(merged_seqs, b_cluster_dict, y_cluster_dict, self.db.proteins, converted_b, converted_y)
+        end_time = time.time() - start_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Expanding natural merges:" + '\t' + str(end_time) + "\n")
+        return merged_seqs
+
+    def method_03(self, spectrum, b_sorted_clusters, y_sorted_clusters, prec_tol):
+        start_time = time.time()
+        hybrid_merged = clustering.get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
+        end_time = time.time() - start_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Finding hybrid merges took:" + '\t' + str(end_time) + "\n")
+        start_time = time.time()
+        hybrid_merged = clustering.filter_by_precursor(hybrid_merged, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, self.max_pep_len)
+        end_time = time.time() - start_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Filtering hybrids by precursor masss took:" + '\t' + str(end_time) + "\n")
+        return hybrid_merged
+
+    def method_02(self, spectrum, b_sorted_clusters, y_sorted_clusters):
+        start_time = time.time()
+        merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
+        merged_seqs.sort(key = lambda x: x[0], reverse = True)
+        end_time = time.time() - start_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Ryan merging and sorting took:" + '\t' + str(end_time) + "\n")
+        prec_tol = ppm_to_da(spectrum.precursor_mass, self.prec_tol)
+        start_time = time.time()
+        merged_seqs = clustering.filter_by_precursor(merged_seqs, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, self.max_pep_len)
+        end_time = time.time() - start_time
+        with open('Timing_data.txt', 'a') as t:
+            t.write("Precursor filtering took:" + '\t' + str(end_time) + "\n")
+        return merged_seqs,prec_tol
+
+    def method_01(self, spectrum):
         total_time = time.time()
         input_list = spectrum.mz_values
         converted_b, converted_y = convert_precursor_to_ion(spectrum.precursor_mass, spectrum.precursor_charge)
@@ -257,68 +342,7 @@ class alignment_info:
         cluster_time = time.time() - cluster_time
         with open('Timing_data.txt', 'a') as t:
             t.write("Clusters took:" + '\t' + str(cluster_time) + "\n")
-
-        start_time = time.time()
-        merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
-        merged_seqs.sort(key = lambda x: x[0], reverse = True)
-        end_time = time.time() - start_time
-        with open('Timing_data.txt', 'a') as t:
-            t.write("Ryan merging and sorting took:" + '\t' + str(end_time) + "\n")
-        prec_tol = ppm_to_da(spectrum.precursor_mass, self.prec_tol)
-        start_time = time.time()
-        merged_seqs = clustering.filter_by_precursor(merged_seqs, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, self.max_pep_len)
-        end_time = time.time() - start_time
-        with open('Timing_data.txt', 'a') as t:
-            t.write("Precursor filtering took:" + '\t' + str(end_time) + "\n")
-        
-        start_time = time.time()
-        hybrid_merged = clustering.get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
-        # clustering.check_unique(hybrid_merged)
-        end_time = time.time() - start_time
-        with open('Timing_data.txt', 'a') as t:
-            t.write("Finding hybrid merges took:" + '\t' + str(end_time) + "\n")
-        start_time = time.time()
-        hybrid_merged = clustering.filter_by_precursor(hybrid_merged, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, self.max_pep_len)
-        end_time = time.time() - start_time
-        with open('Timing_data.txt', 'a') as t:
-            t.write("Filtering hybrids by precursor masss took:" + '\t' + str(end_time) + "\n")
-
-        start_time = time.time()
-        merged_seqs = clustering.expand_clusters(merged_seqs, b_cluster_dict, y_cluster_dict, self.db.proteins, converted_b, converted_y)
-        end_time = time.time() - start_time
-        with open('Timing_data.txt', 'a') as t:
-            t.write("Expanding natural merges:" + '\t' + str(end_time) + "\n")
-        
-        start_time = time.time()
-        hybrid_merged = clustering.expand_clusters(hybrid_merged, b_cluster_dict, y_cluster_dict, self.db.proteins, converted_b, converted_y)
-        end_time = time.time() - start_time
-        with open('Timing_data.txt', 'a') as t:
-            t.write("Expanding natural merges:" + '\t' + str(end_time) + "\n")
-        
-        start_time = time.time()
-        natural_alignments, hybrid_alignments = find_alignments(merged_seqs, hybrid_merged, spectrum.precursor_mass, spectrum.precursor_charge, prec_tol, self.db, self.prec_tol)
-        end_time = time.time() - start_time
-        with open('Timing_data.txt', 'a') as t:
-            t.write("Making alignments took:" + '\t' + str(end_time) + "\n")
-
-        start_time = time.time()
-        rescored_naturals, rescored_hybrids = second_scoring(natural_alignments, hybrid_alignments, spectrum, self.ppm_tol, self.db.proteins, self.max_pep_len)
-        rescored_naturals = sorted(rescored_naturals, key = lambda x: (x[0], x[1]), reverse=True)
-        rescored_hybrids = sorted(rescored_hybrids, key = lambda x: (x[0], x[1]), reverse=True)
-        end_time = time.time() - start_time
-        with open('Timing_data.txt', 'a') as t:
-            t.write("Second round of scoring and sorting took:" + '\t' + str(end_time) + "\n")
-            
-        rescored_alignments = sorted(rescored_naturals + rescored_hybrids, key = lambda x: (x[0], x[1]), reverse = True)
-        start_time = time.time()
-        postprocessed_alignments = postprocessing(rescored_alignments, self.db)
-        end_time = time.time() - start_time
-        with open('Timing_data.txt', 'a') as t:
-            t.write("Postprocessing took:" + '\t' + str(end_time) + "\n")
-        total_time = time.time() - total_time
-        with open('Timing_data.txt', 'a') as t:
-            t.write("Analysis of spectrum " + str(spectrum.num) +  " took:" + "\t" + str(total_time) + "\n")
-        return postprocessed_alignments
+        return total_time,converted_b,converted_y,b_cluster_dict,b_sorted_clusters,y_cluster_dict,y_sorted_clusters
 
 def align(numcores, spectra, location, precursor_tolerance, db, ppm_tolerance, max_peptide_len):
     p = Pool(numcores)
@@ -329,7 +353,6 @@ def align(numcores, spectra, location, precursor_tolerance, db, ppm_tolerance, m
     y = p.map(x, spectra)
     p.close()
     p.join()
-    # print("On 16 cores", time.time() - now)
     return y
     
 def id_spectra(spectra_files: list, db: database, verbose: bool = True,
