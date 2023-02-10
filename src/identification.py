@@ -215,7 +215,7 @@ def find_target_clusters(b_sorted_clusters, y_sorted_clusters, b_sequence, y_seq
     
     print("For b:")
     for i, cluster in enumerate(b_sorted_clusters):
-        if cluster[1] == b_pid and cluster[2] in b_target_starts: #need to check which dictates start position
+        if cluster[1] == b_pid and cluster[2] in b_target_starts:
             print(i, cluster)
     print("\n For y:")
     for i, cluster in enumerate(y_sorted_clusters):
