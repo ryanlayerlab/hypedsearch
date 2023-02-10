@@ -346,7 +346,6 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     if make_new:
         dbf = database_file(max_peptide_len, True)
         kv_prots = [(k, v) for k, v in db.proteins]    
-        # extended_kv_prots = [(k, entry) for (k, v) in kv_prots for entry in v]
         merge_search.modified_make_database_set(kv_prots, max_peptide_len, dbf)
 
     result_list = []
