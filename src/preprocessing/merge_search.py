@@ -179,10 +179,8 @@ def modified_match_masses(input_masses: list, db: Database, max_len: int, ppm_to
     start = time.time()
     for input_mass in input_masses:
         tol = ppm_to_da(input_mass, ppm_tolerance)
-        # ion_int = 0 if ion == 'b' else 1
-        matched_masses_b[input_mass], matched_masses_y[input_mass] = dbf.query_mass(input_mass, tol) #same place: location start, protein_num
-        # print(input_mass, 'b', matched_masses_b[input_mass])
-        # print(input_mass, 'y', matched_masses_y[input_mass])
+        matched_masses_b[input_mass], matched_masses_y[input_mass] = dbf.query_mass(input_mass, tol)
+        
     tol = ppm_to_da(b_prec, ppm_tolerance)
     matched_masses_b[b_prec], _ = dbf.query_mass(b_prec, tol)
     tol = ppm_to_da(y_prec, ppm_tolerance)
@@ -191,7 +189,6 @@ def modified_match_masses(input_masses: list, db: Database, max_len: int, ppm_to
     end = time.time() - start
     with open('Timing_data.txt', 'w') as t:
         t.write("Queries took:" + '\t' + str(end) + "\n")       
-        # if debug:
         # write_matched_masses(write_path, matched_masses_b, matched_masses_y, kmer_set, debug)
 
     return matched_masses_b, matched_masses_y

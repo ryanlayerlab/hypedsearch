@@ -408,27 +408,29 @@ def get_extensions(precursor_mass, precursor_charge, b_pid, b_start, extended_b,
     tol = utils.ppm_to_da(precursor_mass, prec_tol)
     extensions = []
 
-    for b in extended_b:
+    if len(extended_b) == 0: #want to make sure we consider y extensions even if there are no b extensions 
         for y in extended_y:
-            b_mass, y_mass = b[0], y[0]
-            this_prec = gen_spectra.calc_precursor_as_disjoint(b_mass, y_mass, 2, 2, precursor_charge)
-            if this_prec > precursor_mass + tol:
-                break
-            elif abs(this_prec - precursor_mass) <= tol:
-                extensions.append((b + (b_score,), y + (y_score,)))
-    # elif len(extended_b) == 0: #want to make sure we consider y extensions even if there are no b extensions 
-    #     for y in extended_y:
-    #         y_mass = y[0]
-    #         this_prec = gen_spectra.calc_precursor_as_disjoint(0, y_mass, b_charge, 2, precursor_charge)
-    #         if abs(this_prec - precursor_mass) <= tol:
-    #             extensions.append(((b_mz, b_start, b_end, 1, b_charge, b_pid, b_score), y + (y_score,)))
-    # else:
-    #     for b in extended_b:
-    #         b_mass = b[0]
-    #         this_b_charge = b[4]
-    #         this_prec = gen_spectra.calc_precursor_as_disjoint(0, b_mass, this_b_charge, y_charge, precursor_charge)
-    #         if abs(this_prec - precursor_mass) <= tol:
-    #             extensions.append((b + (b_score,), (y_mz, y_start, y_end, 1, y_charge, y_pid, y_score)))
+            y_mass = y[0]
+            this_prec = gen_spectra.calc_precursor_as_disjoint(0, y_mass, b_charge, 2, precursor_charge)
+            if abs(this_prec - precursor_mass) <= tol:
+                extensions.append(((b_mz, b_start, b_end, 1, b_charge, b_pid, b_score), y + (y_score,)))
+    elif len(extended_y) == 0:
+        for b in extended_b:
+            b_mass = b[0]
+            this_b_charge = b[4]
+            this_prec = gen_spectra.calc_precursor_as_disjoint(0, b_mass, this_b_charge, y_charge, precursor_charge)
+            if abs(this_prec - precursor_mass) <= tol:
+                extensions.append((b + (b_score,), (y_mz, y_start, y_end, 1, y_charge, y_pid, y_score)))
+                
+    else:
+        for b in extended_b:
+            for y in extended_y:
+                b_mass, y_mass = b[0], y[0]
+                this_prec = gen_spectra.calc_precursor_as_disjoint(b_mass, y_mass, 2, 2, precursor_charge)
+                if this_prec > precursor_mass + tol:
+                    break
+                elif abs(this_prec - precursor_mass) <= tol:
+                    extensions.append((b + (b_score,), y + (y_score,)))
             
     return extensions
 
@@ -437,14 +439,14 @@ def find_alignments(natural_merged, hybrid_merged, obs_prec, prec_charge, tol, m
     for i, comb_seq in enumerate(natural_merged): #Maybe read the top 50 of these, look for matches and go until we find something
         # if i == 1141:
         #     print("here")
-        pid = comb_seq[3][0]
-        b_start, b_end = comb_seq[3][1], comb_seq[3][2]
-        y_start, y_end = comb_seq[4][1], comb_seq[4][2]
-        b_charge, y_charge = comb_seq[3][5], comb_seq[4][5]
-        b_score, y_score = comb_seq[3][3], comb_seq[4][3]
-        b_mass = comb_seq[3][4]
-        y_mass = comb_seq[4][4]
-        b_extensions, y_extensions = comb_seq[3][6], comb_seq[4][6]
+        pid = comb_seq[1][0]
+        b_start, b_end = comb_seq[1][1], comb_seq[2][2]
+        y_start, y_end = comb_seq[1][1], comb_seq[2][2]
+        b_charge, y_charge = comb_seq[1][5], comb_seq[2][5]
+        b_score, y_score = comb_seq[1][3], comb_seq[2][4]
+        b_mass = comb_seq[1][4]
+        y_mass = comb_seq[2][4]
+        b_extensions, y_extensions = comb_seq[1][6], comb_seq[2][6]
         # print("Natural", i)
         if y_start >= b_end: #no overlap but b before y
             natural_alignments = natural_alignments + natural_get_extensions(obs_prec, prec_charge, pid, y_mass, y_start, y_end, y_charge, b_charge, prec_tol, b_extensions, b_score, y_score) #THERE IS A BUG HERE
@@ -457,14 +459,13 @@ def find_alignments(natural_merged, hybrid_merged, obs_prec, prec_charge, tol, m
 
     total_extension_time = 0
     for i, comb_seq in enumerate(hybrid_merged):
-        b_pid, y_pid = comb_seq[3][0], comb_seq[4][0]
-        b_start, b_end = comb_seq[3][1], comb_seq[3][2]
-        y_start, y_end = comb_seq[4][1], comb_seq[4][2]
-        b_charge, y_charge = comb_seq[3][5], comb_seq[4][5]
-        b_score, y_score = comb_seq[3][3], comb_seq[3][4]
-        b_mass = comb_seq[3][4]
-        y_mass = comb_seq[4][4]
-        b_extensions, y_extensions = comb_seq[3][6], comb_seq[4][6]
+        b_pid, y_pid = comb_seq[1][0], comb_seq[2][0]
+        b_start, b_end = comb_seq[1][1], comb_seq[1][2]
+        y_start, y_end = comb_seq[2][1], comb_seq[2][2]
+        b_charge, y_charge = comb_seq[1][5], comb_seq[2][5]
+        b_score, y_score = comb_seq[1][3], comb_seq[2][3]
+        b_mass, y_mass = comb_seq[1][4],comb_seq[2][4]
+        b_extensions, y_extensions = comb_seq[1][6], comb_seq[2][6]
         extension_time = time.time()
         # print("Hybrid",i)
         hybrid_alignments = hybrid_alignments + get_extensions(obs_prec, prec_charge, b_pid, b_start, b_extensions, y_pid, y_end, y_extensions, prec_tol, y_start, y_charge, b_end, b_charge, b_mass, y_mass, b_score, y_score)     

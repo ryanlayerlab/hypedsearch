@@ -1,6 +1,7 @@
 import database
 from main import get_spectra_files
 from preprocessing.preprocessing_utils import load_spectra
+import re
 
 ppm_tolerance = 20
 peak_filter = 25
@@ -36,8 +37,8 @@ def build_specmill_table(filepath):
     with open(filepath, 'r') as t:
         for line in t:
             A = line.split('\t')
-            seq = A[22]
-            id = A[15].strip('\"')
+            seq = A[21]
+            id = A[14].strip('\"')
             if "BMEM" in id:
                 print(A)
             sequences.append(seq)
@@ -51,6 +52,7 @@ specmill_sequences, seq_ids = build_specmill_table(truth_set_pathway)
 def get_proteins(protein_list, seq_ids, sequences):
     proteins = []
     for i, id in enumerate(seq_ids):
+        print("On i=", i)
         found = False
         for protein in protein_list:
             description = protein[0]
@@ -66,8 +68,6 @@ def get_proteins(protein_list, seq_ids, sequences):
         elif not found:
             print("Not found at", i)
 
-                
-    
     print(len(seq_ids), len(proteins))
     new_proteins = set(proteins)
     return new_proteins
@@ -83,8 +83,5 @@ with open(database_pathway, 'w') as d:
         prot_seq = protein[1]
         seq_len = len(prot_seq)
         curr_write = 0
-        while seq_len >= 70:
-            d.write(prot_seq[curr_write:curr_write+70] + '\n')
-            seq_len = seq_len-70
-            curr_write = curr_write + 70
-        d.write(prot_seq[curr_write:seq_len]+'\n')
+        prot_seq = '\n'.join(prot_seq[i:i+70] for i in range(0, len(prot_seq), 70))
+        d.write(prot_seq + "\n\n")

@@ -1,7 +1,7 @@
 import collections
 import operator
 import os
-from utils import ppm_to_da
+from utils import ppm_to_da, to_percent
 import gen_spectra
 from constants import WATER_MASS, PROTON_MASS
 from sqlite import database_file
@@ -37,8 +37,6 @@ def parse_hits(Hit, all_hits):
         end = int(A[2][2])
         mz = A[1]
         charge = A[2][4]
-        if charge != 1 and charge != 2:
-            print("Bug with charge")
 
         hits.append( Hit(pid=pid, start=start, end=end, mz=mz, charge=charge) )
     return hits
@@ -239,41 +237,58 @@ def check_unique(merges):
             return True
     return False
 
-def check_keys_unique(key_list):
-    check_list = []
-    for key in key_list:
-        check_list.append(key)
-    return check_unique(check_list)
+def extract_natives(large_merges):
+    #Goal is to take in the full expanded list of merges and sort them into naturals or hybrids
+    natural_merges, hybrid_merges = [], []
+    for merge in large_merges:
+        left_part = merge[3]
+        right_part = merge[4]
+        left_pid, right_pid = left_part[5], right_part[5]
+        if left_pid == right_pid: #first requirement for native
+            b_end = left_part[1]
+            y_start = right_part[0]
+            if y_start - b_end > 0 and y_start - b_end <= 10: #second requirement for native
+                natural_merges.append(merge)
+                continue
+        hybrid_merges.append(merge)
+        
+    return natural_merges, hybrid_merges
+                
 
 def expand_clusters(merged, dict_b, dict_y, protein_list, b_prec, y_prec):
-    merges = []
-    b_dict, y_dict, mapping_b_dict = get_unique_merged(merged, dict_b, dict_y, protein_list, b_prec, y_prec)
+    merges = []    
     
-    print("Merges are not unique:",check_unique(merged))
-    
-    for i,left_part in enumerate(mapping_b_dict):
-        all_extended_left = b_dict[left_part]
+    #key_tuple = (score, size, mz)
+    for i,merge in enumerate(merged):
+        left_part = merge[1]
+        score = left_part[3]
+        mz = left_part[2]
+        size = left_part[1]-left_part[0]
+        all_extended_left = dict_b[(score,size,mz)]
         
-        all_extended_right = []
-        for x in mapping_b_dict[left_part]:
-            extended_right = y_dict[x]
-            [all_extended_right.append(x) for x in extended_right]
-        
-        print("b_dict keys are not unique:", check_keys_unique(b_dict.keys()))
-        print("y_dict keys are not unique:", check_keys_unique(y_dict.keys()))
-        print("mapping_b_dict keys are not unique:", check_keys_unique(mapping_b_dict.keys()))
-        print("all_extended_left keys are not unique:", check_keys_unique(all_extended_left.keys()))
-        print("all_extended_right keys are not unique:", check_keys_unique(all_extended_right.keys()))
+        right_part = merge[2]
+        score = right_part[3]
+        mz = right_part[2]
+        size = right_part[1]-right_part[0]
+        all_extended_right = dict_y[(score,size,mz)]        
+
+        # print("all_extended_left keys are not unique:", check_keys_unique(all_extended_left.keys()))
+        # print("all_extended_right keys are not unique:", check_keys_unique(all_extended_right.keys()))
         
         for left in all_extended_left: # These lines are not unique
             for right in all_extended_right:
                 #left_score + right_score, b.end - y.start, y.end-b.start
-                merges.append((left[3] + right[3], left[2]-right[1], right[2]-left[1], left, right))
+                #score, pid, mz, start, end, charge
+                lextensions = find_extensions(left[1], left[3], left[4], left[2], 0, protein_list, left[5], b_prec)
+                rextensions = find_extensions(right[1], right[3], right[4], right[2], 1, protein_list, right[5], y_prec)
+                nleft = (left[0], left[1], left[2], left[3], left[4], left[5], lextensions)
+                nright = (right[0], right[1], right[2], right[3], right[4], right[5], rextensions)
+                merges.append((left[3] + right[3], left[2]-right[1], right[2]-left[1], nleft, nright))
         
-        if check_unique(merges):
-            print("Entry", i, "is not unique")
-        else:
-            print("Entry", i, "is unique")
+        # if check_unique(merges):
+        #     print("Entry", i, "is not unique")
+        # else:
+        #     print("Entry", i, "is unique")
             
         
     return merges
@@ -316,33 +331,33 @@ def get_unique_clusters(clusters):
         
     return cluster_mapping, sorted_clusters
     
-# def old_score_clusters(ion, clusters, conv_prec, protein_list):
-#     #Wants a sorted list of all unique cluster objects where uniqueness is determined by the length and 
-#     cluster = collections.namedtuple('cluster', 'score pid start end mz charge extensions')
-#     cluster_array = []
-#     with open('clusters.txt', 'a') as b:
-#         for i, A in enumerate(clusters):
-#             score = A[0]
-#             pid = int(A[1])
-#             mz = float(A[2])
-#             start = int(A[3])
-#             end = int(A[4])
-#             charge = A[5]
-#             # query_time = time.time()
-#             extensions = find_extensions(pid, start, end, mz, ion, protein_list, charge, conv_prec)
-#             target_cluster = cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions)
-#             # print("Time:", time.time() - query_time, "End-Start", end-start)
+def old_score_clusters(ion, clusters, conv_prec, protein_list):
+    cluster = collections.namedtuple('cluster', 'score pid start end mz charge extensions')
+    cluster_array = []
+    # with open('clusters.txt', 'a') as b:
+    for i, A in enumerate(clusters):
+        score = A[0]
+        pid = int(A[1])
+        mz = float(A[2])
+        start = int(A[3])
+        end = int(A[4])
+        charge = A[5]
+        # query_time = time.time()
+        extensions = find_extensions(pid, start, end, mz, ion, protein_list, charge, conv_prec)
+        # extensions = []
+        target_cluster = cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions)
+        # print("Time:", time.time() - query_time, "End-Start", end-start)
 
-#             cluster_array.append(target_cluster)
-            
-#             b.write(str(score) + '\t' + str(pid) + '\t' + str(start) + '\t' + str(end) + '\t' + str(mz) + '\t' + str(charge) + '\t' + str(extensions) + '\n')
+        cluster_array.append(target_cluster)
+        
+        # b.write(str(score) + '\t' + str(pid) + '\t' + str(start) + '\t' + str(end) + '\t' + str(mz) + '\t' + str(charge) + '\t' + str(extensions) + '\n')
 
-#         sorted_clusters = sorted(cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
+    sorted_clusters = sorted(cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
 
-#         return sorted_clusters
+    return sorted_clusters
 
 def min_info(cluster):
-    return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.mz, cluster.charge)
+    return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.mz, cluster.charge, cluster.extensions)
 
 def bsearch(key, Y):
         lo = -1
@@ -390,12 +405,7 @@ def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
         sorted_B = sorted(B[pid], key=operator.attrgetter('pid', 'start', 'end'))
         sorted_Y = sorted(Y[pid], key=operator.attrgetter('pid', 'start', 'end'))
         
-        if i == 23:
-            for merge in merge_seqs:
-                if merge==(4, (1, 182, 187, 3, 349.1622619628906, 2), (1, 182, 187, 1, 358.1739196777344, 2)):
-                    print("target merge already exists")
-
-        for b in sorted_B:
+        for j, b in sorted_B:
             y_i = bsearch(b.start, sorted_Y)
 
             if y_i >= len(sorted_Y): break
@@ -406,16 +416,11 @@ def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
                 y = sorted_Y[y_i]
                 merge_seqs.append((b.score + y.score, min_info(b), min_info(y)))
                 y_i += 1
-                # if not check_unique(merge_seqs):
-                #     print("b part added unique merge in",b.score + y.score, min_info(b), min_info(y))
-        
-        # if i == 23:
-        #     for merge in merge_seqs:
-        #         if merge==(4, (1, 182, 187, 3, 349.1622619628906, 2), (1, 182, 187, 1, 358.1739196777344, 2)):
-        #             print("target merge inserted in the b part")
+                print(i,j)
+                b_unique = check_unique(merge_seqs)
                     
-        for y in sorted_Y:
-            b_i = ysearch(y.start, sorted_B) #(4, (1, 182, 187, 3, 349.1622619628906, 2), (1, 182, 187, 1, 358.1739196777344, 2)) has a count of 2
+        for j, y in sorted_Y:
+            b_i = ysearch(y.start, sorted_B) 
 
             if b_i >= len(sorted_B): break
 
@@ -425,12 +430,8 @@ def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
                 b = sorted_B[b_i]
                 merge_seqs.append((b.score + y.score, min_info(b), min_info(y)))
                 b_i += 1
-                # if not check_unique(merge_seqs):
-                #     print("y part added unique merge in",b.score + y.score, min_info(b), min_info(y))
-        # if i == 23:
-        #     for merge in merge_seqs:
-        #         if merge==(4, (1, 182, 187, 3, 349.1622619628906, 2), (1, 182, 187, 1, 358.1739196777344, 2)):
-        #             print("target merge inserted in y part")
+                if b_unique != check_unique(merge_seqs):
+                    print("y added something unique at", i, j)
     return merge_seqs
 
 def calc_from_total_overlap(side, b_mass, b_charge, y_mass, y_charge, prec_charge):
@@ -532,26 +533,26 @@ def modified_find_next_mass(cluster, ion, db):
         
 #         if (b_start )
 
-def combine_merges(pure_seqs, hybrid_seqs, target_num): #TODO
-    merged_top = []
-    pure_index, hybrid_index = 0, 0
-    while len(merged_top) < target_num and pure_index < len(pure_seqs) and hybrid_index < len(hybrid_seqs):
-        pure = pure_seqs[pure_index]
-        hybrid = hybrid_seqs[hybrid_index]
-        if pure[0] >= hybrid[0]: #We give ties to the non-hybrid sequences
-            merged_top.append(pure)
-            pure_index += 1
-        else:
-            merged_top.append(hybrid)
-            hybrid_index += 1
-    while len(merged_top) < target_num and pure_index < len(pure_seqs):
-        merged_top.append(pure_seqs[pure_index])
-        pure_index += 1
-    while len(merged_top) < target_num and hybrid_index < len(hybrid_seqs):
-        merged_top.append(hybrid_seqs[hybrid_index])
-        hybrid_index += 1
+# def combine_merges(pure_seqs, hybrid_seqs, target_num): #TODO
+#     merged_top = []
+#     pure_index, hybrid_index = 0, 0
+#     while len(merged_top) < target_num and pure_index < len(pure_seqs) and hybrid_index < len(hybrid_seqs):
+#         pure = pure_seqs[pure_index]
+#         hybrid = hybrid_seqs[hybrid_index]
+#         if pure[0] >= hybrid[0]: #We give ties to the non-hybrid sequences
+#             merged_top.append(pure)
+#             pure_index += 1
+#         else:
+#             merged_top.append(hybrid)
+#             hybrid_index += 1
+#     while len(merged_top) < target_num and pure_index < len(pure_seqs):
+#         merged_top.append(pure_seqs[pure_index])
+#         pure_index += 1
+#     while len(merged_top) < target_num and hybrid_index < len(hybrid_seqs):
+#         merged_top.append(hybrid_seqs[hybrid_index])
+#         hybrid_index += 1
 
-    return merged_top
+#     return merged_top
 
 def check_for_hybrid_overlap(b_seq, y_seq, ion):
     match = True
@@ -579,20 +580,14 @@ def check_for_hybrid_overlap(b_seq, y_seq, ion):
             modified_seq = b_seq[:i]
     return match, modified_seq
 
-def grab_matches(b,indexed_clusters, target_val, ion):
+def grab_matches(b,indexed_clusters, target_val):
     #Given a cluster we want to find everything that it can pair with
     # It can pair with anything up to a certain mass 
     matches = []
     for key in indexed_clusters.keys():
         if key<=target_val: #if key is a valid key
             for y in indexed_clusters[key]:
-                if ion == 'b':
                     matches.append((b.score + y.score, min_info(b), min_info(y)))
-                else:
-                    matches.append((b.score + y.score, min_info(y), min_info(b)))
-        else:
-#             match, modified_seq = check_for_hybrid_overlap()
-            break            
     return matches
     
 def index_by_precursor_mass(sorted_clusters, pc, ion):
@@ -607,21 +602,22 @@ def index_by_precursor_mass(sorted_clusters, pc, ion):
     
 def get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, obs_prec, precursor_tol, prec_charge):
     merged_seqs = []
-    ind_b, ind_y = index_by_precursor_mass(b_sorted_clusters, prec_charge, 0),index_by_precursor_mass(y_sorted_clusters, prec_charge, 1)
+    ind_b, ind_y = index_by_precursor_mass(b_sorted_clusters, prec_charge, 1), index_by_precursor_mass(y_sorted_clusters, prec_charge, 1) #Currently no functionality for overlap
     for cluster in b_sorted_clusters[:10]:
         cluster_mass = gen_spectra.convert_ion_to_precursor(cluster.mz, 0, cluster.charge, prec_charge)
         tol = ppm_to_da(obs_prec, precursor_tol)
         if not (cluster_mass > obs_prec + tol):
             diff = obs_prec + tol - cluster_mass + (prec_charge * PROTON_MASS) + WATER_MASS
-            merges = grab_matches(cluster,ind_y, diff, 'b')
+            merges = grab_matches(cluster,ind_y, diff)
             [merged_seqs.append(x) for x in merges]
-    for cluster in y_sorted_clusters[:10]:
+        # The commented code below doesn't need to be here if we are finding uniqueness from every b cluster
+    for cluster in y_sorted_clusters[:10]: 
         cluster_mass = gen_spectra.convert_ion_to_precursor(cluster.mz, 1, cluster.charge, prec_charge)
         tol = ppm_to_da(obs_prec, precursor_tol)
         if not (cluster_mass > obs_prec + tol):
             diff = obs_prec + tol - cluster_mass + (prec_charge * PROTON_MASS) + WATER_MASS
 #             print(get_precursor(cluster_seq + 'DL', charge), obs_prec + tol)
-            merges = grab_matches(cluster,ind_b, diff, 'y')
+            merges = grab_matches(cluster,ind_b, diff)
             [merged_seqs.append(x) for x in merges]
 
     merged_seqs.sort(key=lambda a: a[0], reverse=True)
