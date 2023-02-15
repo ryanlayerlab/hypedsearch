@@ -580,7 +580,7 @@ def score_by_dist(comb_seq, obs_prec, prec_charge, max_len, hybrid): #Change bul
     dist = abs(combined_precursor - obs_prec)
     return dist
 
-def rescore(comb_seq, input_masses, ppm_tolerance, hybrid, proteins):
+def overlap_scoring(comb_seq, input_masses, ppm_tolerance, hybrid, proteins):
     total_score = 0
     b_pid, y_pid = comb_seq[0][5], comb_seq[1][5]
     b_start, y_start = comb_seq[0][1], comb_seq[1][1]
@@ -620,11 +620,11 @@ def second_scoring(natural_alignments, hybrid_alignments, input_spectrum, tol, p
     rescored_naturals, rescored_hybrids = [], []
     for comb_seq in natural_alignments:
         dist = score_by_dist(comb_seq, input_spectrum.precursor_mass, input_spectrum.precursor_charge, max_len, False)
-        score = rescore(comb_seq, input_spectrum.mz_values, tol, False, proteins)
+        score = overlap_scoring(comb_seq, input_spectrum.mz_values, tol, False, proteins)
         rescored_naturals.append((score, 1/dist, comb_seq, 0))
     for comb_seq in hybrid_alignments:
         dist = score_by_dist(comb_seq, input_spectrum.precursor_mass, input_spectrum.precursor_charge, max_len, True)
-        score = rescore(comb_seq, input_spectrum.mz_values, tol, True, proteins)
+        score = overlap_scoring(comb_seq, input_spectrum.mz_values, tol, True, proteins)
         rescored_hybrids.append((score, 1/dist, comb_seq, 1))
     return rescored_naturals, rescored_hybrids
 
