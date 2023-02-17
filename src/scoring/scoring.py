@@ -97,17 +97,22 @@ def rescore_with_seq(sequence, ppm_tolerance, input_masses):
                 
     return(total_score)
     
-def score_by_dist(comb_seq, obs_prec, prec_charge, max_len, hybrid): #Change bullet points to be a query
+def score_by_dist(comb_seq, obs_prec, prec_charge, max_len, hybrid, protein_list): #Change bullet points to be a query
     #((bmass,bstart,bend,ion,charge,pid)(ymass,ystart,yend,ion,charge,pid))
-    b_pid = comb_seq[0][5]
-    b_start = comb_seq[0][1]
-    y_end = comb_seq[1][2]
+    b_pid, y_pid = comb_seq[0][5], comb_seq[1][5]
+    b_start, b_end = comb_seq[0][1], comb_seq[0][2]
+    y_start, y_end = comb_seq[1][1], comb_seq[1][2]
     b_mass, y_mass = comb_seq[0][0], comb_seq[1][0]
     b_charge,y_charge = comb_seq[0][4], comb_seq[1][4]
-    if hybrid == False:
-        combined_precursor = clustering.calc_from_sequences(b_start, y_end, b_pid, max_len, prec_charge)
+    if hybrid:
+        full_seq = clustering.find_sequence(b_pid, b_start, b_end, protein_list) + clustering.find_sequence(y_pid, y_start, y_end, protein_list)
     else:
-        combined_precursor = gen_spectra.calc_precursor_as_disjoint(b_mass, y_mass, b_charge, y_charge, prec_charge)
+        full_seq = clustering.find_sequence(b_pid, b_start, y_end, protein_list)
+    combined_precursor = gen_spectra.get_precursor(full_seq, prec_charge)
+    # if hybrid == False:
+    #     combined_precursor = clustering.calc_from_sequences(b_start, y_end, b_pid, max_len, prec_charge)
+    # else:
+    #     combined_precursor = gen_spectra.calc_precursor_as_disjoint(b_mass, y_mass, b_charge, y_charge, prec_charge)
     dist = abs(combined_precursor - obs_prec)
     return dist
 
@@ -150,11 +155,11 @@ def overlap_scoring(comb_seq, input_masses, ppm_tolerance, hybrid, proteins):
 def second_scoring(natural_alignments, hybrid_alignments, input_spectrum, tol, proteins, max_len):
     rescored_naturals, rescored_hybrids = [], []
     for comb_seq in natural_alignments:
-        dist = score_by_dist(comb_seq, input_spectrum.precursor_mass, input_spectrum.precursor_charge, max_len, False)
+        dist = score_by_dist(comb_seq, input_spectrum.precursor_mass, input_spectrum.precursor_charge, max_len, False, proteins)
         score = overlap_scoring(comb_seq, input_spectrum.mz_values, tol, False, proteins)
         rescored_naturals.append((score, 1/dist, comb_seq, 0))
     for comb_seq in hybrid_alignments:
-        dist = score_by_dist(comb_seq, input_spectrum.precursor_mass, input_spectrum.precursor_charge, max_len, True)
+        dist = score_by_dist(comb_seq, input_spectrum.precursor_mass, input_spectrum.precursor_charge, max_len, True, proteins)
         score = overlap_scoring(comb_seq, input_spectrum.mz_values, tol, True, proteins)
         rescored_hybrids.append((score, 1/dist, comb_seq, 1))
     return rescored_naturals, rescored_hybrids

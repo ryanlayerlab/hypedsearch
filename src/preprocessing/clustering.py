@@ -153,7 +153,7 @@ def find_extensions(pid, start, end, mass, ion, protein_list, charge, prec):
             if not any (x in bad_chars for x in next_AA):
                 raw_b_mass = raw_b_mass + AMINO_ACIDS[next_AA]
                 current_mass = gen_spectra.calc_combined_mass(raw_b_mass, 0)
-                tup = (current_mass, start, current_position, 0, 2, pid)
+                tup = (current_mass, start, current_position+1, 0, 2, pid)
                 extensions.append(tup)
                 current_position = current_position + 1
             else:
@@ -332,7 +332,7 @@ def get_unique_clusters(clusters):
     return cluster_mapping, sorted_clusters
     
 def old_score_clusters(ion, clusters, conv_prec, protein_list):
-    cluster = collections.namedtuple('cluster', 'score pid start end mz charge extensions')
+    cluster = collections.namedtuple('cluster', 'score pid start end mz charge extensions seq')
     cluster_array = []
     # with open('clusters.txt', 'a') as b:
     for i, A in enumerate(clusters):
@@ -342,10 +342,11 @@ def old_score_clusters(ion, clusters, conv_prec, protein_list):
         start = int(A[3])
         end = int(A[4])
         charge = A[5]
+        seq = find_sequence(pid, start, end, protein_list)
         # query_time = time.time()
         extensions = find_extensions(pid, start, end, mz, ion, protein_list, charge, conv_prec)
         # extensions = []
-        target_cluster = cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions)
+        target_cluster = cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions, seq=seq)
         # print("Time:", time.time() - query_time, "End-Start", end-start)
 
         cluster_array.append(target_cluster)
@@ -357,7 +358,7 @@ def old_score_clusters(ion, clusters, conv_prec, protein_list):
     return sorted_clusters
 
 def min_info(cluster):
-    return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.mz, cluster.charge, cluster.extensions)
+    return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.mz, cluster.charge, cluster.extensions, cluster.seq)
 
 def bsearch(key, Y):
         lo = -1
@@ -384,7 +385,7 @@ def ysearch(key, B):
         return hi
 
 def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
-    merge_seqs = []
+    merge_seqs = list()
 
     B = {}
     for c in b_sorted_clusters:
@@ -405,7 +406,7 @@ def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
         sorted_B = sorted(B[pid], key=operator.attrgetter('pid', 'start', 'end'))
         sorted_Y = sorted(Y[pid], key=operator.attrgetter('pid', 'start', 'end'))
         
-        for j, b in sorted_B:
+        for j, b in enumerate(sorted_B):
             y_i = bsearch(b.start, sorted_Y)
 
             if y_i >= len(sorted_Y): break
@@ -416,10 +417,8 @@ def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
                 y = sorted_Y[y_i]
                 merge_seqs.append((b.score + y.score, min_info(b), min_info(y)))
                 y_i += 1
-                print(i,j)
-                b_unique = check_unique(merge_seqs)
                     
-        for j, y in sorted_Y:
+        for j, y in enumerate(sorted_Y):
             b_i = ysearch(y.start, sorted_B) 
 
             if b_i >= len(sorted_B): break
@@ -430,8 +429,6 @@ def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
                 b = sorted_B[b_i]
                 merge_seqs.append((b.score + y.score, min_info(b), min_info(y)))
                 b_i += 1
-                if b_unique != check_unique(merge_seqs):
-                    print("y added something unique at", i, j)
     return merge_seqs
 
 def calc_from_total_overlap(side, b_mass, b_charge, y_mass, y_charge, prec_charge):
@@ -580,14 +577,20 @@ def check_for_hybrid_overlap(b_seq, y_seq, ion):
             modified_seq = b_seq[:i]
     return match, modified_seq
 
-def grab_matches(b,indexed_clusters, target_val):
+def grab_matches(cluster,ion,indexed_clusters,target_val):
     #Given a cluster we want to find everything that it can pair with
     # It can pair with anything up to a certain mass 
     matches = []
-    for key in indexed_clusters.keys():
-        if key<=target_val: #if key is a valid key
-            for y in indexed_clusters[key]:
-                    matches.append((b.score + y.score, min_info(b), min_info(y)))
+    if ion == 0:
+        for key in indexed_clusters.keys():
+            if key<=target_val: #if key is a valid key
+                for y in indexed_clusters[key]:
+                    matches.append((cluster.score + y.score, min_info(cluster), min_info(y)))
+    else:
+        for key in indexed_clusters.keys():
+            if key<=target_val: #if key is a valid key
+                for b in indexed_clusters[key]:
+                    matches.append((b.score + cluster.score, min_info(b), min_info(cluster)))
     return matches
     
 def index_by_precursor_mass(sorted_clusters, pc, ion):
@@ -608,16 +611,16 @@ def get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, obs_prec, precursor
         tol = ppm_to_da(obs_prec, precursor_tol)
         if not (cluster_mass > obs_prec + tol):
             diff = obs_prec + tol - cluster_mass + (prec_charge * PROTON_MASS) + WATER_MASS
-            merges = grab_matches(cluster,ind_y, diff)
+            merges = grab_matches(cluster,0,ind_y, diff)
             [merged_seqs.append(x) for x in merges]
         # The commented code below doesn't need to be here if we are finding uniqueness from every b cluster
-    for cluster in y_sorted_clusters[:10]: 
+    for cluster in y_sorted_clusters[:10]: #290.139027285
         cluster_mass = gen_spectra.convert_ion_to_precursor(cluster.mz, 1, cluster.charge, prec_charge)
         tol = ppm_to_da(obs_prec, precursor_tol)
         if not (cluster_mass > obs_prec + tol):
             diff = obs_prec + tol - cluster_mass + (prec_charge * PROTON_MASS) + WATER_MASS
 #             print(get_precursor(cluster_seq + 'DL', charge), obs_prec + tol)
-            merges = grab_matches(cluster,ind_b, diff)
+            merges = grab_matches(cluster,1,ind_b, diff)
             [merged_seqs.append(x) for x in merges]
 
     merged_seqs.sort(key=lambda a: a[0], reverse=True)
