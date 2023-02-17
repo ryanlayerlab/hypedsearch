@@ -183,16 +183,19 @@ def rand_jitter(arr):
 #Hybrids 
 all_overlap_masses_hyb = list()
 all_yaxis = list()
+scores_hyb = list() 
 for i,hybrid in enumerate(known_hybrids):
     hybrid_seq = known_hybrid_seqs[i]
     score, overlap_masses = find_overlaps(hybrid_seq, ppm_tolerance, hybrid.mz_values)
     [all_overlap_masses_hyb.append(x) for x in overlap_masses]
     y_axis = rand_jitter(overlap_masses)
     [all_yaxis.append(x) for x in y_axis]
+    [scores_hyb.append(score) for x in overlap_masses]
     
 #Naturals 
 all_overlap_masses_nat = list()
 all_yaxis_nat = list()
+scores_nat = list()
 for i,natural in enumerate(known_naturals):
     natural_seq = known_natural_seqs[i]
     score, overlap_masses = find_overlaps(natural_seq, ppm_tolerance, natural.mz_values)
@@ -200,12 +203,13 @@ for i,natural in enumerate(known_naturals):
     if len(overlap_masses) != 0: 
         y_axis = rand_jitter(overlap_masses)
         [all_yaxis_nat.append(x) for x in y_axis]
+    [scores_nat.append(score) for x in overlap_masses]
     
 plt1, ax1 = plt.subplots() #color can be red, blue, green, etc
 ax1.scatter(all_overlap_masses_nat, all_yaxis_nat, color = 'b', alpha=.1, label='natural')
 ax1.scatter(all_overlap_masses_hyb, all_yaxis, color = 'r', alpha=.5, label='hybrid')
 plt.xlabel("Mz")
-plt.ylabel("Jitter")
+plt.ylabel("random jitter")
 plt.title("Mass hits naturals vs hybrids")
 plt.legend()
-plt.savefig("mass_hits")
+plt.savefig("mass_hits_norm")
