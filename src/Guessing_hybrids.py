@@ -187,7 +187,7 @@ scores_hyb = list()
 for i,hybrid in enumerate(known_hybrids):
     hybrid_seq = known_hybrid_seqs[i]
     score, overlap_masses = find_overlaps(hybrid_seq, ppm_tolerance, hybrid.mz_values)
-    [all_overlap_masses_hyb.append(x) for x in overlap_masses]
+    [all_overlap_masses_hyb.append(x/len(hybrid_seq)) for x in overlap_masses]
     y_axis = rand_jitter(overlap_masses)
     [all_yaxis.append(x) for x in y_axis]
     [scores_hyb.append(score) for x in overlap_masses]
@@ -199,7 +199,7 @@ scores_nat = list()
 for i,natural in enumerate(known_naturals):
     natural_seq = known_natural_seqs[i]
     score, overlap_masses = find_overlaps(natural_seq, ppm_tolerance, natural.mz_values)
-    [all_overlap_masses_nat.append(x) for x in overlap_masses]
+    [all_overlap_masses_nat.append(x/len(natural_seq)) for x in overlap_masses]
     if len(overlap_masses) != 0: 
         y_axis = rand_jitter(overlap_masses)
         [all_yaxis_nat.append(x) for x in y_axis]
