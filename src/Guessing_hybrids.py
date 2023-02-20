@@ -208,8 +208,25 @@ for i,natural in enumerate(known_naturals):
 plt1, ax1 = plt.subplots() #color can be red, blue, green, etc
 ax1.scatter(all_overlap_masses_nat, all_yaxis_nat, color = 'b', alpha=.1, label='natural')
 ax1.scatter(all_overlap_masses_hyb, all_yaxis, color = 'r', alpha=.5, label='hybrid')
-plt.xlabel("Mz")
+plt.xlabel("Mz (/len(seq))")
 plt.ylabel("random jitter")
 plt.title("Mass hits naturals vs hybrids")
 plt.legend()
 plt.savefig("mass_hits_norm")
+
+plt2, ax1 = plt.subplots() #color can be red, blue, green, etc
+ax1.scatter(all_overlap_masses_nat, scores_nat, color = 'b', alpha=.1, label='natural')
+ax1.scatter(all_overlap_masses_hyb, scores_hyb, color = 'r', alpha=.5, label='hybrid')
+plt.xlabel("Mz (/len(seq))")
+plt.ylabel("Score (/100)")
+plt.title("Score naturals vs hybrids")
+plt.legend()
+plt.savefig("mass_hits_score")
+
+plt3, ax1 = plt.subplots()
+ax1.hist(scores_nat, color='b', alpha=0.5, label='natural')
+ax1.hist(scores_hyb, color='r', alpha=0.5, label='hybrid')
+plt.xlabel("Score")
+plt.ylabel("Freq.")
+plt.legend()
+plt.savefig("score_hist")
