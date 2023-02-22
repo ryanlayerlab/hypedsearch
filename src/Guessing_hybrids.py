@@ -186,11 +186,12 @@ all_yaxis = list()
 scores_hyb = list() 
 for i,hybrid in enumerate(known_hybrids):
     hybrid_seq = known_hybrid_seqs[i]
-    score, overlap_masses = find_overlaps(hybrid_seq, ppm_tolerance, hybrid.mz_values)
-    [all_overlap_masses_hyb.append(x/len(hybrid_seq)) for x in overlap_masses]
-    y_axis = rand_jitter(overlap_masses)
-    [all_yaxis.append(x) for x in y_axis]
-    [scores_hyb.append(score) for x in overlap_masses]
+    if len(hybrid_seq) <= 25:
+        score, overlap_masses = find_overlaps(hybrid_seq, ppm_tolerance, hybrid.mz_values)
+        [all_overlap_masses_hyb.append(x) for x in overlap_masses] #/len(hybrid_seq)
+        y_axis = rand_jitter(overlap_masses)
+        [all_yaxis.append(x) for x in y_axis]
+        [scores_hyb.append(score) for x in overlap_masses]
     
 #Naturals 
 all_overlap_masses_nat = list()
@@ -198,12 +199,13 @@ all_yaxis_nat = list()
 scores_nat = list()
 for i,natural in enumerate(known_naturals):
     natural_seq = known_natural_seqs[i]
-    score, overlap_masses = find_overlaps(natural_seq, ppm_tolerance, natural.mz_values)
-    [all_overlap_masses_nat.append(x/len(natural_seq)) for x in overlap_masses]
-    if len(overlap_masses) != 0: 
-        y_axis = rand_jitter(overlap_masses)
-        [all_yaxis_nat.append(x) for x in y_axis]
-    [scores_nat.append(score) for x in overlap_masses]
+    if len(natural_seq) <= 25:
+        score, overlap_masses = find_overlaps(natural_seq, ppm_tolerance, natural.mz_values)
+        [all_overlap_masses_nat.append(x) for x in overlap_masses] #/len(natural_seq)
+        if len(overlap_masses) != 0: 
+            y_axis = rand_jitter(overlap_masses)
+            [all_yaxis_nat.append(x) for x in y_axis]
+        [scores_nat.append(score) for x in overlap_masses]
     
 plt1, ax1 = plt.subplots() #color can be red, blue, green, etc
 ax1.scatter(all_overlap_masses_nat, all_yaxis_nat, color = 'b', alpha=.1, label='natural')
@@ -219,6 +221,7 @@ ax1.scatter(all_overlap_masses_nat, scores_nat, color = 'b', alpha=.1, label='na
 ax1.scatter(all_overlap_masses_hyb, scores_hyb, color = 'r', alpha=.5, label='hybrid')
 plt.xlabel("Mz (/len(seq))")
 plt.ylabel("Score (/100)")
+plt.axhline(sum(scores_nat)/len(scores_nat))
 plt.title("Score naturals vs hybrids")
 plt.legend()
 plt.savefig("mass_hits_score")
@@ -230,3 +233,57 @@ plt.xlabel("Score")
 plt.ylabel("Freq.")
 plt.legend()
 plt.savefig("score_hist")
+
+plt3, ax1 = plt.subplots()
+ax1.hist(all_overlap_masses_nat, color='b', alpha=0.5, label='natural')
+ax1.hist(all_overlap_masses_hyb, color='r', alpha=0.5, label='hybrid')
+plt.xlabel("Score")
+plt.ylabel("Freq.")
+plt.legend()
+plt.axvline(sum(all_overlap_masses_nat)/len(all_overlap_masses_nat))
+plt.savefig("size_hist")
+
+#2-21 experiments
+percent_matched = list()
+garbage_matches = list()
+missing_matched = list()
+for i,spectrum in enumerate(spectra):
+    #Checking proportion of peaks matched for spectrummill seqs
+    specmill_seq = specmill_seqs[i]
+    score, _ = find_overlaps(specmill_seq, ppm_tolerance, spectrum.mz_values)
+    percent_matched.append(score/peak_filter)
+    missing_matched.append(score/(4*len(specmill_seq)))
+    
+    #Finding # garbage peaks 
+    b_prec, y_prec = gen_spectra.convert_precursor_to_ion(spectrum.precursor_mass, spectrum.precursor_charge)
+    matched_masses_b, matched_masses_y = merge_search.modified_match_masses(spectrum.mz_values, proteins, max_pep_len, ppm_tolerance, b_prec, y_prec)
+    #check how many things match to nothing 
+    count = 0
+    for mass in spectrum.mz_values:
+        if matched_masses_b[mass] == [] and matched_masses_y[mass] == []:
+            count = count + 1  
+    garbage_matches.append(count)
+    
+#plotting the percent of peaks matched 
+plt4, ax1 = plt.subplots() #color can be red, blue, green, etc
+ax1.scatter(range(0,len(spectra)), percent_matched, color = 'b')
+plt.xlabel("range")
+plt.ylabel("percent matched")
+plt.title("Percentage of peaks matched")
+plt.savefig("peak_match")
+
+#plotting the percent of peaks matched 
+plt4, ax1 = plt.subplots() #color can be red, blue, green, etc
+ax1.scatter(range(0,len(spectra)), missing_matched, color = 'b')
+plt.xlabel("range")
+plt.ylabel("percent")
+plt.title("Percentage of good masses in the data")
+plt.savefig("missing_match")
+
+#Plotting the number of garbage peaks (didn't match to anything)
+plt5, ax1 = plt.subplots() #color can be red, blue, green, etc
+ax1.scatter(range(0,len(spectra)), garbage_matches, color = 'b')
+plt.xlabel("range")
+plt.ylabel("number of garbage peaks")
+plt.title("Number of garbage peaks")
+plt.savefig("garb_peaks")
