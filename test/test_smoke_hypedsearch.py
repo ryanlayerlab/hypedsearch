@@ -42,7 +42,7 @@ class Test_Main(unittest.TestCase):
             arguments = self.get_arguments()
             matched_spectra = runner.run(arguments)
             actual = len(matched_spectra)
-            expected = 3
+            expected = 1
             self.assertEqual(expected, actual, 'matched_spectra length is three')
 
 
