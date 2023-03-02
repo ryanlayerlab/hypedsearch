@@ -15,29 +15,19 @@ for file in output_files:
         for line in f:
             A = line.split('\t')
             if A[1] == "Hybrid":
-                hybrid_list.append((A[2], A[5], A[6]))
+                hybrid_list.append((A[9], A[5], A[6]))
                 hybrid_score_list.append(A[3])
             else:
                 nat_list.append((A[2], A[5], A[6]))
                 nat_scores.append(A[3])
                 
-prot_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/BMEM_searches_database.fasta'
+prot_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/UniProt_mouse.fasta'
 proteins = database.build(prot_path)
                 
-with open("/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/Adjusted_"+os.path.basename(prot_path), 'w') as d:
-    for protein in proteins.proteins:
-        d.write('>' + protein[0] + '\n')
-        prot_seq = protein[1]
-        seq_len = len(prot_seq)
-        curr_write = 0
-        while seq_len >= 70:
-            d.write(prot_seq[curr_write:curr_write+70] + '\n')
-            seq_len = seq_len-70
-            curr_write = curr_write + 70
-        d.write(prot_seq[curr_write:seq_len]+'\n')
+with open("/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/Hybrid_"+os.path.basename(prot_path), 'w') as d:
     for hybrid in hybrid_list:
         parent1, parent2 = hybrid[1], hybrid[2]
-        d.write(">sp|Hypedsearch Hybrid|Hybrid: "+str(parent1)+" - "+str(parent2)+"|"+hybrid[0]+"\n")
+        d.write(">sp|Hypedsearch Hybrid|Hybrid: "+str(parent1)+" - "+str(parent2)+"|" + hybrid[0])
         d.write(hybrid[0].replace("-", "") + "\n\n")
         
         

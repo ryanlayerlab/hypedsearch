@@ -38,15 +38,22 @@ def text_file(results: dict, txt_file_name: str) -> None:
             for alignment in target_alignments:
                 spec_num = str(i)
                 hybrid = alignment[0]
-                left_protein = alignment[1]
-                right_protein = alignment[2]
+                # left_protein, right_protein = alignment[1][0], alignment[2][0]
+                # for x in alignment[1][1:]:
+                #     left_protein += ("/" + x)
+                # left_protein = alignment[2][0]
+                # for x in alignment[2][1:]:
+                #     left_protein += ("/" + x)
+                left_protein,right_protein = alignment[1], alignment[2]
                 sequence = alignment[3]
+                print(txt_file_name, spec_num)
                 b_score = str(alignment[4])
                 y_score = str(alignment[5])
                 total_score = str(alignment[6])
                 precursor_distance = str(alignment[7])
+                extended_seq = alignment[8]
                 
-                t.write(spec_num + '\t' + hybrid + '\t' + sequence + '\t' + total_score + '\t' + precursor_distance + '\t' + left_protein + '\t' + right_protein + '\t' + b_score + '\t' + y_score + '\n')
+                t.write(spec_num + '\t' + hybrid + '\t' + sequence + '\t' + total_score + '\t' + precursor_distance + '\t' + left_protein + '\t' + right_protein + '\t' + b_score + '\t' + y_score + '\t' + extended_seq + '\n')
 
 def tsv_file(results: dict, output_dir: str) -> None:
     '''
