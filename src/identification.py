@@ -340,7 +340,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     precursor_tolerance: int = 10, digest: str = '',cores: int = 1,
     n: int = 5,DEBUG: bool = False, truth_set: str = "", output_dir: str = ''):
     fall_off = None
-    make_new = True
+    make_new = False
     if make_new:
         dbf = database_file(max_peptide_len, True)
         kv_prots = [(k, v) for k, v in db.proteins]    
