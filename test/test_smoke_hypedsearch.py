@@ -13,7 +13,7 @@ from constants import AMINO_ACIDS, SINGLY_CHARGED_B_BASE, DOUBLY_CHARGED_B_BASE,
 class Test_Main(unittest.TestCase):
         def get_arguments(self):
             dirname = os.path.dirname(__file__)
-            spectra_file_paths = [os.path.join(dirname, '../data/spectra/hybrid_nod2e3.mzML')]  
+            spectra_file_paths = [os.path.join(dirname, '../data/spectra/NOD2_E3/NOD2_E3.mzML')]  
             database_file_path = os.path.join(dirname, '../data/database/sample_database.fasta')
             database_file = database.build(database_file_path)
             output_dir = '../output'
@@ -42,7 +42,7 @@ class Test_Main(unittest.TestCase):
             arguments = self.get_arguments()
             matched_spectra = runner.run(arguments)
             actual = len(matched_spectra)
-            expected = 3
+            expected = 1
             self.assertEqual(expected, actual, 'matched_spectra length is three')
 
 
