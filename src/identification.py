@@ -313,6 +313,7 @@ class alignment_info:
         # check_top_location(rescored_naturals[0], rescored_hybrids[0], merged_seqs, hybrid_merged)
         
         rescored_alignments = sorted(rescored_naturals + rescored_hybrids, key = lambda x: (x[0], x[1]), reverse = True)
+        rescored_alignments = [x for x in rescored_alignments if x[0] > 6]
         
         start_time = time.time()
         postprocessed_alignments = postprocessing(rescored_alignments, self.db)

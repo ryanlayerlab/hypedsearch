@@ -11,6 +11,20 @@ def make_db_mapping(db):
     
     return num_to_prot_name
 
+def make_db_mapping_by_key(db):
+    name_list = []
+    [name_list.append(x) for x in db.proteins]
+
+    num_to_prot_name = dict()
+    for i, x in enumerate(name_list):
+        prot_description = x[0]
+        prot_arr = prot_description.split("|")
+        prot_arr2 = prot_arr[2].split(" ")
+        prot_name=prot_arr2[0]
+        num_to_prot_name[prot_name] = name_list[i]
+    
+    return num_to_prot_name
+
 def label_alignments(alignment):
     #b_mass, b_start, b_end, 1, b_charge, b_pid, b_score
     type = alignment[3]
@@ -54,8 +68,8 @@ def get_extended_sequence(alignment, protein_list, label, sequence):
         b_start, y_end = alignment[2][0][1], alignment[2][1][2]
         b_parent_id, y_parent_id = alignment[2][0][5], alignment[2][1][5]
         b_parent_seq, y_parent_seq = protein_list[b_parent_id][1], protein_list[y_parent_id][1]
-        b_extensions = b_parent_seq[max(b_start-5, 0):b_start]
-        y_extensions = y_parent_seq[y_end:min(y_end+5,len(y_parent_seq))]
+        b_extensions = b_parent_seq[max(b_start-25, 0):b_start]
+        y_extensions = y_parent_seq[y_end:min(y_end+25,len(y_parent_seq))]
         return b_extensions + sequence + y_extensions
 
 # spec_num, non_hybrid, proteins, sequence, b_score, y_score, total_score, precursor_distance, total_mass_error
