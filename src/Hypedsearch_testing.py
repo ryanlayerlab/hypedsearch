@@ -21,8 +21,8 @@ prec_tol = 10
 max_pep_len = 25
 digest = True
 
-prot_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/sample_database.fasta'
-proteins = database.build(prot_path)
+# prot_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/sample_database.fasta'
+# proteins = database.build(prot_path)
 
 spectra_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/spectra/Lab_Data'
 spectra_files = get_spectra_files(spectra_path)
@@ -56,16 +56,15 @@ def get_natives_and_hybrids(filepath):
     natives, hybrids = dict(), dict()
     with open(filepath, 'r') as truth_set:
         for i, line in enumerate(truth_set):
-            if i==300:
+            split_line = line.split('\t')
+            if split_line[21] == "DGLNHL":
                 print("here")
             if "Hybrid" not in line:
-                split_line = line.split('\t')
                 if split_line[21] not in natives.keys():
                     natives[split_line[21]] = []
                 natives[split_line[21]].append(split_line[17])
 
             else:
-                split_line = line.split('\t')
                 if split_line[21] not in hybrids.keys():
                     hybrids[split_line[21]] = []
                 hybrids[split_line[21]].append(split_line[17])
@@ -80,6 +79,10 @@ correct_sequences = truth_set(specmill_path)
 first_pass_specmill_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/truth_table/BMEM_searches.txt'
 first_pass_specmill_seqs = truth_set(first_pass_specmill_path)
 specmill_natives, native_scores, specmill_hybrids, hybrid_scores = get_natives_and_hybrids(specmill_path)
+for seq in correct_sequences:
+    if seq not in specmill_natives:
+        if seq not in specmill_hybrids:
+            print(seq)
 
 # How many times did spectrumMill find the same thing?
 # def hypedsearch_top_answers(output_files):
@@ -118,7 +121,18 @@ def get_nonisomorphic_set(sequences):
             if same_permutation(sequence, oseq):
                 sequences
                 
-    
+def num_of_id_seqs(output_files):
+    ncount, hcount = 0, 0
+    for file in output_files:
+        with open(file, 'r') as r:
+            for line in r:
+                A = line.split("\t")
+                eval = A[1]
+                if eval == "Hybrid":
+                    hcount += 1
+                else:
+                    ncount += 1
+    return ncount, hcount
 
 def hypedsearch_all_answers(output_files):
     natives, hybrids = dict(), dict()
@@ -126,9 +140,8 @@ def hypedsearch_all_answers(output_files):
         with open(file, 'r') as f:
             for line in f:
                 A = line.split('\t')
-                hypedsearch_sequence = A[2]
-                if A[1] == "Hybrid":
-                    hypedsearch_sequence = A[2].replace("-", "")                    
+                hypedsearch_sequence = A[2].replace("-", "")
+                if A[1] == "Natural":                    
                     if hypedsearch_sequence not in natives.keys():
                         natives[hypedsearch_sequence] = []
                     natives[hypedsearch_sequence].append(A[3])
@@ -136,6 +149,7 @@ def hypedsearch_all_answers(output_files):
                     if hypedsearch_sequence not in hybrids.keys():
                         hybrids[hypedsearch_sequence] = []
                     hybrids[hypedsearch_sequence].append(A[3])
+                    
     return natives.keys(), natives, hybrids.keys(), hybrids
 
 def test_isomorphic_seqs(seq1, seq2):
@@ -173,27 +187,29 @@ def get_output_files(open_path):
 open_path = "/home/naco3124/jaime_hypedsearch/hypedsearch/data/output"
 output_files = get_output_files(open_path)
 hnatives, hnative_scores, hhybrids, hhybrid_scores = hypedsearch_all_answers(output_files)
-# hunaturals, huhybrids = hypedsearch_top_answers(output_files)
+hnat_num, hhyb_num = num_of_id_seqs(output_files)
 
-def compare_with_SpecMill(hypedsearch_answer_set, correct_sequences):
+def compare_with_SpecMill(hypedsearch_answer_set, correct_sequences, target_dict, hybrid_seqs):
     hcount = 0
     hcount_array = set()
     for answer in hypedsearch_answer_set:
         if answer in correct_sequences:
-            hcount = hcount + 1
+            if answer in hybrid_seqs:
+                print("error")
+            hcount = hcount + len(target_dict[answer])
             hcount_array.add(answer)
     return hcount, hcount_array
 
-def compare_unique_with_SpecMill(hypedsearch_answer_set, correct_sequences):
-    hcount = 0
-    for answer in hypedsearch_answer_set:
-        for specanswer in correct_sequences:
-            if test_isomorphic_seqs(answer, specanswer):
-                hcount = hcount + 1
-    return hcount
+# def compare_unique_with_SpecMill(hypedsearch_answer_set, correct_sequences):
+#     hcount = 0
+#     for answer in hypedsearch_answer_set:
+#         for specanswer in correct_sequences:
+#             if test_isomorphic_seqs(answer, specanswer):
+#                 hcount = hcount + 1
+#     return hcount
     
-hcountn, specmill_matched_natives = compare_with_SpecMill(hnatives, correct_sequences)
-hcounth, specmill_new_hybrids = compare_with_SpecMill(hhybrids, correct_sequences)
+hcountn, specmill_matched_natives = compare_with_SpecMill(hnatives, correct_sequences, native_scores, specmill_hybrids)
+hcounth, specmill_new_hybrids = compare_with_SpecMill(hhybrids, correct_sequences, hybrid_scores)
 # hucounth, _ = compare_with_SpecMill(huhybrids, correct_sequences)
 # hucountn, _ = compare_with_SpecMill(hunaturals, correct_sequences)
 
@@ -210,18 +226,27 @@ scount = 0
 for answer in correct_sequences:
     if answer in hnatives or answer in hhybrids:
         scount = scount + 1
+        
+hcount = 0
+for hybrid in hhybrids:
+    hcount += len(hhybrid_scores[hybrid])
+ncount = 0
+for native in hnatives:
+    ncount += len(hnative_scores[native])
+    
 
 print("Number of specmill sequences found by Hypedsearch", scount, "out of", len(correct_sequences), scount/len(correct_sequences)*100, "%")
 print("For Hybrids:\n")
-print("Number of Hypedsearch Hybrids", len([len(hhybrid_scores[x]) for x in hhybrids]))
-print("Number of unique Hypedsearch Hybrids", len(set(hhybrids)))
+print("Number of Hypedsearch Hybrids", hcount)
+print("Number of unique Hypedsearch Hybrids", len(hhybrids))
 print("Of these,", hcounth, "were found by SpectrumMill", hcounth/len(hhybrids)*100, "%")
-# print("Number of Identified Hybrid sequences", len(huhybrids))
+print("Number of Identified Hybrid sequences", hhyb_num)
 # print("Number of the top Hybrids that matched with SpectrumMill:", hucounth, hucounth/len(huhybrids)*100, "%")
 print("\nFor Natives:\n")
-print("Number of Hypedsearch natives", len([len(hnative_scores[x]) for x in hnatives]))
+print("Number of Hypedsearch natives", ncount)
+print("Number of unique Hypedsearch natives", len(hnatives))
 print("Of these,", hcountn, "were found by SpectrumMill", hcountn/len(hnatives)*100, "%")
-# print("Number of Identified Native sequences", len(hunaturals))
+print("Number of Identified Native sequences", hnat_num)
 # print("Number of the top natives that matched with SpectrumMill:", hucountn, hucountn/len(hunaturals)*100, "%")
 print("\nData on SpecMill:\n")
 print("Number of sequences that SpecMill skipped on the first pass", len(spectra)-len(first_pass_specmill_seqs))
