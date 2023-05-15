@@ -38,6 +38,7 @@ def set_args(args) -> dict:
     relative_abundance_filter = args.rel_abund_filter if not use_params else config['relative_abundance']
     digest = args.digest if not use_params else config['digest']
     cores = args.cores if not use_params else config['cores']
+    make_new = args.new_db if not use_params else config['new_db']
     n = args.n if not use_params else config['top_results']
     debug = config['debug']
     truth_set = config['truth_set']
@@ -58,7 +59,7 @@ def set_args(args) -> dict:
         'min_peptide_len': min_peptide_len,'max_peptide_len': max_peptide_len,'tolerance': ppm_tolerance,
         'precursor_tolerance': precursor_tolerance,'verbose': verbose, 'peak_filter': peak_filter, 
         'relative_abundance_filter': relative_abundance_filter,'digest': digest, 'DEBUG': debug, 
-        'cores': cores,'n': n,'truth_set': truth_set}
+        'cores': cores,'n': n,'new_db': make_new ,'truth_set': truth_set}
 
 @profile
 def main(args: object) -> None:
@@ -84,6 +85,7 @@ if __name__ == '__main__':
     parser.add_argument('--digest', dest='digest', type=str, default='', help='The digest performed. Default=None')
     parser.add_argument('--verbose', dest='verbose', type=bool, default=True, help='Extra printing to console during run. Default=True')
     parser.add_argument('--cores', dest='cores', type=int, default=1, help='The number of cores allowed to use when searching. Uses at least 1 and at most the number of available cores. Default=1')
+    parser.add_argument('--new-database', dest='new_db', type=bool, default=False, help='Whether to make a new SQLite database. Only needs to be run once per database. Default=False')
     parser.add_argument('--n', dest='n', type=int, default=5, help='The number of alignments to keep per spectrum. Default=5')
     args = parser.parse_args()
     main(args)
