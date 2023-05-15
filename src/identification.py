@@ -338,10 +338,9 @@ def align(numcores, spectra, location, precursor_tolerance, db, ppm_tolerance, m
 def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     min_peptide_len: int = 5, max_peptide_len: int = 10, peak_filter: int = 0, 
     relative_abundance_filter: float = 0.0,ppm_tolerance: int = 20, 
-    precursor_tolerance: int = 10, digest: str = '',cores: int = 1,
+    precursor_tolerance: int = 10, digest: str = '',cores: int = 1, make_new: bool = False,
     n: int = 5,DEBUG: bool = False, truth_set: str = "", output_dir: str = ''):
     fall_off = None
-    make_new = False
     if make_new:
         dbf = database_file(max_peptide_len, True)
         kv_prots = [(k, v) for k, v in db.proteins]    
