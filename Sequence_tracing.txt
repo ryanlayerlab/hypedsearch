@@ -1,0 +1,22 @@
+For BMEM: 5 DLQTLALNAAR scored: 10 on spectrum: 2703 while Hypedsearch returned: LSQEL-AAINAR as a: Hybrid with score: 9
+For BMEM: 4 DLQTLALNAAR scored: 10 on spectrum: 2361 while Hypedsearch returned: EV-AASGVLAAVAAG as a: Hybrid with score: 7
+
+Now looking at the case of equality 
+
+
+Now looking at the case of things Spectrummill scored >8 
+ 
+For BMEM: 6 DPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored 14 for spectrum:3311
+For BMEM: 6 DLQTLAL-EVE scored 12 for spectrum:4345
+For BMEM: 5 DLQTLAL-NAAR scored 9 for spectrum:2697
+For BMEM: 5 DLQTLAL-NAAR scored 10 for spectrum:2703
+For BMEM: 5 DPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored 13 for spectrum:3073
+For BMEM: 5 EVEDPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored 12 for spectrum:3272
+For BMEM: 5 EVEDPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored 13 for spectrum:3308
+For BMEM: 5 EVEDPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored 11 for spectrum:3346
+For BMEM: 5 DLQTLAL-EVE scored 9 for spectrum:4575
+For BMEM: 4 DLQTLAL-NAAR scored 10 for spectrum:2361
+For BMEM: 4 DPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored 13 for spectrum:2749
+For BMEM: 4 DLQTLAL-EVE scored 12 for spectrum:4203
+For BMEM: 7 DPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored 14 for spectrum:2786
+For BMEM: 7 DPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored 13 for spectrum:2804
