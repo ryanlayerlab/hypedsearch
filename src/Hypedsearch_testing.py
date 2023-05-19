@@ -57,7 +57,7 @@ def get_natives_and_hybrids(filepath):
     with open(filepath, 'r') as truth_set:
         for i, line in enumerate(truth_set):
             split_line = line.split('\t')
-            if split_line[21] == "DGLNHL":
+            if split_line[21] == "DFLHAR":
                 print("here")
             if "Hybrid" not in line:
                 if split_line[21] not in natives.keys():
@@ -196,8 +196,21 @@ def compare_with_SpecMill(hypedsearch_answer_set, correct_sequences, target_dict
         if answer in correct_sequences:
             if answer in hybrid_seqs:
                 print("error")
-            hcount = hcount + len(target_dict[answer])
-            hcount_array.add(answer)
+            else:
+                hcount = hcount + len(target_dict[answer])
+                hcount_array.add(answer)
+    return hcount, hcount_array
+
+def compare_with_SpecMill_hybrids(hypedsearch_answer_set, correct_sequences, target_dict, native_seqs):
+    hcount = 0
+    hcount_array = set()
+    for answer in hypedsearch_answer_set:
+        if answer in correct_sequences:
+            if answer in native_seqs:
+                print("error")
+            else:
+                hcount = hcount + len(target_dict[answer])
+                hcount_array.add(answer)
     return hcount, hcount_array
 
 # def compare_unique_with_SpecMill(hypedsearch_answer_set, correct_sequences):
@@ -209,7 +222,7 @@ def compare_with_SpecMill(hypedsearch_answer_set, correct_sequences, target_dict
 #     return hcount
     
 hcountn, specmill_matched_natives = compare_with_SpecMill(hnatives, correct_sequences, native_scores, specmill_hybrids)
-hcounth, specmill_new_hybrids = compare_with_SpecMill(hhybrids, correct_sequences, hybrid_scores)
+hcounth, specmill_new_hybrids = compare_with_SpecMill_hybrids(hhybrids, correct_sequences, hybrid_scores, specmill_natives)
 # hucounth, _ = compare_with_SpecMill(huhybrids, correct_sequences)
 # hucountn, _ = compare_with_SpecMill(hunaturals, correct_sequences)
 
@@ -223,9 +236,14 @@ def check_for_changed_mind(first_pass_truth_set, second_pass_truth_set):
 changednum = check_for_changed_mind(first_pass_specmill_seqs, correct_sequences)
 
 scount = 0
+nacount = 0
+hycount = 0
 for answer in correct_sequences:
-    if answer in hnatives or answer in hhybrids:
-        scount = scount + 1
+    if answer in hnatives:
+        nacount = nacount + 1
+    elif answer in hhybrids:
+        hycount = hycount + 1
+scount = nacount + hycount
         
 hcount = 0
 for hybrid in hhybrids:
@@ -236,6 +254,8 @@ for native in hnatives:
     
 
 print("Number of specmill sequences found by Hypedsearch", scount, "out of", len(correct_sequences), scount/len(correct_sequences)*100, "%")
+print("Number of specmill natives found by Hypedsearch", nacount, "out of", len(specmill_natives), nacount/len(specmill_natives)*100, "%")
+print("Number of specmill hybrids found by Hypedsearch", hycount, "out of", len(specmill_hybrids), hycount/len(specmill_hybrids)*100, "%")
 print("For Hybrids:\n")
 print("Number of Hypedsearch Hybrids", hcount)
 print("Number of unique Hypedsearch Hybrids", len(hhybrids))
