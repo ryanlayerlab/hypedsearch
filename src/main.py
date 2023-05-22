@@ -94,5 +94,4 @@ if __name__ == '__main__':
     parser.add_argument('--n', dest='n', type=int, default=5, help='The number of alignments to keep per spectrum. Default=5')
     parser.add_argument('--debug', dest='debug', type=bool, default=False, help='The number of alignments to keep per spectrum. Default=5')
     args = parser.parse_args()
-    print(args)
     main(args)
