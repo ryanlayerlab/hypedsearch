@@ -139,5 +139,5 @@ src/intermediate_files
 
 .fake
 .ionide
-.txt
+Timing_data.txt
 *.db
