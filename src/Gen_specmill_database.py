@@ -2,6 +2,7 @@ import database
 from main import get_spectra_files
 from preprocessing.preprocessing_utils import load_spectra
 import re
+import sys
 
 ppm_tolerance = 20
 peak_filter = 25
@@ -14,23 +15,6 @@ dataset_id = 'BMEM_searches'
 
 prot_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/UniProt_mouse.fasta'
 proteins = database.build(prot_path)
-
-# alphabet = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
-# for char in alphabet:
-#     found = False
-#     for protein in proteins.proteins:
-#         prot_seq = protein[1]
-#         if char in prot_seq:
-#             print("We found a", char, protein[0])
-#             found = True
-#             break
-#     if not found:
-#         print("There are no", char, "in the database")
-
-
-# spectra_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/spectra/Lab_Data'
-# spectra_files = get_spectra_files(spectra_path)
-# spectra = load_spectra(spectra_files, ppm_tolerance, peak_filter, relative_abundance_filter)
 
 def build_specmill_table(filepath):
     sequences, ids = [], []
