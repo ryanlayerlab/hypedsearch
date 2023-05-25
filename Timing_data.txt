@@ -1,10 +1,10 @@
-Queries took:	0.007065773010253906
-Hits took:	4.76837158203125e-05
-Clusters took:	0.0003859996795654297
-Ryan merging and sorting took:	6.198883056640625e-05
-Precursor filtering took:	4.887580871582031e-05
-Finding hybrid merges took:	0.00010776519775390625
-Filtering hybrids by precursor masss took:	4.673004150390625e-05
-Making alignments took:	0.0008361339569091797
-Second round of scoring and sorting took:	1.3113021850585938e-05
-Postprocessing took:	1.7881393432617188e-05
+Queries took:	0.21090388298034668
+Hits took:	0.18997406959533691
+Clusters took:	4.505597829818726
+Ryan merging and sorting took:	13.908193111419678
+Precursor filtering took:	35.397119998931885
+Finding hybrid merges took:	4.077992916107178
+Filtering hybrids by precursor masss took:	10.556735038757324
+Making alignments took:	108.84663009643555
+Second round of scoring and sorting took:	1.1695549488067627
+Postprocessing took:	0.003922939300537109
