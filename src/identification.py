@@ -275,19 +275,27 @@ def do_fourth_thing(spectrum, b_sorted_clusters, y_sorted_clusters, prec_tol):
     return hybrid_merged
 
 def do_third_thing(spectrum, max_pep_len, prec_tol, b_sorted_clusters, y_sorted_clusters):
-    start_time = time.time()
-    merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
-    merged_seqs.sort(key = lambda x: x[0], reverse = True)
-    end_time = time.time() - start_time
-    with open('Timing_data.txt', 'a') as t:
-        t.write("Ryan merging and sorting took:" + '\t' + str(end_time) + "\n")
+    merged_seqs = do_third_thing_A(b_sorted_clusters, y_sorted_clusters)
+    prec_tol, merged_seqs = do_third_thing_B(spectrum, max_pep_len, prec_tol, merged_seqs)
+    return merged_seqs,prec_tol
+
+def do_third_thing_B(spectrum, max_pep_len, prec_tol, merged_seqs):
     prec_tol = ppm_to_da(spectrum.precursor_mass, prec_tol)
     start_time = time.time()
     merged_seqs = clustering.filter_by_precursor(merged_seqs, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, max_pep_len)
     end_time = time.time() - start_time
     with open('Timing_data.txt', 'a') as t:
         t.write("Precursor filtering took:" + '\t' + str(end_time) + "\n")
-    return merged_seqs,prec_tol
+    return prec_tol,merged_seqs
+
+def do_third_thing_A(b_sorted_clusters, y_sorted_clusters):
+    start_time = time.time()
+    merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
+    merged_seqs.sort(key = lambda x: x[0], reverse = True)
+    end_time = time.time() - start_time
+    with open('Timing_data.txt', 'a') as t:
+        t.write("Ryan merging and sorting took:" + '\t' + str(end_time) + "\n")
+    return merged_seqs
 
 def do_second_thing(db, converted_b, converted_y, b_hits, y_hits):
     cluster_time = time.time()
