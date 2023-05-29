@@ -40,12 +40,6 @@ class database_file:
         self.cursor.execute("DROP TABLE temp.mass")
         return b_rows, y_rows
     
-    # def query_unique_mass(self, mass, tol):
-        # upper = mass + tol
-        # lower = mass - tol
-        # self.cursor.execute("CREATE TABLE temp.mass AS SELECT * FROM kmers where mass between ? and ? order by protein, location_start", (lower, upper))
-        # unique_b_rows = self.cursor.execute("SELECT DISTINCT location_end - location_start FROM temp.mass where ion = 0 order by protein, location_start, location_end").fetchall()
-        # 
         
     def query_sequence(self, pid, start, end):
         rows = self.cursor.execute("SELECT * FROM kmers where protein = ? and location_start = ? and location_end = ?", (pid, start, end)).fetchall()

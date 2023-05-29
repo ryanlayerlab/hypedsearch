@@ -8,27 +8,25 @@ from sqlite import database_file
 import time
 from constants import AMINO_ACIDS
 
-def write_cluster(cluster):
-    #returns cluster of the form (score, pid, mz, start, end)
-    if len(cluster) == 0 : return None
-    O = []
-    O.append(len(cluster))
-    O.append(cluster[0].pid)
+def create_clusters_from_foos(foos):
+    if len(foos) == 0 : return None
+    clusters = []
+    clusters.append(len(foos))
+    clusters.append(foos[0].pid)
     max_len = 0
     max_hit = None
-    for hit in cluster:
-        l = hit.end - hit.start + 1
+    for foo in foos:
+        l = foo.end - foo.start + 1
         if l > max_len:
             max_len = l
-            max_hit = hit
-    O.append(max_hit.mz)
-    O.append(max_hit.start)
-    O.append(max_hit.end)
-    O.append(max_hit.charge)
+            max_hit = foo
+    clusters.append(max_hit.mz)
+    clusters.append(max_hit.start)
+    clusters.append(max_hit.end)
+    clusters.append(max_hit.charge)
+    return clusters
 
-    return O
-
-def parse_hits(Hit, all_hits):
+def parse_foos(Hit, all_hits):
     hits = []
     #Matched masses data is of form (mass, start, end, ion_int, charge, protein_num)
     for A in all_hits:
@@ -42,39 +40,41 @@ def parse_hits(Hit, all_hits):
     return hits
 
 def create_clusters(ion, b_hits, y_hits):
-    clusters = []
-    Hit = collections.namedtuple('Hit', 'pid start end mz charge')
+    all_clusters = []
+    Foo = collections.namedtuple('Foo', 'pid start end mz charge')
     if ion == 'b':
-        hits = parse_hits(Hit, b_hits)
-        sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'start', 'end'))
+        foos = parse_foos(Foo, b_hits)
+        sorted_foos = sorted(foos, key=operator.attrgetter('pid', 'start', 'end'))
         last_pid = None
         last_start = None
-        cluster = []
-        for hit in sorted_hits:
-            if last_pid == hit.pid and last_start == hit.start:
-                cluster.append(hit)
+        foos = []
+        for foo in sorted_foos:
+            if last_pid == foo.pid and last_start == foo.start:
+                foos.append(foo)
             else:
-                if cluster != []:   
-                    clusters.append(write_cluster(cluster))
-                cluster = [hit]
-            last_pid = hit.pid
-            last_start = hit.start
+                if foos != []:
+                    clusters = create_clusters_from_foos(foos)
+                    all_clusters.append(clusters)
+                foos = [foo]
+            last_pid = foo.pid
+            last_start = foo.start
     else:
-        hits = parse_hits(Hit, y_hits)
-        sorted_hits = sorted(hits, key=operator.attrgetter('pid', 'end', 'start'))
+        foos = parse_foos(Foo, y_hits)
+        sorted_foos = sorted(foos, key=operator.attrgetter('pid', 'end', 'start'))
         last_pid = None
         last_start = None
-        cluster = []
-        for hit in sorted_hits:
-            if last_pid == hit.pid and last_end == hit.end:
-                cluster.append(hit)
+        foos = []
+        for foo in sorted_foos:
+            if last_pid == foo.pid and last_end == foo.end:
+                foos.append(foo)
             else:
-                if cluster != []:
-                    clusters.append(write_cluster(cluster))
-                cluster = [hit]
-            last_pid = hit.pid
-            last_end = hit.end
-    return clusters
+                if foos != []:
+                    clusters = create_clusters_from_foos(foos)
+                    all_clusters.append(clusters)
+                foos = [foo]
+            last_pid = foo.pid
+            last_end = foo.end
+    return all_clusters
 
 
 def parse_indices(index_set):
@@ -322,19 +322,14 @@ def get_unique_clusters(clusters):
         start = first_cluster[3]
         end = first_cluster[4]
         charge = first_cluster[5]
-        
         target_cluster = cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge)
-
         unique_clusters.append(target_cluster)
-        
     sorted_clusters = sorted(unique_clusters, key=operator.attrgetter('score', 'pid'), reverse = True)
-        
     return cluster_mapping, sorted_clusters
     
 def old_score_clusters(ion, clusters, conv_prec, protein_list):
-    cluster = collections.namedtuple('cluster', 'score pid start end mz charge extensions seq')
+    sorted_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge extensions seq')
     cluster_array = []
-    # with open('clusters.txt', 'a') as b:
     for i, A in enumerate(clusters):
         score = A[0]
         pid = int(A[1])
@@ -343,18 +338,10 @@ def old_score_clusters(ion, clusters, conv_prec, protein_list):
         end = int(A[4])
         charge = A[5]
         seq = find_sequence(pid, start, end, protein_list)
-        # query_time = time.time()
         extensions = find_extensions(pid, start, end, mz, ion, protein_list, charge, conv_prec)
-        # extensions = []
-        target_cluster = cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions, seq=seq)
-        # print("Time:", time.time() - query_time, "End-Start", end-start)
-
+        target_cluster = sorted_cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions, seq=seq)
         cluster_array.append(target_cluster)
-        
-        # b.write(str(score) + '\t' + str(pid) + '\t' + str(start) + '\t' + str(end) + '\t' + str(mz) + '\t' + str(charge) + '\t' + str(extensions) + '\n')
-
     sorted_clusters = sorted(cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
-
     return sorted_clusters
 
 def min_info(cluster):
