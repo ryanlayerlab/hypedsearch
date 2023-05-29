@@ -169,10 +169,6 @@ def modified_merge(kmers, boundaries: dict):
     return matched_masses_b, matched_masses_y
 
 def modified_match_masses(input_masses: list, db: Database, max_len: int, ppm_tolerance, b_prec, y_prec):
-    # max_boundary = max(boundaries.keys())
-    # estimated_max_len = ceil(boundaries[max_boundary][1] / 57.021464)
-    # max_len = min(estimated_max_len, max_pep_len)
-    
     dbf = database_file(max_len, False)
     matched_masses_b, matched_masses_y = dict(), dict()
     
@@ -189,7 +185,6 @@ def modified_match_masses(input_masses: list, db: Database, max_len: int, ppm_to
     end = time.time() - start
     with open('Timing_data.txt', 'w') as t:
         t.write("Queries took:" + '\t' + str(end) + "\n")       
-        # write_matched_masses(write_path, matched_masses_b, matched_masses_y, kmer_set, debug)
 
     return matched_masses_b, matched_masses_y
 
