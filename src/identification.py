@@ -207,16 +207,6 @@ def find_target_clusters(b_sorted_clusters, y_sorted_clusters, b_sequence, y_seq
         if cluster[1] == y_pid and cluster[3] in y_target_ends: 
             print(i, cluster)
 
-def  write_postprocessed_alignments_to_disk(postprocessed_alignments):
-    file_name = 'postprocessed_alignments.csv'
-    with open(file_name, 'w') as t:
-        header = 'label'+ '\t'+ 'left_protein'+ '\t'+ 'right_protein'+ '\t'+ 'sequence' + '\t'+ 'b_score' + '\t'+ 'y_score' + '\t'+ 'total_score' + '\t'+ 'precursor_distance' + '\t'+ 'extended_sequence' + '\t'+ 'alignment' + '\n'
-        t.write(header)    
-    for postprocessed_alignment in postprocessed_alignments:
-        label, left_protein, right_protein, sequence, b_score, y_score, total_score, precursor_distance, extended_sequence, alignment = postprocessed_alignment
-        item = str(label)+ '\t' + str(left_protein)+ '\t' + str(right_protein)+ '\t' + str(sequence)+ str(b_score)+ '\t' + str(y_score)+ '\t' + str(total_score)+ '\t' + str(precursor_distance)+ '\t' + str(extended_sequence)+ '\t' + str(alignment)+ '\t' +'\n'
-        with open(file_name, 'a') as t:
-            t.write(item)
 
 def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len):
         print(f'\rCreating an alignment for {spectrum.num + 1}/{results_len} [{to_percent(spectrum.num + 1, results_len)}%]', end='')
@@ -230,7 +220,6 @@ def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_
         rescored_naturals, rescored_hybrids = do_seventh_thing(spectrum, max_pep_len, db, ppm_tol, natural_alignments, hybrid_alignments)
         rescored_alignments = create_rescored_alignments(rescored_naturals, rescored_hybrids)
         postprocessed_alignments = do_eigth_thing(db, rescored_alignments)
-        write_postprocessed_alignments_to_disk(postprocessed_alignments)
         return postprocessed_alignments
 
 def prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol):
