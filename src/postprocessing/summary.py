@@ -31,19 +31,12 @@ def json_file(results: dict, output_dir: str) -> None:
 
 
 def text_file(results: dict, txt_file_name: str) -> None:
-
     with open(txt_file_name, 'w') as t:
         for i, x in enumerate(results):
             target_alignments = x
             for alignment in target_alignments:
                 spec_num = str(i)
                 hybrid = alignment[0]
-                # left_protein, right_protein = alignment[1][0], alignment[2][0]
-                # for x in alignment[1][1:]:
-                #     left_protein += ("/" + x)
-                # left_protein = alignment[2][0]
-                # for x in alignment[2][1:]:
-                #     left_protein += ("/" + x)
                 left_protein,right_protein = alignment[1], alignment[2]
                 sequence = alignment[3]
                 print(txt_file_name, spec_num)

@@ -206,19 +206,31 @@ def find_target_clusters(b_sorted_clusters, y_sorted_clusters, b_sequence, y_seq
     for i, cluster in enumerate(y_sorted_clusters):
         if cluster[1] == y_pid and cluster[3] in y_target_ends: 
             print(i, cluster)
-    
+
+def  write_postprocessed_alignments_to_disk(postprocessed_alignments):
+    file_name = 'postprocessed_alignments.csv'
+    with open(file_name, 'w') as t:
+        header = 'label'+ '\t'+ 'left_protein'+ '\t'+ 'right_protein'+ '\t'+ 'sequence' + '\t'+ 'b_score' + '\t'+ 'y_score' + '\t'+ 'total_score' + '\t'+ 'precursor_distance' + '\t'+ 'extended_sequence' + '\t'+ 'alignment' + '\n'
+        t.write(header)    
+    for postprocessed_alignment in postprocessed_alignments:
+        label, left_protein, right_protein, sequence, b_score, y_score, total_score, precursor_distance, extended_sequence, alignment = postprocessed_alignment
+        item = str(label)+ '\t' + str(left_protein)+ '\t' + str(right_protein)+ '\t' + str(sequence)+ str(b_score)+ '\t' + str(y_score)+ '\t' + str(total_score)+ '\t' + str(precursor_distance)+ '\t' + str(extended_sequence)+ '\t' + str(alignment)+ '\t' +'\n'
+        with open(file_name, 'a') as t:
+            t.write(item)
+
 def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len):
         print(f'\rCreating an alignment for {spectrum.num + 1}/{results_len} [{to_percent(spectrum.num + 1, results_len)}%]', end='')
         converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol)
         b_hits, y_hits = do_first_thing(spectrum, converted_b, converted_y, matched_masses_b, matched_masses_y)
         b_sorted_clusters, y_sorted_clusters = do_second_thing(db, converted_b, converted_y, b_hits, y_hits)
         merged_seqs, prec_tol = do_third_thing(spectrum, max_pep_len, prec_tol, b_sorted_clusters, y_sorted_clusters)
-        hybrid_merged = do_fourth_thing(spectrum, b_sorted_clusters, y_sorted_clusters, prec_tol)
-        hybrid_merged = do_fifth_thing(spectrum, max_pep_len, prec_tol, hybrid_merged)
-        natural_alignments, hybrid_alignments = do_sixth_thing(spectrum, db, merged_seqs, prec_tol, hybrid_merged)
+        a_merged_hybrids = do_fourth_thing(spectrum, b_sorted_clusters, y_sorted_clusters, prec_tol)
+        b_merged_hybrids = do_fifth_thing(spectrum, max_pep_len, prec_tol, a_merged_hybrids)
+        natural_alignments, hybrid_alignments = do_sixth_thing(spectrum, db, merged_seqs, prec_tol, b_merged_hybrids)
         rescored_naturals, rescored_hybrids = do_seventh_thing(spectrum, max_pep_len, db, ppm_tol, natural_alignments, hybrid_alignments)
         rescored_alignments = create_rescored_alignments(rescored_naturals, rescored_hybrids)
         postprocessed_alignments = do_eigth_thing(db, rescored_alignments)
+        write_postprocessed_alignments_to_disk(postprocessed_alignments)
         return postprocessed_alignments
 
 def prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol):
@@ -282,11 +294,11 @@ def do_third_thing(spectrum, max_pep_len, prec_tol, b_sorted_clusters, y_sorted_
 def do_third_thing_B(spectrum, max_pep_len, prec_tol, merged_seqs):
     prec_tol = ppm_to_da(spectrum.precursor_mass, prec_tol)
     start_time = time.time()
-    merged_seqs = clustering.filter_by_precursor(merged_seqs, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, max_pep_len)
+    updated_merged_seqs = clustering.filter_by_precursor(merged_seqs, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, max_pep_len)
     end_time = time.time() - start_time
     with open('Timing_data.txt', 'a') as t:
         t.write("Precursor filtering took:" + '\t' + str(end_time) + "\n")
-    return prec_tol,merged_seqs
+    return prec_tol,updated_merged_seqs
 
 def do_third_thing_A(b_sorted_clusters, y_sorted_clusters):
     start_time = time.time()

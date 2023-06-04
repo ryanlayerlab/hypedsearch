@@ -1,6 +1,10 @@
-Queries took:	2.7061679363250732
-Hits took:	0.19570374488830566
-Clusters took:	4.934612274169922
-Ryan merging and sorting took:	16.871070861816406
-Precursor filtering took:	57.09390878677368
-Finding hybrid merges took:	5.273381233215332
+Queries took:	0.8428361415863037
+Hits took:	0.21915602684020996
+Clusters took:	6.203393936157227
+Ryan merging and sorting took:	17.156860828399658
+Precursor filtering took:	52.50537896156311
+Finding hybrid merges took:	4.59610390663147
+Filtering hybrids by precursor masss took:	13.190795183181763
+Making alignments took:	143.02664184570312
+Second round of scoring and sorting took:	1.309229850769043
+Postprocessing took:	0.0029108524322509766
