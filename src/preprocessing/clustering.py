@@ -453,7 +453,6 @@ def filter_by_precursor(mseqs, obs_prec, tol, precursor_charge, max_len):
         y_start, y_end = comb_seq[2][1], comb_seq[2][2]
         b_charge, y_charge = comb_seq[1][5], comb_seq[2][5]
         b_mass, y_mass = comb_seq[1][4], comb_seq[2][4]
-        # checking cases
         full, side = total_overlap(b_pid, y_pid, b_start, y_start, b_end, y_end)
         if full:
             combined_precursor = calc_from_total_overlap(side, b_mass, b_charge, y_mass, y_charge, precursor_charge)
@@ -461,7 +460,6 @@ def filter_by_precursor(mseqs, obs_prec, tol, precursor_charge, max_len):
             combined_precursor = calc_from_sequences(b_start, y_end, b_pid, max_len, precursor_charge)
         else:
             combined_precursor = gen_spectra.calc_precursor_as_disjoint(b_mass, y_mass, b_charge, y_charge, precursor_charge)
-
         if not (combined_precursor > obs_prec + tol):
             filtered_seqs.append(comb_seq)
     return filtered_seqs
