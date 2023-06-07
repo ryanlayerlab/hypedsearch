@@ -51,7 +51,6 @@ def get_score_map(hybrid_set, input_dict):
     numbers = [len(score_dict[x]) for x in score_dict.keys()]
     return scores, numbers
 
-
 def get_natives_and_hybrids(filepath):
     natives, hybrids = dict(), dict()
     with open(filepath, 'r') as truth_set:
