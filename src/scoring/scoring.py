@@ -172,9 +172,7 @@ def losing_water(comb_seq, input_masses, ppm_tolerance, hybrid, proteins):
         minus_water.append(mass - WATER_MASS)
     input_masses = sorted(input_masses)
     score = calc_overlap(minus_water, input_masses, ppm_tolerance)
-    return score
-        
-    
+    return score    
 
 def second_scoring(natural_alignments, hybrid_alignments, input_spectrum, tol, proteins, max_len):
     rescored_naturals, rescored_hybrids = [], []

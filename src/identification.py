@@ -1,5 +1,6 @@
 from multiprocessing import Pool, set_start_method
 import operator
+from typing import Any
 
 from postprocessing.postprocessing_utils import postprocessing
 from objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry
@@ -17,6 +18,7 @@ import os
 from gen_spectra import convert_precursor_to_ion, calc_masses
 from scoring.scoring import second_scoring
 from alignment.alignment import find_alignments
+import finding_seqs
 
 ID_SPECTRUM = 0
 MULTIPROCESSING = 0
@@ -207,20 +209,40 @@ def find_target_clusters(b_sorted_clusters, y_sorted_clusters, b_sequence, y_seq
         if cluster[1] == y_pid and cluster[3] in y_target_ends: 
             print(i, cluster)
 
+class alignment_info:
+    def __init__(self, max_peptide_len, precursor_tolerance, database, ppm_tolerance, results_len) -> None:
+        self.max_pep_len = max_peptide_len
+        self.prec_tol = precursor_tolerance
+        self.ppm_tol = ppm_tolerance
+        self.db = database
+        self.results_len = results_len
+        
+    def __call__(self, spectrum) -> Any:
+        return create_alignment_info(spectrum, self.max_pep_len, self.prec_tol, self.db, self.ppm_tol, self.results_len)
+
 
 def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len):
-        print(f'\rCreating an alignment for {spectrum.num + 1}/{results_len} [{to_percent(spectrum.num + 1, results_len)}%]', end='')
-        converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol)
-        b_hits, y_hits = do_first_thing(spectrum, converted_b, converted_y, matched_masses_b, matched_masses_y)
-        b_sorted_clusters, y_sorted_clusters = do_second_thing(db, converted_b, converted_y, b_hits, y_hits)
-        merged_seqs, prec_tol = do_third_thing(spectrum, max_pep_len, prec_tol, b_sorted_clusters, y_sorted_clusters)
-        a_merged_hybrids = do_fourth_thing(spectrum, b_sorted_clusters, y_sorted_clusters, prec_tol)
-        b_merged_hybrids = do_fifth_thing(spectrum, max_pep_len, prec_tol, a_merged_hybrids)
-        natural_alignments, hybrid_alignments = do_sixth_thing(spectrum, db, merged_seqs, prec_tol, b_merged_hybrids)
-        rescored_naturals, rescored_hybrids = do_seventh_thing(spectrum, max_pep_len, db, ppm_tol, natural_alignments, hybrid_alignments)
-        rescored_alignments = create_rescored_alignments(rescored_naturals, rescored_hybrids)
-        postprocessed_alignments = do_eigth_thing(db, rescored_alignments)
-        return postprocessed_alignments
+    print(f'\rCreating an alignment for {spectrum.num + 1}/{results_len} [{to_percent(spectrum.num + 1, results_len)}%]', end='')
+    target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = finding_seqs.get_target_data("DLQTLAL-NAAR", db, spectrum.mz_values, ppm_tol)
+    converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol)
+    good_b_entries, good_y_entries = finding_seqs.check_in_matched_masses(matched_masses_b, matched_masses_y, target_left_pids, target_left_indices, target_right_pids, target_right_indices)
+    b_hits, y_hits = do_first_thing(spectrum, converted_b, converted_y, matched_masses_b, matched_masses_y)
+    b_sorted_clusters, y_sorted_clusters = do_second_thing(db, converted_b, converted_y, b_hits, y_hits)
+    good_b_clusters, good_y_clusters = finding_seqs.check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_entries, good_y_entries, target_seq)
+    merged_seqs, _ = do_third_thing(spectrum, max_pep_len, prec_tol, b_sorted_clusters, y_sorted_clusters)
+    good_natives = finding_seqs.check_in_natives(merged_seqs, good_b_clusters, good_y_clusters)
+    a_merged_hybrids = do_fourth_thing(spectrum, b_sorted_clusters, y_sorted_clusters, prec_tol)
+    check_in_hybrids()
+    b_merged_hybrids = do_fifth_thing(spectrum, max_pep_len, prec_tol, a_merged_hybrids)
+    check_in_hybrids()
+    natural_alignments, hybrid_alignments = do_sixth_thing(spectrum, db, merged_seqs, prec_tol, b_merged_hybrids)
+    check_in_alignments()
+    rescored_naturals, rescored_hybrids = do_seventh_thing(spectrum, max_pep_len, db, ppm_tol, natural_alignments, hybrid_alignments)
+    check_score()
+    rescored_alignments = create_rescored_alignments(rescored_naturals, rescored_hybrids)
+    check_in_rescored()
+    postprocessed_alignments = do_eigth_thing(db, rescored_alignments)
+    return postprocessed_alignments
 
 def prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol):
     input_list = spectrum.mz_values        
@@ -318,13 +340,23 @@ def do_first_thing(spectrum, converted_b, converted_y, matched_masses_b, matched
         t.write("Hits took:" + '\t' + str(hit_time) + "\n")
     return b_hits,y_hits
 
-def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len):
-    all_alignment_infos = []
-    for spectrum in spectra:
-        spectra_length = len(spectra)
-        alignment_info = create_alignment_info(spectrum, max_peptide_len,precursor_tolerance,db,ppm_tolerance,spectra_length)
-        all_alignment_infos.append(alignment_info)
-    return all_alignment_infos
+def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, numcores):
+    p = Pool(numcores)
+    y, spec_nums = [], []
+    [spec_nums.append(i) for i in range(0, len(spectra))]
+    x = alignment_info(max_peptide_len,precursor_tolerance,db,ppm_tolerance,len(spectra))
+    y = p.map(x, spectra)
+    p.close()
+    p.join()
+    return y
+
+# def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, numcores): #Version of align for when multiprocessing doesn't work
+#     all_alignment_infos = []
+#     for spectrum in spectra:
+#         spectra_length = len(spectra)
+#         alignment_info = create_alignment_info(spectrum, max_peptide_len,precursor_tolerance,db,ppm_tolerance,spectra_length)
+#         all_alignment_infos.append(alignment_info)
+#     return all_alignment_infos
     
 def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     min_peptide_len: int = 5, max_peptide_len: int = 10, peak_filter: int = 0, 
@@ -344,6 +376,6 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
         verbose and print('Loading spectra start.')
         spectra = preprocessing_utils.load_spectra(file, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
         verbose and print('Loading spectra finish.')
-        results = align(spectra,precursor_tolerance,db,ppm_tolerance,max_peptide_len)
+        results = align(spectra,precursor_tolerance,db,ppm_tolerance,max_peptide_len, cores)
         result_list.append(results)
     return result_list

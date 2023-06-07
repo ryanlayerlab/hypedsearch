@@ -1,5 +1,6 @@
 import sqlite3
 import time
+import os
 
 class database_file:
     def __init__(self, max_len, reset=True):
