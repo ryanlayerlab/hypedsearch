@@ -326,11 +326,11 @@ def get_unique_clusters(clusters):
         unique_clusters.append(target_cluster)
     sorted_clusters = sorted(unique_clusters, key=operator.attrgetter('score', 'pid'), reverse = True)
     return cluster_mapping, sorted_clusters
-    
-def old_score_clusters(ion, clusters, conv_prec, protein_list):
+
+def old_score_clusters(ion, clusters, conv_prec, protein_list, prec_charge):
     sorted_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge extensions seq')
-    cluster_array = []
-    for i, A in enumerate(clusters):
+    cluster_dict = dict()
+    for A in clusters:
         score = A[0]
         pid = int(A[1])
         mz = float(A[2])
@@ -340,9 +340,29 @@ def old_score_clusters(ion, clusters, conv_prec, protein_list):
         seq = find_sequence(pid, start, end, protein_list)
         extensions = find_extensions(pid, start, end, mz, ion, protein_list, charge, conv_prec)
         target_cluster = sorted_cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions, seq=seq)
-        cluster_array.append(target_cluster)
-    sorted_clusters = sorted(cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
-    return sorted_clusters
+        converted_precursor = gen_spectra.convert_ion_to_precursor(mz, ion, charge, prec_charge)
+        if converted_precursor not in cluster_dict.keys():
+            cluster_dict[converted_precursor] = []
+        cluster_dict[converted_precursor].append(target_cluster)
+        
+    return cluster_dict
+    
+# def old_score_clusters(ion, clusters, conv_prec, protein_list):
+#     sorted_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge extensions seq')
+#     cluster_array = []
+#     for i, A in enumerate(clusters):
+#         score = A[0]
+#         pid = int(A[1])
+#         mz = float(A[2])
+#         start = int(A[3])
+#         end = int(A[4])
+#         charge = A[5]
+#         seq = find_sequence(pid, start, end, protein_list)
+#         extensions = find_extensions(pid, start, end, mz, ion, protein_list, charge, conv_prec)
+#         target_cluster = sorted_cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions, seq=seq)
+#         cluster_array.append(target_cluster)
+#     sorted_clusters = sorted(cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
+#     return sorted_clusters
 
 def min_info(cluster):
     return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.mz, cluster.charge, cluster.extensions, cluster.seq)
@@ -375,16 +395,18 @@ def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
     merge_seqs = list()
 
     B = {}
-    for c in b_sorted_clusters:
-        if c.pid not in B:
-            B[c.pid] = []
-        B[c.pid].append(c)
+    for mz in b_sorted_clusters.keys():
+        for c in b_sorted_clusters[mz]:
+            if c.pid not in B:
+                B[c.pid] = []
+            B[c.pid].append(c)
 
     Y = {}
-    for c in y_sorted_clusters:
-        if c.pid not in Y:
-            Y[c.pid] = []
-        Y[c.pid].append(c)
+    for mz in y_sorted_clusters.keys():
+        for c in y_sorted_clusters[mz]:
+            if c.pid not in Y:
+                Y[c.pid] = []
+            Y[c.pid].append(c)
 
     for i, pid in enumerate(B):
         if pid not in Y:
@@ -562,52 +584,46 @@ def check_for_hybrid_overlap(b_seq, y_seq, ion):
             modified_seq = b_seq[:i]
     return match, modified_seq
 
-def grab_matches(cluster,ion,indexed_clusters,target_val):
+def grab_y_matches(conv_prec,indexed_clusters,target_val):
     #Given a cluster we want to find everything that it can pair with
     # It can pair with anything up to a certain mass 
     matches = []
-    if ion == 0:
-        for key in indexed_clusters.keys():
-            if key<=target_val: #if key is a valid key
-                for y in indexed_clusters[key]:
-                    matches.append((cluster.score + y.score, min_info(cluster), min_info(y)))
-    else:
-        for key in indexed_clusters.keys():
-            if key<=target_val: #if key is a valid key
-                for b in indexed_clusters[key]:
-                    matches.append((b.score + cluster.score, min_info(b), min_info(cluster)))
+    for key in indexed_clusters.keys():
+        if key<=target_val: #if key is a valid key
+            matches.append(key)
     return matches
     
 def index_by_precursor_mass(sorted_clusters, pc, ion):
     indexed = dict()
-    for y in sorted_clusters:
-        converted_precursor = gen_spectra.convert_ion_to_precursor(y.mz,ion,y.charge,pc)
+    for mz, charge in sorted_clusters.keys():
+        converted_precursor = gen_spectra.convert_ion_to_precursor(mz,ion,charge,pc) #TODO: C
         if converted_precursor not in indexed.keys():
             indexed[converted_precursor] = []
-        indexed[converted_precursor].append(y)
+        indexed[converted_precursor].append(mz)
     indexed = collections.OrderedDict(sorted(indexed.items(),key=lambda t: t[0]))
     return indexed
     
 def get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, obs_prec, precursor_tol, prec_charge):
-    merged_seqs = []
-    ind_b, ind_y = index_by_precursor_mass(b_sorted_clusters, prec_charge, 1), index_by_precursor_mass(y_sorted_clusters, prec_charge, 1) #Currently no functionality for overlap
-    for cluster in b_sorted_clusters[:10]:
-        cluster_mass = gen_spectra.convert_ion_to_precursor(cluster.mz, 0, cluster.charge, prec_charge)
-        tol = ppm_to_da(obs_prec, precursor_tol)
-        if not (cluster_mass > obs_prec + tol):
-            diff = obs_prec + tol - cluster_mass + (prec_charge * PROTON_MASS) + WATER_MASS
-            merges = grab_matches(cluster,0,ind_y, diff)
-            [merged_seqs.append(x) for x in merges]
-        # The commented code below doesn't need to be here if we are finding uniqueness from every b cluster
-    for cluster in y_sorted_clusters[:10]: #290.139027285
-        cluster_mass = gen_spectra.convert_ion_to_precursor(cluster.mz, 1, cluster.charge, prec_charge)
-        tol = ppm_to_da(obs_prec, precursor_tol)
-        if not (cluster_mass > obs_prec + tol):
-            diff = obs_prec + tol - cluster_mass + (prec_charge * PROTON_MASS) + WATER_MASS
-#             print(get_precursor(cluster_seq + 'DL', charge), obs_prec + tol)
-            merges = grab_matches(cluster,1,ind_b, diff)
-            [merged_seqs.append(x) for x in merges]
+    merged_seqs = dict()
+    #want clusters to be a dictionary where the keys are the input mz value this was matched to
+    # ind_y = index_by_precursor_mass(y_sorted_clusters, prec_charge, 1) #Currently no functionality for overlap
+    
+    tol = ppm_to_da(obs_prec, precursor_tol)
+    for conv_prec in b_sorted_clusters.keys():
+        if not (conv_prec > obs_prec + tol):
+            diff = obs_prec + tol - conv_prec + (prec_charge * PROTON_MASS) + WATER_MASS
+            merges = grab_y_matches(conv_prec,y_sorted_clusters, diff)
+            merged_seqs[conv_prec] = []
+            [merged_seqs[conv_prec].append(x) for x in merges]
 
-    merged_seqs.sort(key=lambda a: a[0], reverse=True)
     return merged_seqs
 
+def distribute_merges(merges, b_sorted_clusters, y_sorted_clusters):
+    merged_clusters = []
+    for key in merges.keys():
+        for y_conv in merges[key]:
+            for b in b_sorted_clusters[key]:
+                for y in y_sorted_clusters[y_conv]:
+                    merged_clusters.append((b.score + y.score, min_info(b), min_info(y)))
+
+    return merged_clusters
