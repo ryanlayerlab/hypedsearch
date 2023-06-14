@@ -29,10 +29,6 @@ def overlap_scoring(sequence, input_masses, ppm_tolerance):
                 
     return(total_score)
 
-
-
-
-
 def get_target_data(target_seq, proteins, input_masses, ppm_tolerance):
     target_left_pids, target_right_pids = [], []
     target_left_indices, target_right_indices = [], []
@@ -113,22 +109,24 @@ def check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_hits, 
         good_maxy_hit.append(best_hit)
     
     for hit in good_maxb_hit:
-        for cluster in b_sorted_clusters:
-            if cluster.pid == hit[5]:
-                if cluster.start == hit[1]:
-                    if cluster.end > hit[1]+len(b_part):
-                        print("check this")
-                    else:
-                        good_b_clusters.append(cluster)
+        for mz in b_sorted_clusters.keys():
+            for cluster in b_sorted_clusters[mz]:
+                if cluster.pid == hit[5]:
+                    if cluster.start == hit[1]:
+                        if cluster.end > hit[1]+len(b_part):
+                            print("check this")
+                        else:
+                            good_b_clusters.append((mz, cluster))
 
     for hit in good_maxy_hit:
-        for cluster in y_sorted_clusters:
-            if cluster.pid == hit[5]:
-                if cluster.end == hit[2]:
-                    if cluster.start < hit[2]-len(y_part):
-                        print("check this")
-                    else:
-                        good_y_clusters.append(cluster)
+        for mz in y_sorted_clusters.keys():
+            for cluster in y_sorted_clusters[mz]:
+                if cluster.pid == hit[5]:
+                    if cluster.end == hit[2]:
+                        if cluster.start < hit[2]-len(y_part):
+                            print("check this")
+                        else:
+                            good_y_clusters.append((mz, cluster))
     # want to return good clusters and print whether these good clusters are in our sorted list
 
     if len(good_b_clusters) > 0 and len(good_y_clusters) > 0:
@@ -144,21 +142,102 @@ def check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_hits, 
 def check_in_natives(natives, good_b, good_y):
     good_natives = []
     for native in natives:
-        if good_b == native[1] and good_y == native[2]:
-            good_natives.append(native)
+        for b in good_b:
+            for y in good_y:
+                if b == native[1] and y == native[2]:
+                    good_natives.append(native)
     
     if len(good_natives) > 0:
         print("good natives were found")
+        
+    else:
+        print("no good natives were found")
     
     return good_natives
 
-def check_in_hybrids(hybrids, good_b, good_y):
+def check_in_hybrids(hybrid_dict, good_b, good_y, all_b, all_y):
+            
+    for x in all_b:
+        for b in all_b[x]:
+            if all_b[x].count(b) > 1:
+                print("b_sorted_clusters are non unique")
+                break
+        
+    for x in all_y:
+        for y in all_y[x]:
+            if all_y[x].count(y) > 1:
+                print("y_sorted_clusters are non unique")
+                break
+    
     good_hybrids = []
-    for hybrid in hybrids:
-        if good_b == hybrid[1] and good_y == hybrid[2]:
-            good_hybrids.append(hybrid)
+    for b in good_b:
+        conv_b = b[0]
+        for y in good_y:
+            conv_y = y[0]
+            if conv_b in hybrid_dict.keys():
+                if conv_y in hybrid_dict[conv_b]:
+                    good_hybrids.append((b[1].score + y[1].score, b[1], y[1]))
+            
+           
     
     if len(good_hybrids) > 0:
         print("good hybrids were found")
+        
+    else:
+        print("no good hybrids were found")
     
     return good_hybrids
+
+def check_in_combined_hybrids(good_hybrids, b_merged_hybrids):
+    good_combined = []
+    for hybrid in good_hybrids:
+        if hybrid in b_merged_hybrids:
+            good_combined.append(hybrid)
+            
+    if len(good_combined) > 0:
+        print("good combined hybrids were found")
+        
+    else:
+        print("no good combined hybrids were found")
+    
+    return good_combined
+
+def check_in_alignments(target_left_pids, target_left_indices, target_right_pids, target_right_indices, native_alignments, hybrid_alignments):
+    good_natives, good_hybrids = [],[]
+    for left_native, right_native in native_alignments:
+        left_pid = left_native[5]
+        left_start, left_end = left_native[1], left_native[2]
+        right_pid = right_native[5]
+        right_start, right_end = right_native[1], right_native[2]
+        if left_pid in target_left_pids and (left_start, left_end) in target_left_indices and right_pid in target_right_pids and (right_start, right_end) in target_right_indices:
+            good_natives.append((left_native, right_native))
+    
+    for left_hybrid, right_hybrid in hybrid_alignments:
+        left_pid = left_hybrid[5]
+        left_start, left_end = left_hybrid[1], left_hybrid[2]
+        right_pid = right_hybrid[5]
+        right_start, right_end = right_hybrid[1], right_hybrid[2]
+        if left_pid in target_left_pids and (left_start, left_end) in target_left_indices and right_pid in target_right_pids and (right_start, right_end) in target_right_indices:
+            good_hybrids.append((left_hybrid, right_hybrid))
+            
+    if len(good_natives) > 0:
+        print("Good native alignments were found")
+        
+    if len(good_hybrids) > 0:
+        print("Good hybrid alignments were found")
+        
+    else:
+        print("No good native or hybrid alignments were found")
+    
+    return good_natives, good_hybrids
+
+def check_score(good_natives, good_hybrids, target_score):
+    for native in good_natives:
+        native_score = native[0]
+        if native_score != target_score:
+            print("Scores were not equal. target score was:", target_score, "while Hypedsearch scored:", native_score)
+            
+    for hybrid in good_hybrids:
+        hybrid_score = hybrid[0]
+        if hybrid_score != target_score:
+            print("Scores were not equal. target score was:", target_score, "while Hypedsearch scored:", hybrid_score)

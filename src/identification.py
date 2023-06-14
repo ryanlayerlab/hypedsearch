@@ -227,20 +227,20 @@ def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_
     converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol)
     good_b_entries, good_y_entries = finding_seqs.check_in_matched_masses(matched_masses_b, matched_masses_y, target_left_pids, target_left_indices, target_right_pids, target_right_indices)
     b_hits, y_hits = do_first_thing(spectrum, converted_b, converted_y, matched_masses_b, matched_masses_y)
-    b_sorted_clusters, y_sorted_clusters = do_second_thing(db, converted_b, converted_y, b_hits, y_hits)
+    b_sorted_clusters, y_sorted_clusters = do_second_thing(db, converted_b, converted_y, b_hits, y_hits, spectrum.precursor_charge)
     good_b_clusters, good_y_clusters = finding_seqs.check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_entries, good_y_entries, target_seq)
     merged_seqs, _ = do_third_thing(spectrum, max_pep_len, prec_tol, b_sorted_clusters, y_sorted_clusters)
     good_natives = finding_seqs.check_in_natives(merged_seqs, good_b_clusters, good_y_clusters)
     a_merged_hybrids = do_fourth_thing(spectrum, b_sorted_clusters, y_sorted_clusters, prec_tol)
-    check_in_hybrids()
-    b_merged_hybrids = do_fifth_thing(spectrum, max_pep_len, prec_tol, a_merged_hybrids)
-    check_in_hybrids()
-    natural_alignments, hybrid_alignments = do_sixth_thing(spectrum, db, merged_seqs, prec_tol, b_merged_hybrids)
-    check_in_alignments()
-    rescored_naturals, rescored_hybrids = do_seventh_thing(spectrum, max_pep_len, db, ppm_tol, natural_alignments, hybrid_alignments)
-    check_score()
+    good_hybrids = finding_seqs.check_in_hybrids(a_merged_hybrids, good_b_clusters, good_y_clusters, b_sorted_clusters, y_sorted_clusters)
+    b_merged_hybrids = do_fifth_thing(a_merged_hybrids, b_sorted_clusters, y_sorted_clusters)
+    good_filtered_hybrids = finding_seqs.check_in_combined_hybrids(good_hybrids, b_merged_hybrids)
+    native_alignments, hybrid_alignments = do_sixth_thing(spectrum, db, merged_seqs, prec_tol, b_merged_hybrids)
+    good_natives, good_hybrids = finding_seqs.check_in_alignments(target_left_pids, target_left_indices, target_right_pids, target_right_indices, native_alignments, hybrid_alignments)
+    rescored_naturals, rescored_hybrids = do_seventh_thing(spectrum, max_pep_len, db, ppm_tol, native_alignments, hybrid_alignments)
+    finding_seqs.check_score(good_natives, good_hybrids, target_score)
     rescored_alignments = create_rescored_alignments(rescored_naturals, rescored_hybrids)
-    check_in_rescored()
+    finding_seqs.check_in_rescored(rescored_alignments)
     postprocessed_alignments = do_eigth_thing(db, rescored_alignments)
     return postprocessed_alignments
 
@@ -281,9 +281,9 @@ def do_sixth_thing(spectrum, db, merged_seqs, prec_tol, hybrid_merged):
         t.write("Making alignments took:" + '\t' + str(end_time) + "\n")
     return natural_alignments,hybrid_alignments
 
-def do_fifth_thing(spectrum, max_pep_len, prec_tol, hybrid_merged):
+def do_fifth_thing(hybrid_merged, b_sorted_clusters, y_sorted_clusters):
     start_time = time.time()
-    hybrid_merged = clustering.filter_by_precursor(hybrid_merged, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, max_pep_len)
+    hybrid_merged = clustering.distribute_merges(hybrid_merged, b_sorted_clusters, y_sorted_clusters)
     end_time = time.time() - start_time
     with open('Timing_data.txt', 'a') as t:
         t.write("Filtering hybrids by precursor masss took:" + '\t' + str(end_time) + "\n")
@@ -320,13 +320,13 @@ def do_third_thing_A(b_sorted_clusters, y_sorted_clusters):
         t.write("Ryan merging and sorting took:" + '\t' + str(end_time) + "\n")
     return merged_seqs
 
-def do_second_thing(db, converted_b, converted_y, b_hits, y_hits):
+def do_second_thing(db, converted_b, converted_y, b_hits, y_hits, prec_charge):
     cluster_time = time.time()
     b_clusters = clustering.create_clusters('b', b_hits, y_hits)
-    b_sorted_clusters = clustering.old_score_clusters(0, b_clusters, converted_b, db.proteins)
+    b_sorted_clusters = clustering.old_score_clusters(0, b_clusters, converted_b, db.proteins, prec_charge)
     cluster_time = time.time()
     y_clusters = clustering.create_clusters('y', y_hits, y_hits)
-    y_sorted_clusters = clustering.old_score_clusters(1, y_clusters, converted_y, db.proteins)
+    y_sorted_clusters = clustering.old_score_clusters(1, y_clusters, converted_y, db.proteins, prec_charge)
     cluster_time = time.time() - cluster_time
     with open('Timing_data.txt', 'a') as t:
         t.write("Clusters took:" + '\t' + str(cluster_time) + "\n")
