@@ -223,11 +223,11 @@ class alignment_info:
 
 def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len):
     print(f'\rCreating an alignment for {spectrum.num + 1}/{results_len} [{to_percent(spectrum.num + 1, results_len)}%]', end='')
-    target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = finding_seqs.get_target_data("DLQTLAL-NAAR", db, spectrum.mz_values, ppm_tol)
+    target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = finding_seqs.get_target_data("DLQTLAL-NAAR", db, spectrum.mz_values, ppm_tol, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
     converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol)
     good_b_entries, good_y_entries = finding_seqs.check_in_matched_masses(matched_masses_b, matched_masses_y, target_left_pids, target_left_indices, target_right_pids, target_right_indices)
     b_hits, y_hits = do_first_thing(spectrum, converted_b, converted_y, matched_masses_b, matched_masses_y)
-    b_sorted_clusters, y_sorted_clusters = do_second_thing(db, converted_b, converted_y, b_hits, y_hits, spectrum.precursor_charge)
+    b_sorted_clusters, y_sorted_clusters = do_second_thing(db, converted_b, converted_y, b_hits, y_hits, spectrum.precursor_charge, ppm_tol)
     good_b_clusters, good_y_clusters = finding_seqs.check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_entries, good_y_entries, target_seq)
     merged_seqs, _ = do_third_thing(spectrum, max_pep_len, prec_tol, b_sorted_clusters, y_sorted_clusters)
     good_natives = finding_seqs.check_in_natives(merged_seqs, good_b_clusters, good_y_clusters)
@@ -237,10 +237,10 @@ def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_
     good_filtered_hybrids = finding_seqs.check_in_combined_hybrids(good_hybrids, b_merged_hybrids)
     native_alignments, hybrid_alignments = do_sixth_thing(spectrum, db, merged_seqs, prec_tol, b_merged_hybrids)
     good_natives, good_hybrids = finding_seqs.check_in_alignments(target_left_pids, target_left_indices, target_right_pids, target_right_indices, native_alignments, hybrid_alignments)
-    rescored_naturals, rescored_hybrids = do_seventh_thing(spectrum, max_pep_len, db, ppm_tol, native_alignments, hybrid_alignments)
-    finding_seqs.check_score(good_natives, good_hybrids, target_score)
-    rescored_alignments = create_rescored_alignments(rescored_naturals, rescored_hybrids)
-    finding_seqs.check_in_rescored(rescored_alignments)
+    rescored_natives, rescored_hybrids = do_seventh_thing(spectrum, max_pep_len, db, ppm_tol, native_alignments, hybrid_alignments)
+    good_scored = finding_seqs.check_score(rescored_natives, rescored_hybrids, good_natives, good_hybrids, target_score)
+    rescored_alignments = create_rescored_alignments(rescored_natives, rescored_hybrids)
+    finding_seqs.check_in_rescored(rescored_alignments[:10], good_scored)
     postprocessed_alignments = do_eigth_thing(db, rescored_alignments)
     return postprocessed_alignments
 
@@ -320,13 +320,12 @@ def do_third_thing_A(b_sorted_clusters, y_sorted_clusters):
         t.write("Ryan merging and sorting took:" + '\t' + str(end_time) + "\n")
     return merged_seqs
 
-def do_second_thing(db, converted_b, converted_y, b_hits, y_hits, prec_charge):
+def do_second_thing(db, converted_b, converted_y, b_hits, y_hits, prec_charge, ppm_tol):
     cluster_time = time.time()
     b_clusters = clustering.create_clusters('b', b_hits, y_hits)
-    b_sorted_clusters = clustering.old_score_clusters(0, b_clusters, converted_b, db.proteins, prec_charge)
-    cluster_time = time.time()
+    b_sorted_clusters = clustering.old_score_clusters(0, b_clusters, converted_b, db.proteins, prec_charge, ppm_tol)
     y_clusters = clustering.create_clusters('y', y_hits, y_hits)
-    y_sorted_clusters = clustering.old_score_clusters(1, y_clusters, converted_y, db.proteins, prec_charge)
+    y_sorted_clusters = clustering.old_score_clusters(1, y_clusters, converted_y, db.proteins, prec_charge, ppm_tol)
     cluster_time = time.time() - cluster_time
     with open('Timing_data.txt', 'a') as t:
         t.write("Clusters took:" + '\t' + str(cluster_time) + "\n")
@@ -376,6 +375,6 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
         verbose and print('Loading spectra start.')
         spectra = preprocessing_utils.load_spectra(file, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
         verbose and print('Loading spectra finish.')
-        results = align(spectra,precursor_tolerance,db,ppm_tolerance,max_peptide_len, cores)
+        results = align(spectra,precursor_tolerance,db,ppm_tolerance,max_peptide_len,cores)
         result_list.append(results)
     return result_list

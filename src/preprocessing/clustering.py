@@ -76,7 +76,6 @@ def create_clusters(ion, b_hits, y_hits):
             last_end = foo.end
     return all_clusters
 
-
 def parse_indices(index_set):
     indices = []
     for index in index_set:
@@ -138,97 +137,96 @@ def find_sequence(pid, start_ind, end_ind, proteins):
     target = prot_seq[start_ind: end_ind]
     return target
 
-def find_extensions(pid, start, end, mass, ion, protein_list, charge, prec):
+# def find_extensions(pid, start, end, mass, ion, protein_list, charge, prec, prec_charge):
+#     prot_seq = protein_list[pid][1]
+#     current_mass = gen_spectra.convert_ion_to_precursor(mass,ion,charge,prec_charge)
+#     extensions = []
+#     bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
+#     if ion == 0: #b ion
+#         raw_b_mass = gen_spectra.get_raw_mass(mass, ion, charge)
+#         current_position = end
+#         while current_mass < prec:
+#             if current_position > len(prot_seq)-1:
+#                 break
+#             next_AA = prot_seq[current_position]
+#             if not any (x in bad_chars for x in next_AA):
+#                 raw_b_mass = raw_b_mass + AMINO_ACIDS[next_AA]
+#                 normalized_mass = gen_spectra.calc_combined_mass(raw_b_mass, 0)
+#                 current_mass = gen_spectra.convert_ion_to_precursor(normalized_mass, 0, 2, prec_charge)
+#                 tup = (normalized_mass, start, current_position+1, 0, 2, pid)
+#                 extensions.append(tup)
+#                 current_position = current_position + 1
+#             else:
+#                 break
+#     else: #y ion
+#         raw_y_mass = gen_spectra.get_raw_mass(mass, ion, charge)
+#         current_position = start-1
+#         while current_mass < prec:
+#             if current_position < 0:
+#                 break
+#             next_AA = prot_seq[current_position]
+#             if not any (x in bad_chars for x in next_AA):
+#                 raw_y_mass = raw_y_mass + AMINO_ACIDS[next_AA]
+#                 current_mass = gen_spectra.calc_combined_mass(raw_y_mass, 1)
+#                 tup = (current_mass, current_position, end, 1, 2, pid)
+#                 extensions.append(tup)
+#                 current_position = current_position - 1
+#             else:
+#                 break
+#     return(extensions)
+
+def append_AA(next_AA, current_mass, ion, charge):
+    
+    raw_current_mass = gen_spectra.get_raw_mass(current_mass, ion, charge)
+    new_raw = raw_current_mass + AMINO_ACIDS[next_AA]
+    normalized_raw = gen_spectra.calc_combined_mass(new_raw, ion)
+    return normalized_raw
+
+def find_extensions(conv_prec,current_mass,ion,charge,pid,protein_list,start,end,ppm_tolerance):
+    #goal is to get a list of all database extensions leading up to the precursor mass
     prot_seq = protein_list[pid][1]
-    current_mass = mass
-    extensions = []
     bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
-    if ion == 0: #b ion
-        raw_b_mass = gen_spectra.get_raw_mass(mass, ion, charge)
+    extensions = []
+    repeat = True
+
+    #get next AA
+    #Append AA and do calculation
+    #Repeat as long as calculation is less than precursor
+
+    
+    if ion == 0:
         current_position = end
-        while current_mass < prec:
-            if current_position > len(prot_seq)-1:
-                break
-            next_AA = prot_seq[current_position]
-            if not any (x in bad_chars for x in next_AA):
-                raw_b_mass = raw_b_mass + AMINO_ACIDS[next_AA]
-                current_mass = gen_spectra.calc_combined_mass(raw_b_mass, 0)
-                tup = (current_mass, start, current_position+1, 0, 2, pid)
-                extensions.append(tup)
-                current_position = current_position + 1
-            else:
-                break
-    else: #y ion
-        raw_y_mass = gen_spectra.get_raw_mass(mass, ion, charge)
+        while(repeat):
+            if current_position < len(prot_seq):
+                next_AA = prot_seq[current_position]
+                if next_AA not in bad_chars:
+                    current_mass = append_AA(next_AA, current_mass, ion, charge)
+                    charge = 2
+                    tol = ppm_to_da(current_mass, ppm_tolerance)
+                    if current_mass < conv_prec + tol:
+                        tup = (current_mass, start, current_position+1, 0, 2, pid)
+                        extensions.append(tup)
+                        current_position += 1
+                    else:
+                        repeat = False
+    
+    else:
         current_position = start-1
-        while current_mass < prec:
-            if current_position < 0:
-                break
-            next_AA = prot_seq[current_position]
-            if not any (x in bad_chars for x in next_AA):
-                raw_y_mass = raw_y_mass + AMINO_ACIDS[next_AA]
-                current_mass = gen_spectra.calc_combined_mass(raw_y_mass, 1)
-                tup = (current_mass, current_position, end, 1, 2, pid)
-                extensions.append(tup)
-                current_position = current_position - 1
-            else:
-                break
-    return(extensions)
-
-def get_all_extensions(all_side, ion, protein_list, prec):
-    all_tuples = []
-    for hit in all_side:
-        score = hit[0]
-        pid = hit[1]
-        mz = hit[2]
-        start = int(hit[3])
-        end = int(hit[4])
-        charge = hit[5]
-        
-        extensions = find_extensions(pid, start, end, mz, ion, protein_list, charge, prec)
-        all_tuples.append((pid, start, end, score, mz, charge, extensions))
-    return all_tuples
-
-def get_unique_merged(merged, dict_b, dict_y, protein_list, b_prec, y_prec):
-    #Problem with uniqueness at the moment since combinations can still have multiple pieces in common
-    #Need to do extensions on each unique piece that shows up and then substitute them into existing merges    
-    #Make a mapping between each unique cluster and all of it's extended replacements
-    unique_left, unique_right = set(), set()
-    b_indices, y_indices = dict(), dict()
-    mb_dict = dict()
-    for m in merged:
-        unique_left.add(m[1])        
-        unique_right.add(m[2])
-        
-    for m in unique_left:
-        left_score = m[3]
-        left_mz = m[4]
-        left_len = m[2]-m[1]
-        left_key = (left_score, left_len, left_mz)
-        all_left = dict_b[left_key]
-        extended_unique_left = get_all_extensions(all_left, 0, protein_list, b_prec)
-        if m not in b_indices.keys():
-            b_indices[m] = []
-        [b_indices[m].append(x) for x in extended_unique_left]
-        if m not in mb_dict.keys():
-            mb_dict[m] = []
-        mb_dict[m].append(m[2]) #m[2] is made from unique_left where we actually want the corresponding right. Does this live in any of our dicts?
+        while(repeat):
+            if current_position >= 0:
+                next_AA = prot_seq[current_position]
+                if next_AA not in bad_chars:
+                    current_mass = append_AA(next_AA, current_mass, ion, charge)
+                    charge = 2
+                    tol = ppm_to_da(current_mass, ppm_tolerance)
+                    if current_mass < conv_prec + tol:
+                        tup = (current_mass, current_position, end, 1, 2, pid)
+                        extensions.append(tup)
+                        current_position -= 1
+                    else:
+                        repeat = False
     
-    for m in unique_right:
-        right_score = m[3]
-        right_mz = m[4]
-        right_len = m[2] - m[1]
-        right_key = (right_score, right_len, right_mz)
-        all_right = dict_y[right_key]
-        extended_unique_right = get_all_extensions(all_right, 1, protein_list, y_prec)
-        if m not in y_indices.keys():
-            y_indices[m] = []
-        [y_indices[m].append(x) for x in extended_unique_right]
-        
-    
-    #now want a dictionary mapping each index to the unique place where they occur
-
-    return b_indices, y_indices, mb_dict
+    return extensions
 
 def check_unique(merges):
     for m in merges:
@@ -237,97 +235,7 @@ def check_unique(merges):
             return True
     return False
 
-def extract_natives(large_merges):
-    #Goal is to take in the full expanded list of merges and sort them into naturals or hybrids
-    natural_merges, hybrid_merges = [], []
-    for merge in large_merges:
-        left_part = merge[3]
-        right_part = merge[4]
-        left_pid, right_pid = left_part[5], right_part[5]
-        if left_pid == right_pid: #first requirement for native
-            b_end = left_part[1]
-            y_start = right_part[0]
-            if y_start - b_end > 0 and y_start - b_end <= 10: #second requirement for native
-                natural_merges.append(merge)
-                continue
-        hybrid_merges.append(merge)
-        
-    return natural_merges, hybrid_merges
-                
-
-def expand_clusters(merged, dict_b, dict_y, protein_list, b_prec, y_prec):
-    merges = []    
-    
-    #key_tuple = (score, size, mz)
-    for i,merge in enumerate(merged):
-        left_part = merge[1]
-        score = left_part[3]
-        mz = left_part[2]
-        size = left_part[1]-left_part[0]
-        all_extended_left = dict_b[(score,size,mz)]
-        
-        right_part = merge[2]
-        score = right_part[3]
-        mz = right_part[2]
-        size = right_part[1]-right_part[0]
-        all_extended_right = dict_y[(score,size,mz)]        
-
-        # print("all_extended_left keys are not unique:", check_keys_unique(all_extended_left.keys()))
-        # print("all_extended_right keys are not unique:", check_keys_unique(all_extended_right.keys()))
-        
-        for left in all_extended_left: # These lines are not unique
-            for right in all_extended_right:
-                #left_score + right_score, b.end - y.start, y.end-b.start
-                #score, pid, mz, start, end, charge
-                lextensions = find_extensions(left[1], left[3], left[4], left[2], 0, protein_list, left[5], b_prec)
-                rextensions = find_extensions(right[1], right[3], right[4], right[2], 1, protein_list, right[5], y_prec)
-                nleft = (left[0], left[1], left[2], left[3], left[4], left[5], lextensions)
-                nright = (right[0], right[1], right[2], right[3], right[4], right[5], rextensions)
-                merges.append((left[3] + right[3], left[2]-right[1], right[2]-left[1], nleft, nright))
-        
-        # if check_unique(merges):
-        #     print("Entry", i, "is not unique")
-        # else:
-        #     print("Entry", i, "is unique")
-            
-        
-    return merges
-    
-def get_unique_clusters(clusters):
-    # Want to determine uniqueness by the size and the mass matched to
-    # Load them into dictionary
-    cluster = collections.namedtuple('cluster', 'score pid start end mz charge')
-    cluster_mapping = dict()
-    unique_clusters = []
-    for A in clusters:
-        score = A[0]
-        pid = int(A[1])
-        mz = float(A[2])
-        charge = A[5]
-            
-        start = int(A[3])
-        end = int(A[4])
-
-        size = end-start
-        key_tuple = (score, size, mz)
-        if key_tuple not in cluster_mapping.keys():
-            cluster_mapping[key_tuple] = []
-        cluster_mapping[key_tuple].append(A)
-        
-    for key in cluster_mapping:
-        first_cluster = cluster_mapping[key][0]
-        score = first_cluster[0]
-        pid = first_cluster[1]
-        mz = first_cluster[2]
-        start = first_cluster[3]
-        end = first_cluster[4]
-        charge = first_cluster[5]
-        target_cluster = cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge)
-        unique_clusters.append(target_cluster)
-    sorted_clusters = sorted(unique_clusters, key=operator.attrgetter('score', 'pid'), reverse = True)
-    return cluster_mapping, sorted_clusters
-
-def old_score_clusters(ion, clusters, conv_prec, protein_list, prec_charge):
+def old_score_clusters(ion, clusters, conv_prec, protein_list, prec_charge, ppm_tol):
     sorted_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge extensions seq')
     cluster_dict = dict()
     for A in clusters:
@@ -338,7 +246,7 @@ def old_score_clusters(ion, clusters, conv_prec, protein_list, prec_charge):
         end = int(A[4])
         charge = A[5]
         seq = find_sequence(pid, start, end, protein_list)
-        extensions = find_extensions(pid, start, end, mz, ion, protein_list, charge, conv_prec)
+        extensions = find_extensions(conv_prec,mz,ion,charge,pid,protein_list,start,end,ppm_tol)
         target_cluster = sorted_cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions, seq=seq)
         converted_precursor = gen_spectra.convert_ion_to_precursor(mz, ion, charge, prec_charge)
         if converted_precursor not in cluster_dict.keys():
@@ -347,23 +255,6 @@ def old_score_clusters(ion, clusters, conv_prec, protein_list, prec_charge):
         
     return cluster_dict
     
-# def old_score_clusters(ion, clusters, conv_prec, protein_list):
-#     sorted_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge extensions seq')
-#     cluster_array = []
-#     for i, A in enumerate(clusters):
-#         score = A[0]
-#         pid = int(A[1])
-#         mz = float(A[2])
-#         start = int(A[3])
-#         end = int(A[4])
-#         charge = A[5]
-#         seq = find_sequence(pid, start, end, protein_list)
-#         extensions = find_extensions(pid, start, end, mz, ion, protein_list, charge, conv_prec)
-#         target_cluster = sorted_cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions, seq=seq)
-#         cluster_array.append(target_cluster)
-#     sorted_clusters = sorted(cluster_array, key=operator.attrgetter('score', 'pid'), reverse = True)
-#     return sorted_clusters
-
 def min_info(cluster):
     return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.mz, cluster.charge, cluster.extensions, cluster.seq)
 
@@ -424,7 +315,7 @@ def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
 
             while y_i < len(sorted_Y) and y.start - b.end < 10:
                 y = sorted_Y[y_i]
-                merge_seqs.append((b.score + y.score, min_info(b), min_info(y)))
+                merge_seqs.append((b.score + y.score, b, y))
                 y_i += 1
                     
         for j, y in enumerate(sorted_Y):
@@ -436,7 +327,7 @@ def Ryan_merge(b_sorted_clusters, y_sorted_clusters):
 
             while b_i < len(sorted_B) and y.start - b.end < 10:
                 b = sorted_B[b_i]
-                merge_seqs.append((b.score + y.score, min_info(b), min_info(y)))
+                merge_seqs.append((b.score + y.score, b, y))
                 b_i += 1
     return merge_seqs
 
@@ -584,7 +475,7 @@ def check_for_hybrid_overlap(b_seq, y_seq, ion):
             modified_seq = b_seq[:i]
     return match, modified_seq
 
-def grab_y_matches(conv_prec,indexed_clusters,target_val):
+def grab_y_matches(indexed_clusters,target_val):
     #Given a cluster we want to find everything that it can pair with
     # It can pair with anything up to a certain mass 
     matches = []
@@ -593,15 +484,15 @@ def grab_y_matches(conv_prec,indexed_clusters,target_val):
             matches.append(key)
     return matches
     
-def index_by_precursor_mass(sorted_clusters, pc, ion):
-    indexed = dict()
-    for mz, charge in sorted_clusters.keys():
-        converted_precursor = gen_spectra.convert_ion_to_precursor(mz,ion,charge,pc) #TODO: C
-        if converted_precursor not in indexed.keys():
-            indexed[converted_precursor] = []
-        indexed[converted_precursor].append(mz)
-    indexed = collections.OrderedDict(sorted(indexed.items(),key=lambda t: t[0]))
-    return indexed
+# def index_by_precursor_mass(sorted_clusters, pc, ion):
+#     indexed = dict()
+#     for mz, charge in sorted_clusters.keys():
+#         converted_precursor = gen_spectra.convert_ion_to_precursor(mz,ion,charge,pc) #TODO: C
+#         if converted_precursor not in indexed.keys():
+#             indexed[converted_precursor] = []
+#         indexed[converted_precursor].append(mz)
+#     indexed = collections.OrderedDict(sorted(indexed.items(),key=lambda t: t[0]))
+#     return indexed
     
 def get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, obs_prec, precursor_tol, prec_charge):
     merged_seqs = dict()
@@ -612,7 +503,7 @@ def get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, obs_prec, precursor
     for conv_prec in b_sorted_clusters.keys():
         if not (conv_prec > obs_prec + tol):
             diff = obs_prec + tol - conv_prec + (prec_charge * PROTON_MASS) + WATER_MASS
-            merges = grab_y_matches(conv_prec,y_sorted_clusters, diff)
+            merges = grab_y_matches(y_sorted_clusters, diff)
             merged_seqs[conv_prec] = []
             [merged_seqs[conv_prec].append(x) for x in merges]
 
@@ -624,6 +515,6 @@ def distribute_merges(merges, b_sorted_clusters, y_sorted_clusters):
         for y_conv in merges[key]:
             for b in b_sorted_clusters[key]:
                 for y in y_sorted_clusters[y_conv]:
-                    merged_clusters.append((b.score + y.score, min_info(b), min_info(y)))
+                    merged_clusters.append((b.score + y.score, b, y))
 
     return merged_clusters
