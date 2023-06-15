@@ -97,22 +97,13 @@ def rescore_with_seq(sequence, ppm_tolerance, input_masses):
                 
     return(total_score)
     
-def score_by_dist(comb_seq, obs_prec, prec_charge, max_len, hybrid, protein_list): #Change bullet points to be a query
+def score_by_dist(b_side, y_side, obs_prec, prec_charge, max_len, hybrid, protein_list): #Change bullet points to be a query
     #((bmass,bstart,bend,ion,charge,pid)(ymass,ystart,yend,ion,charge,pid))
-    b_pid, y_pid = comb_seq[0][5], comb_seq[1][5]
-    b_start, b_end = comb_seq[0][1], comb_seq[0][2]
-    y_start, y_end = comb_seq[1][1], comb_seq[1][2]
-    b_mass, y_mass = comb_seq[0][0], comb_seq[1][0]
-    b_charge,y_charge = comb_seq[0][4], comb_seq[1][4]
     if hybrid:
-        full_seq = clustering.find_sequence(b_pid, b_start, b_end, protein_list) + clustering.find_sequence(y_pid, y_start, y_end, protein_list)
+        full_seq = clustering.find_sequence(b_side.pid, b_side.start, b_side.end, protein_list) + clustering.find_sequence(y_side.pid, y_side.start, y_side.end, protein_list)
     else:
-        full_seq = clustering.find_sequence(b_pid, b_start, y_end, protein_list)
+        full_seq = clustering.find_sequence(b_side.pid, b_side.start, y_side.end, protein_list)
     combined_precursor = gen_spectra.get_precursor(full_seq, prec_charge)
-    # if hybrid == False:
-    #     combined_precursor = clustering.calc_from_sequences(b_start, y_end, b_pid, max_len, prec_charge)
-    # else:
-    #     combined_precursor = gen_spectra.calc_precursor_as_disjoint(b_mass, y_mass, b_charge, y_charge, prec_charge)
     dist = abs(combined_precursor - obs_prec)
     return dist
 
@@ -141,30 +132,24 @@ def calc_overlap(masses, input_masses, ppm_tolerance):
                 
     return(total_score)
 
-def overlap_scoring(comb_seq, input_masses, ppm_tolerance, hybrid, proteins):
-    b_pid, y_pid = comb_seq[0][5], comb_seq[1][5]
-    b_start, y_start = comb_seq[0][1], comb_seq[1][1]
-    b_end, y_end = comb_seq[0][2], comb_seq[1][2]
+def overlap_scoring(b_side, y_side, input_masses, ppm_tolerance, hybrid, proteins):
     if hybrid:
-        b_sequence, y_sequence = clustering.find_sequence(b_pid, b_start, b_end, proteins), clustering.find_sequence(y_pid, y_start, y_end, proteins)
+        b_sequence, y_sequence = clustering.find_sequence(b_side.pid, b_side.start, b_side.end, proteins), clustering.find_sequence(y_side.pid, y_side.start, y_side.end, proteins)
         sequence = b_sequence + y_sequence
     else:
-        sequence = clustering.find_sequence(b_pid, b_start, y_end, proteins)
+        sequence = clustering.find_sequence(b_side.pid, b_side.start, y_side.end, proteins)
     spectrum = gen_spectra.gen_spectrum(sequence)
     masses = sorted(spectrum['spectrum'])
     input_masses = sorted(input_masses)
     score = calc_overlap(masses, input_masses, ppm_tolerance)
     return score
 
-def losing_water(comb_seq, input_masses, ppm_tolerance, hybrid, proteins):
-    b_pid, y_pid = comb_seq[0][5], comb_seq[1][5]
-    b_start, y_start = comb_seq[0][1], comb_seq[1][1]
-    b_end, y_end = comb_seq[0][2], comb_seq[1][2]
+def losing_water(b_side, y_side, input_masses, ppm_tolerance, hybrid, proteins):
     if hybrid:
-        b_sequence, y_sequence = clustering.find_sequence(b_pid, b_start, b_end, proteins), clustering.find_sequence(y_pid, y_start, y_end, proteins)
+        b_sequence, y_sequence = clustering.find_sequence(b_side.pid, b_side.start, b_side.end, proteins), clustering.find_sequence(y_side.pid, y_side.start, y_side.end, proteins)
         sequence = b_sequence + y_sequence
     else:
-        sequence = clustering.find_sequence(b_pid, b_start, y_end, proteins)
+        sequence = clustering.find_sequence(b_side.pid, b_side.start, y_side.end, proteins)
     spectrum = gen_spectra.gen_spectrum(sequence)
     masses = sorted(spectrum['spectrum'])
     minus_water = []
@@ -177,13 +162,15 @@ def losing_water(comb_seq, input_masses, ppm_tolerance, hybrid, proteins):
 def second_scoring(natural_alignments, hybrid_alignments, input_spectrum, tol, proteins, max_len):
     rescored_naturals, rescored_hybrids = [], []
     for comb_seq in natural_alignments:
-        dist = score_by_dist(comb_seq, input_spectrum.precursor_mass, input_spectrum.precursor_charge, max_len, False, proteins)
-        score = overlap_scoring(comb_seq, input_spectrum.mz_values, tol, False, proteins)
-        score += losing_water(comb_seq, input_spectrum.mz_values, tol, False, proteins)
+        b_side, y_side = comb_seq[1], comb_seq[2]
+        dist = score_by_dist(b_side, y_side, input_spectrum.precursor_mass, input_spectrum.precursor_charge, max_len, False, proteins)
+        score = overlap_scoring(b_side, y_side, input_spectrum.mz_values, tol, False, proteins)
+        score += losing_water(b_side, y_side, input_spectrum.mz_values, tol, False, proteins)
         rescored_naturals.append((score, 1/dist, comb_seq, 0))
     for comb_seq in hybrid_alignments:
-        dist = score_by_dist(comb_seq, input_spectrum.precursor_mass, input_spectrum.precursor_charge, max_len, True, proteins)
-        score = overlap_scoring(comb_seq, input_spectrum.mz_values, tol, True, proteins)
-        score += losing_water(comb_seq, input_spectrum.mz_values, tol, True, proteins)
-        rescored_hybrids.append((score, 1/dist, comb_seq, 1))
+        b_side, y_side = comb_seq[1], comb_seq[2]
+        dist = score_by_dist(b_side, y_side, input_spectrum.precursor_mass, input_spectrum.precursor_charge, max_len, True, proteins)
+        score = overlap_scoring(b_side, y_side, input_spectrum.mz_values, tol, True, proteins)
+        score += losing_water(b_side, y_side, input_spectrum.mz_values, tol, True, proteins)
+        rescored_hybrids.append((score, 1/dist, b_side, y_side, 1))
     return rescored_naturals, rescored_hybrids

@@ -27,26 +27,26 @@ def make_db_mapping_by_key(db):
 
 def label_alignments(alignment):
     #b_mass, b_start, b_end, 1, b_charge, b_pid, b_score
-    type = alignment[3]
+    type = alignment[4]
     if type:
         label = "Hybrid"
     else:
-        label = "Natural"
+        label = "Native"
     return label
 
 def get_score(alignment):
-    b_c, y_c = alignment[2][0], alignment[2][1]
-    return b_c[6], y_c[6]
+    b_c, y_c = alignment[2], alignment[3]
+    return b_c.score, y_c.score
 
 def get_precursor_dist(alignment):
     return alignment[1]
 
 def get_sequence(alignment, proteins):
-    hybrid = alignment[3]
-    b_c, y_c = alignment[2][0], alignment[2][1]
-    b_pid, y_pid = b_c[5], y_c[5]
-    b_start, y_start = b_c[1], y_c[1]
-    b_end, y_end = b_c[2], y_c[2]
+    hybrid = alignment[4]
+    b_c, y_c = alignment[2], alignment[3]
+    b_pid, y_pid = b_c.pid, y_c.pid
+    b_start, y_start = b_c.start, y_c.start
+    b_end, y_end = b_c.end, y_c.end
     if hybrid:
         total_sequence = clustering.find_sequence(b_pid, b_start, b_end, proteins) + '-' + clustering.find_sequence(y_pid, y_start, y_end, proteins)
     else:
@@ -55,8 +55,7 @@ def get_sequence(alignment, proteins):
     return total_sequence
 
 def find_parent_protein(alignment, db_mapping):
-    b_c, y_c = alignment[2][0], alignment[2][1]
-    left_num, right_num = b_c[5], y_c[5]
+    left_num, right_num = alignment[2].pid, alignment[3].pid
     get_name = lambda x: x.split('|')[-1].split()[0]
     left_parent, right_parent = get_name(db_mapping[left_num].description), get_name(db_mapping[right_num].description)
     return left_parent, right_parent
@@ -65,11 +64,10 @@ def get_extended_sequence(alignment, protein_list, label, sequence):
     if label != "Hybrid":
         return sequence
     else:
-        b_start, y_end = alignment[2][0][1], alignment[2][1][2]
-        b_parent_id, y_parent_id = alignment[2][0][5], alignment[2][1][5]
-        b_parent_seq, y_parent_seq = protein_list[b_parent_id][1], protein_list[y_parent_id][1]
-        b_extensions = b_parent_seq[max(b_start-25, 0):b_start]
-        y_extensions = y_parent_seq[y_end:min(y_end+25,len(y_parent_seq))]
+        b_side, y_side = alignment[2], alignment[3]
+        b_parent_seq, y_parent_seq = protein_list[b_side.pid][1], protein_list[y_side.pid][1]
+        b_extensions = b_parent_seq[max(b_side.start-25, 0):b_side.start]
+        y_extensions = y_parent_seq[y_side.end:min(y_side.end+25,len(y_parent_seq))]
         return b_extensions + sequence + y_extensions
 
 # spec_num, non_hybrid, proteins, sequence, b_score, y_score, total_score, precursor_distance, total_mass_error
@@ -84,5 +82,5 @@ def postprocessing(alignments, db):
         b_score, y_score = get_score(alignment)
         total_score = alignment[0]
         precursor_distance = get_precursor_dist(alignment)
-        postprocessed_alignments.append((label, left_protein, right_protein, sequence, b_score, y_score, total_score, precursor_distance, extended_sequence, alignment))
+        postprocessed_alignments.append((label, left_protein, right_protein, sequence, b_score, y_score, total_score, precursor_distance, extended_sequence))
     return postprocessed_alignments

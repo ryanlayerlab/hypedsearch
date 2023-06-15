@@ -10,6 +10,7 @@ import gen_spectra
 from sqlite import database_file
 
 import math
+import collections
 import re
 
 import time
@@ -395,71 +396,99 @@ def make_merge(b, y, b_seq, y_seq):
     new_y = (y[0], y[1], y[2], y[3], y_seq)
     return (b[3] + y[3], b[1] - y[2], y[2]-b[1], new_b, new_y)
 
-def natural_get_extensions(obs_prec,prec_charge,pid,y_mass,y_start,y_end,y_charge,b_charge,precursor_tolerance,extended_b,b_score,y_score):
+def native_get_extensions(precursor_mass,prec_charge,b_side,y_side,prec_tol):
+    extended_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge')
+    tol = utils.ppm_to_da(precursor_mass, prec_tol)
     extensions = []
-    for b in extended_b:
-        if b[2]-1 == y_start:
-            total_precursor = gen_spectra.calc_precursor_as_disjoint(b[0], y_mass, b_charge, y_charge, prec_charge)
-            if abs(total_precursor - obs_prec) < precursor_tolerance:
-                extensions.append((extended_b[0] + (b_score,), (y_mass, y_start, y_end, 1, y_charge, pid, y_score)))
+    #if both the clusters simply glue together
+    if b_side.end -1 == y_side.start: # Does it have to be -1?
+        combined_prec = gen_spectra.calc_precursor_as_disjoint(b_side.mz, y_side.mz, b_side.charge, y_side.charge, prec_charge)
+        if abs(combined_prec - precursor_mass) <= tol:
+            b_cluster = extended_cluster(b_side.score, b_side.pid, b_side.start, b_side.end, b_side.mz, b_side.charge)
+            y_cluster = extended_cluster(y_side.score, y_side.pid, y_side.start, y_side.end, y_side.mz, y_side.charge)
+            return [(b_side.score + y_side.score, b_cluster, y_cluster)]
+    
+    #if the clusters are not h
+    for b in b_side.extensions:
+        if b[2]-1 == y_side.start:
+            total_precursor = gen_spectra.calc_precursor_as_disjoint(b[0], y_side.mz, b[4], y_side.charge, prec_charge)
+            if abs(total_precursor - precursor_mass) < prec_tol:
+                b_half = extended_cluster(score = b_side.score, pid=b[5], start=b[1], end = b[2], mz = b[0], charge= b[4])
+                y_half = extended_cluster(score = y_side.score, pid=y[5], start=y[1], end = y[2], mz = y[0], charge= y[4])
+                extensions.append((b[0] + y_side.score, b_half, y_half))
     return extensions
 
-def get_extensions(precursor_mass, precursor_charge, b_side, y_side, prec_tol, b_seq, y_seq):
+def get_extensions(precursor_mass, precursor_charge, b_side, y_side, prec_tol):
+    extended_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge')
     tol = utils.ppm_to_da(precursor_mass, prec_tol)
     extensions = []
     
-    #Check if the two pieces just go together already
-    normal_b = (b_side[4], b_side[1], b_side[2], 0, b_side[5], b_side[0])
-    normal_y = (y_side[4], y_side[1], y_side[2], 1, y_side[5], y_side[0])
-    extended_b = [normal_b] + b_side[6]
-    extended_y = [normal_y] + y_side[6]
+    #Check if the two pieces just go together already  
+    combined_prec = gen_spectra.calc_precursor_as_disjoint(b_side.mz, y_side.mz, b_side.charge, y_side.charge, precursor_charge)
+    if abs(combined_prec - precursor_mass) <= tol:
+        b_cluster = extended_cluster(b_side.score, b_side.pid, b_side.start, b_side.end, b_side.mz, b_side.charge)
+        y_cluster = extended_cluster(y_side.score, y_side.pid, y_side.start, y_side.end, y_side.mz, y_side.charge)
+        return [(b_side.score + y_side.score, b_cluster, y_cluster)]
+        
+    #Only extend b
+    for b in b_side.extensions:
+        b_mass = b[0]
+        this_prec = gen_spectra.calc_precursor_as_disjoint(b_mass, y_side.mz, b[4], y_side.charge, precursor_charge)
+        if this_prec > precursor_mass + tol:
+            break
+        elif abs(this_prec - precursor_mass) <= tol:
+            extended_b_cluster = extended_cluster(score = b_side.score, pid=b[5], start=b[1], end = b[2], mz = b[0], charge= b[4])
+            extended_y_cluster = extended_cluster(score = y_side.score, pid=y_side.pid, start=y_side.start, end = y_side.end, mz = y_side.mz, charge = y_side.charge)
+            extensions.append((b_side.score + y_side.score, extended_b_cluster, extended_y_cluster))
     
-    # this_prec = gen_spectra.calc_precursor_as_disjoint(b_mz, y_mz, b_charge, y_charge, precursor_charge)
-    # if abs(this_prec - precursor_mass) <= tol:
-    #     extensions.append(((b_mz, b_start, b_end, 0, b_charge, b_pid, b_score), (y_mz, y_start, y_end, 1, y_charge, y_pid, y_score)))
-    #642.345718435, 579.270778135
-    for b in extended_b:
-        for y in extended_y:
+    #Only extend y
+    for y in y_side.extensions:
+        y_mass = y[0]
+        this_prec = gen_spectra.calc_precursor_as_disjoint(b_side.mz, y_mass, b_side.charge, y[4], precursor_charge)
+        if this_prec > precursor_mass + tol:
+            break
+        elif abs(this_prec - precursor_mass) <= tol:
+            extended_b_cluster = extended_cluster(score = b_side.score, pid=b_side.pid, start=b_side.start, end = b_side.end, mz = b_side.mz, charge = b_side.charge)
+            extended_y_cluster = extended_cluster(score = y_side.score, pid=y[5], start=y[1], end = y[2], mz = y[0], charge= y[4])
+            extensions.append((b_side.score + y_side.score, extended_b_cluster, extended_y_cluster))
+    
+    #Either side needs to be extended
+    for b in b_side.extensions:
+        for y in y_side.extensions:
             b_mass, y_mass = b[0], y[0]
             this_prec = gen_spectra.calc_precursor_as_disjoint(b_mass, y_mass, b[4], y[4], precursor_charge)
             if this_prec > precursor_mass + tol:
                 break
             elif abs(this_prec - precursor_mass) <= tol:
-                extensions.append((b + (b_side[3],b_seq), y + (y_side[3],y_seq)))
+                extended_b_cluster = extended_cluster(score = b_side.score, pid=b[5], start=b[1], end = b[2], mz = b[0], charge= b[4])
+                extended_y_cluster = extended_cluster(score = y_side.score, pid=y[5], start=y[1], end = y[2], mz = y[0], charge= y[4])
+                extensions.append((b_side.score + y_side.score, extended_b_cluster, extended_y_cluster))
             
     return extensions
 
 def find_alignments(natural_merged, hybrid_merged, obs_prec, prec_charge, tol, max_len, prec_tol):
+    extended_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge')
     natural_alignments, hybrid_alignments = [], []
     for i, comb_seq in enumerate(natural_merged): #Maybe read the top 50 of these, look for matches and go until we find something
-        pid = comb_seq[1][0]
-        b_start, b_end = comb_seq[1][1], comb_seq[2][2]
-        y_start, y_end = comb_seq[1][1], comb_seq[2][2]
-        b_charge, y_charge = comb_seq[1][5], comb_seq[2][5]
-        b_score, y_score = comb_seq[1][3], comb_seq[2][3]
-        b_mass, y_mass = comb_seq[1][4], comb_seq[2][4]
-        b_extensions, y_extensions = comb_seq[1][6], comb_seq[2][6]
+        b_side = comb_seq[1]
+        y_side = comb_seq[2]
         # print("Natural", i)
-        if y_start >= b_end: #no overlap but b before y
-            natural_alignments = natural_alignments + natural_get_extensions(obs_prec, prec_charge, pid, y_mass, y_start, y_end, y_charge, b_charge, prec_tol, b_extensions, b_score, y_score) #THERE IS A BUG HERE
-        elif b_start <= y_start and b_end <= y_end and y_start < b_end: #some overlap
-            combined_precursor = calc_from_sequences(b_start, y_end, pid, max_len, prec_charge)
+        if y_side.start >= b_side.end: #no overlap but b before y
+            natural_alignments = natural_alignments + native_get_extensions(obs_prec, prec_charge, b_side, y_side, prec_tol)
+        elif b_side.start <= y_side.start and b_side.end <= y_side.end and y_side.start < b_side.end: #some overlap
+            combined_precursor = calc_from_sequences(b_side.start, y_side.end, b_side.pid, max_len, prec_charge)
             if abs(combined_precursor - obs_prec) < tol:
-                natural_alignments.append(((b_mass, b_start, b_end, 1, b_charge, pid, b_score),(y_mass, y_start, y_end, 1, y_charge, pid, y_score)))
+                b_cluster = extended_cluster(b_side.score, b_side.pid, b_side.start, b_side.end, b_side.mz, b_side.charge)
+                y_cluster = extended_cluster(y_side.score, y_side.pid, y_side.start, y_side.end, y_side.mz, y_side.charge)
+                natural_alignments.append((b_side.score + y_side.score, b_cluster, y_cluster))
         else:
-            hybrid_alignments = hybrid_alignments + get_extensions(obs_prec, prec_charge, pid, b_start, b_extensions, pid, y_end, y_extensions, prec_tol, y_start, y_charge, b_end, b_charge, b_mass, y_mass, b_score, y_score)
+            hybrid_alignments = hybrid_alignments + get_extensions(obs_prec, prec_charge, b_side, y_side, prec_tol)
 
     total_extension_time = 0
     for i, comb_seq in enumerate(hybrid_merged):
-        b_pid, y_pid = comb_seq[1][0], comb_seq[2][0]
-        b_start, b_end = comb_seq[1][1], comb_seq[1][2]
-        y_start, y_end = comb_seq[2][1], comb_seq[2][2]
-        b_charge, y_charge = comb_seq[1][5], comb_seq[2][5]
-        b_score, y_score = comb_seq[1][3], comb_seq[2][3]
-        b_mass, y_mass = comb_seq[1][4],comb_seq[2][4]
-        b_extensions, y_extensions = comb_seq[1][6], comb_seq[2][6]
+        b_side, y_side = comb_seq[1], comb_seq[2]
         extension_time = time.time()
-        hybrid_alignments = hybrid_alignments + get_extensions(obs_prec, prec_charge, comb_seq[1], comb_seq[2], prec_tol, comb_seq[1][7], comb_seq[2][7])     
+        hybrid_alignments = hybrid_alignments + get_extensions(obs_prec, prec_charge, b_side, y_side, prec_tol)
         total_extension_time = total_extension_time + (time.time() - extension_time)
     # print("\n Average extension time:",total_extension_time/len(hybrid_merged))
     return natural_alignments, hybrid_alignments

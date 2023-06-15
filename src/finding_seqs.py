@@ -29,7 +29,14 @@ def overlap_scoring(sequence, input_masses, ppm_tolerance):
                 
     return(total_score)
 
-def get_target_data(target_seq, proteins, input_masses, ppm_tolerance):
+def get_target_data(target_seq, proteins, input_masses, ppm_tolerance, precursor_mass, precursor_tolerance, precursor_charge):
+    prec_tol = ppm_to_da(precursor_mass, precursor_tolerance)
+    theoretical_prec = gen_spectra.get_precursor(target_seq.replace("-", ""), precursor_charge)
+    if abs(theoretical_prec - precursor_mass) <= precursor_tolerance:
+        print(target_seq,"is a valid hybrid to find")
+    else:
+        print(target_seq,"is NOT a valid hybrid to find")
+    
     target_left_pids, target_right_pids = [], []
     target_left_indices, target_right_indices = [], []
     protein_list = proteins.proteins
@@ -204,21 +211,21 @@ def check_in_combined_hybrids(good_hybrids, b_merged_hybrids):
 
 def check_in_alignments(target_left_pids, target_left_indices, target_right_pids, target_right_indices, native_alignments, hybrid_alignments):
     good_natives, good_hybrids = [],[]
-    for left_native, right_native in native_alignments:
-        left_pid = left_native[5]
-        left_start, left_end = left_native[1], left_native[2]
-        right_pid = right_native[5]
-        right_start, right_end = right_native[1], right_native[2]
+    for score, left_native, right_native in native_alignments:
+        left_pid = left_native.pid
+        left_start, left_end = left_native.start, left_native.end
+        right_pid = right_native.pid
+        right_start, right_end = right_native.start, right_native.end
         if left_pid in target_left_pids and (left_start, left_end) in target_left_indices and right_pid in target_right_pids and (right_start, right_end) in target_right_indices:
-            good_natives.append((left_native, right_native))
+            good_natives.append((score, left_native, right_native))
     
-    for left_hybrid, right_hybrid in hybrid_alignments:
-        left_pid = left_hybrid[5]
-        left_start, left_end = left_hybrid[1], left_hybrid[2]
-        right_pid = right_hybrid[5]
-        right_start, right_end = right_hybrid[1], right_hybrid[2]
+    for score, left_hybrid, right_hybrid in hybrid_alignments:
+        left_pid = left_hybrid.pid
+        left_start, left_end = left_hybrid.start, left_hybrid.end
+        right_pid = right_hybrid.pid
+        right_start, right_end = right_hybrid.start, right_hybrid.end
         if left_pid in target_left_pids and (left_start, left_end) in target_left_indices and right_pid in target_right_pids and (right_start, right_end) in target_right_indices:
-            good_hybrids.append((left_hybrid, right_hybrid))
+            good_hybrids.append((score, left_hybrid, right_hybrid))
             
     if len(good_natives) > 0:
         print("Good native alignments were found")
@@ -231,13 +238,35 @@ def check_in_alignments(target_left_pids, target_left_indices, target_right_pids
     
     return good_natives, good_hybrids
 
-def check_score(good_natives, good_hybrids, target_score):
+def check_score(rescored_natives, rescored_hybrids, good_natives, good_hybrids, target_score):
+    good_scored = []
     for native in good_natives:
-        native_score = native[0]
-        if native_score != target_score:
-            print("Scores were not equal. target score was:", target_score, "while Hypedsearch scored:", native_score)
+        for renative in rescored_natives:
+            if native[1] == renative[2] and native[2] == renative[3]:
+                native_score = native[0]
+                if native_score != target_score:
+                    print("Scores were not equal for this native. target score was:", target_score, "while Hypedsearch scored:", native_score)
+                good_scored.append((native_score, renative[2], renative[3]))
             
     for hybrid in good_hybrids:
-        hybrid_score = hybrid[0]
-        if hybrid_score != target_score:
-            print("Scores were not equal. target score was:", target_score, "while Hypedsearch scored:", hybrid_score)
+        for rehybrid in rescored_hybrids:
+            if hybrid[1] == rehybrid[2] and hybrid[2] == rehybrid[3]:
+                hybrid_score = rehybrid[0]
+                if hybrid_score != target_score:
+                    print("Scores were not equal for this hybrid. target score was:", target_score, "while Hypedsearch scored:", hybrid_score)
+                good_scored.append((hybrid_score, rehybrid[2], rehybrid[3]))
+    
+    return good_scored
+
+def check_in_rescored(rescored, good_scored):
+    good_rescored = []
+    for score, left_alignment, right_alignment in good_scored:
+        for new_score, _, rescored_left, rescored_right, _ in rescored:
+            if score == new_score and left_alignment == rescored_left and right_alignment == rescored_right:
+                good_rescored.append((new_score, rescored_left, rescored_right))
+                
+    if len(good_rescored) > 0:
+        print("Good rescored alignments were found")
+    
+    else:
+        print("Lost in final filtering")
