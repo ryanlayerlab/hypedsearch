@@ -38,7 +38,8 @@ def set_args(args) -> dict:
     verbose = string_to_bool(args.verbose) if not use_params else config['verbose']
     peak_filter = args.peak_filter if not use_params else config['num_peaks']
     relative_abundance_filter = args.rel_abund_filter if not use_params else config['relative_abundance']
-    digest = args.digest if not use_params else config['digest']
+    digest_left = args.digest_left if not use_params else config['digest_left']
+    digest_right = args.digest_right if not use_params else config['digest_right']
     cores = args.cores if not use_params else config['cores']
     make_new = args.new_db if not use_params else config['new_db']
     n = args.n if not use_params else config['top_results']
@@ -59,7 +60,7 @@ def set_args(args) -> dict:
     return {'spectra_files': spectra_files,'database_file': database_file,'output_dir': output_dir,
         'min_peptide_len': min_peptide_len,'max_peptide_len': max_peptide_len,'tolerance': ppm_tolerance,
         'precursor_tolerance': precursor_tolerance,'verbose': verbose, 'peak_filter': peak_filter, 
-        'relative_abundance_filter': relative_abundance_filter,'digest': digest, 'DEBUG': debug, 
+        'relative_abundance_filter': relative_abundance_filter, 'digest_left': digest_left, 'digest_right': digest_right, 'DEBUG': debug, 
         'cores': cores,'n': n,'new_db': make_new}
     
 def boolean_string(s):
@@ -87,7 +88,8 @@ if __name__ == '__main__':
     parser.add_argument('--precursor-tolerance', dest='precursor_tolerance', type=float, default=1, help='ppm tolerance to accept when matching precursor masses. Default=10')
     parser.add_argument('--peak-filter', dest='peak_filter', type=int, default=0, help='The number of peaks to take from a spectrum. The most abundant peaks will be taken. Leave blank if you want no filter or to use relative abundance filter. Defualt=0')
     parser.add_argument('--abundance-filter', dest='rel_abund_filter', type=float, default=0.0, help='Take only peaks from a spectrum where the abundance of the peak is >= the percentage give. Leave blank if you want no filter or to use peak filter. Default=0.0')
-    parser.add_argument('--digest', dest='digest', type=str, default='', help='The digest performed. Default=None')
+    parser.add_argument('--digest-left', dest='digest_left', type=str, default='', help='The Amino Acid for which the digest cuts left of. Default=None')
+    parser.add_argument('--digest-right', dest='digest_right', type=str, default='', help='The Amino Acid for which the digest cuts right of. Default=None')
     parser.add_argument('--verbose', dest='verbose', type=lambda x:bool(distutils.util.strtobool(x)))
     parser.add_argument('--cores', dest='cores', type=int, default=1, help='The number of cores allowed to use when searching. Uses at least 1 and at most the number of available cores. Default=1')
     parser.add_argument('--new-database', dest='new_db', type=lambda x:bool(distutils.util.strtobool(x)))

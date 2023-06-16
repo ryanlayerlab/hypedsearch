@@ -1,6 +1,7 @@
 from multiprocessing import Pool, set_start_method
 import operator
 from typing import Any
+# import matplotlib.pyplot as plt
 
 from postprocessing.postprocessing_utils import postprocessing
 from objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry
@@ -208,26 +209,46 @@ def find_target_clusters(b_sorted_clusters, y_sorted_clusters, b_sequence, y_seq
     for i, cluster in enumerate(y_sorted_clusters):
         if cluster[1] == y_pid and cluster[3] in y_target_ends: 
             print(i, cluster)
+            
+# def get_distribution(hybrids):
+#     scores = dict()
+#     score_list, frequency = [], []
+#     for hybrid in hybrids:
+#         score = hybrid[0]
+#         if score not in scores.keys():
+#             scores[score] = 0
+#         scores[score] = scores[score] + 1
+    
+#     for score in scores.keys():
+#         frequency.append(scores[score])
+#         score_list.append(score)
+    
+#     fig1, ax1 = plt.subplots()
+#     ax1.bar(score_list, frequency)
+#     plt.title('Distribution of scores')
+#     plt.xlabel('Scores')
+#     plt.ylabel('Number of merges with this score')
+#     plt.savefig("Score_Distribution.png")
 
 class alignment_info:
-    def __init__(self, max_peptide_len, precursor_tolerance, database, ppm_tolerance, results_len) -> None:
+    def __init__(self, max_peptide_len, precursor_tolerance, database, ppm_tolerance, results_len, left_digest, right_digest) -> None:
         self.max_pep_len = max_peptide_len
         self.prec_tol = precursor_tolerance
         self.ppm_tol = ppm_tolerance
         self.db = database
         self.results_len = results_len
+        self.digest = (left_digest, right_digest)
         
     def __call__(self, spectrum) -> Any:
-        return create_alignment_info(spectrum, self.max_pep_len, self.prec_tol, self.db, self.ppm_tol, self.results_len)
+        return create_alignment_info(spectrum, self.max_pep_len, self.prec_tol, self.db, self.ppm_tol, self.results_len, self.digest)
 
-
-def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len):
+def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len, digest):
     print(f'\rCreating an alignment for {spectrum.num + 1}/{results_len} [{to_percent(spectrum.num + 1, results_len)}%]', end='')
     target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = finding_seqs.get_target_data("DLQTLAL-NAAR", db, spectrum.mz_values, ppm_tol, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
     converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol)
     good_b_entries, good_y_entries = finding_seqs.check_in_matched_masses(matched_masses_b, matched_masses_y, target_left_pids, target_left_indices, target_right_pids, target_right_indices)
     b_hits, y_hits = do_first_thing(spectrum, converted_b, converted_y, matched_masses_b, matched_masses_y)
-    b_sorted_clusters, y_sorted_clusters = do_second_thing(db, converted_b, converted_y, b_hits, y_hits, spectrum.precursor_charge, ppm_tol)
+    b_sorted_clusters, y_sorted_clusters = do_second_thing(db, converted_b, converted_y, b_hits, y_hits, spectrum.precursor_charge, ppm_tol, digest)
     good_b_clusters, good_y_clusters = finding_seqs.check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_entries, good_y_entries, target_seq)
     merged_seqs, _ = do_third_thing(spectrum, max_pep_len, prec_tol, b_sorted_clusters, y_sorted_clusters)
     good_natives = finding_seqs.check_in_natives(merged_seqs, good_b_clusters, good_y_clusters)
@@ -235,6 +256,7 @@ def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_
     good_hybrids = finding_seqs.check_in_hybrids(a_merged_hybrids, good_b_clusters, good_y_clusters, b_sorted_clusters, y_sorted_clusters)
     b_merged_hybrids = do_fifth_thing(a_merged_hybrids, b_sorted_clusters, y_sorted_clusters)
     good_filtered_hybrids = finding_seqs.check_in_combined_hybrids(good_hybrids, b_merged_hybrids)
+    # get_distribution(b_merged_hybrids)
     native_alignments, hybrid_alignments = do_sixth_thing(spectrum, db, merged_seqs, prec_tol, b_merged_hybrids)
     good_natives, good_hybrids = finding_seqs.check_in_alignments(target_left_pids, target_left_indices, target_right_pids, target_right_indices, native_alignments, hybrid_alignments)
     rescored_natives, rescored_hybrids = do_seventh_thing(spectrum, max_pep_len, db, ppm_tol, native_alignments, hybrid_alignments)
@@ -284,6 +306,7 @@ def do_sixth_thing(spectrum, db, merged_seqs, prec_tol, hybrid_merged):
 def do_fifth_thing(hybrid_merged, b_sorted_clusters, y_sorted_clusters):
     start_time = time.time()
     hybrid_merged = clustering.distribute_merges(hybrid_merged, b_sorted_clusters, y_sorted_clusters)
+    hybrid_merged = sorted(hybrid_merged, key = lambda x: x[0], reverse=True)
     end_time = time.time() - start_time
     with open('Timing_data.txt', 'a') as t:
         t.write("Filtering hybrids by precursor masss took:" + '\t' + str(end_time) + "\n")
@@ -320,12 +343,12 @@ def do_third_thing_A(b_sorted_clusters, y_sorted_clusters):
         t.write("Ryan merging and sorting took:" + '\t' + str(end_time) + "\n")
     return merged_seqs
 
-def do_second_thing(db, converted_b, converted_y, b_hits, y_hits, prec_charge, ppm_tol):
+def do_second_thing(db, converted_b, converted_y, b_hits, y_hits, prec_charge, ppm_tol, digest):
     cluster_time = time.time()
     b_clusters = clustering.create_clusters('b', b_hits, y_hits)
-    b_sorted_clusters = clustering.old_score_clusters(0, b_clusters, converted_b, db.proteins, prec_charge, ppm_tol)
+    b_sorted_clusters = clustering.old_score_clusters(0, b_clusters, converted_b, db.proteins, prec_charge, ppm_tol, digest)
     y_clusters = clustering.create_clusters('y', y_hits, y_hits)
-    y_sorted_clusters = clustering.old_score_clusters(1, y_clusters, converted_y, db.proteins, prec_charge, ppm_tol)
+    y_sorted_clusters = clustering.old_score_clusters(1, y_clusters, converted_y, db.proteins, prec_charge, ppm_tol, digest)
     cluster_time = time.time() - cluster_time
     with open('Timing_data.txt', 'a') as t:
         t.write("Clusters took:" + '\t' + str(cluster_time) + "\n")
@@ -339,28 +362,28 @@ def do_first_thing(spectrum, converted_b, converted_y, matched_masses_b, matched
         t.write("Hits took:" + '\t' + str(hit_time) + "\n")
     return b_hits,y_hits
 
-def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, numcores):
+def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, numcores, digest_left, digest_right):
     p = Pool(numcores)
     y, spec_nums = [], []
     [spec_nums.append(i) for i in range(0, len(spectra))]
-    x = alignment_info(max_peptide_len,precursor_tolerance,db,ppm_tolerance,len(spectra))
+    x = alignment_info(max_peptide_len,precursor_tolerance,db,ppm_tolerance,len(spectra),digest_left,digest_right)
     y = p.map(x, spectra)
     p.close()
     p.join()
     return y
 
-# def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, numcores): #Version of align for when multiprocessing doesn't work
+# def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, numcores, digest_left, digest_right): #Version of align for when multiprocessing doesn't work
 #     all_alignment_infos = []
 #     for spectrum in spectra:
 #         spectra_length = len(spectra)
-#         alignment_info = create_alignment_info(spectrum, max_peptide_len,precursor_tolerance,db,ppm_tolerance,spectra_length)
+#         alignment_info = create_alignment_info(spectrum, max_peptide_len,precursor_tolerance,db,ppm_tolerance,spectra_length, (digest_left, digest_right))
 #         all_alignment_infos.append(alignment_info)
 #     return all_alignment_infos
     
 def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     min_peptide_len: int = 5, max_peptide_len: int = 10, peak_filter: int = 0, 
     relative_abundance_filter: float = 0.0,ppm_tolerance: int = 20, 
-    precursor_tolerance: int = 10, digest: str = '',cores: int = 1, make_new: bool = False,
+    precursor_tolerance: int = 10, digest_left: str = '', digest_right: str = '', cores: int = 1, make_new: bool = False,
     n: int = 5,DEBUG: bool = False, output_dir: str = ''):
     fall_off = None
     if make_new:
@@ -375,6 +398,6 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
         verbose and print('Loading spectra start.')
         spectra = preprocessing_utils.load_spectra(file, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
         verbose and print('Loading spectra finish.')
-        results = align(spectra,precursor_tolerance,db,ppm_tolerance,max_peptide_len,cores)
+        results = align(spectra,precursor_tolerance,db,ppm_tolerance,max_peptide_len,cores,digest_left,digest_right)
         result_list.append(results)
     return result_list

@@ -414,7 +414,7 @@ def native_get_extensions(precursor_mass,prec_charge,b_side,y_side,prec_tol):
             total_precursor = gen_spectra.calc_precursor_as_disjoint(b[0], y_side.mz, b[4], y_side.charge, prec_charge)
             if abs(total_precursor - precursor_mass) < prec_tol:
                 b_half = extended_cluster(score = b_side.score, pid=b[5], start=b[1], end = b[2], mz = b[0], charge= b[4])
-                y_half = extended_cluster(score = y_side.score, pid=y[5], start=y[1], end = y[2], mz = y[0], charge= y[4])
+                y_half = extended_cluster(score = y_side.score, pid=y_side.pid, start=y_side.start, end = y_side.end, mz = y_side.mz, charge=y_side.charge)
                 extensions.append((b[0] + y_side.score, b_half, y_half))
     return extensions
 
@@ -466,10 +466,10 @@ def get_extensions(precursor_mass, precursor_charge, b_side, y_side, prec_tol):
             
     return extensions
 
-def find_alignments(natural_merged, hybrid_merged, obs_prec, prec_charge, tol, max_len, prec_tol):
+def find_alignments(native_merged, hybrid_merged, obs_prec, prec_charge, tol, max_len, prec_tol):
     extended_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge')
     natural_alignments, hybrid_alignments = [], []
-    for i, comb_seq in enumerate(natural_merged): #Maybe read the top 50 of these, look for matches and go until we find something
+    for i, comb_seq in enumerate(native_merged): #Maybe read the top 50 of these, look for matches and go until we find something
         b_side = comb_seq[1]
         y_side = comb_seq[2]
         # print("Natural", i)
@@ -485,7 +485,7 @@ def find_alignments(natural_merged, hybrid_merged, obs_prec, prec_charge, tol, m
             hybrid_alignments = hybrid_alignments + get_extensions(obs_prec, prec_charge, b_side, y_side, prec_tol)
 
     total_extension_time = 0
-    for i, comb_seq in enumerate(hybrid_merged):
+    for i, comb_seq in enumerate(hybrid_merged[:10000]):
         b_side, y_side = comb_seq[1], comb_seq[2]
         extension_time = time.time()
         hybrid_alignments = hybrid_alignments + get_extensions(obs_prec, prec_charge, b_side, y_side, prec_tol)
