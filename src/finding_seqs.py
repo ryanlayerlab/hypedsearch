@@ -137,13 +137,13 @@ def check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_hits, 
     # want to return good clusters and print whether these good clusters are in our sorted list
 
     if len(good_b_clusters) > 0 and len(good_y_clusters) > 0:
-        print("Good hits in matched_masses_b and matched_masses_y")
+        print("Good hits in b_clusters and y_clusters")
     if len(good_b_clusters) > 0 and len(good_y_clusters) == 0:
-        print("Good hits in matched_masses_b but not matched_masses_y")
+        print("Good hits in b_clusters but not y_clusters")
     if len(good_b_clusters) == 0 and len(good_y_clusters) > 0:
-        print("No good hits in matched_masses_b but in matched_masses_y")
+        print("No good hits in b_clusters but in y_clusters")
     if len(good_b_clusters) == 0 and len(good_y_clusters) == 0:
-        print("No good hits in matched_masses_b nor in matched_masses_y")
+        print("No good hits in b_clusters nor in y_clusters")
     return good_b_clusters, good_y_clusters
 
 def check_in_natives(natives, good_b, good_y):

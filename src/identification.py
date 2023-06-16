@@ -244,7 +244,7 @@ class alignment_info:
 
 def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len, digest):
     print(f'\rCreating an alignment for {spectrum.num + 1}/{results_len} [{to_percent(spectrum.num + 1, results_len)}%]', end='')
-    target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = finding_seqs.get_target_data("DLQTLAL-NAAR", db, spectrum.mz_values, ppm_tol, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
+    target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = finding_seqs.get_target_data("DPQVAQLELGG-EVEDPQVAQLELGGGPGAG", db, spectrum.mz_values, ppm_tol, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
     converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol)
     good_b_entries, good_y_entries = finding_seqs.check_in_matched_masses(matched_masses_b, matched_masses_y, target_left_pids, target_left_indices, target_right_pids, target_right_indices)
     b_hits, y_hits = do_first_thing(spectrum, converted_b, converted_y, matched_masses_b, matched_masses_y)
@@ -256,7 +256,6 @@ def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_
     good_hybrids = finding_seqs.check_in_hybrids(a_merged_hybrids, good_b_clusters, good_y_clusters, b_sorted_clusters, y_sorted_clusters)
     b_merged_hybrids = do_fifth_thing(a_merged_hybrids, b_sorted_clusters, y_sorted_clusters)
     good_filtered_hybrids = finding_seqs.check_in_combined_hybrids(good_hybrids, b_merged_hybrids)
-    # get_distribution(b_merged_hybrids)
     native_alignments, hybrid_alignments = do_sixth_thing(spectrum, db, merged_seqs, prec_tol, b_merged_hybrids)
     good_natives, good_hybrids = finding_seqs.check_in_alignments(target_left_pids, target_left_indices, target_right_pids, target_right_indices, native_alignments, hybrid_alignments)
     rescored_natives, rescored_hybrids = do_seventh_thing(spectrum, max_pep_len, db, ppm_tol, native_alignments, hybrid_alignments)
