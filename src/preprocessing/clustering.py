@@ -460,11 +460,16 @@ def get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, obs_prec, precursor
 
 def distribute_merges(merges, b_sorted_clusters, y_sorted_clusters):
     merged_clusters = []
+    i = 0
     for key in merges.keys():
         for y_conv in merges[key]:
             for b in b_sorted_clusters[key]:
                 for y in y_sorted_clusters[y_conv]:
                     if b.score + y.score > 4:
-                        merged_clusters.append((b.score + y.score, b, y))
+                        if i < 10000:
+                            merged_clusters.append((b.score + y.score, b, y))
+                            i = i + 1
+                        else:
+                            return merged_clusters
 
     return merged_clusters
