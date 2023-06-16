@@ -485,7 +485,7 @@ def find_alignments(native_merged, hybrid_merged, obs_prec, prec_charge, tol, ma
             hybrid_alignments = hybrid_alignments + get_extensions(obs_prec, prec_charge, b_side, y_side, prec_tol)
 
     total_extension_time = 0
-    for i, comb_seq in enumerate(hybrid_merged[:10000]):
+    for i, comb_seq in enumerate(hybrid_merged):
         b_side, y_side = comb_seq[1], comb_seq[2]
         extension_time = time.time()
         hybrid_alignments = hybrid_alignments + get_extensions(obs_prec, prec_charge, b_side, y_side, prec_tol)
