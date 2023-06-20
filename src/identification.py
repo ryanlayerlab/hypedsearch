@@ -17,7 +17,7 @@ import multiprocessing as mp
 import json
 import os
 from gen_spectra import convert_precursor_to_ion, calc_masses
-from scoring.scoring import second_scoring
+from scoring.scoring import second_scoring, rescore_merges
 from alignment.alignment import find_alignments
 import finding_seqs
 
@@ -210,6 +210,26 @@ def find_target_clusters(b_sorted_clusters, y_sorted_clusters, b_sequence, y_seq
         if cluster[1] == y_pid and cluster[3] in y_target_ends: 
             print(i, cluster)
             
+def group_by_uniqueness(hybrid_rescored, native_rescored):
+    unique_merges = dict()
+    for merge in hybrid_rescored:
+        left_seq, right_seq = merge[2][0][6], merge[2][1][6]
+        full_seq = left_seq + right_seq
+        score = merge[0]
+        abundance_sum = merge[1]
+        if (full_seq, score, abundance_sum) not in unique_merges.keys():
+            unique_merges[(full_seq, score, abundance_sum, 1)] = []
+        unique_merges[(full_seq, score, abundance_sum, 1)].append(merge)
+    
+    for merge in native_rescored:
+        full_seq = merge[2][0][6]
+        score = merge[0]
+        abundance_sum = merge[1]
+        if (full_seq, score, abundance_sum) not in unique_merges.keys():
+            unique_merges[(full_seq, score, abundance_sum, 0)] = []
+        unique_merges[(full_seq, score, abundance_sum, 0)].append(merge)
+    return unique_merges
+            
 # def get_distribution(hybrids):
 #     scores = dict()
 #     score_list, frequency = [], []
@@ -244,25 +264,30 @@ class alignment_info:
 
 def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len, digest):
     print(f'\rCreating an alignment for {spectrum.num + 1}/{results_len} [{to_percent(spectrum.num + 1, results_len)}%]', end='')
-    target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = finding_seqs.get_target_data("DPQVAQLELGG-EVEDPQVAQLELGGGPGAG", db, spectrum.mz_values, ppm_tol, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
+    target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = finding_seqs.get_target_data("DPQVEQLEL", db, spectrum.mz_values, ppm_tol, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
     converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol)
-    good_b_entries, good_y_entries = finding_seqs.check_in_matched_masses(matched_masses_b, matched_masses_y, target_left_pids, target_left_indices, target_right_pids, target_right_indices)
+    # good_b_entries, good_y_entries = finding_seqs.check_in_matched_masses(matched_masses_b, matched_masses_y, target_left_pids, target_left_indices, target_right_pids, target_right_indices)
+    
+    best_prec_hit, score_filter = alignment.find_from_prec(converted_b, matched_masses_b, spectrum, ppm_tol, db.proteins)
+    
     b_hits, y_hits = do_first_thing(spectrum, converted_b, converted_y, matched_masses_b, matched_masses_y)
     b_sorted_clusters, y_sorted_clusters = do_second_thing(db, converted_b, converted_y, b_hits, y_hits, spectrum.precursor_charge, ppm_tol, digest)
-    good_b_clusters, good_y_clusters = finding_seqs.check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_entries, good_y_entries, target_seq)
-    merged_seqs, _ = do_third_thing(spectrum, max_pep_len, prec_tol, b_sorted_clusters, y_sorted_clusters)
-    good_natives = finding_seqs.check_in_natives(merged_seqs, good_b_clusters, good_y_clusters)
-    a_merged_hybrids = do_fourth_thing(spectrum, b_sorted_clusters, y_sorted_clusters, prec_tol)
-    good_hybrids = finding_seqs.check_in_hybrids(a_merged_hybrids, good_b_clusters, good_y_clusters, b_sorted_clusters, y_sorted_clusters)
-    b_merged_hybrids = do_fifth_thing(a_merged_hybrids, b_sorted_clusters, y_sorted_clusters)
-    good_filtered_hybrids = finding_seqs.check_in_combined_hybrids(good_hybrids, b_merged_hybrids)
-    native_alignments, hybrid_alignments = do_sixth_thing(spectrum, db, merged_seqs, prec_tol, b_merged_hybrids)
-    good_natives, good_hybrids = finding_seqs.check_in_alignments(target_left_pids, target_left_indices, target_right_pids, target_right_indices, native_alignments, hybrid_alignments)
-    rescored_natives, rescored_hybrids = do_seventh_thing(spectrum, max_pep_len, db, ppm_tol, native_alignments, hybrid_alignments)
-    good_scored = finding_seqs.check_score(rescored_natives, rescored_hybrids, good_natives, good_hybrids, target_score)
-    rescored_alignments = create_rescored_alignments(rescored_natives, rescored_hybrids)
-    finding_seqs.check_in_rescored(rescored_alignments[:10], good_scored)
-    postprocessed_alignments = do_eigth_thing(db, rescored_alignments)
+    # good_b_clusters, good_y_clusters = finding_seqs.check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_entries, good_y_entries)
+    
+    b_search_space, y_search_space = clustering.get_search_space(b_sorted_clusters, y_sorted_clusters, spectrum.precursor_charge)
+    # good_b_searches, good_y_searches = finding_seqs.check_in_searches(b_search_space, y_search_space, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_seq, spectrum.precursor_charge, ppm_tol)
+    
+    #For finding natives. Option A: Uncomment code below and adapt slightly or option B: just find the native from the extensions or option C: Group other indices by uniqueness and cleverly pick out the natives
+    native_merged_seqs = alignment.pair_natives(b_search_space, y_search_space, spectrum.precursor_mass, prec_tol, score_filter)
+    hybrid_merged_seqs = alignment.pair_indices(b_search_space, y_search_space, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, score_filter)
+    
+    # good_merged_seqs = finding_seqs.check_in_merges(hybrid_merged_seqs, native_merged_seqs, good_b_searches, good_y_searches)
+    rescored_hybrids, rescored_natives = rescore_merges(hybrid_merged_seqs, native_merged_seqs, spectrum, ppm_tol)
+    # good_rescored = finding_seqs.check_in_rescored_merges(rescored_hybrids, rescored_natives, good_merged_seqs)
+    unique_rescored = group_by_uniqueness(rescored_hybrids, rescored_natives) #the keys are sorted within the next function
+    # good_unique = finding_seqs.check_in_unique(unique_rescored, good_merged_seqs)
+    
+    postprocessed_alignments = do_eigth_thing(db, unique_rescored)
     return postprocessed_alignments
 
 def prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol):
@@ -388,7 +413,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     if make_new:
         dbf = database_file(max_peptide_len, True)
         kv_prots = [(k, v) for k, v in db.proteins]    
-        merge_search.modified_make_database_set(kv_prots, max_peptide_len, dbf)
+        merge_search.modified_make_database_set(kv_prots, max_peptide_len, dbf, (digest_left, digest_right))
 
     result_list = []
     set_start_method('forkserver')

@@ -44,19 +44,43 @@ def handle_sorting_keys(db_dict_b, db_dict_y, kmer_list):
 #     code = int.from_bytes(mBytes, byteorder="big")
 #     return code
 
-def get_data(kmer, start, end, protein_num):
+def get_data(kmer, start, end, protein_num, ion):
     data_list = []
-    for ion in 'by':
-        for charge in [1,2]:
-            mass = gen_spectra.max_mass(kmer, ion=ion, charge=charge)
-            ion_int = 0 if ion == 'b' else 1
-            # code = encode_kmer(kmer)
-            input_tuple = (mass, start, end, ion_int, charge, protein_num) #change this to code for larger databases when we need an encoding
-            data_list.append(input_tuple)
+    for charge in [1,2]:
+        # if kmer == "DPQVAQLELGG":
+        #     print("here")
+        mass = gen_spectra.max_mass(kmer, ion=ion, charge=charge) #1108.563316435
+        ion_int = 0 if ion == 'b' else 1
+        # code = encode_kmer(kmer)
+        input_tuple = (mass, start, end, ion_int, charge, protein_num)
+        data_list.append(input_tuple)
 
     return data_list
             
-def db_make_set_for_protein(i,prot,max_len, dbf, data):
+# def db_make_set_for_protein(i,prot,max_len, dbf, data, digest):
+#     seq_len = len(prot)
+#     count_max = 1000000
+#     for size in range(2, max_len + 1):
+#         # size -> [2, max_len]
+#         for start in range(0, seq_len - size + 1):
+#             end = start + size
+#             kmer = prot[start:end]
+#             bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
+#             if not any (x in bad_chars for x in kmer):
+                
+#             # last_index = seq - size 6, end = start + size - 1 = 7
+#             # [data.append(x) for x in get_data(kmer, start, end)]
+#                 for ion in 'by':
+#                     data_list = get_data(kmer, start, end, i, ion)
+#                     data.extend(data_list)
+#                 # insertion code
+#                 if len(data) > count_max:
+#                     dbf.insert(data)
+#                     data.clear()
+            
+#     return
+
+def db_make_set_for_protein_digest(i,prot,max_len, dbf, data, digest):
     seq_len = len(prot)
     count_max = 1000000
     for size in range(2, max_len + 1):
@@ -64,21 +88,28 @@ def db_make_set_for_protein(i,prot,max_len, dbf, data):
         for start in range(0, seq_len - size + 1):
             end = start + size
             kmer = prot[start:end]
-            bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
-            if not any (x in bad_chars for x in kmer):
-                
-            # last_index = seq - size 6, end = start + size - 1 = 7
-            # [data.append(x) for x in get_data(kmer, start, end)]
-                data_list = get_data(kmer, start, end, i)
-                data.extend(data_list)
-                # insertion code
-                if len(data) > count_max:
-                    dbf.insert(data)
-                    data.clear()
+            if kmer[0] in digest[0] or digest[0] == ['-'] or (start > 0 and prot[start-1] in digest[1]): #cuts to the left
+                bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
+                if not any (x in bad_chars for x in kmer):
+                    data_list = get_data(kmer, start, end, i, 'b')
+                    data.extend(data_list)
+                    # insertion code
+                    if len(data) > count_max:
+                        dbf.insert(data)
+                        data.clear()
+            if kmer[-1] in digest[1] or digest[1] == ['-'] or (end < seq_len and prot[end] in digest[0]): #cuts to the right
+                bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
+                if not any (x in bad_chars for x in kmer):
+                    data_list = get_data(kmer, start, end, i, 'y')
+                    data.extend(data_list)
+                    # insertion code
+                    if len(data) > count_max:
+                        dbf.insert(data)
+                        data.clear()
             
     return
 
-def db_make_database_set_for_proteins(proteins,max_len,dbf):
+def db_make_database_set_for_proteins(proteins,max_len,dbf,digest):
     plen = len(proteins)
     last_percent = 0
     data = []
@@ -94,27 +125,16 @@ def db_make_database_set_for_proteins(proteins,max_len,dbf):
             if free < 10:
                 print("\nUsed too much space, Space available =", free, "GB" )
                 sys.exit(1)
-        db_make_set_for_protein(i,prot_entry,max_len, dbf, data)
+        db_make_set_for_protein_digest(i,prot_entry,max_len, dbf, data, digest)
         
     if len(data) != 0:
         dbf.insert(data)
         
-def modified_make_database_set(proteins: list, max_len: int, dbf):    
-    # final data structure: dict-> called mass_kmers
-    # input_masses -> list of tuples
-    # mass_kmers[mass] -> list of tuples
-    # db.query_mass(mass) -> list of tuples
-    # for input_mass in input_masses:
-    #   kmers = db.query_mass(input_mass) 
-    #   if len(kmers) != 0:
-    #       we have the list
+def modified_make_database_set(proteins: list, max_len: int, dbf, digest):
     
-    
-    #kmer -> list of proteins where it occurs
-    #kmer list: list of tuples (kmer, mass, location, ion, charge)
     print("\nBeginning Insertions")
     start = time.time()
-    db_make_database_set_for_proteins(proteins,max_len, dbf)
+    db_make_database_set_for_proteins(proteins,max_len,dbf,digest)
     duration = time.time() - start
     print("Insertion took: ", duration)
     # db.read() #Only for debugging
@@ -126,12 +146,6 @@ def modified_make_database_set(proteins: list, max_len: int, dbf):
     dbf.index_ion_mass_y()
     print('Done making database')
     
-    
-    # print('\nSorting the set of protein masses...')
-    # kmer_list = []
-    # # handle_sorting_keys(db_dict_b, db_dict_y, kmer_list)
-    # kmer_list = sorted(kmer_list, key=lambda x: x[0])
-    # print('Sorting the set of protein masses done')
     return
 
 def in_bounds(int1, interval):

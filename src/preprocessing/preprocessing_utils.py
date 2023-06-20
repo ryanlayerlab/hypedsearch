@@ -26,9 +26,8 @@ def load_spectra(
         relative_abundance_filter=relative_abundance_filter
     )
     all_spectra += these_spectra
-    #Jamie
     # leave next 2 lines commented; uncomment only to test just specific indices
-    index_list = [2749] #For using a condensed database
+    index_list = [0,1,2,3,4,5,6,7,8,9,10,11] #For using a condensed database
     these_spectra, all_spectra = reduce_database(all_spectra, these_spectra, index_list) 
     # index_list = [0,1,2,3,4] #For using a condensed database
     # these_spectra, all_spectra = reduce_database(all_spectra, these_spectra, index_list) 

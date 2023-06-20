@@ -174,3 +174,88 @@ def second_scoring(natural_alignments, hybrid_alignments, input_spectrum, tol, p
         score += losing_water(b_side, y_side, input_spectrum.mz_values, tol, True, proteins)
         rescored_hybrids.append((score, 1/dist, b_side, y_side, 1))
     return rescored_naturals, rescored_hybrids
+
+def calc_overlap(masses, input_masses, abundances, ppm_tolerance):
+    total_score = 0
+    total_abundance = 0
+    o_ctr, t_ctr = 0, 0
+    observed = input_masses[o_ctr]
+    theoretical = masses[t_ctr]
+    while (o_ctr < len(input_masses) and t_ctr < len(masses)):
+        tol = ppm_to_da(observed, ppm_tolerance)
+        if theoretical < observed - tol:
+            t_ctr = t_ctr + 1
+            if t_ctr < len(masses):
+                theoretical = masses[t_ctr]
+        elif observed + tol < theoretical:
+            o_ctr = o_ctr + 1
+            if o_ctr < len(input_masses):
+                observed = input_masses[o_ctr]
+        elif abs(observed-theoretical) <= tol:
+            total_score = total_score + 1
+            total_abundance = abundances[o_ctr]
+            o_ctr = o_ctr + 1
+            t_ctr = t_ctr + 1
+            if o_ctr < len(input_masses) and t_ctr < len(masses):
+                observed = input_masses[o_ctr]
+                theoretical = masses[t_ctr]
+                
+    return total_score, total_abundance
+
+def modified_overlap_scoring(b_side, y_side, input_masses, abundances, ppm_tolerance, hybrid):
+    if hybrid:
+        b_sequence, y_sequence = b_side[6], y_side[6]
+        sequence = b_sequence + y_sequence
+    else:
+        sequence = b_side[6]
+    spectrum = gen_spectra.gen_spectrum(sequence)
+    masses = sorted(spectrum['spectrum'])
+    input_masses = sorted(input_masses)
+    score = calc_overlap(masses, input_masses, abundances, ppm_tolerance)
+    return score
+
+def modified_losing_water(b_side, y_side, input_masses, abundances, ppm_tolerance, hybrid):
+    if hybrid:
+        b_sequence, y_sequence = b_side[6], y_side[6]
+        sequence = b_sequence + y_sequence
+    else:
+        sequence = b_side[6]
+    spectrum = gen_spectra.gen_spectrum(sequence)
+    masses = sorted(spectrum['spectrum'])
+    minus_water = []
+    for mass in masses:
+        minus_water.append(mass - WATER_MASS)
+    input_masses = sorted(input_masses)
+    score = calc_overlap(minus_water, input_masses, abundances, ppm_tolerance)
+    return score    
+
+def rescore_merges(hybrid_merge_space, native_merge_space, input_spectrum, ppm_tol):
+    rescored_hybrids, rescored_natives = [], []
+    for b, y in hybrid_merge_space:
+        score, abundance_sum = modified_overlap_scoring(b,y, input_spectrum.mz_values, input_spectrum.abundance, ppm_tol, True)
+        minus_water_score, minus_water_abundance_sum = modified_losing_water(b,y, input_spectrum.mz_values, input_spectrum.abundance, ppm_tol, True)
+        score += minus_water_score
+        abundance_sum += minus_water_abundance_sum
+        rescored_hybrids.append((score, abundance_sum, (b,y))) #change this once hyb is fixed above
+    
+    for b, y in native_merge_space:
+        score, abundance_sum = modified_overlap_scoring(b,y, input_spectrum.mz_values, input_spectrum.abundance, ppm_tol, True)
+        minus_water_score, minus_water_abundance_sum = modified_losing_water(b,y, input_spectrum.mz_values, input_spectrum.abundance, ppm_tol, True)
+        score += minus_water_score
+        abundance_sum += minus_water_abundance_sum
+        rescored_natives.append((score, abundance_sum, (b,y))) #change this once hyb is fixed above
+
+    
+    return sorted(rescored_hybrids, key = lambda x: (x[0], x[1]), reverse=True), sorted(rescored_natives, key = lambda x: (x[0], x[1]), reverse=True)
+
+def prec_overlap_scoring(input_masses, abundances, ppm_tolerance, pid, start, end, protein_list):
+    sequence = clustering.find_sequence(pid, start, end, protein_list)
+    spectrum = gen_spectra.gen_spectrum(sequence)
+    masses = sorted(spectrum['spectrum'])
+    input_masses = sorted(input_masses)
+    score = calc_overlap(masses, input_masses, abundances, ppm_tolerance)
+    return score
+
+def prec_score(hit, input_spectrum, ppm_tolerance, protein_list):
+    score, abundance_sum = prec_overlap_scoring(input_spectrum.mz_values, input_spectrum.abundance, ppm_tolerance, hit[5], hit[1], hit[2], protein_list)
+    return score, abundance_sum

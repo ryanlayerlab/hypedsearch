@@ -1,5 +1,6 @@
 from scoring import scoring
 from objects import Spectrum, SequenceAlignment, HybridSequenceAlignment, Database, Alignments, DEVFallOffEntry
+from constants import PROTON_MASS, WATER_MASS
 from alignment import alignment_utils, hybrid_alignment
 from gen_spectra import get_precursor
 from preprocessing.clustering import calc_from_sequences
@@ -409,7 +410,7 @@ def native_get_extensions(precursor_mass,prec_charge,b_side,y_side,prec_tol):
             return [(b_side.score + y_side.score, b_cluster, y_cluster)]
     
     #if the clusters are not h
-    for b in b_side.extensions:
+    for b in b_side.components:
         if b[2]-1 == y_side.start:
             total_precursor = gen_spectra.calc_precursor_as_disjoint(b[0], y_side.mz, b[4], y_side.charge, prec_charge)
             if abs(total_precursor - precursor_mass) < prec_tol:
@@ -431,7 +432,7 @@ def get_extensions(precursor_mass, precursor_charge, b_side, y_side, prec_tol):
         return [(b_side.score + y_side.score, b_cluster, y_cluster)]
         
     #Only extend b
-    for b in b_side.extensions:
+    for b in b_side.components:
         b_mass = b[0]
         this_prec = gen_spectra.calc_precursor_as_disjoint(b_mass, y_side.mz, b[4], y_side.charge, precursor_charge)
         if this_prec > precursor_mass + tol:
@@ -442,7 +443,7 @@ def get_extensions(precursor_mass, precursor_charge, b_side, y_side, prec_tol):
             extensions.append((b_side.score + y_side.score, extended_b_cluster, extended_y_cluster))
     
     #Only extend y
-    for y in y_side.extensions:
+    for y in y_side.components:
         y_mass = y[0]
         this_prec = gen_spectra.calc_precursor_as_disjoint(b_side.mz, y_mass, b_side.charge, y[4], precursor_charge)
         if this_prec > precursor_mass + tol:
@@ -453,8 +454,8 @@ def get_extensions(precursor_mass, precursor_charge, b_side, y_side, prec_tol):
             extensions.append((b_side.score + y_side.score, extended_b_cluster, extended_y_cluster))
     
     #Either side needs to be extended
-    for b in b_side.extensions:
-        for y in y_side.extensions:
+    for b in b_side.components:
+        for y in y_side.components:
             b_mass, y_mass = b[0], y[0]
             this_prec = gen_spectra.calc_precursor_as_disjoint(b_mass, y_mass, b[4], y[4], precursor_charge)
             if this_prec > precursor_mass + tol:
@@ -492,3 +493,62 @@ def find_alignments(native_merged, hybrid_merged, obs_prec, prec_charge, tol, ma
         total_extension_time = total_extension_time + (time.time() - extension_time)
     # print("\n Average extension time:",total_extension_time/len(hybrid_merged))
     return natural_alignments, hybrid_alignments
+
+def pair_indices(b_search_space, y_search_space, prec_mass, prec_tol, prec_charge, score_filter):
+    pairs = []
+    tol = utils.ppm_to_da(prec_mass, prec_tol)
+    sorted_y_keys = sorted(y_search_space)
+        
+    for b_prec in sorted(b_search_space): # can speed up by sorting these. May need seperate keys arrays that can be sorted.
+        missing_mass_low = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge - tol
+        missing_mass_upper = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge + tol
+        for y_prec in sorted_y_keys:
+            if y_prec > missing_mass_low:
+                if y_prec < missing_mass_upper: #can put these in an AND block once I know this code works
+                    for b in b_search_space[b_prec]:
+                        for y in y_search_space[y_prec]:
+                            if b[7] + y[7] > score_filter:
+                                pairs.append((b, y))
+                else:
+                    break
+    
+    return pairs
+
+def find_from_prec(converted_b, matched_masses_b, input_spectrum, ppm_tolerance, protein_list):
+    prec_matches = []
+    prec_hits = matched_masses_b[converted_b]
+    for hit in prec_hits:
+        if hit[4] == 2:
+            hit_score, hit_abundance = scoring.prec_score(hit, input_spectrum, ppm_tolerance, protein_list)
+            prec_matches.append((hit_score, hit_abundance, hit))
+        
+    prec_matches = sorted(prec_matches, key = lambda x: (x[0], x[1]), reverse=True)
+    if len(prec_matches) != 0:
+        return prec_matches[0], prec_matches[0][0]
+    else:
+        return [], 0
+    
+def make_native_pair(b, ion):
+    y_cluster = (gen_spectra.max_mass(b[6], 'b' if ion == 0 else 'y', b[4]), b[1], b[2], ion, b[4], b[5], b[6], b[7])
+    return y_cluster
+    
+def pair_natives(b_search_space, y_search_space, prec_mass, prec_tol, score_filter):
+    # in the case of a native, the b must be before the y, the two seqs must come from the same protein, and the two seqs together cannot be less than the max_pep_len. Actually, 
+    # Actually, since we have all the extensions we could just find the good extension
+    native_pairs = []
+    tol = utils.ppm_to_da(prec_mass, prec_tol)
+    for b_prec in sorted(b_search_space):
+        if abs(b_prec - prec_mass) < tol:
+            for b in b_search_space[b_prec]:
+                # if b[7] >= score_filter
+                y_pair = make_native_pair(b, 0)
+                native_pairs.append((b,y_pair))
+    
+    for y_prec in sorted(y_search_space):
+        if abs(y_prec - prec_mass) < tol:
+            for y in y_search_space[y_prec]:
+                # if y[7] >= score_filter:
+                b_pair = make_native_pair(y, 1)
+                native_pairs.append((b_pair, y))
+                
+    return native_pairs
