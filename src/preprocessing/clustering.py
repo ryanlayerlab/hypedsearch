@@ -25,6 +25,7 @@ def create_clusters_from_foos(foos):
     clusters.append(max_hit.start)
     clusters.append(max_hit.end)
     clusters.append(max_hit.charge)
+    clusters.append(foos)
     return clusters
 
 def parse_foos(Hit, all_hits):
@@ -109,7 +110,8 @@ def append_AA(next_AA, current_mass, ion, charge):
     normalized_raw = gen_spectra.calc_combined_mass(new_raw, ion)
     return normalized_raw
 
-def test_digest_match(parent_seq, digest, start, end, ion):
+def test_digest_match(protein_list, pid, digest, start, end, ion):
+    parent_seq = protein_list[pid][1]
     if ion == 0:
         if parent_seq[start] == digest[0]: #if we correctly cut to the left. Means sequence starts with D
             return True
@@ -127,13 +129,14 @@ def test_digest_match(parent_seq, digest, start, end, ion):
     
     return False
 
-def find_extensions_and_digest(conv_prec,current_mass,ion,charge,pid,protein_list,start,end,ppm_tolerance,digest):
+def find_extensions(conv_prec,current_mass,ion,charge,pid,protein_list,start,end,ppm_tolerance,seq,score):
     #goal is to get a list of all database extensions leading up to the precursor mass
     prot_seq = protein_list[pid][1]
     bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
     extensions = []
     repeat = True
-    digest_match = test_digest_match(prot_seq,digest,start,end,ion)
+    current_score = score
+    current_seq = seq
     
     if ion == 0:
         current_position = end
@@ -145,7 +148,9 @@ def find_extensions_and_digest(conv_prec,current_mass,ion,charge,pid,protein_lis
                     charge = 2
                     tol = ppm_to_da(current_mass, ppm_tolerance)
                     if current_mass < conv_prec + tol:
-                        tup = (current_mass, start, current_position+1, 0, 2, pid)
+                        current_score += 1
+                        current_seq = current_seq + next_AA
+                        tup = (current_mass, start, current_position+1, 0, 2, pid, current_seq, current_score)
                         extensions.append(tup)
                         current_position += 1
                     else:
@@ -165,7 +170,9 @@ def find_extensions_and_digest(conv_prec,current_mass,ion,charge,pid,protein_lis
                     charge = 2
                     tol = ppm_to_da(current_mass, ppm_tolerance)
                     if current_mass < conv_prec + tol:
-                        tup = (current_mass, current_position, end, 1, 2, pid)
+                        current_score += 1
+                        current_seq = next_AA + current_seq
+                        tup = (current_mass, current_position, end, 1, 2, pid, current_seq, current_score)
                         extensions.append(tup)
                         current_position = current_position - 1
                     else:
@@ -175,28 +182,65 @@ def find_extensions_and_digest(conv_prec,current_mass,ion,charge,pid,protein_lis
             else:
                 repeat = False
     
-    return extensions, digest_match
+    return extensions
 
 def check_unique(merges):
     for m in merges:
         if merges.count(m) > 1:
             print(m,"has a count of", merges.count(m))
             return True
-    return False
+    return False                
+
+def convert_components(component_arr, ion, score, seq):
+    Foo = collections.namedtuple('Foo', 'pid start end mz charge')
+    converted_components = []
+    #(current_mass, start, end, 1, 2, pid)
+    components_rev = list(reversed(component_arr))
+    i = 0
+    if ion == 0:
+        prev_component = list(reversed(component_arr))[0]
+        for component in list(reversed(component_arr)):
+            if i != 0:
+                while component.end < prev_component.end - 1:
+                    new_component = Foo(pid = prev_component.pid, start = prev_component.start, end = prev_component.end - 1, mz = gen_spectra.max_mass(seq[:len(seq)-i], 'b', prev_component.charge), charge=prev_component.charge)
+                    converted_components.append((new_component.mz, new_component.start, new_component.end, ion, new_component.charge, new_component.pid, seq[:len(seq)-i], score-i))
+                    prev_component = new_component
+                    i +=1
+                
+            converted_components.append((component.mz, component.start, component.end, ion, component.charge, component.pid, seq[:len(seq)-i], score-i))
+            prev_component = component
+            i += 1
+    else:
+        prev_component = component_arr[0]
+        for component in component_arr:
+            if i != 0:
+                while component.start > prev_component.start +1:
+                    new_component = Foo(pid = prev_component.pid, start = prev_component.start + 1, end = prev_component.end, mz = gen_spectra.max_mass(seq[i:], 'y', prev_component.charge), charge=prev_component.charge)
+                    converted_components.append((new_component.mz, new_component.start, new_component.end, ion, new_component.charge, new_component.pid, seq[i:], score-i))
+                    prev_component = new_component
+                    i +=1
+            
+            converted_components.append((component.mz, component.start, component.end, ion, component.charge, component.pid, seq[i:], score-i))
+            prev_component = component
+            i += 1
+
+    return converted_components
 
 def old_score_clusters(ion, clusters, conv_prec, protein_list, prec_charge, ppm_tol, digest):
-    sorted_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge extensions seq')
+    sorted_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge components seq')
     cluster_dict = dict()
     for i, A in enumerate(clusters):
-        pid = int(A[1])
-        mz = float(A[2])
-        start = int(A[3])
-        end = int(A[4])
+        pid = A[1]
+        mz = A[2]
+        start = A[3]
+        end = A[4]
         charge = A[5]
         seq = find_sequence(pid, start, end, protein_list)
-        extensions, digest_match = find_extensions_and_digest(conv_prec,mz,ion,charge,pid,protein_list,start,end,ppm_tol,digest)
-        score = A[0] + 2 if digest_match else A[0]
-        target_cluster = sorted_cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, extensions=extensions, seq=seq)
+        # digest_match = test_digest_match(protein_list,pid,digest,start,end,ion) #this code doesn't work
+        score = A[0]
+        components = convert_components(A[6], ion, score, seq)
+        extensions = find_extensions(conv_prec,mz,ion,charge,pid,protein_list,start,end,ppm_tol,seq,score)
+        target_cluster = sorted_cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, components=components + extensions, seq=seq)
         converted_precursor = gen_spectra.convert_ion_to_precursor(mz, ion, charge, prec_charge)
         if converted_precursor not in cluster_dict.keys():
             cluster_dict[converted_precursor] = []
@@ -205,7 +249,7 @@ def old_score_clusters(ion, clusters, conv_prec, protein_list, prec_charge, ppm_
     return cluster_dict
     
 def min_info(cluster):
-    return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.mz, cluster.charge, cluster.extensions, cluster.seq)
+    return (cluster.pid, cluster.start, cluster.end, cluster.score, cluster.mz, cluster.charge, cluster.components, cluster.seq)
 
 def bsearch(key, Y):
         lo = -1
@@ -466,10 +510,34 @@ def distribute_merges(merges, b_sorted_clusters, y_sorted_clusters):
             for b in b_sorted_clusters[key]:
                 for y in y_sorted_clusters[y_conv]:
                     if b.score + y.score > 4:
-                        if i < 10000:
+                        if i < 100000000:
                             merged_clusters.append((b.score + y.score, b, y))
                             i = i + 1
                         else:
                             return merged_clusters
 
     return merged_clusters
+
+def get_search_space(b_sorted_clusters, y_sorted_clusters, prec_charge): #This will eventually be reworked throughout the entire codebase but this is for proof of concept
+    b_searches, y_searches = dict(), dict()
+    for key in b_sorted_clusters.keys():
+        for b in b_sorted_clusters[key]:
+            for component in b.components:
+                mass = component[0]
+                charge = component[4]
+                prec = gen_spectra.convert_ion_to_precursor(mass, 0, charge, prec_charge)
+                if prec not in b_searches.keys():
+                    b_searches[prec] = []
+                b_searches[prec].append(component)
+            
+    for key in y_sorted_clusters.keys():       
+        for y in y_sorted_clusters[key]:
+            for component in y.components:
+                mass = component[0]
+                charge = component[4]
+                prec = gen_spectra.convert_ion_to_precursor(mass, 1, charge, prec_charge)
+                if prec not in y_searches.keys():
+                    y_searches[prec] = []
+                y_searches[prec].append(component)
+            
+    return b_searches, y_searches

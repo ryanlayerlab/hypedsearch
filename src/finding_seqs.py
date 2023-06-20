@@ -40,7 +40,10 @@ def get_target_data(target_seq, proteins, input_masses, ppm_tolerance, precursor
     target_left_pids, target_right_pids = [], []
     target_left_indices, target_right_indices = [], []
     protein_list = proteins.proteins
-    b_part, y_part = target_seq.split("-")
+    if "-" in target_seq:
+        b_part, y_part = target_seq.split("-")
+    else:
+        b_part, y_part = target_seq, target_seq
     for i, protein in enumerate(protein_list):
         protein_seq = protein[1]
         if b_part in protein_seq:
@@ -90,11 +93,10 @@ def check_in_matched_masses(matched_masses_b, matched_masses_y, left_pids, left_
         print("No good hits in matched_masses_b nor in matched_masses_y")
     return good_b_entries, good_y_entries
     
-def check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_hits, good_y_hits, target_seq):
+def check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_hits, good_y_hits):
     good_maxb_hit, good_maxy_hit = [], []
     good_maxb_dict, good_maxy_dict = dict(), dict()
     good_b_clusters, good_y_clusters = [], []
-    b_part, y_part = target_seq.split("-")
     for hit in good_b_hits:
         pid = hit[5]
         if pid not in good_maxb_dict.keys():
@@ -120,20 +122,14 @@ def check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_hits, 
             for cluster in b_sorted_clusters[mz]:
                 if cluster.pid == hit[5]:
                     if cluster.start == hit[1]:
-                        if cluster.end > hit[1]+len(b_part):
-                            print("check this")
-                        else:
-                            good_b_clusters.append((mz, cluster))
+                        good_b_clusters.append((mz, cluster))
 
     for hit in good_maxy_hit:
         for mz in y_sorted_clusters.keys():
             for cluster in y_sorted_clusters[mz]:
                 if cluster.pid == hit[5]:
                     if cluster.end == hit[2]:
-                        if cluster.start < hit[2]-len(y_part):
-                            print("check this")
-                        else:
-                            good_y_clusters.append((mz, cluster))
+                        good_y_clusters.append((mz, cluster))
     # want to return good clusters and print whether these good clusters are in our sorted list
 
     if len(good_b_clusters) > 0 and len(good_y_clusters) > 0:
@@ -270,3 +266,113 @@ def check_in_rescored(rescored, good_scored):
     
     else:
         print("Lost in final filtering")
+        
+def check_in_searches(b_searches, y_searches, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_seq, prec_charge, ppm_tol):
+    good_b_searches, good_y_searches = [],[]
+    if "-" in target_seq:
+        left_part, right_part = target_seq.split("-")
+    else:
+        left_part, right_part = target_seq, target_seq
+    left_prec = gen_spectra.get_precursor(left_part, prec_charge)
+    right_prec = gen_spectra.get_precursor(right_part, prec_charge)
+    b_tol = ppm_to_da(left_prec, ppm_tol)
+    y_tol = ppm_to_da(right_prec, ppm_tol)
+    
+    for prec in b_searches.keys():
+        if abs(prec - left_prec) < b_tol:
+            for cluster in b_searches[prec]:
+                cluster_pid = cluster[5]
+                cluster_start = cluster[1]
+                cluster_end = cluster[2]
+                if cluster_pid in target_left_pids:
+                    if (cluster_start, cluster_end) in target_left_indices:
+                        good_b_searches.append((prec, cluster))
+                        
+    for prec in y_searches.keys():
+        if abs(prec - right_prec) < y_tol:
+            for cluster in y_searches[prec]:
+                cluster_pid = cluster[5]
+                cluster_start = cluster[1]
+                cluster_end = cluster[2]
+                if cluster_pid in target_right_pids:
+                    if (cluster_start, cluster_end) in target_right_indices:
+                        good_y_searches.append((prec, cluster))
+    
+    if len(good_b_searches) > 0 and len(good_y_searches) > 0:
+        print("Good hits in b_searches and y_searches")
+    if len(good_b_searches) > 0 and len(good_y_searches) == 0:
+        print("Good hits in b_searches but not y_searches")
+    if len(good_b_searches) == 0 and len(good_y_searches) > 0:
+        print("No good hits in b_searches but in y_searches")
+    if len(good_b_searches) == 0 and len(good_y_searches) == 0:
+        print("No good hits in b_searches nor in y_searches")
+    return good_b_searches, good_y_searches
+
+def check_in_merges(hybrid_merges, native_merges, good_b_searches, good_y_searches):
+    good_merges = []
+    for merge in hybrid_merges:
+        left_part, right_part = merge[0], merge[1]
+        for good_b in good_b_searches:
+            if left_part == good_b[1]:
+                for good_y in good_y_searches:
+                    if right_part == good_y[1]:
+                        good_merges.append((left_part, right_part, 1))
+    
+    for merge in native_merges:
+        left_part, right_part = merge[0], merge[1]
+        for good_b in good_b_searches:
+            if left_part == good_b[1]:
+                good_merges.append((left_part, right_part, 0))
+                        
+    if len(good_merges) > 0:
+        print("Good merges were found")
+        
+    return good_merges
+
+def check_in_rescored_merges(rescored_hybrids, rescored_natives, good_merges):
+    good_rescored = []
+    for merge in good_merges:
+        for i, remerged in enumerate(rescored_hybrids):
+            if (merge[0], merge[1]) == remerged[2]:
+                good_rescored.append((i, merge))
+                break
+    
+    for merge in good_merges:
+        for i, remerged in enumerate(rescored_natives):
+            if (merge[0], merge[1]) == remerged[2]:
+                good_rescored.append((i, merge))
+                break
+                
+    good = False
+    for index, merge in good_rescored:
+        if index < 10:
+            good = True
+            break
+        
+    if len(good_rescored) == 0:
+        print("There were no good rescored")
+    elif not good and len(good_rescored) > 0:
+        print("There were good_rescored but they all score outside of the top 10. Best scores in top", good_rescored[0][0])
+    else:
+        print("There were good rescored and it scores in the top 10")
+    
+    return good_rescored
+
+def check_in_unique(unique_merges, good_merges):
+    good_unique = []
+    for merge in good_merges:
+        if merge[2]: #hybrid
+            good_seq = merge[0][6] + merge[1][6]
+        else:
+            good_seq = merge[0][6]
+        for i, (seq, score, abundance, hybrid) in enumerate(sorted(unique_merges, key = lambda x: (x[1], x[2]), reverse=True)):
+            if i < 10:
+                if seq == good_seq:
+                    good_unique.append(((seq, score, abundance, hybrid), unique_merges[(seq, score, abundance, hybrid)]))
+    
+    if len(good_unique) > 0:
+        print("After uniqueness, there are good rescored merges in the top 10")
+    else:
+        print("There were no good rescored merges in the top 10 after uniqueness")
+    
+    return good_unique

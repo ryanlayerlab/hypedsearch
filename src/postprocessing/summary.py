@@ -28,6 +28,36 @@ def json_file(results: dict, output_dir: str) -> None:
             'alignments': [x._asdict() for x in alignment.alignments]
         }
     JSON.save_dict(json_file_name, dictified)
+    
+def get_protein_strings(left_proteins, right_proteins):
+    left_protein_string, right_protein_string = '',''
+    for protein in left_proteins:
+        left_protein_string += protein + "/"
+    for protein in right_proteins:
+        right_protein_string += protein + "/"
+    
+    return left_protein_string[:-1], right_protein_string[:-1]
+
+def get_score_strings(b_scores, y_scores):
+    b_score_string, y_score_string = '',''
+    for score in b_scores:
+        b_score_string += str(score) + "/"
+    for score in y_scores:
+        y_score_string += str(score) + "/"
+        
+    return b_score_string[:-1], y_score_string[:-1]
+        
+def get_extensions_strings(extensions):
+    b_extension_string = ''
+    y_extension_string = ''
+    left = extensions[0]
+    right = extensions[1]
+    for b in left:
+        b_extension_string += b + "/"
+    for y in right:
+        y_extension_string += y + "/"
+    
+    return b_extension_string[:-1], y_extension_string[:-1]
 
 
 def text_file(results: dict, txt_file_name: str) -> None:
@@ -37,15 +67,18 @@ def text_file(results: dict, txt_file_name: str) -> None:
             for alignment in target_alignments:
                 spec_num = str(i)
                 hybrid = alignment[0]
-                left_protein,right_protein = alignment[1], alignment[2]
+                left_proteins,right_proteins = alignment[1], alignment[2]
+                left_protein_string, right_protein_string = get_protein_strings(left_proteins, right_proteins)
                 sequence = alignment[3]
-                b_score = str(alignment[4])
-                y_score = str(alignment[5])
+                b_scores = alignment[4]
+                y_scores = alignment[5]
+                b_score_string, y_score_string = get_score_strings(b_scores, y_scores)
                 total_score = str(alignment[6])
-                precursor_distance = str(alignment[7])
-                extended_seq = alignment[8]
+                total_abundance = str(alignment[7])
+                extensions = alignment[8]
+                b_extension_strings, y_extension_strings = get_extensions_strings(extensions)
                 
-                t.write(spec_num + '\t' + hybrid + '\t' + sequence + '\t' + total_score + '\t' + precursor_distance + '\t' + left_protein + '\t' + right_protein + '\t' + b_score + '\t' + y_score + '\t' + extended_seq + '\n')
+                t.write(spec_num + '\t' + hybrid + '\t' + sequence + '\t' + total_score + '\t' + total_abundance + '\t' + left_protein_string + '\t' + right_protein_string + '\t' + b_score_string + '\t' + y_score_string + '\t' + b_extension_strings + '\t' + y_extension_strings + '\n')
 
 def tsv_file(results: dict, output_dir: str) -> None:
     '''
