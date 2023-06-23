@@ -61,7 +61,7 @@ def get_extensions_strings(extensions):
 
 
 def text_file(results: dict, txt_file_name: str) -> None:
-    with open(txt_file_name, 'w+') as t:
+    with open(txt_file_name, 'w') as t:
         for i, x in enumerate(results):
             target_alignments = x
             for alignment in target_alignments:

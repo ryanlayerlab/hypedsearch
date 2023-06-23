@@ -27,9 +27,7 @@ def load_spectra(
     )
     all_spectra += these_spectra
     # leave next 2 lines commented; uncomment only to test just specific indices
-    index_list = [0,1,2,3,4,5,6,7,8,9,10,11] #For using a condensed database
-    these_spectra, all_spectra = reduce_database(all_spectra, these_spectra, index_list) 
-    # index_list = [0,1,2,3,4] #For using a condensed database
+    # index_list = [4835] #For using a condensed database
     # these_spectra, all_spectra = reduce_database(all_spectra, these_spectra, index_list) 
     linear_spectra += list(set([
         x for spectrum in these_spectra for x in spectrum.mz_values

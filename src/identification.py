@@ -210,24 +210,20 @@ def find_target_clusters(b_sorted_clusters, y_sorted_clusters, b_sequence, y_seq
         if cluster[1] == y_pid and cluster[3] in y_target_ends: 
             print(i, cluster)
             
-def group_by_uniqueness(hybrid_rescored, native_rescored):
+def group_by_uniqueness(natives, hybrids):
     unique_merges = dict()
-    for merge in hybrid_rescored:
-        left_seq, right_seq = merge[2][0][6], merge[2][1][6]
+    for merge in hybrids:
+        left_seq, right_seq = merge[0][6], merge[1][6]
         full_seq = left_seq + right_seq
-        score = merge[0]
-        abundance_sum = merge[1]
-        if (full_seq, score, abundance_sum) not in unique_merges.keys():
-            unique_merges[(full_seq, score, abundance_sum, 1)] = []
-        unique_merges[(full_seq, score, abundance_sum, 1)].append(merge)
+        if (full_seq, 1) not in unique_merges.keys():
+            unique_merges[(full_seq, 1)] = []
+        unique_merges[(full_seq, 1)].append(merge)
     
-    for merge in native_rescored:
-        full_seq = merge[2][0][6]
-        score = merge[0]
-        abundance_sum = merge[1]
-        if (full_seq, score, abundance_sum) not in unique_merges.keys():
-            unique_merges[(full_seq, score, abundance_sum, 0)] = []
-        unique_merges[(full_seq, score, abundance_sum, 0)].append(merge)
+    for merge in natives:
+        full_seq = merge[0][6]
+        if (full_seq, 0) not in unique_merges.keys():
+            unique_merges[(full_seq, 0)] = []
+        unique_merges[(full_seq, 0)].append(merge)
     return unique_merges
             
 # def get_distribution(hybrids):
@@ -263,8 +259,10 @@ class alignment_info:
         return create_alignment_info(spectrum, self.max_pep_len, self.prec_tol, self.db, self.ppm_tol, self.results_len, self.digest)
 
 def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len, digest):
-    print(f'\rCreating an alignment for {spectrum.num + 1}/{results_len} [{to_percent(spectrum.num + 1, results_len)}%]', end='')
-    target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = finding_seqs.get_target_data("DPQVEQLEL", db, spectrum.mz_values, ppm_tol, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
+    print(f'\rCreating an alignment for {spectrum.num}/{results_len} [{to_percent(spectrum.num + 1, results_len)}%]', end='')
+    with open("Timing_data.txt", 'a') as t:
+        t.write("On spectrum: " + str(spectrum.num) + "\n")
+    # target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = finding_seqs.get_target_data("DPQVEQLEL", db, spectrum.mz_values, ppm_tol, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
     converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol)
     # good_b_entries, good_y_entries = finding_seqs.check_in_matched_masses(matched_masses_b, matched_masses_y, target_left_pids, target_left_indices, target_right_pids, target_right_indices)
     
@@ -280,12 +278,13 @@ def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_
     #For finding natives. Option A: Uncomment code below and adapt slightly or option B: just find the native from the extensions or option C: Group other indices by uniqueness and cleverly pick out the natives
     native_merged_seqs = alignment.pair_natives(b_search_space, y_search_space, spectrum.precursor_mass, prec_tol, score_filter)
     hybrid_merged_seqs = alignment.pair_indices(b_search_space, y_search_space, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, score_filter)
-    
     # good_merged_seqs = finding_seqs.check_in_merges(hybrid_merged_seqs, native_merged_seqs, good_b_searches, good_y_searches)
-    rescored_hybrids, rescored_natives = rescore_merges(hybrid_merged_seqs, native_merged_seqs, spectrum, ppm_tol)
+ 
+    unique_merges = group_by_uniqueness(native_merged_seqs, hybrid_merged_seqs) #the keys are sorted within the next function
+    # good_unique = finding_seqs.check_in_unique(unique_rescored, good_merged_seqs) 
+    
+    unique_rescored = rescore_merges(unique_merges, spectrum, ppm_tol)
     # good_rescored = finding_seqs.check_in_rescored_merges(rescored_hybrids, rescored_natives, good_merged_seqs)
-    unique_rescored = group_by_uniqueness(rescored_hybrids, rescored_natives) #the keys are sorted within the next function
-    # good_unique = finding_seqs.check_in_unique(unique_rescored, good_merged_seqs)
     
     postprocessed_alignments = do_eigth_thing(db, unique_rescored)
     return postprocessed_alignments
@@ -370,9 +369,9 @@ def do_third_thing_A(b_sorted_clusters, y_sorted_clusters):
 def do_second_thing(db, converted_b, converted_y, b_hits, y_hits, prec_charge, ppm_tol, digest):
     cluster_time = time.time()
     b_clusters = clustering.create_clusters('b', b_hits, y_hits)
-    b_sorted_clusters = clustering.old_score_clusters(0, b_clusters, converted_b, db.proteins, prec_charge, ppm_tol, digest)
+    b_sorted_clusters = clustering.old_score_clusters(0, b_clusters, converted_b, db.proteins, prec_charge, ppm_tol)
     y_clusters = clustering.create_clusters('y', y_hits, y_hits)
-    y_sorted_clusters = clustering.old_score_clusters(1, y_clusters, converted_y, db.proteins, prec_charge, ppm_tol, digest)
+    y_sorted_clusters = clustering.old_score_clusters(1, y_clusters, converted_y, db.proteins, prec_charge, ppm_tol)
     cluster_time = time.time() - cluster_time
     with open('Timing_data.txt', 'a') as t:
         t.write("Clusters took:" + '\t' + str(cluster_time) + "\n")
@@ -419,6 +418,8 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     set_start_method('forkserver')
     for file in spectra_files:
         print("\nProcessing", os.path.basename(file))
+        with open("Timing_data.txt", 'w') as t:
+            t.write("")
         verbose and print('Loading spectra start.')
         spectra = preprocessing_utils.load_spectra(file, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
         verbose and print('Loading spectra finish.')

@@ -226,7 +226,7 @@ def convert_components(component_arr, ion, score, seq):
 
     return converted_components
 
-def old_score_clusters(ion, clusters, conv_prec, protein_list, prec_charge, ppm_tol, digest):
+def old_score_clusters(ion, clusters, conv_prec, protein_list, prec_charge, ppm_tol):
     sorted_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge components seq')
     cluster_dict = dict()
     for i, A in enumerate(clusters):
