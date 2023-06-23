@@ -197,7 +197,7 @@ def modified_match_masses(input_masses: list, db: Database, max_len: int, ppm_to
     _, matched_masses_y[y_prec] = dbf.query_mass(y_prec, tol)
         
     end = time.time() - start
-    with open('Timing_data.txt', 'w') as t:
+    with open('Timing_data.txt', 'a') as t:
         t.write("Queries took:" + '\t' + str(end) + "\n")       
 
     return matched_masses_b, matched_masses_y

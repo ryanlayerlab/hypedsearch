@@ -497,23 +497,33 @@ def find_alignments(native_merged, hybrid_merged, obs_prec, prec_charge, tol, ma
 def pair_indices(b_search_space, y_search_space, prec_mass, prec_tol, prec_charge, score_filter):
     pairs = []
     tol = utils.ppm_to_da(prec_mass, prec_tol)
-    sorted_y_keys = sorted(y_search_space)
-        
-    for b_prec in sorted(b_search_space): # can speed up by sorting these. May need seperate keys arrays that can be sorted.
-        missing_mass_low = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge - tol
-        missing_mass_upper = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge + tol
-        for y_prec in sorted_y_keys:
-            if y_prec > missing_mass_low:
-                if y_prec < missing_mass_upper: #can put these in an AND block once I know this code works
-                    for b in b_search_space[b_prec]:
-                        for y in y_search_space[y_prec]:
-                            if b[7] + y[7] > score_filter:
-                                pairs.append((b, y))
-                else:
-                    break
+    sorted_b_keys = sorted(b_search_space) #might want to produce this outside this function so we don't do this again
+    sorted_y_keys = sorted(y_search_space, reverse = True)
     
-    return pairs
+    b_end, y_end = len(sorted_b_keys), len(sorted_y_keys)
+    b_ctr, y_ctr = 0, 0
+    
+    while b_ctr < b_end and y_ctr < y_end:
+        b_prec, y_prec = sorted_b_keys[b_ctr], sorted_y_keys[y_ctr]
+        missing_mass_upper = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge + tol
+        if y_prec > missing_mass_upper:
+            y_ctr += 1
+            continue
+            
+        missing_mass_low = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge - tol
+        if y_prec < missing_mass_low:
+            b_ctr += 1
+            continue
+        
+        for b in b_search_space[b_prec]:
+            for y in y_search_space[y_prec]:
+                if b[7] + y[7] > score_filter:
+                    pairs.append((b, y))
+        b_ctr += 1
+        y_ctr += 1
 
+    return pairs
+        
 def find_from_prec(converted_b, matched_masses_b, input_spectrum, ppm_tolerance, protein_list):
     prec_matches = []
     prec_hits = matched_masses_b[converted_b]

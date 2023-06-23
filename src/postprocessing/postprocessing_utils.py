@@ -83,7 +83,7 @@ def get_extensions(alignment_info, protein_list):
 def postprocessing(alignments, db):
     postprocessed_alignments = []
     db_mapping = make_db_mapping(db)
-    sorted_alignments = sorted(alignments, key = lambda x: (x[1], x[2]), reverse=True)
+    sorted_alignments = sorted(alignments, key = lambda x: (x[0], x[1]), reverse=True)
     i = 0
     while i < 10 and i < len(sorted_alignments):
         alignment = sorted_alignments[i]
@@ -93,8 +93,8 @@ def postprocessing(alignments, db):
         sequence = get_sequence(alignment_info, label)
         extended_sequence = get_extensions(alignment_info, db.proteins)
         b_scores, y_scores = get_scores(alignment_info)
-        total_score = alignment[1]
-        total_abundance = alignment[2]
+        total_score = alignment[0]
+        total_abundance = alignment[1]
         postprocessed_alignments.append((label, left_proteins, right_proteins, sequence, b_scores, y_scores, total_score, total_abundance, extended_sequence))
         i += 1
     return postprocessed_alignments
