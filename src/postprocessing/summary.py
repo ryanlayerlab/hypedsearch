@@ -62,6 +62,7 @@ def get_extensions_strings(extensions):
 
 def text_file(results: dict, txt_file_name: str) -> None:
     with open(txt_file_name, 'w') as t:
+        t.write("spectrum_id" + '\t' + "hybrid" + '\t' + "sequence" + '\t' + "total score" + '\t' + "total abundance" + '\t' + "left kmer" + '\t' + "right kmer" + '\t' + "b score" + '\t' + "y score" + '\t' + "prev aa" + '\t' + "next aa" + '\n')
         for i, x in enumerate(results):
             target_alignments = x
             for alignment in target_alignments:
