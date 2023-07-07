@@ -220,10 +220,13 @@ def modified_losing_water(sequence, input_masses, abundances, ppm_tolerance):
     return score    
 
 def rescore_merges(unique_merge_space, input_spectrum, ppm_tol):
+    # unique_merge_space
+    # key   -> (sequence (str), 1 hybrid 0 not hybrid)
+    # value -> list of merges objects, each merges is (b, y) 
     rescored_unique = dict()
     for key, hyb in unique_merge_space:
-        score, abundance_sum = modified_overlap_scoring(key, input_spectrum.mz_values, input_spectrum.abundance, ppm_tol)
-        minus_water_score, minus_water_abundance_sum = modified_losing_water(key, input_spectrum.mz_values, input_spectrum.abundance, ppm_tol)
+        score, abundance_sum = modified_overlap_scoring(key, input_spectrum.mz_values, input_spectrum.abundance, ppm_tol) # counts peaks
+        minus_water_score, minus_water_abundance_sum = modified_losing_water(key, input_spectrum.mz_values, input_spectrum.abundance, ppm_tol) # counts again but strip water
         score += minus_water_score
         abundance_sum += minus_water_abundance_sum
         if (score, abundance_sum, key, hyb) not in rescored_unique.keys():
