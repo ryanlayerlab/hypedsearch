@@ -539,7 +539,7 @@ def find_from_prec(converted_b, matched_masses_b, input_spectrum, ppm_tolerance,
         return [], 0
     
 def make_native_pair(b, ion):
-    y_cluster = (gen_spectra.max_mass(b[6], 'b' if ion == 0 else 'y', b[4]), b[1], b[2], ion, b[4], b[5], b[6], b[7])
+    y_cluster = (gen_spectra.max_mass(b[6], 'b' if ion == 0 else 'y', b[4]), b[1], b[2], ion, b[4], b[5], b[6], 0)
     return y_cluster
     
 def pair_natives(b_search_space, y_search_space, prec_mass, prec_tol, score_filter):

@@ -80,7 +80,7 @@ def get_extensions(alignment_info, protein_list):
     return left_extensions, right_extensions
 
 # spec_num, non_hybrid, proteins, sequence, b_score, y_score, total_score, precursor_distance, total_mass_error
-def postprocessing(alignments, db):
+def postprocessing(alignments, db, input_spectrum):
     postprocessed_alignments = []
     db_mapping = make_db_mapping(db)
     sorted_alignments = sorted(alignments, key = lambda x: (x[0], x[1]), reverse=True)
@@ -95,6 +95,6 @@ def postprocessing(alignments, db):
         b_scores, y_scores = get_scores(alignment_info)
         total_score = alignment[0]
         total_abundance = alignment[1]
-        postprocessed_alignments.append((label, left_proteins, right_proteins, sequence, b_scores, y_scores, total_score, total_abundance, extended_sequence))
+        postprocessed_alignments.append((label, left_proteins, right_proteins, sequence, b_scores, y_scores, total_score, total_abundance, extended_sequence, input_spectrum.precursor_mass, input_spectrum.precursor_charge))
         i += 1
     return postprocessed_alignments
