@@ -286,7 +286,7 @@ def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_
     unique_rescored = rescore_merges(unique_merges, spectrum, ppm_tol)
     # good_rescored = finding_seqs.check_in_rescored_merges(rescored_hybrids, rescored_natives, good_merged_seqs)
     
-    postprocessed_alignments = do_eigth_thing(db, unique_rescored)
+    postprocessed_alignments = do_eigth_thing(db, unique_rescored, spectrum)
     return postprocessed_alignments
 
 def prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol):
@@ -300,9 +300,9 @@ def create_rescored_alignments(rescored_naturals, rescored_hybrids):
     rescored_alignments = [x for x in rescored_alignments if x[0] > 6]
     return rescored_alignments
 
-def do_eigth_thing(db, rescored_alignments):
+def do_eigth_thing(db, rescored_alignments, input_spectrum):
     start_time = time.time()
-    postprocessed_alignments = postprocessing(rescored_alignments, db)
+    postprocessed_alignments = postprocessing(rescored_alignments, db, input_spectrum)
     end_time = time.time() - start_time
     with open('Timing_data.txt', 'a') as t:
         t.write("Postprocessing took:" + '\t' + str(end_time) + "\n")
