@@ -29,7 +29,7 @@ def overlap_scoring(sequence, input_masses, ppm_tolerance):
                 
     return(total_score)
 
-def get_target_data(target_seq, proteins, input_masses, ppm_tolerance, precursor_mass, precursor_tolerance, precursor_charge):
+def get_target_data(target_seq, proteins, input_masses, ppm_tolerance, precursor_mass, precursor_tolerance, precursor_charge, digest):
     prec_tol = ppm_to_da(precursor_mass, precursor_tolerance)
     theoretical_prec = gen_spectra.get_precursor(target_seq.replace("-", ""), precursor_charge)
     if abs(theoretical_prec - precursor_mass) <= precursor_tolerance:
@@ -47,17 +47,19 @@ def get_target_data(target_seq, proteins, input_masses, ppm_tolerance, precursor
     for i, protein in enumerate(protein_list):
         protein_seq = protein[1]
         if b_part in protein_seq:
-            target_left_pids.append(i)
             start = protein_seq.find(b_part)
             end = start + len(b_part)
-            print(protein_seq[start:end])
-            target_left_indices.append((start, end))
+            if protein_seq[start] in digest[0] or (start > 0 and protein_seq[start-1] in digest[1]):
+                print(protein_seq[start:end])
+                target_left_pids.append(i)
+                target_left_indices.append((start, end))
         if y_part in protein_seq:
-            target_right_pids.append(i)
             start = protein_seq.find(y_part)
             end = start + len(y_part)
-            print(protein_seq[start:end])
-            target_right_indices.append((start, end))
+            if protein_seq[end] in digest[0] or (protein_seq[end-1] in digest[1]):
+                print(protein_seq[start:end])
+                target_right_pids.append(i)
+                target_right_indices.append((start, end))
             
     target_score = overlap_scoring(target_seq.replace("-", ""), input_masses, ppm_tolerance)
     

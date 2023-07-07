@@ -5,6 +5,8 @@ from sqlite import database_file
 ppm_tolerance = 20
 max_len = 10
 
+
+spectra_id = 
 sequence = "DLQTLALEVE"
 rival_seq = "EIAEKALVE"
 obs_prec = 565.805089
