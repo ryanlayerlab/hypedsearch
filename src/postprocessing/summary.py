@@ -154,5 +154,5 @@ def generate_to_txt(matched_spectra, spectra_files, output_dir) -> None:
         filename = os.path.basename(file)
         A = filename.split(".")
         base_file = "HS_"+ A[0] + ".txt"
-        output_file = os.path.join(output_dir, "Hypedsearch_outputs" ,base_file)
+        output_file = os.path.join(output_dir,base_file)
         text_file(alignments, output_file)
