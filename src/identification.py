@@ -101,11 +101,6 @@ def get_hits_from_file(bf, yf):
             y_hits.append(out)
     return b_hits, y_hits
 def create_hits(spec_num,spectrum,matched_masses_b,matched_masses_y,b_prec,y_prec):
-    # if DEBUG:
-    #     filename = "spec_" + str(spec_num) + "_"
-    #     if utils.find_dir(filename + 'b_hits.txt', location) and utils.find_dir(filename + 'y_hits.txt', location):
-    #         b_hits, y_hits = get_hits_from_file(os.path.join(location, 'b_hits.txt'), os.path.join(location, 'y_hits.txt'))
-    # if not DEBUG or not (utils.find_dir(filename + 'b_hits.txt', location) and utils.find_dir(filename + 'y_hits.txt', location)):
     b_hits, y_hits = [], []
     for mz in spectrum.mz_values:
         if mz in matched_masses_b:
@@ -262,14 +257,14 @@ def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_
     print(f'\rCreating an alignment for {spectrum.num}/{results_len} [{to_percent(spectrum.num + 1, results_len)}%]', end='')
     with open("Timing_data.txt", 'a') as t:
         t.write("On spectrum: " + str(spectrum.num) + "\n")
-    # target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = finding_seqs.get_target_data("DPQVEQLEL", db, spectrum.mz_values, ppm_tol, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
+    # target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = finding_seqs.get_target_data("EVEDPQVAQLELGG-EVEDPQVAQLELGGGPGAG", db, spectrum.mz_values, ppm_tol, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, digest)
     converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol)
     # good_b_entries, good_y_entries = finding_seqs.check_in_matched_masses(matched_masses_b, matched_masses_y, target_left_pids, target_left_indices, target_right_pids, target_right_indices)
     
     best_prec_hit, score_filter = alignment.find_from_prec(converted_b, matched_masses_b, spectrum, ppm_tol, db.proteins)
     
     b_hits, y_hits = do_first_thing(spectrum, converted_b, converted_y, matched_masses_b, matched_masses_y)
-    b_sorted_clusters, y_sorted_clusters = do_second_thing(db, converted_b, converted_y, b_hits, y_hits, spectrum.precursor_charge, ppm_tol, digest)
+    b_sorted_clusters, y_sorted_clusters = do_second_thing(db, converted_b, converted_y, b_hits, y_hits, spectrum.precursor_charge, ppm_tol)
     # good_b_clusters, good_y_clusters = finding_seqs.check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_entries, good_y_entries)
     
     b_search_space, y_search_space = clustering.get_search_space(b_sorted_clusters, y_sorted_clusters, spectrum.precursor_charge)
@@ -279,12 +274,12 @@ def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_
     native_merged_seqs = alignment.pair_natives(b_search_space, y_search_space, spectrum.precursor_mass, prec_tol, score_filter)
     hybrid_merged_seqs = alignment.pair_indices(b_search_space, y_search_space, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, score_filter)
     # good_merged_seqs = finding_seqs.check_in_merges(hybrid_merged_seqs, native_merged_seqs, good_b_searches, good_y_searches)
- 
+
     unique_merges = group_by_uniqueness(native_merged_seqs, hybrid_merged_seqs) #the keys are sorted within the next function
-    # good_unique = finding_seqs.check_in_unique(unique_rescored, good_merged_seqs) 
+    # good_unique = finding_seqs.check_in_unique(unique_merges, good_merged_seqs) 
     
     unique_rescored = rescore_merges(unique_merges, spectrum, ppm_tol)
-    # good_rescored = finding_seqs.check_in_rescored_merges(rescored_hybrids, rescored_natives, good_merged_seqs)
+    # good_rescored = finding_seqs.check_in_rescored_merges(unique_rescored, good_unique)
     
     postprocessed_alignments = do_eigth_thing(db, unique_rescored, spectrum)
     return postprocessed_alignments
@@ -300,9 +295,9 @@ def create_rescored_alignments(rescored_naturals, rescored_hybrids):
     rescored_alignments = [x for x in rescored_alignments if x[0] > 6]
     return rescored_alignments
 
-def do_eigth_thing(db, rescored_alignments, input_spectrum):
+def do_eigth_thing(db, rescored_alignments, spectrum):
     start_time = time.time()
-    postprocessed_alignments = postprocessing(rescored_alignments, db, input_spectrum)
+    postprocessed_alignments = postprocessing(rescored_alignments, db, spectrum)
     end_time = time.time() - start_time
     with open('Timing_data.txt', 'a') as t:
         t.write("Postprocessing took:" + '\t' + str(end_time) + "\n")
@@ -366,7 +361,7 @@ def do_third_thing_A(b_sorted_clusters, y_sorted_clusters):
         t.write("Ryan merging and sorting took:" + '\t' + str(end_time) + "\n")
     return merged_seqs
 
-def do_second_thing(db, converted_b, converted_y, b_hits, y_hits, prec_charge, ppm_tol, digest):
+def do_second_thing(db, converted_b, converted_y, b_hits, y_hits, prec_charge, ppm_tol):
     cluster_time = time.time()
     b_clusters = clustering.create_clusters('b', b_hits, y_hits)
     b_sorted_clusters = clustering.old_score_clusters(0, b_clusters, converted_b, db.proteins, prec_charge, ppm_tol)

@@ -500,27 +500,46 @@ def pair_indices(b_search_space, y_search_space, prec_mass, prec_tol, prec_charg
     sorted_b_keys = sorted(b_search_space) #might want to produce this outside this function so we don't do this again
     sorted_y_keys = sorted(y_search_space, reverse = True)
     
+    good_b_prec, good_y_prec = gen_spectra.get_precursor("DLQTLAL", prec_charge), gen_spectra.get_precursor("EVE", prec_charge)
+        
     b_end, y_end = len(sorted_b_keys), len(sorted_y_keys)
     b_ctr, y_ctr = 0, 0
     
-    while b_ctr < b_end and y_ctr < y_end:
-        b_prec, y_prec = sorted_b_keys[b_ctr], sorted_y_keys[y_ctr]
+    for b_prec in sorted_b_keys:
         missing_mass_upper = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge + tol
-        if y_prec > missing_mass_upper:
-            y_ctr += 1
-            continue
-            
         missing_mass_low = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge - tol
-        if y_prec < missing_mass_low:
-            b_ctr += 1
-            continue
+        for y_prec in sorted_y_keys:
+            if y_prec > missing_mass_upper:
+                continue
+            elif y_prec < missing_mass_low:
+                break
+            else:
+                for b in b_search_space[b_prec]:
+                    for y in y_search_space[y_prec]:
+                        if b[7] + y[7] > score_filter:
+                            pairs.append((b, y))
+    
+    # while b_ctr < b_end and y_ctr < y_end: #(188.58901117418367, (376.1707458496094, 56, 59, 1, 1, 274, 'EVE', 2))
+    #     b_prec, y_prec = sorted_b_keys[b_ctr], sorted_y_keys[y_ctr]
+    #     if b_prec == 387.223811816879:
+    #         print('here')
+    #     missing_mass_upper = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge + tol
+    #     if y_prec > missing_mass_upper:
+    #         y_ctr += 1
+    #         continue
+            
+    #     missing_mass_low = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge - tol
+    #     if y_prec < missing_mass_low:
+    #         b_ctr += 1
+    #         continue
         
-        for b in b_search_space[b_prec]:
-            for y in y_search_space[y_prec]:
-                if b[7] + y[7] > score_filter:
-                    pairs.append((b, y))
-        b_ctr += 1
-        y_ctr += 1
+    #     for b in b_search_space[b_prec]:
+    #         for y in y_search_space[y_prec]:
+    #             if "DLQTLAL" == b[6] and y[6] == "EVE":
+    #                 print('here')
+    #             if b[7] + y[7] > score_filter:
+    #                 pairs.append((b, y))
+    #     b_ctr += 1
 
     return pairs
         

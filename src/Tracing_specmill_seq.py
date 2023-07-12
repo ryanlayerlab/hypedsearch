@@ -95,13 +95,9 @@ def get_hypedsearch_results(file):
                 result.append((spec_id, score, seq, eval))
     return result
 
-def get_target_scores(input_masses, target1, target2, target3, target4, target5, ppm_tol):
-    target1_score = overlap_scoring(target1, input_masses, ppm_tol)
-    target2_score = overlap_scoring(target2, input_masses, ppm_tol)
-    target3_score = overlap_scoring(target3, input_masses, ppm_tol)
-    target4_score = overlap_scoring(target4, input_masses, ppm_tol)
-    target5_score = overlap_scoring(target5, input_masses, ppm_tol)
-    return target1_score, target2_score, target3_score, target4_score, target5_score
+def get_target_score(input_masses, target, ppm_tol):
+    target_score = overlap_scoring(target, input_masses, ppm_tol)
+    return target_score
 
 def get_output_files(spectra_folder):
     spectra_files = []
@@ -136,6 +132,7 @@ with open("Sequence_tracing.txt", "w") as w:
         
 with open("Sequence_tracing.txt", "a") as w:
     for file in spectra_files:
+        filename = file.split("/")[-1]
         spectra = preprocessing_utils.load_spectra(file, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
         filesplit = file.split("Fxn")[1]
         file_id = filesplit.split(".")[0]
@@ -148,25 +145,37 @@ with open("Sequence_tracing.txt", "a") as w:
             hybrid_eval = result[3]
             input_spectrum = spectra[int(spec_id)]
             prec_tolerance = ppm_to_da(input_spectrum.precursor_mass, prec_tol)
-            #score all the good ones and see if it beats hypedsearch score
-            score1, score2, score3, score4, score5 = get_target_scores(input_spectrum.mz_values, "DLQTLALEVE", "DLQTLALNAAR", "DPQVAQLELGGEVEDPQVAQLELGGGPGAG", "EVEDPQVAQLELGGEVEDPQVAQLELGGGPGAG", "DLQTLALWSRM", ppm_tolerance)
-            if score1 > int(hypedsearch_score) and abs(gen_spectra.get_precursor("DLQTLALEVE", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + file_id + " DLQTLAL-EVE scored: " + str(score1) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
-            if score2 > int(hypedsearch_score) and abs(gen_spectra.get_precursor("DLQTLALNAAR", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + file_id + " DLQTLAL-NAAR scored: " + str(score2) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
-            if score3 > int(hypedsearch_score) and abs(gen_spectra.get_precursor("DPQVAQLELGGEVEDPQVAQLELGGGPGAG", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + file_id + " DPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored: " + str(score3) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
-            if score4 > int(hypedsearch_score) and abs(gen_spectra.get_precursor("EVEDPQVAQLELGGEVEDPQVAQLELGGGPGAG", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + file_id + " EVEDPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored: " + str(score3) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
-            if score5 > int(hypedsearch_score) and abs(gen_spectra.get_precursor("DLQTLALWSRM", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + file_id + " DLQTLAL-WSRM scored: " + str(score3) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
+            
+            if abs(gen_spectra.get_precursor("DLQTLALEVE", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
+                tscore = get_target_score(input_spectrum.mz_values, "DLQTLALEVE", ppm_tolerance)
+                if tscore > int(hypedsearch_score):
+                    w.write("For " + filename + " DLQTLAL-EVE scored: " + str(tscore) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
+            if abs(gen_spectra.get_precursor("DLQTLALNAAR", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
+                tscore = get_target_score(input_spectrum.mz_values, "DLQTLALNAAR", ppm_tolerance)
+                if tscore > int(hypedsearch_score):
+                    w.write("For " + filename + " DLQTLAL-NAAR scored: " + str(tscore) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
+            if abs(gen_spectra.get_precursor("DPQVAQLELGGEVEDPQVAQLELGGGPGAG", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
+                tscore = get_target_score(input_spectrum.mz_values, "DPQVAQLELGGEVEDPQVAQLELGGGPGAG", ppm_tolerance)
+                if tscore > int(hypedsearch_score):
+                    w.write("For " + filename + " DPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored: " + str(tscore) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
+            if abs(gen_spectra.get_precursor("EVEDPQVAQLELGGEVEDPQVAQLELGGGPGAG", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
+                tscore = get_target_score(input_spectrum.mz_values, "EVEDPQVAQLELGGEVEDPQVAQLELGGGPGAG", ppm_tolerance)
+                if tscore > int(hypedsearch_score):
+                    w.write("For " + filename + " EVEDPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored: " + str(tscore) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
+            if abs(gen_spectra.get_precursor("DLQTLALWSRM", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
+                tscore = get_target_score(input_spectrum.mz_values, "DLQTLALWSRM", ppm_tolerance)
+                if tscore > int(hypedsearch_score):
+                    w.write("For " + filename + " DLQTLAL-WSRM scored: " + str(tscore) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
                     
     w.write("\nNow looking at the case of equality: \n \n")
             
+with open("Sequence_tracing.txt", "a") as w:
     for file in spectra_files:
+        filename = file.split("/")[-1]
         spectra = preprocessing_utils.load_spectra(file, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
         filesplit = file.split("Fxn")[1]
         file_id = filesplit.split(".")[0]
+        # prev_spec_id = -1
 
         hypedsearch_answers = get_hypedsearch_results(output_dict[int(file_id)])
         for result in hypedsearch_answers:
@@ -176,40 +185,32 @@ with open("Sequence_tracing.txt", "a") as w:
             hybrid_eval = result[3]
             input_spectrum = spectra[int(spec_id)]
             prec_tolerance = ppm_to_da(input_spectrum.precursor_mass, prec_tol)
-            #score all the good ones and see if it beats hypedsearch score
-            score1, score2, score3, score4, score5 = get_target_scores(input_spectrum.mz_values, "DLQTLALEVE", "DLQTLALNAAR", "DPQVAQLELGGEVEDPQVAQLELGGGPGAG", "EVEDPQVAQLELGGEVEDPQVAQLELGGGPGAG", "DLQTLALWSRM", ppm_tolerance)
-            if score1 == int(hypedsearch_score) and abs(gen_spectra.get_precursor("DLQTLALEVE", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + file_id + " DLQTLAL-EVE scored: " + str(score1) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
-            if score2 == int(hypedsearch_score) and abs(gen_spectra.get_precursor("DLQTLALNAAR", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + file_id + " DLQTLAL-NAAR scored: " + str(score2) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
-            if score3 == int(hypedsearch_score) and abs(gen_spectra.get_precursor("DPQVAQLELGGEVEDPQVAQLELGGGPGAG", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + file_id + " DPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored: " + str(score3) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
-            if score4 == int(hypedsearch_score) and abs(gen_spectra.get_precursor("EVEDPQVAQLELGGEVEDPQVAQLELGGGPGAG", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + file_id + " EVEDPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored: " + str(score4) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
-            if score5 == int(hypedsearch_score) and abs(gen_spectra.get_precursor("DLQTLALWSRM", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + file_id + " DLQTLAL-WSRM scored: " + str(score4) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
-
-    w.write("\nNow looking at the case of things which scored >8: \n \n")
-    for file in spectra_files:
-        spectra = preprocessing_utils.load_spectra(file, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
-        filesplit = file.split("Fxn")[1]
-        file_id = filesplit.split(".")[0]
-        for spec_id, input_spectrum in enumerate(spectra):
-            score1, score2, score3, score4, score5 = get_target_scores(input_spectrum.mz_values, "DLQTLALEVE", "DLQTLALNAAR", "DPQVAQLELGGEVEDPQVAQLELGGGPGAG", "EVEDPQVAQLELGGEVEDPQVAQLELGGGPGAG", "DLQTLALWSRM", ppm_tolerance)
-            if score1 > 8 and abs(gen_spectra.get_precursor("DLQTLALEVE", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + str(file_id) + " DLQTLAL-EVE scored " + str(score1) + " for spectrum: " + str(spec_id) + "\n")
-            if score2 > 8 and abs(gen_spectra.get_precursor("DLQTLALNAAR", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + str(file_id) + " DLQTLAL-NAAR scored " + str(score2) + " for spectrum: " + str(spec_id) + "\n")
-            if score3 > 8 and abs(gen_spectra.get_precursor("DPQVAQLELGGEVEDPQVAQLELGGGPGAG", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + str(file_id) + " DPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored " + str(score3) + " for spectrum: " + str(spec_id) + "\n")
-            if score4 > 8 and abs(gen_spectra.get_precursor("EVEDPQVAQLELGGEVEDPQVAQLELGGGPGAG", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + str(file_id) + " EVEDPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored " + str(score4) + " for spectrum: " + str(spec_id) + "\n")
-            if score5 > 8 and abs(gen_spectra.get_precursor("DLQTLALWSRM", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + str(file_id) + " DLQTLAL-WSRM scored " + str(score4) + " for spectrum: " + str(spec_id) + "\n")
+            
+            if abs(gen_spectra.get_precursor("DLQTLALEVE", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
+                tscore = get_target_score(input_spectrum.mz_values, "DLQTLALEVE", ppm_tolerance)
+                if tscore == int(hypedsearch_score): #and spec_id != prev_spec_id
+                    w.write("For " + filename + " DLQTLAL-EVE scored: " + str(tscore) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
+            if abs(gen_spectra.get_precursor("DLQTLALNAAR", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
+                tscore = get_target_score(input_spectrum.mz_values, "DLQTLALNAAR", ppm_tolerance)
+                if tscore == int(hypedsearch_score): #and spec_id != prev_spec_id
+                    w.write("For " + filename + " DLQTLAL-NAAR scored: " + str(tscore) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
+            if abs(gen_spectra.get_precursor("DPQVAQLELGGEVEDPQVAQLELGGGPGAG", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
+                tscore = get_target_score(input_spectrum.mz_values, "DPQVAQLELGGEVEDPQVAQLELGGGPGAG", ppm_tolerance)
+                if tscore == int(hypedsearch_score): #and spec_id != prev_spec_id
+                    w.write("For " + filename + " DPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored: " + str(tscore) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
+            if abs(gen_spectra.get_precursor("EVEDPQVAQLELGGEVEDPQVAQLELGGGPGAG", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
+                tscore = get_target_score(input_spectrum.mz_values, "EVEDPQVAQLELGGEVEDPQVAQLELGGGPGAG", ppm_tolerance)
+                if tscore == int(hypedsearch_score): #and spec_id != prev_spec_id
+                    w.write("For " + filename + " EVEDPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored: " + str(tscore) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
+            if abs(gen_spectra.get_precursor("DLQTLALWSRM", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance: #and spec_id != prev_spec_id
+                tscore = get_target_score(input_spectrum.mz_values, "DLQTLALWSRM", ppm_tolerance)
+                if tscore == int(hypedsearch_score):
+                    w.write("For " + filename + " DLQTLAL-WSRM scored: " + str(tscore) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
             
     w.write("\nNow looking at the case of things Hypedsearch found the target Hybrids: \n \n")
             
     for file in spectra_files:
+        filename = file.split("/")[-1]
         spectra = preprocessing_utils.load_spectra(file, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
         filesplit = file.split("Fxn")[1]
         file_id = filesplit.split(".")[0]
@@ -220,18 +221,20 @@ with open("Sequence_tracing.txt", "a") as w:
             hypedsearch_score = result[1]
             seq = result[2]
             if seq == "DLQTLAL-EVE":
-                w.write("For BMEM: " + file_id + " Hypedsearch found DLQTLAL-EVE on spectrum: " + spec_id + " with score: " + hypedsearch_score + "\n")
+                w.write("For " + filename + " Hypedsearch found DLQTLAL-EVE on spectrum: " + spec_id + " with score: " + hypedsearch_score + "\n")
             elif seq == "DLQTLAL-NAAR":
-                 w.write("For BMEM: " + file_id + " Hypedsearch found DLQTLAL-NAAR on spectrum: " + spec_id + " with score: " + hypedsearch_score + "\n")
+                 w.write("For " + filename + " Hypedsearch found DLQTLAL-NAAR on spectrum: " + spec_id + " with score: " + hypedsearch_score + "\n")
             elif seq == "DLQTLAL-WSRM":
-                 w.write("For BMEM: " + file_id + " Hypedsearch found DLQTLAL-WSRM on spectrum: " + spec_id + " with score: " + hypedsearch_score + "\n")
+                 w.write("For " + filename + " Hypedsearch found DLQTLAL-WSRM on spectrum: " + spec_id + " with score: " + hypedsearch_score + "\n")
             elif seq == "DPQVAQLELGG-EVEDPQVAQLELGGGPGAG":
-                 w.write("For BMEM: " + file_id + " Hypedsearch found DPQVAQLELGG-EVEDPQVAQLELGGGPGAG on spectrum: " + spec_id + " with score: " + hypedsearch_score + "\n")
+                 w.write("For " + filename+ " Hypedsearch found DPQVAQLELGG-EVEDPQVAQLELGGGPGAG on spectrum: " + spec_id + " with score: " + hypedsearch_score + "\n")
             elif seq == "EVEDPQVAQLELGG-EVEDPQVAQLELGGGPGAG":
-                 w.write("For BMEM: " + file_id + " Hypedsearch found EVEDPQVAQLELGG-EVEDPQVAQLELGGGPGAG on spectrum: " + spec_id + " with score: " + hypedsearch_score + "\n")
+                 w.write("For " + filename + " Hypedsearch found EVEDPQVAQLELGG-EVEDPQVAQLELGGGPGAG on spectrum: " + spec_id + " with score: " + hypedsearch_score + "\n")
 
     w.write("\nNow looking at the case of things Hypedsearch scored higher than Comet but target hybrid scored >8: \n \n")
+with open("Sequence_tracing.txt", "a") as w:
     for file in spectra_files:
+        filename = file.split("/")[-1]
         spectra = preprocessing_utils.load_spectra(file, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
         filesplit = file.split("Fxn")[1]
         file_id = filesplit.split(".")[0]
@@ -244,21 +247,31 @@ with open("Sequence_tracing.txt", "a") as w:
             hybrid_eval = result[3]
             input_spectrum = spectra[int(spec_id)]
             prec_tolerance = ppm_to_da(input_spectrum.precursor_mass, prec_tol)
-            #score all the good ones and see if it beats hypedsearch score
-            score1, score2, score3, score4, score5 = get_target_scores(input_spectrum.mz_values, "DLQTLALEVE", "DLQTLALNAAR", "DPQVAQLELGGEVEDPQVAQLELGGGPGAG", "EVEDPQVAQLELGGEVEDPQVAQLELGGGPGAG", "DLQTLALWSRM", ppm_tolerance)
-            if score1 > 8 and (abs(gen_spectra.get_precursor("DLQTLALEVE", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance) and int(hypedsearch_score) >  score1:
-                w.write("For BMEM: " + file_id + " DLQTLAL-EVE scored: " + str(score1) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
-            if score2 > 8 and (abs(gen_spectra.get_precursor("DLQTLALNAAR", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance) and int(hypedsearch_score) >  score2:
-                w.write("For BMEM: " + file_id + " DLQTLAL-NAAR scored: " + str(score2) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
-            if score3 > 8 and (abs(gen_spectra.get_precursor("DPQVAQLELGGEVEDPQVAQLELGGGPGAG", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance) and int(hypedsearch_score) >  score3:
-                w.write("For BMEM: " + file_id + " DPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored: " + str(score3) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
-            if score4 > 8 and (abs(gen_spectra.get_precursor("EVEDPQVAQLELGGEVEDPQVAQLELGGGPGAG", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance) and int(hypedsearch_score) >  score4:
-                w.write("For BMEM: " + file_id + " EVEDPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored: " + str(score4) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
-            if score5 > 8 and (abs(gen_spectra.get_precursor("DLQTLALWSRM", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance) and int(hypedsearch_score) >  score5:
-                w.write("For BMEM: " + file_id + " DLQTLAL-WSRM scored: " + str(score4) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
+            
+            if abs(gen_spectra.get_precursor("DLQTLALEVE", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
+                tscore = get_target_score(input_spectrum.mz_values, "DLQTLALEVE", ppm_tolerance)
+                if tscore < int(hypedsearch_score) and tscore > 8:
+                    w.write("For " + filename + " DLQTLAL-EVE scored: " + str(tscore) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
+            if abs(gen_spectra.get_precursor("DLQTLALNAAR", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
+                tscore = get_target_score(input_spectrum.mz_values, "DLQTLALNAAR", ppm_tolerance)
+                if tscore < int(hypedsearch_score) and tscore > 8:
+                    w.write("For " + filename + " DLQTLAL-NAAR scored: " + str(tscore) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
+            if abs(gen_spectra.get_precursor("DPQVAQLELGGEVEDPQVAQLELGGGPGAG", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
+                tscore = get_target_score(input_spectrum.mz_values, "DPQVAQLELGGEVEDPQVAQLELGGGPGAG", ppm_tolerance)
+                if tscore < int(hypedsearch_score) and tscore > 8:
+                    w.write("For " + filename + " DPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored: " + str(tscore) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
+            if abs(gen_spectra.get_precursor("EVEDPQVAQLELGGEVEDPQVAQLELGGGPGAG", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
+                tscore = get_target_score(input_spectrum.mz_values, "EVEDPQVAQLELGGEVEDPQVAQLELGGGPGAG", ppm_tolerance)
+                if tscore < int(hypedsearch_score) and tscore > 8:
+                    w.write("For " + filename + " EVEDPQVAQLELGG-EVEDPQVAQLELGGGPGAG scored: " + str(tscore) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
+            if abs(gen_spectra.get_precursor("DLQTLALWSRM", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
+                tscore = get_target_score(input_spectrum.mz_values, "DLQTLALWSRM", ppm_tolerance)
+                if tscore < int(hypedsearch_score) and tscore > 8:
+                    w.write("For " + filename + " DLQTLAL-WSRM scored: " + str(tscore) + " on spectrum: " + spec_id + " while Hypedsearch returned: " + seq + " as a " + hybrid_eval + " with score: " + hypedsearch_score + "\n")
                 
     w.write("\n Where all of the target hybrids could even appear \n \n")
     for file in spectra_files:
+        filename = file.split("/")[-1]
         spectra = preprocessing_utils.load_spectra(file, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
         filesplit = file.split("Fxn")[1]
         file_id = filesplit.split(".")[0]
@@ -267,12 +280,12 @@ with open("Sequence_tracing.txt", "a") as w:
         for input_spectrum in spectra:
             prec_tolerance = ppm_to_da(input_spectrum.precursor_mass, prec_tol)
             if abs(gen_spectra.get_precursor("DLQTLALEVE", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + file_id + " DLQTLAL-EVE is a match for spectrum: " + str(input_spectrum.num) + "\n")
+                w.write("For " + filename + " DLQTLAL-EVE is a match for spectrum: " + str(input_spectrum.num) + "\n")
             if abs(gen_spectra.get_precursor("DLQTLALNAAR", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + file_id + " DLQTLAL-NAAR is a match for spectrum: " + str(input_spectrum.num) + "\n")
+                w.write("For " + filename + " DLQTLAL-NAAR is a match for spectrum: " + str(input_spectrum.num) + "\n")
             if abs(gen_spectra.get_precursor("DLQTLALWSRM", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + file_id + " DLQTLAL-WSRM is a match for spectrum: " + str(input_spectrum.num) + "\n")
+                w.write("For " + filename + " DLQTLAL-WSRM is a match for spectrum: " + str(input_spectrum.num) + "\n")
             if abs(gen_spectra.get_precursor("EVEDPQVAQLELGGEVEDPQVAQLELGGGPGAG", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + file_id + " EVEDPQVAQLELGG-EVEDPQVAQLELGGGPGAG is a match for spectrum: " + str(input_spectrum.num) + "\n")
+                w.write("For " + filename + " EVEDPQVAQLELGG-EVEDPQVAQLELGGGPGAG is a match for spectrum: " + str(input_spectrum.num) + "\n")
             if abs(gen_spectra.get_precursor("DPQVAQLELGGEVEDPQVAQLELGGGPGAG", input_spectrum.precursor_charge) - input_spectrum.precursor_mass) < prec_tolerance:
-                w.write("For BMEM: " + file_id + " DPQVAQLELGG-EVEDPQVAQLELGGGPGAG is a match for spectrum: " + str(input_spectrum.num) + "\n")
+                w.write("For " + filename + " DPQVAQLELGG-EVEDPQVAQLELGGGPGAG is a match for spectrum: " + str(input_spectrum.num) + "\n")

@@ -60,6 +60,9 @@ def create_clusters(ion, b_hits, y_hits):
                 foos = [foo]
             last_pid = foo.pid
             last_start = foo.start
+        if foos != []:
+            clusters = create_clusters_from_foos(foos)
+            all_clusters.append(clusters)
     else:
         foos = parse_foos(Foo, y_hits)
         sorted_foos = sorted(foos, key=operator.attrgetter('pid', 'end', 'start'))
@@ -76,6 +79,9 @@ def create_clusters(ion, b_hits, y_hits):
                 foos = [foo]
             last_pid = foo.pid
             last_end = foo.end
+        if foos != []:
+            clusters = create_clusters_from_foos(foos)
+            all_clusters.append(clusters)
     return all_clusters
 
 def parse_indices(index_set):
@@ -135,7 +141,6 @@ def find_extensions(conv_prec,current_mass,ion,charge,pid,protein_list,start,end
     bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
     extensions = []
     repeat = True
-    current_score = score
     current_seq = seq
     
     if ion == 0:
@@ -148,9 +153,8 @@ def find_extensions(conv_prec,current_mass,ion,charge,pid,protein_list,start,end
                     charge = 2
                     tol = ppm_to_da(current_mass, ppm_tolerance)
                     if current_mass < conv_prec + tol:
-                        current_score += 1
                         current_seq = current_seq + next_AA
-                        tup = (current_mass, start, current_position+1, 0, 2, pid, current_seq, current_score)
+                        tup = (current_mass, start, current_position+1, 0, 2, pid, current_seq, score)
                         extensions.append(tup)
                         current_position += 1
                     else:
@@ -170,9 +174,8 @@ def find_extensions(conv_prec,current_mass,ion,charge,pid,protein_list,start,end
                     charge = 2
                     tol = ppm_to_da(current_mass, ppm_tolerance)
                     if current_mass < conv_prec + tol:
-                        current_score += 1
                         current_seq = next_AA + current_seq
-                        tup = (current_mass, current_position, end, 1, 2, pid, current_seq, current_score)
+                        tup = (current_mass, current_position, end, 1, 2, pid, current_seq, score)
                         extensions.append(tup)
                         current_position = current_position - 1
                     else:
@@ -200,29 +203,25 @@ def convert_components(component_arr, ion, score, seq):
     if ion == 0:
         prev_component = list(reversed(component_arr))[0]
         for component in list(reversed(component_arr)):
-            if i != 0:
-                while component.end < prev_component.end - 1:
-                    new_component = Foo(pid = prev_component.pid, start = prev_component.start, end = prev_component.end - 1, mz = gen_spectra.max_mass(seq[:len(seq)-i], 'b', prev_component.charge), charge=prev_component.charge)
-                    converted_components.append((new_component.mz, new_component.start, new_component.end, ion, new_component.charge, new_component.pid, seq[:len(seq)-i], score-i))
-                    prev_component = new_component
-                    i +=1
-                
-            converted_components.append((component.mz, component.start, component.end, ion, component.charge, component.pid, seq[:len(seq)-i], score-i))
-            prev_component = component
-            i += 1
+            if component.end == prev_component.end:
+                converted_components.append((component.mz, component.start, component.end, ion, component.charge, component.pid, seq[:len(seq)-i], score-i))
+                prev_component = component
+            while component.end < prev_component.end:
+                i +=1
+                new_component = Foo(pid = prev_component.pid, start = prev_component.start, end = prev_component.end - 1, mz = gen_spectra.max_mass(seq[:len(seq)-i], 'b', prev_component.charge), charge=prev_component.charge)
+                converted_components.append((new_component.mz, new_component.start, new_component.end, ion, new_component.charge, new_component.pid, seq[:len(seq)-i], score-i))
+                prev_component = new_component
     else:
         prev_component = component_arr[0]
         for component in component_arr:
-            if i != 0:
-                while component.start > prev_component.start +1:
-                    new_component = Foo(pid = prev_component.pid, start = prev_component.start + 1, end = prev_component.end, mz = gen_spectra.max_mass(seq[i:], 'y', prev_component.charge), charge=prev_component.charge)
-                    converted_components.append((new_component.mz, new_component.start, new_component.end, ion, new_component.charge, new_component.pid, seq[i:], score-i))
-                    prev_component = new_component
-                    i +=1
-            
-            converted_components.append((component.mz, component.start, component.end, ion, component.charge, component.pid, seq[i:], score-i))
-            prev_component = component
-            i += 1
+            if component.start == prev_component.start:
+                converted_components.append((component.mz, component.start, component.end, ion, component.charge, component.pid, seq[i:], score-i))
+                prev_component = component
+            while component.start > prev_component.start +1:
+                i +=1
+                new_component = Foo(pid = prev_component.pid, start = prev_component.start + 1, end = prev_component.end, mz = gen_spectra.max_mass(seq[i:], 'y', prev_component.charge), charge=prev_component.charge)
+                converted_components.append((new_component.mz, new_component.start, new_component.end, ion, new_component.charge, new_component.pid, seq[i:], score-i))
+                prev_component = new_component
 
     return converted_components
 
@@ -236,7 +235,6 @@ def old_score_clusters(ion, clusters, conv_prec, protein_list, prec_charge, ppm_
         end = A[4]
         charge = A[5]
         seq = find_sequence(pid, start, end, protein_list)
-        # digest_match = test_digest_match(protein_list,pid,digest,start,end,ion) #this code doesn't work
         score = A[0]
         components = convert_components(A[6], ion, score, seq)
         extensions = find_extensions(conv_prec,mz,ion,charge,pid,protein_list,start,end,ppm_tol,seq,score)

@@ -5,15 +5,22 @@ from sqlite import database_file
 ppm_tolerance = 20
 max_len = 10
 
+DLQTLAL = gen_spectra.get_precursor("DLQTLAL", 2)
+DLQTLALE = gen_spectra.get_precursor("DLQTLALE", 2)
 
-spectra_id = 
-sequence = "DLQTLALEVE"
-rival_seq = "EIAEKALVE"
-obs_prec = 565.805089
-prec_charge = 2
-theoretical_prec = gen_spectra.get_precursor(sequence, prec_charge)
-rival_theoretical_prec = gen_spectra.get_precursor(sequence, prec_charge)
-print(theoretical_prec, rival_theoretical_prec, obs_prec)
+EV = gen_spectra.get_precursor("EV", 1)
+
+print(DLQTLALE + EV, DLQTLAL + EV)
+
+print(DLQTLAL, DLQTLALE, EV)
+
+# sequence = "DLQTLALEVE"
+# rival_seq = "EIAEKALVE"
+# obs_prec = 565.805089
+# prec_charge = 2
+# theoretical_prec = gen_spectra.get_precursor(sequence, prec_charge)
+# rival_theoretical_prec = gen_spectra.get_precursor(sequence, prec_charge)
+# print(theoretical_prec, rival_theoretical_prec, obs_prec)
 
 # b_mass = gen_spectra.max_mass("DLQTLA", 'b', 1)
 # y_mass = gen_spectra.max_mass("WSRM", 'y', 1)

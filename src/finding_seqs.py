@@ -328,23 +328,19 @@ def check_in_merges(hybrid_merges, native_merges, good_b_searches, good_y_search
                         
     if len(good_merges) > 0:
         print("Good merges were found")
+    else:
+        print("No good merges were found")
         
     return good_merges
 
-def check_in_rescored_merges(rescored_hybrids, rescored_natives, good_merges):
+def check_in_rescored_merges(rescored_merges, good_merges):
     good_rescored = []
+    sorted_rescored = sorted(rescored_merges, key=lambda x: (x[0], x[1]), reverse = True)
     for merge in good_merges:
-        for i, remerged in enumerate(rescored_hybrids):
-            if (merge[0], merge[1]) == remerged[2]:
+        for i, remerged in enumerate(sorted_rescored):
+            if merge[0][0] == remerged[2]:
                 good_rescored.append((i, merge))
-                break
-    
-    for merge in good_merges:
-        for i, remerged in enumerate(rescored_natives):
-            if (merge[0], merge[1]) == remerged[2]:
-                good_rescored.append((i, merge))
-                break
-                
+                break                
     good = False
     for index, merge in good_rescored:
         if index < 10:
@@ -367,14 +363,17 @@ def check_in_unique(unique_merges, good_merges):
             good_seq = merge[0][6] + merge[1][6]
         else:
             good_seq = merge[0][6]
-        for i, (seq, score, abundance, hybrid) in enumerate(sorted(unique_merges, key = lambda x: (x[1], x[2]), reverse=True)):
-            if i < 10:
-                if seq == good_seq:
-                    good_unique.append(((seq, score, abundance, hybrid), unique_merges[(seq, score, abundance, hybrid)]))
+        # for i, (seq, score, abundance, hybrid) in enumerate(sorted(unique_merges, key = lambda x: (x[1], x[2]), reverse=True)):
+        #     if i < 10:
+        #         if seq == good_seq:
+        #             good_unique.append(((seq, score, abundance, hybrid), unique_merges[(seq, score, abundance, hybrid)]))
+        for (seq, score) in unique_merges:
+            if seq == good_seq:
+                good_unique.append(((seq, score), unique_merges[(seq, score)]))
     
     if len(good_unique) > 0:
-        print("After uniqueness, there are good rescored merges in the top 10")
+        print("After uniqueness, there are good merges")
     else:
-        print("There were no good rescored merges in the top 10 after uniqueness")
+        print("There were no good merges after uniqueness")
     
     return good_unique
