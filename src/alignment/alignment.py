@@ -495,7 +495,7 @@ def find_alignments(native_merged, hybrid_merged, obs_prec, prec_charge, tol, ma
     return natural_alignments, hybrid_alignments
 
 def pair_indices(b_search_space, y_search_space, prec_mass, prec_tol, prec_charge, score_filter):
-    pairs = []
+    unique_merges = dict()
     tol = utils.ppm_to_da(prec_mass, prec_tol)
     sorted_b_keys = sorted(b_search_space) #might want to produce this outside this function so we don't do this again
     sorted_y_keys = sorted(y_search_space, reverse = True)
@@ -503,45 +503,47 @@ def pair_indices(b_search_space, y_search_space, prec_mass, prec_tol, prec_charg
     good_b_prec, good_y_prec = gen_spectra.get_precursor("DLQTLAL", prec_charge), gen_spectra.get_precursor("EVE", prec_charge)
         
     b_end, y_end = len(sorted_b_keys), len(sorted_y_keys)
-    b_ctr, y_ctr = 0, 0
-    
-    for b_prec in sorted_b_keys:
+    # try something else. b and y are allowed to increment but there is a range we have to stay in
+    b_ctr = 0
+    y_low_ctr, y_high_ctr = 0,0
+    while b_ctr < b_end and y_high_ctr < y_end:
+        b_prec = sorted_b_keys[b_ctr]
         missing_mass_upper = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge + tol
-        missing_mass_low = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge - tol
-        for y_prec in sorted_y_keys:
-            if y_prec > missing_mass_upper:
-                continue
-            elif y_prec < missing_mass_low:
-                break
-            else:
-                for b in b_search_space[b_prec]:
-                    for y in y_search_space[y_prec]:
-                        if b[7] + y[7] > score_filter:
-                            pairs.append((b, y))
-    
-    # while b_ctr < b_end and y_ctr < y_end: #(188.58901117418367, (376.1707458496094, 56, 59, 1, 1, 274, 'EVE', 2))
-    #     b_prec, y_prec = sorted_b_keys[b_ctr], sorted_y_keys[y_ctr]
-    #     if b_prec == 387.223811816879:
-    #         print('here')
-    #     missing_mass_upper = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge + tol
-    #     if y_prec > missing_mass_upper:
-    #         y_ctr += 1
-    #         continue
-            
-    #     missing_mass_low = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge - tol
-    #     if y_prec < missing_mass_low:
-    #         b_ctr += 1
-    #         continue
+        missing_mass_lower = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge - tol
+        y_prec = sorted_y_keys[y_high_ctr]
         
-    #     for b in b_search_space[b_prec]:
-    #         for y in y_search_space[y_prec]:
-    #             if "DLQTLAL" == b[6] and y[6] == "EVE":
-    #                 print('here')
-    #             if b[7] + y[7] > score_filter:
-    #                 pairs.append((b, y))
-    #     b_ctr += 1
+        if y_prec > missing_mass_upper: #b_prec + y_prec is too big
+            # b_prec or y_prec need to increment. Either b needs to get bigger or y needs to get smaller
+            y_high_ctr += 1
+            continue
+        
+        elif y_prec < missing_mass_lower: #b_prec + y_prec is too small
+            # b_prec needs to get bigger or y_prec needs to get smaller.
+            b_ctr += 1
+            continue
+        
+        else: #we have a match. Use the low counter to append all y which match. Want this since when we incrememnt b at the end, we can match b+1 with the same y's if compatable
+            y_low_ctr = y_high_ctr
+            while (y_prec > missing_mass_lower and y_prec < missing_mass_upper and y_low_ctr < len(sorted_y_keys)):
+                for b in b_search_space[b_prec]: #append all the combos here
+                    for y in y_search_space[y_prec]:
+                        # if "DLQTLAL" == b[6] and y[6] == "EVE":
+                        #     print('here')
+                        if b[7] + y[7] > score_filter:
+                            #unique_merges[(full_seq, 1)].append(merge)
+                            full_seq = b[6] + y[6]
+                            if ((full_seq, 1)) not in unique_merges.keys():
+                                unique_merges[(full_seq, 1)] = []
+                            unique_merges[(full_seq,1)].append((b,y))
+                y_low_ctr += 1
+                if y_low_ctr < len(sorted_y_keys):
+                    y_prec = sorted_y_keys[y_low_ctr]
+                else:
+                    break
 
-    return pairs
+            b_ctr += 1
+            
+    return unique_merges
         
 def find_from_prec(converted_b, matched_masses_b, input_spectrum, ppm_tolerance, protein_list):
     prec_matches = []
@@ -561,23 +563,27 @@ def make_native_pair(b, ion):
     y_cluster = (gen_spectra.max_mass(b[6], 'b' if ion == 0 else 'y', b[4]), b[1], b[2], ion, b[4], b[5], b[6], 0)
     return y_cluster
     
-def pair_natives(b_search_space, y_search_space, prec_mass, prec_tol, score_filter):
+def pair_natives(b_search_space, y_search_space, prec_mass, prec_tol):
     # in the case of a native, the b must be before the y, the two seqs must come from the same protein, and the two seqs together cannot be less than the max_pep_len. Actually, 
     # Actually, since we have all the extensions we could just find the good extension
-    native_pairs = []
+    unique_merges = dict()
     tol = utils.ppm_to_da(prec_mass, prec_tol)
     for b_prec in sorted(b_search_space):
         if abs(b_prec - prec_mass) < tol:
             for b in b_search_space[b_prec]:
-                # if b[7] >= score_filter
                 y_pair = make_native_pair(b, 0)
-                native_pairs.append((b,y_pair))
+                full_seq = b[6] + y_pair[6]
+                if (full_seq, 1) not in unique_merges.keys():
+                    unique_merges[(full_seq, 0)] = []
+                unique_merges[(full_seq,0)].append((b,y_pair))
     
     for y_prec in sorted(y_search_space):
         if abs(y_prec - prec_mass) < tol:
             for y in y_search_space[y_prec]:
-                # if y[7] >= score_filter:
                 b_pair = make_native_pair(y, 1)
-                native_pairs.append((b_pair, y))
+                full_seq = b_pair[6] + y[6]
+                if (full_seq, 1) not in unique_merges.keys():
+                    unique_merges[(full_seq, 0)] = []
+                unique_merges[(full_seq,0)].append((b_pair,y))
                 
-    return native_pairs
+    return unique_merges

@@ -186,7 +186,6 @@ def modified_match_masses(input_masses: list, db: Database, max_len: int, ppm_to
     dbf = database_file(max_len, False)
     matched_masses_b, matched_masses_y = dict(), dict()
     
-    start = time.time()
     for input_mass in input_masses:
         tol = ppm_to_da(input_mass, ppm_tolerance)
         matched_masses_b[input_mass], matched_masses_y[input_mass] = dbf.query_mass(input_mass, tol)
@@ -196,9 +195,6 @@ def modified_match_masses(input_masses: list, db: Database, max_len: int, ppm_to
     tol = ppm_to_da(y_prec, ppm_tolerance)
     _, matched_masses_y[y_prec] = dbf.query_mass(y_prec, tol)
         
-    end = time.time() - start
-    with open('Timing_data.txt', 'a') as t:
-        t.write("Queries took:" + '\t' + str(end) + "\n")       
 
     return matched_masses_b, matched_masses_y
 
