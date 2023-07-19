@@ -69,10 +69,7 @@ def boolean_string(s):
 
 def main(args: object) -> None:
     arguments = set_args(args)
-    matched_spectras = runner.run(arguments)
-    output_dir = arguments['output_dir']
-    print('\nFinished search. Writting results to {}...'.format(output_dir))
-    summary.generate_to_txt(matched_spectras, arguments["spectra_files"], output_dir)
+    runner.run(arguments)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Tool for identifying proteins, both hybrid and non hybrid from MS/MS data')

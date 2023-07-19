@@ -147,10 +147,8 @@ def generate(alignments: dict, output_dir='./') -> None:
     json_file(alignments, output_dir)
     tsv_file(alignments, output_dir)
 
-def generate_to_txt(matched_spectra, spectra_files, output_dir) -> None:
+def generate_to_txt(alignments, file, output_dir) -> None:
 
-    for i, file in enumerate(spectra_files):
-        alignments = matched_spectra[i]
         filename = os.path.basename(file)
         A = filename.split(".")
         base_file = "HS_"+ A[0] + ".txt"
