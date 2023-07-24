@@ -66,7 +66,7 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
         # get the id
         id = content.get('id', '')
 
-        retention_time = content['RetentionTime']
+        retention_time = content['scan'][0]['scan start time']
 
         spectra.append(
             Spectrum(
