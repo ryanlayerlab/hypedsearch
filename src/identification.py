@@ -393,14 +393,7 @@ def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, numc
     p.join()
     return y
 
-# def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, numcores, digest_left, digest_right): #Version of align for when multiprocessing doesn't work
-#     all_alignment_infos = []
-#     for spectrum in spectra:
-#         spectra_length = len(spectra)
-#         alignment_info = create_alignment_info(spectrum, max_peptide_len,precursor_tolerance,db,ppm_tolerance,spectra_length, (digest_left, digest_right))
-#         all_alignment_infos.append(alignment_info)
-#     return all_alignment_infos
-    
+
 def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     min_peptide_len: int = 5, max_peptide_len: int = 10, peak_filter: int = 0, 
     relative_abundance_filter: float = 0.0,ppm_tolerance: int = 20, 
@@ -421,6 +414,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
         verbose and print('Loading spectra start.')
         spectra = preprocessing_utils.load_spectra(file, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
         verbose and print('Loading spectra finish.')
+        #this is where the magic happens
         results = align(spectra,precursor_tolerance,db,ppm_tolerance,max_peptide_len,cores)
         print('\nFinished search. Writting results to {}...'.format(output_dir))
         generate_to_txt(results, file, output_dir)
