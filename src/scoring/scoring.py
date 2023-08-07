@@ -217,7 +217,7 @@ def modified_losing_water(sequence, input_masses, abundances, ppm_tolerance):
         minus_water.append(mass - WATER_MASS)
     input_masses = sorted(input_masses)
     score = calc_overlap(minus_water, input_masses, abundances, ppm_tolerance)
-    return score    
+    return score
 
 def rescore_merges(unique_merge_space, input_spectrum, ppm_tol):
     # unique_merge_space
