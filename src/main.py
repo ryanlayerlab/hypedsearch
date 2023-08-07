@@ -41,7 +41,8 @@ def set_args(args) -> dict:
     digest_right = args.digest_right if not use_params else config['digest_right']
     cores = args.cores if not use_params else config['cores']
     make_new = args.new_db if not use_params else config['new_db']
-    n = args.n if not use_params else config['top_results']
+    num_hybrids = args.num_hybrids if not use_params else config['top_hybrids']
+    num_natives = args.num_natives if not use_params else config['top_natives']
     debug = args.debug if not use_params else config['debug']
 
     if not utils.is_dir(spectra_folder):
@@ -60,7 +61,7 @@ def set_args(args) -> dict:
         'min_peptide_len': min_peptide_len,'max_peptide_len': max_peptide_len,'tolerance': ppm_tolerance,
         'precursor_tolerance': precursor_tolerance,'verbose': verbose, 'peak_filter': peak_filter, 
         'relative_abundance_filter': relative_abundance_filter, 'digest_left': digest_left, 'digest_right': digest_right, 'DEBUG': debug, 
-        'cores': cores,'n': n,'new_db': make_new}
+        'cores': cores,'num_hybrids': num_hybrids, 'num_natives': num_natives, 'new_db': make_new}
     
 def boolean_string(s):
     if s not in {'False', 'True'}:
@@ -92,7 +93,9 @@ if __name__ == '__main__':
     parser.add_argument('--verbose', dest='verbose', type=lambda x:bool(distutils.util.strtobool(x)))
     parser.add_argument('--cores', dest='cores', type=int, default=1, help='The number of cores allowed to use when searching. Uses at least 1 and at most the number of available cores. Default=1')
     parser.add_argument('--new-database', dest='new_db', type=lambda x:bool(distutils.util.strtobool(x)))
-    parser.add_argument('--n', dest='n', type=int, default=5, help='The number of alignments to keep per spectrum. Default=5')
+    parser.add_argument('--num-hybrids', dest='num_hybrids', type=int, default=5, help='The number of hybrid alignments to keep per spectrum. Default=5')
+    parser.add_argument('--num-natives', dest='num_natives', type=int, default=5, help='The number of native alignments to keep per spectrum. Default=5')
+
     parser.add_argument('--debug', dest='debug', type=bool, default=False, help='The number of alignments to keep per spectrum. Default=5')
     args = parser.parse_args()
 

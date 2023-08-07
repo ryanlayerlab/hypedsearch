@@ -499,9 +499,7 @@ def pair_indices(b_search_space, y_search_space, prec_mass, prec_tol, prec_charg
     tol = utils.ppm_to_da(prec_mass, prec_tol)
     sorted_b_keys = sorted(b_search_space) #might want to produce this outside this function so we don't do this again
     sorted_y_keys = sorted(y_search_space, reverse = True)
-    
-    good_b_prec, good_y_prec = gen_spectra.get_precursor("DLQTLAL", prec_charge), gen_spectra.get_precursor("EVE", prec_charge)
-        
+            
     b_end, y_end = len(sorted_b_keys), len(sorted_y_keys)
     # try something else. b and y are allowed to increment but there is a range we have to stay in
     b_ctr = 0
@@ -572,7 +570,7 @@ def pair_natives(b_search_space, y_search_space, prec_mass, prec_tol):
         if abs(b_prec - prec_mass) < tol:
             for b in b_search_space[b_prec]:
                 y_pair = make_native_pair(b, 0)
-                full_seq = b[6] + y_pair[6]
+                full_seq = b[6]
                 if (full_seq, 1) not in unique_merges.keys():
                     unique_merges[(full_seq, 0)] = []
                 unique_merges[(full_seq,0)].append((b,y_pair))
@@ -581,7 +579,7 @@ def pair_natives(b_search_space, y_search_space, prec_mass, prec_tol):
         if abs(y_prec - prec_mass) < tol:
             for y in y_search_space[y_prec]:
                 b_pair = make_native_pair(y, 1)
-                full_seq = b_pair[6] + y[6]
+                full_seq = y[6]
                 if (full_seq, 1) not in unique_merges.keys():
                     unique_merges[(full_seq, 0)] = []
                 unique_merges[(full_seq,0)].append((b_pair,y))
