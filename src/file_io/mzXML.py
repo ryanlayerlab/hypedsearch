@@ -64,8 +64,9 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
         ms_level = content['msLevel']
         scan_number = content['num']
 
-        # finally some other metadata
         other_metadata = content['scanOrigin']
+
+        retention_time = content['scan'][0]['scan start time']
 
         spectra.append(Spectrum(
             spec_num,
@@ -74,7 +75,9 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
             precursor,
             precursor_charge,
             filename, 
-            id
+            id,
+            other_metadata,
+            retention_time
         ))
 
     return spectra

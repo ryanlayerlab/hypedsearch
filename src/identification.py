@@ -422,6 +422,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
         verbose and print('Loading spectra start.')
         spectra = preprocessing_utils.load_spectra(file, ppm_tolerance, peak_filter=peak_filter, relative_abundance_filter=relative_abundance_filter)
         verbose and print('Loading spectra finish.')
+        #this is where the magic happens
         results = align(spectra,precursor_tolerance,db,ppm_tolerance,max_peptide_len,cores,num_hybrids,num_natives)
         print('\nFinished search. Writting results to {}...'.format(output_dir))
         generate_to_txt(results, file, output_dir)

@@ -21,9 +21,10 @@ Spectrum = namedtuple(
         'precursor_charge',
         'file_name',
         'id', 
-        'other_metadata'
+        'other_metadata',
+        'retention_time'
     ],
-    defaults=[-1,[], [], 0, '', '', '', {}]
+    defaults=[-1,[], [], 0, '', '', '', {}, '']
 )
 
 SequenceAlignment = namedtuple(
