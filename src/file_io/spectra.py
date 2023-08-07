@@ -24,7 +24,8 @@ def load(filename: str, peak_filter: int = 0, relative_abundance_filter: float =
     ext = filename.split('.')[-1]
 
     if ext.lower() == 'mzxml':
-        return mzXML.read(filename, peak_filter, relative_abundance_filter)
+        foo = mzXML.read(filename, peak_filter, relative_abundance_filter)
+        return foo
 
     elif ext.lower() == 'mzml':
         return mzML.read(filename, peak_filter, relative_abundance_filter)
