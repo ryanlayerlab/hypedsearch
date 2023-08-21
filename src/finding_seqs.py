@@ -29,7 +29,7 @@ def overlap_scoring(sequence, input_masses, ppm_tolerance):
                 
     return(total_score)
 
-def get_target_data(target_seq, proteins, input_masses, ppm_tolerance, precursor_mass, precursor_tolerance, precursor_charge, digest):
+def get_target_data(target_seq, proteins, input_masses, ppm_tolerance, precursor_mass, precursor_tolerance, precursor_charge):
     prec_tol = ppm_to_da(precursor_mass, precursor_tolerance)
     theoretical_prec = gen_spectra.get_precursor(target_seq.replace("-", ""), precursor_charge)
     if abs(theoretical_prec - precursor_mass) <= precursor_tolerance:
@@ -49,17 +49,15 @@ def get_target_data(target_seq, proteins, input_masses, ppm_tolerance, precursor
         if b_part in protein_seq:
             start = protein_seq.find(b_part)
             end = start + len(b_part)
-            if protein_seq[start] in digest[0] or (start > 0 and protein_seq[start-1] in digest[1]):
-                print(protein_seq[start:end])
-                target_left_pids.append(i)
-                target_left_indices.append((start, end))
+            print(protein_seq[start:end])
+            target_left_pids.append(i)
+            target_left_indices.append((start, end))
         if y_part in protein_seq:
             start = protein_seq.find(y_part)
             end = start + len(y_part)
-            if protein_seq[end] in digest[0] or (protein_seq[end-1] in digest[1]):
-                print(protein_seq[start:end])
-                target_right_pids.append(i)
-                target_right_indices.append((start, end))
+            print(protein_seq[start:end])
+            target_right_pids.append(i)
+            target_right_indices.append((start, end))
             
     target_score = overlap_scoring(target_seq.replace("-", ""), input_masses, ppm_tolerance)
     
@@ -312,19 +310,21 @@ def check_in_searches(b_searches, y_searches, target_left_pids, target_right_pid
 
 def check_in_merges(hybrid_merges, native_merges, good_b_searches, good_y_searches):
     good_merges = []
-    for merge in hybrid_merges:
-        left_part, right_part = merge[0], merge[1]
-        for good_b in good_b_searches:
-            if left_part == good_b[1]:
-                for good_y in good_y_searches:
-                    if right_part == good_y[1]:
-                        good_merges.append((left_part, right_part, 1))
+    for key in hybrid_merges:
+        for merge in hybrid_merges[key]:
+            left_part, right_part = merge[0], merge[1]
+            for good_b in good_b_searches:
+                if left_part == good_b[1]:
+                    for good_y in good_y_searches:
+                        if right_part == good_y[1]:
+                            good_merges.append((left_part, right_part, 1))
     
-    for merge in native_merges:
-        left_part, right_part = merge[0], merge[1]
-        for good_b in good_b_searches:
-            if left_part == good_b[1]:
-                good_merges.append((left_part, right_part, 0))
+    for key in native_merges:
+        for merge in native_merges[key]:
+            left_part, right_part = merge[0], merge[1]
+            for good_b in good_b_searches:
+                if left_part == good_b[1]:
+                    good_merges.append((left_part, right_part, 0))
                         
     if len(good_merges) > 0:
         print("Good merges were found")
@@ -338,9 +338,14 @@ def check_in_rescored_merges(rescored_merges, good_merges):
     sorted_rescored = sorted(rescored_merges, key=lambda x: (x[0], x[1]), reverse = True)
     for merge in good_merges:
         for i, remerged in enumerate(sorted_rescored):
-            if merge[0][0] == remerged[2]:
-                good_rescored.append((i, merge))
-                break                
+            if merge[0][6] != merge[1][6]:
+                if merge[0][6] + merge[1][6] == remerged[2]:
+                    good_rescored.append((i, merge))
+                    break
+            else: 
+                if merge[0][6] == remerged[2]:
+                    good_rescored.append((i, merge))
+                    break
     good = False
     for index, merge in good_rescored:
         if index < 10:

@@ -1,4 +1,4 @@
-from constants import AMINO_ACIDS, WATER_MASS, SINGLY_CHARGED_B_BASE, SINGLY_CHARGED_Y_BASE, DOUBLY_CHARGED_B_BASE, DOUBLY_CHARGED_Y_BASE, INTEGER_ORDERED_AMINO_ACIDS, PROTON_MASS
+from constants import AMINO_ACIDS, WATER_MASS, SINGLY_CHARGED_B_BASE, SINGLY_CHARGED_Y_BASE, DOUBLY_CHARGED_B_BASE, DOUBLY_CHARGED_Y_BASE, INTEGER_ORDERED_AMINO_ACIDS, PROTON_MASS, AMMONIUM
 import numpy as np
 
 def b_ions(sequence: str, charge: int = None): 
@@ -38,6 +38,35 @@ def calc_masses(sequence: str, charge: int =None, ion: str = None):
     total = WATER_MASS
     for i in range(length):
         total +=  AMINO_ACIDS[sequence[i]]
+    pre_mz_charge = 2 if charge is None else charge
+    pre_mz = (total+pre_mz_charge*PROTON_MASS)/pre_mz_charge
+    if ion is None or ion == 'b': 
+        masses += b_ions(sequence, charge=charge)
+    if ion is None or ion == 'y': 
+        masses += y_ions(sequence, charge=charge)
+    return masses, pre_mz
+
+def calc_masses_no_water(sequence: str, charge: int =None, ion: str = None):
+    masses = []
+    length = len(sequence)
+    total = 0
+    for i in range(length):
+        total +=  AMINO_ACIDS[sequence[i]]
+    pre_mz_charge = 2 if charge is None else charge
+    pre_mz = (total+pre_mz_charge*PROTON_MASS)/pre_mz_charge
+    if ion is None or ion == 'b': 
+        masses += b_ions(sequence, charge=charge)
+    if ion is None or ion == 'y': 
+        masses += y_ions(sequence, charge=charge)
+    return masses, pre_mz
+
+def calc_masses_no_ammonium(sequence: str, charge: int =None, ion: str = None):
+    masses = []
+    length = len(sequence)
+    total = WATER_MASS
+    for i in range(length):
+        total +=  AMINO_ACIDS[sequence[i]]
+    total -= AMMONIUM
     pre_mz_charge = 2 if charge is None else charge
     pre_mz = (total+pre_mz_charge*PROTON_MASS)/pre_mz_charge
     if ion is None or ion == 'b': 

@@ -61,13 +61,14 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
 
         else:
             precursor = float(content['precursorList']['precursor'][0]['selectedIonList']['selectedIon'][0]['selected ion m/z'])
+            precursor_abundance = float(content['precursorList']['precursor'][0]['selectedIonList']['selectedIon'][0]['peak intensity'])
             precursor_charge = int(content['precursorList']['precursor'][0]['selectedIonList']['selectedIon'][0]['charge state'])
 
         # get the id
         id = content.get('id', '')
 
         retention_time = content['scanList']['scan'][0]['scan start time']
-
+        
         spectra.append(
             Spectrum(
             spec_num,
@@ -77,7 +78,8 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
             precursor_charge,
             filename, 
             id,
-            retention_time
+            retention_time,
+            precursor_abundance
         ))
 
     return spectra

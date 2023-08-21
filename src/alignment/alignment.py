@@ -527,7 +527,8 @@ def pair_indices(b_search_space, y_search_space, prec_mass, prec_tol, prec_charg
                     for y in y_search_space[y_prec]:
                         # if "DLQTLAL" == b[6] and y[6] == "EVE":
                         #     print('here')
-                        if b[7] + y[7] > score_filter:
+                        # if b[7] + y[7] > (len(b[6]) + len(y[6])) / 2: #We see at least 1/8 of the peptides we would expect to
+                        if b[7] + y[7] > max(score_filter, 4): # We see at least 4 ions
                             #unique_merges[(full_seq, 1)].append(merge)
                             full_seq = b[6] + y[6]
                             if ((full_seq, 1)) not in unique_merges.keys():
@@ -548,8 +549,8 @@ def find_from_prec(converted_b, matched_masses_b, input_spectrum, ppm_tolerance,
     prec_hits = matched_masses_b[converted_b]
     for hit in prec_hits:
         if hit[4] == 2:
-            hit_score, hit_abundance = scoring.prec_score(hit, input_spectrum, ppm_tolerance, protein_list)
-            prec_matches.append((hit_score, hit_abundance, hit))
+            hit_score, tiebreaker = scoring.prec_score(hit, input_spectrum, ppm_tolerance, protein_list)
+            prec_matches.append((hit_score, tiebreaker, hit))
         
     prec_matches = sorted(prec_matches, key = lambda x: (x[0], x[1]), reverse=True)
     if len(prec_matches) != 0:

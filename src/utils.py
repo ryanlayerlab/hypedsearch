@@ -5,9 +5,6 @@ from itertools import product
 import numpy as np
 from collections import namedtuple
 
-from objects import Spectrum
-import gen_spectra
-
 import math
 import re
 
@@ -226,41 +223,6 @@ def make_sparse_array(spectrum: list, width: float, value=50) -> np.ndarray:
 
 def to_percent(index, total):
     return int(100 * (index)/total)
-
-def predicted_len(precursor_mass: float, precursor_charge: int) -> int:
-    '''The predicted length of a spectrum based on its maximum mass
-
-    :param precursor_mass: The maximum mass of the sequence
-    :type precursor_mass: float
-    :param precursor_charge: The charge of the observed precusor mass
-    :type precursor_charge: int
-
-    :returns: Predicted sequence length
-    :rtype: int
-    '''
-
-    return math.ceil(precursor_mass / gen_spectra.get_precursor('G', precursor_charge))
-
-def predicted_len_precursor(spectrum: Spectrum, sequence: str) -> int:
-    '''Make a prediction of the peptide length give a spectrum and the current 
-    sequence. 
-
-    :param spectrum: The observed spectrum 
-    :type spectrum: Spectrum
-    :param sequence: The current alignment made
-    :type sequence: str
-
-    :returns: Predicted length of a full alignment
-    :rtype: int
-    '''
-
-    # first get the theoretical precursor of the sequence
-    theoretical_prec = gen_spectra.get_precursor(sequence, spectrum.precursor_charge)
-
-    # now we can estimate length   spec/seq = real/theory
-    estimated_len = math.ceil(len(sequence) * (spectrum.precursor_mass / theoretical_prec))
-
-    return estimated_len
 
 def hashable_boundaries(boundaries: list) -> str:
     '''Turn a lower and upper bound into a string in order 
