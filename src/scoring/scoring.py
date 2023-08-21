@@ -2,7 +2,8 @@ from scoring import mass_comparisons
 from objects import Spectrum, Database
 from utils import ppm_to_da
 from preprocessing import clustering
-from constants import WATER_MASS
+from constants import WATER_MASS, AMMONIUM
+from math import exp
 import gen_spectra
 import utils
 import database
@@ -175,9 +176,10 @@ def second_scoring(natural_alignments, hybrid_alignments, input_spectrum, tol, p
         rescored_hybrids.append((score, 1/dist, b_side, y_side, 1))
     return rescored_naturals, rescored_hybrids
 
-def calc_overlap(masses, input_masses, abundances, ppm_tolerance):
+def calc_overlap(masses, input_masses, ppm_tolerance):
     total_score = 0
-    total_abundance = 0
+    tiebreaker = 1
+    ppm_sum = 0
     o_ctr, t_ctr = 0, 0
     observed = input_masses[o_ctr]
     theoretical = masses[t_ctr]
@@ -193,31 +195,37 @@ def calc_overlap(masses, input_masses, abundances, ppm_tolerance):
                 observed = input_masses[o_ctr]
         elif abs(observed-theoretical) <= tol:
             total_score = total_score + 1
-            total_abundance = abundances[o_ctr]
+            ppm_mass_error = ((observed-theoretical)/theoretical) * 1000000 #converting to ppm
+            ppm_sum += ppm_mass_error
+            similarityScore_gauss = exp(-0.5 * abs(ppm_mass_error/ppm_tolerance)**2)
+            tiebreaker = tiebreaker * similarityScore_gauss
             o_ctr = o_ctr + 1
             t_ctr = t_ctr + 1
             if o_ctr < len(input_masses) and t_ctr < len(masses):
                 observed = input_masses[o_ctr]
                 theoretical = masses[t_ctr]
                 
-    return total_score, total_abundance
+    return total_score, tiebreaker, ppm_sum
 
-def modified_overlap_scoring(sequence, input_masses, abundances, ppm_tolerance):
+def modified_overlap_scoring(sequence, input_masses, ppm_tolerance):
     spectrum = gen_spectra.gen_spectrum(sequence)
     masses = sorted(spectrum['spectrum'])
     input_masses = sorted(input_masses)
-    score = calc_overlap(masses, input_masses, abundances, ppm_tolerance)
-    return score
+    score, tiebreaker, mass_error_sum = calc_overlap(masses, input_masses, ppm_tolerance)
+    return score, tiebreaker, mass_error_sum
 
-def modified_losing_water(sequence, input_masses, abundances, ppm_tolerance):
-    spectrum = gen_spectra.gen_spectrum(sequence)
-    masses = sorted(spectrum['spectrum'])
-    minus_water = []
-    for mass in masses:
-        minus_water.append(mass - WATER_MASS)
+def modified_losing_water(sequence, input_masses, ppm_tolerance):
+    masses,_ = gen_spectra.calc_masses_no_water(sequence)
     input_masses = sorted(input_masses)
-    score = calc_overlap(minus_water, input_masses, abundances, ppm_tolerance)
-    return score
+    score, tiebreaker, mass_error_sum = calc_overlap(masses, input_masses, ppm_tolerance)
+    return score, tiebreaker, mass_error_sum
+
+def modified_losing_ammonium(sequence, input_masses, ppm_tolerance):
+    masses,_ = gen_spectra.calc_masses_no_ammonium(sequence)
+    input_masses = sorted(input_masses)
+    score, tiebreaker, mass_error_sum = calc_overlap(masses, input_masses, ppm_tolerance)
+    return score, tiebreaker, mass_error_sum
+
 
 def rescore_merges(unique_merge_space, input_spectrum, ppm_tol):
     # unique_merge_space
@@ -225,24 +233,26 @@ def rescore_merges(unique_merge_space, input_spectrum, ppm_tol):
     # value -> list of merges objects, each merges is (b, y) 
     rescored_unique = dict()
     for key, hyb in unique_merge_space:
-        score, abundance_sum = modified_overlap_scoring(key, input_spectrum.mz_values, input_spectrum.abundance, ppm_tol) # counts peaks
-        minus_water_score, minus_water_abundance_sum = modified_losing_water(key, input_spectrum.mz_values, input_spectrum.abundance, ppm_tol) # counts again but strip water
-        score += minus_water_score
-        abundance_sum += minus_water_abundance_sum
-        if (score, abundance_sum, key, hyb) not in rescored_unique.keys():
-            rescored_unique[(score, abundance_sum, key, hyb)] = []
+        score, tiebreaker, ppm_sum = modified_overlap_scoring(key, input_spectrum.mz_values, ppm_tol) # counts peaks
+        minus_water_score, minus_water_tiebreaker, minus_water_ppm_sum = modified_losing_water(key, input_spectrum.mz_values, ppm_tol) # counts again but strip water
+        minus_ammonium_score, minus_ammonium_tiebreaker, minus_ammonium_ppm_sum = modified_losing_ammonium(key, input_spectrum.mz_values, ppm_tol) # counts again but strip ammonium
+        score += minus_water_score + minus_ammonium_score
+        ppm_sum += minus_water_ppm_sum + minus_ammonium_ppm_sum
+        tiebreaker * minus_water_tiebreaker * minus_ammonium_tiebreaker
+        if (score/len(key), tiebreaker, key, hyb) not in rescored_unique.keys():
+            rescored_unique[(score, tiebreaker, key, hyb)] = []
         for b, y in unique_merge_space[(key, hyb)]:
-            rescored_unique[(score, abundance_sum, key, hyb)].append((score, abundance_sum, (b,y)))
+            rescored_unique[(score, tiebreaker, key, hyb)].append((score, tiebreaker, (b,y), ppm_sum))
     return rescored_unique
                
-def prec_overlap_scoring(input_masses, abundances, ppm_tolerance, pid, start, end, protein_list):
+def prec_overlap_scoring(input_masses, ppm_tolerance, pid, start, end, protein_list):
     sequence = clustering.find_sequence(pid, start, end, protein_list)
     spectrum = gen_spectra.gen_spectrum(sequence)
     masses = sorted(spectrum['spectrum'])
     input_masses = sorted(input_masses)
-    score = calc_overlap(masses, input_masses, abundances, ppm_tolerance)
-    return score
+    score, tiebreaker, _ = calc_overlap(masses, input_masses, ppm_tolerance)
+    return score, tiebreaker
 
 def prec_score(hit, input_spectrum, ppm_tolerance, protein_list):
-    score, abundance_sum = prec_overlap_scoring(input_spectrum.mz_values, input_spectrum.abundance, ppm_tolerance, hit[5], hit[1], hit[2], protein_list)
-    return score, abundance_sum
+    score, tiebreaker = prec_overlap_scoring(input_spectrum.mz_values, ppm_tolerance, hit[5], hit[1], hit[2], protein_list)
+    return score, tiebreaker

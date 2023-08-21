@@ -83,3 +83,5 @@ DOUBLY_CHARGED_Y_BASE = 4 * 1.007825035 + 15.99491463 - 2 * 0.0005486 #another p
 
 SINGLY_CHARGED_B_BASE = 1.007825035 - 0.0005486 #for the H to turn the residue NH on the N-terminus into NH2
 DOUBLY_CHARGED_B_BASE = 2 * 1.007825035 - 2 * 0.0005486 #adding one more proton this time to make it doubly charged
+
+AMMONIUM = 3 * 1.00782503517 + 14.003074 #NH3 weight

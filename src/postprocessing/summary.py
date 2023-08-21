@@ -62,7 +62,7 @@ def get_extensions_strings(extensions):
 
 def text_file(results: dict, txt_file_name: str) -> None:
     with open(txt_file_name, 'w') as t:
-        t.write("spectrum_id" + '\t' + "hybrid" + '\t' + "sequence" + '\t' + "total score" + '\t' + "total abundance" + '\t' + "precursor mass" + '\t' + "precursor charge" + '\t' + "left kmer" + '\t' + "right kmer" + '\t' + "b score" + '\t' + "y score" + '\t' + "prev aa" + '\t' + "next aa" + '\n')
+        t.write("spectrum_id" + '\t' + "hybrid" + '\t' + "sequence" + '\t' + "total score" + '\t' + "#peaks/length" + '\t' + "total gaussian score" + '\t' + "total mass error" + '\t' + "precursor mass" + '\t' + "precursor charge" + '\t' + "left kmer" + '\t' + "right kmer" + '\t' + "b score" + '\t' + "y score" + '\t' + "prev aa" + '\t' + "next aa" + '\n')
         for i, x in enumerate(results):
             target_alignments = x
             for alignment in target_alignments:
@@ -74,13 +74,16 @@ def text_file(results: dict, txt_file_name: str) -> None:
                 b_scores = alignment[4]
                 y_scores = alignment[5]
                 b_score_string, y_score_string = get_score_strings(b_scores, y_scores)
-                total_score = str(alignment[6])
-                total_abundance = str(alignment[7])
+                total_score = alignment[6]
+                total_gaussian_score = str(alignment[7])
                 extensions = alignment[8]
                 b_extension_strings, y_extension_strings = get_extensions_strings(extensions)
                 precursor_mass, precursor_charge = str(alignment[9]), str(alignment[10])
+                total_mass_error = str(alignment[11])
+                total_count = int(total_score * len(sequence))
+                fraction_form = str(total_count) + "/" + str(len(sequence))
                 
-                t.write(spec_num + '\t' + hybrid + '\t' + sequence + '\t' + total_score + '\t' + total_abundance + '\t' + precursor_mass + '\t' + precursor_charge + '\t' + left_protein_string + '\t' + right_protein_string + '\t' + b_score_string + '\t' + y_score_string + '\t' + b_extension_strings + '\t' + y_extension_strings + '\n')
+                t.write(spec_num + '\t' + hybrid + '\t' + sequence + '\t' + str(total_score) + '\t' + fraction_form + "\t" + total_gaussian_score + '\t' + total_mass_error + "\t" + precursor_mass + '\t' + precursor_charge + '\t' + left_protein_string + '\t' + right_protein_string + '\t' + b_score_string + '\t' + y_score_string + '\t' + b_extension_strings + '\t' + y_extension_strings + '\n')
 
 def tsv_file(results: dict, output_dir: str) -> None:
     '''

@@ -84,15 +84,11 @@ def postprocessing(alignments, db, input_spectrum, num_hybrids, num_natives):
     postprocessed_alignments = []
     db_mapping = make_db_mapping(db)
     sorted_alignments = sorted(alignments, key = lambda x: (x[0], x[1]), reverse=True)
-    prev_label = -1
-    prev_score = -1
-    prev_abundance = -1.0
-    for score, abundance, seq, label in sorted_alignments:
-        if (label < prev_label) and (prev_score <= score) and (prev_abundance <= abundance):
-            print("error here", (input_spectrum.num, score, abundance, seq, label))
     i = 0
-    if (len(sorted_alignments) > 0) and label_alignments(sorted_alignments[0]) == "Native":
-        while i < num_natives and i < len(sorted_alignments):
+    if (len(sorted_alignments) > 0):
+        max = num_hybrids if label_alignments(sorted_alignments[0]) == "Hybrid" else num_natives
+        
+        while i < max and i < len(sorted_alignments):
             alignment = sorted_alignments[i]
             alignment_info = alignments[alignment]
             label = label_alignments(alignment)
@@ -101,22 +97,9 @@ def postprocessing(alignments, db, input_spectrum, num_hybrids, num_natives):
             extended_sequence = get_extensions(alignment_info, db.proteins)
             b_scores, y_scores = get_scores(alignment_info)
             total_score = alignment[0]
-            total_abundance = alignment[1]
+            gaussian_score = alignment[1]
+            mass_error_sum = alignments[alignment][0][3]
 
-            postprocessed_alignments.append((label, left_proteins, right_proteins, sequence, b_scores, y_scores, total_score, total_abundance, extended_sequence, input_spectrum.precursor_mass, input_spectrum.precursor_charge))
-            i += 1
-    elif (len(sorted_alignments) > 0) and label_alignments(sorted_alignments[0]) == "Hybrid":
-        while i < num_hybrids and i < len(sorted_alignments):
-            alignment = sorted_alignments[i]
-            alignment_info = alignments[alignment]
-            label = label_alignments(alignment)
-            left_proteins, right_proteins = find_parent_proteins(alignment_info, db_mapping)
-            sequence = get_sequence(alignment_info, label)
-            extended_sequence = get_extensions(alignment_info, db.proteins)
-            b_scores, y_scores = get_scores(alignment_info)
-            total_score = alignment[0]
-            total_abundance = alignment[1]
-
-            postprocessed_alignments.append((label, left_proteins, right_proteins, sequence, b_scores, y_scores, total_score, total_abundance, extended_sequence, input_spectrum.precursor_mass, input_spectrum.precursor_charge))
+            postprocessed_alignments.append((label, left_proteins, right_proteins, sequence, b_scores, y_scores, total_score/len(sequence.replace("-","")), gaussian_score, extended_sequence, input_spectrum.precursor_mass, input_spectrum.precursor_charge, mass_error_sum))
             i += 1
     return postprocessed_alignments
