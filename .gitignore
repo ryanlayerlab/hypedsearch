@@ -128,9 +128,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 timelog.txt
-.DS_Store
-data/.DS_Store
-.DS_Store
+*.DS_Store
 
 # Ignored
 src/config.yaml
