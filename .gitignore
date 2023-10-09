@@ -128,12 +128,15 @@ dmypy.json
 # Pyre type checker
 .pyre/
 timelog.txt
-*.DS_Store
 
 # Ignored
 src/config.yaml
 data/output
 src/intermediate_files
+
+# Hidden attribute files
+*.DS_Store
+*.vscode
 
 .fake
 .ionide
