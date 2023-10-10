@@ -48,11 +48,11 @@ To run, open up the config.yaml and edit the filepaths and parameters in the fil
 Then cd to src directory
 Then run below command to run the program
 ```bash
-$> python3 -m src.main
+$> python3 -m main
 
 In order to see the arguments, run
 ```bash
-$> python3 -m src.main --help
+$> python3 -m main --help
 usage: main.py [-h] [--spectra-folder SPECTRA_FOLDER]
            [--database-file DATABASE_FILE] [--output-dir OUTPUT_DIR]
            [--params PARAMS] [--min-peptide-len MIN_PEPTIDE_LEN]
