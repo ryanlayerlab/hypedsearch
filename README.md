@@ -10,7 +10,7 @@ For more information about installation and usage instructions, please see the d
 `hypedsearch` is a tool for identifying both hybrid and non-hybrid proteins from mass spectrometry data. `hypedsearch` takes `mzML` and `fasta` files as inputs and outputs a dataframe with a quality score.  `hypedsearch` identifies sequences by using a method called "k-mer extension".  `hypedsearch` is noted for its speed and accuracy compared to its peers and is actively being used for the exploration for the causes of Type One Diabetes (T1D).  For more informaton of T1D, please see below.  `hypedsearch` does not have to be confined to just T1D research and can be applied to other analysis of mass spectrometry data.  `hypedsearch` was created in the Layer Lab at University Of Colorado Boulder and is 100% open source with a MIT license.
 
 ## Mass Spectrometry
-Mass Spectrometry is used to determine the components of a protein.  Proteins are composed of a series of intermingled peptide chains and these peptide chains, in turn, are composed of a series of amino acids.  A biosample is obtained, perpared by immursing it in acid to break it down into smaller components, and then fed into a mass spectrometer.  During a mass spectrometer run, the peptide chains are bombarded with hydrogen gas to break the peptide bonds, which isolates the individual amino acids.  In addition, the hydogen gas gives the individual amino acid a charge that can be weighed - this mass to charge ratio is measured in daltons. The amino acids of the sample can then be determined by comparing the mass/charges in the result set to known mass/charges.  The output of the mass spectrometer is a `mzML` file that can be fed into `hypedsearch`.  
+Mass Spectrometry is used to determine the components of a protein.  Proteins are composed of a series of intermingled peptide chains and these peptide chains, in turn, are composed of a series of amino acids.  A biosample is obtained, perpared by immersing it in acid to break it down into smaller components, and then fed into a mass spectrometer.  During a mass spectrometer run, the peptide chains are bombarded with hydrogen gas to break the peptide bonds, which isolates the individual amino acids.  In addition, the hydogen gas gives the individual amino acid a charge that can be weighed - this mass to charge ratio is measured in daltons. The amino acids of the sample can then be determined by comparing the mass/charges in the result set to known mass/charges.  The output of the mass spectrometer is a `mzML` file that can be fed into `hypedsearch`.  
 
 ## K-mer Extension
 `hypedsearch` identifies sequences by using a method called "k-mer extension".  A "k-mer" is a k long string, or in this case, a k-long sequence of amino acids. The process, at a high level, works like this:
@@ -48,11 +48,11 @@ To run, open up the config.yaml and edit the filepaths and parameters in the fil
 Then cd to src directory
 Then run below command to run the program
 ```bash
-$> python3 -m src.main
+$> python3 -m main
 
 In order to see the arguments, run
 ```bash
-$> python3 -m src.main --help
+$> python3 -m main --help
 usage: main.py [-h] [--spectra-folder SPECTRA_FOLDER]
            [--database-file DATABASE_FILE] [--output-dir OUTPUT_DIR]
            [--params PARAMS] [--min-peptide-len MIN_PEPTIDE_LEN]
