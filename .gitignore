@@ -130,7 +130,7 @@ dmypy.json
 timelog.txt
 
 # Ignored
-src/config.yaml
+# src/config.yaml
 data/output
 src/intermediate_files
 
