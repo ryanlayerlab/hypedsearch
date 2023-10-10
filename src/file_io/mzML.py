@@ -2,6 +2,15 @@ from utils import file_exists
 from objects import Spectrum
 from preprocessing import spectra_filtering
 from pyteomics import mzml
+import yaml
+
+# def prettyPrint(d, indent=0):
+#    for key, value in d.items():
+#         print('\t' * indent + str(key))
+#         if isinstance(value, dict):
+#             pretty(value, indent+1)
+#         else:
+#             print('\t' * (indent+1) + str(value))
 
 def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
     '''
@@ -30,6 +39,8 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
     content: dict
 
     for spec_num, content in enumerate(filecontents):
+        # prettyPrint(content) # testing
+        # print(yaml.dump(content))
 
         masses = list(content['m/z array'])
         abundances = list(content['intensity array'])

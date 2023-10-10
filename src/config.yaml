@@ -1,0 +1,51 @@
+# full path to the spectra folder containing all spectra files
+spectra_dir: '../data/spectra'
+# full path to the .fasta database file
+database_file: '../data/database/sample_database.fasta' 
+# full path to the output directory
+output_dir: '../data/output'
+# full path to bin directory
+bin_direc: '../bin_directory'
+
+# minimum length peptide to look for
+min_peptide_len: 3
+# maximum length peptide to look for
+max_peptide_len: 30
+# tolerance (in ppm) to allow when matching m/z peaks
+ppm_tolerance: 20
+# tolerance (in ppm) to allow when matching precursor masses
+precursor_tolerance: 10
+
+#-----------------------------------------------------------
+# NOTE: when using the filtering options below (either the peak
+# filtering or the abundance filtering), only set 1 of the values.
+# If both are set, then it defaults to the value set for peak_filter
+#-----------------------------------------------------------
+# the number of most abundant (intense) peaks to allow when filtering
+# input spectra
+num_peaks: 25
+# the minimum allowed percentage of the total intensity a peak 
+# is allowed to have to pass the filter. Values should be 
+# in the range (0, 1) 
+relative_abundance: .01
+
+# in vitro digest performed on the sample. Leave '' if none. If multiple, seperate with a ','
+digest_left: ['D']
+digest_right: ['']
+
+# printing to the console during the run
+verbose: True
+# the number of cores to allow in the search. Should be a number 
+cores: 32
+# the number of alignments to keep per hybrid spectrum
+top_hybrids: 5
+# the number of alignments to keep per native spectrum
+top_natives: 1
+# whether to make a new SQLite database
+new_db: True
+
+# Extra extra printing options for debugging the application
+debug: False
+
+# Proteins that must show up in the pipeline
+user_hybrids: ["DLQTLAL-EVE", "DLQTLAL-NAAR", "DLQTLAL-WSRM", "DPGVAQLELGG-EVEDPQVAQLELGGGPGAG"]
