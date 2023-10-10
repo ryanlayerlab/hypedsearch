@@ -25,7 +25,7 @@ class ConflictingConfigParameters(Warning):
 class Config(dict): 
     
     def __init__(self, config_file: str = DEFAULT_CONFIG_FILE): 
-        '''Load in the config file, check that all feilds are valid and raise any exceptions or warnings as neede
+        '''Load in the config file, check that all feilds are valid and raise any exceptions or warnings as needed
 
         :param str config_file: Path to the config file
             Defaults to './config.yaml'
