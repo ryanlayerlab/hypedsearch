@@ -409,7 +409,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
     fall_off = None
     if make_new:
         dbf = database_file(max_peptide_len, True)
-        kv_prots = [(k, v) for k, v in db.proteins]    
+        kv_prots = [(k, v) for k, v in db.proteins]
         merge_search.modified_make_database_set(kv_prots, max_peptide_len, dbf, (digest_left, digest_right))
 
     result_list = []
@@ -423,7 +423,7 @@ def id_spectra(spectra_files: list, db: database, verbose: bool = True,
         verbose and print('Loading spectra finish.')
         #this is where the magic happens
         results = align(spectra,precursor_tolerance,db,ppm_tolerance,max_peptide_len,cores,num_hybrids,num_natives)
-        print('\nFinished search. Writting results to {}...'.format(output_dir))
+        print('\nFinished search. Writing results to {}...'.format(output_dir))
         generate_to_txt(results, file, output_dir)
 
     return result_list
