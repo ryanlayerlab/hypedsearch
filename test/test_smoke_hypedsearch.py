@@ -2,7 +2,7 @@ import sys, os.path
 import unittest
 import shutil
 
-src_path = (os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) + '/src/')
+src_path = (os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 sys.path.append(src_path)
 import runner, utils, database, gen_spectra, database_preprocessing
 
@@ -11,39 +11,47 @@ from objects import Spectrum
 from constants import AMINO_ACIDS, SINGLY_CHARGED_B_BASE, DOUBLY_CHARGED_B_BASE, SINGLY_CHARGED_Y_BASE, DOUBLY_CHARGED_Y_BASE, PROTON_MASS, WATER_MASS
 
 class Test_Main(unittest.TestCase):
-        def get_arguments(self):
-            dirname = os.path.dirname(__file__)
-            spectra_file_paths = [os.path.join(dirname, '../data/spectra/NOD2_E3/NOD2_E3.mzML')]  
-            database_file_path = os.path.join(dirname, '../data/database/sample_database.fasta')
-            database_file = database.build(database_file_path)
-            output_dir = '../output'
-            min_peptide_len = 3
-            max_peptide_len = 30
-            ppm_tolerance = 20
-            precursor_tolerance = 10
-            verbose = False
-            peak_filter = 25
-            relative_abundance_filter = .01
-            digest = ''
-            debug = False
-            cores = 1
-            n = 5
-            truth_set = ''
+    def get_arguments(self):
+        dirname = os.path.dirname(__file__)
+        # spectra_file_paths = [os.path.join(dirname, '../data/spectra/NOD2_E3/NOD2_E3.mzML')]  
+        # spectra_file_paths = [os.path.join(dirname, '..', 'data', 'spectra', 'NOD2_E3', 'NOD2_E3.mzML')] 
+        spectra_file_paths = [os.path.join(dirname, '..', 'data', 'spectra')]  
+        # database_file_path = os.path.join(dirname, '../data/database/sample_database.fasta')
+        database_file_path = os.path.join(dirname, '..', 'data', 'database', 'sample_database.fasta')
+        database_file = database.build(database_file_path)
+        # output_dir = '../output'
+        output_dir = os.path.join(dirname, '..', 'data', 'output')
+        min_peptide_len = 3
+        max_peptide_len = 30
+        ppm_tolerance = 20
+        precursor_tolerance = 10
+        verbose = False
+        peak_filter = 25
+        relative_abundance_filter = .01
+        digest_left, digest_right = '', ''
+        num_hybrids, num_natives = 5, 5
+        debug = False
+        cores = 1
+        n = 5
+        truth_set = ''
+        new_db = ''
 
-            return {'spectra_files': spectra_file_paths, 'database_file': database_file,
-                'output_dir': output_dir, 'min_peptide_len': min_peptide_len,
-                'max_peptide_len': max_peptide_len,'tolerance': ppm_tolerance,
-                'precursor_tolerance': precursor_tolerance,'verbose': verbose, 
-                'peak_filter': peak_filter, 'relative_abundance_filter': relative_abundance_filter,
-                'digest': digest, 'DEBUG': debug, 'cores': cores,'n': n,
-                'truth_set': truth_set}        
-    
-        def test_runner(self):  
-            arguments = self.get_arguments()
-            matched_spectra = runner.run(arguments)
-            actual = len(matched_spectra)
-            expected = 1
-            self.assertEqual(expected, actual, 'matched_spectra length is three')
+        return {'spectra_files': spectra_file_paths, 'database_file': database_file,
+            'output_dir': output_dir, 'min_peptide_len': min_peptide_len,
+            'max_peptide_len': max_peptide_len,'tolerance': ppm_tolerance,
+            'precursor_tolerance': precursor_tolerance,'verbose': verbose, 
+            'peak_filter': peak_filter, 'relative_abundance_filter': relative_abundance_filter,
+            'digest_left': digest_left, 'digest_right': digest_right, 
+            'num_hybrids': num_hybrids, 'num_natives': num_natives, 
+            'DEBUG': debug, 'cores': cores,'n': n,
+            'truth_set': truth_set, 'new_db': new_db}        
+
+    def test_runner(self):  
+        arguments = self.get_arguments()
+        matched_spectra = runner.run(arguments)
+        actual = len(matched_spectra)
+        expected = 1
+        self.assertEqual(expected, actual, 'matched_spectra length is three')
 
 
 if __name__ == "__main__":
