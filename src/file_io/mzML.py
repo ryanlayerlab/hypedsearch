@@ -2,7 +2,6 @@ from utils import file_exists
 from objects import Spectrum
 from preprocessing import spectra_filtering
 from pyteomics import mzml
-import yaml
 
 # def prettyPrint(d, indent=0):
 #    for key, value in d.items():
@@ -32,11 +31,8 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
         print('File {} not found. Please make sure that this file exists'.format(filename))
         return
 
-    spectra = []
-    
+    spectra = [] 
     filecontents = mzml.read(filename)
-
-    content: dict
 
     for spec_num, content in enumerate(filecontents):
         # prettyPrint(content) # testing
@@ -65,15 +61,17 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
         # we will assume its the first entry in the list
         precursor = None
         precursor_charge = 0
+        precursor_abundance = 0
 
         if not len(content['precursorList']['precursor']) or not len(content['precursorList']['precursor'][0]['selectedIonList']['selectedIon']):
             precursor = max(masses)
             precursor_charge = 1
 
         else:
-            precursor = float(content['precursorList']['precursor'][0]['selectedIonList']['selectedIon'][0]['selected ion m/z'])
-            precursor_abundance = float(content['precursorList']['precursor'][0]['selectedIonList']['selectedIon'][0]['peak intensity'])
-            precursor_charge = int(content['precursorList']['precursor'][0]['selectedIonList']['selectedIon'][0]['charge state'])
+            selected_ion = content['precursorList']['precursor'][0]['selectedIonList']['selectedIon'][0]
+            precursor = float(selected_ion.get('selected ion m/z', 0))
+            precursor_charge = int(selected_ion.get('charge state', 0))
+            precursor_abundance = float(selected_ion.get('peak intensity', 0))
 
         # get the id
         id = content.get('id', '')
