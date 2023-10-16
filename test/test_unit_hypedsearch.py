@@ -1,10 +1,11 @@
 import sys, os.path  
 import unittest
 import shutil
+import database_preprocessing
 
-src_path = (os.path.abspath(os.path.join(os.path.dirname(__file__), '..')) + '/src/')
+src_path = (os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 sys.path.append(src_path)
-import runner, utils, database, gen_spectra, database_preprocessing
+import runner, utils, database, gen_spectra
 
 from alignment import alignment_utils
 from objects import Spectrum
@@ -41,14 +42,15 @@ class Test_Main(unittest.TestCase):
         self.assertEqual(utils.to_percent(value1, total1), 53)
         self.assertEqual(utils.to_percent(value2, total2), 6)
     
-    def test_predicted_len(self):
-        #Run the utils.predicted_len function with two different precursor masses.
-        precursor = 240 #Expected len would be 4
-        charge = 1
-        self.assertEqual(utils.predicted_len(precursor, charge), 4)
-        precursor = precursor * 5
-        charge = charge + 1 #Expected len would be 32
-        self.assertEqual(utils.predicted_len(precursor, charge), 32)
+    # predicted_len doesn't exist inside util.py
+    # def test_predicted_len(self):
+    #     #Run the utils.predicted_len function with two different precursor masses.
+    #     precursor = 240 #Expected len would be 4
+    #     charge = 1
+    #     self.assertEqual(utils.predicted_len(precursor, charge), 4)
+    #     precursor = precursor * 5
+    #     charge = charge + 1 #Expected len would be 32
+    #     self.assertEqual(utils.predicted_len(precursor, charge), 32)
     
     def test_hashable_boundaries(self):
         #run the hashable_boundaries function with two lists of boundaries
