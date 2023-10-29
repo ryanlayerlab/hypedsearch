@@ -1,4 +1,4 @@
-from objects import SequenceAlignment, Alignments
+from lookups.objects import SequenceAlignment, Alignments
 
 def __is_swap_up_to_dist(a: str, b: str, i: int, j: int, dist: int, d: list) -> list:
     '''

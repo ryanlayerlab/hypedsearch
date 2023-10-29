@@ -1,6 +1,6 @@
 from pyrsistent import s
-from utils import file_exists
-from objects import Spectrum
+from lookups.utils import file_exists
+from lookups.objects import Spectrum
 from preprocessing import spectra_filtering
 from pyteomics import mzxml
 

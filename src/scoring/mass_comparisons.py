@@ -1,10 +1,8 @@
-from gen_spectra import calc_masses
-from utils import ppm_to_da, hashable_boundaries
+from computational_pipeline.gen_spectra import calc_masses
+from lookups.utils import ppm_to_da, hashable_boundaries
 
 from bisect import bisect
 
-
-#   CREATED JULY 1 2020
 def optimized_compare_masses(
     observed: list, 
     reference: list, 
@@ -49,18 +47,14 @@ def optimized_compare_masses(
     for obs in observed:
         observed_boundaries += boundaries(obs)
         
-    #hack
-    #the_type = type(reference) #python = 'dict' #cpp = 'list'
     updated_reference = reference      
     if isinstance(updated_reference,dict):
         reference = updated_reference.get('spectrum')
     
-    # local variables for score
     return_value = 0
     for ref in reference:
         if bisect(observed_boundaries, ref) % 2:
             return_value = return_value + 1
-    # return_value = sum([1 for ref in reference if bisect(observed_boundaries, ref) % 2])
     return return_value
     
 

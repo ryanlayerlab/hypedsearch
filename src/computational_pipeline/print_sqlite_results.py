@@ -1,14 +1,7 @@
 
-# Import the python module - sqlite3
 import sqlite3
-
-# Create database connection to a main database which is stored in a file
 connectionObject = sqlite3.connect("kmers.db")
-
-# Obtain a cursor object
 cursorObject = connectionObject.cursor()
-
-# Print the tables and indices present in the SQLite main database
 cursorObject.execute("select * from SQLite_master")
 tables = cursorObject.fetchall()
 print("Listing tables and indices from main database:")
