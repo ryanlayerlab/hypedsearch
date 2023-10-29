@@ -19,7 +19,7 @@ import os
 from computational_pipeline.gen_spectra import convert_precursor_to_ion, calc_masses
 from scoring.scoring import second_scoring, rescore_merges
 from alignment.alignment import find_alignments
-import finding_seqs
+import computational_pipeline.finding_seqs
 
 ID_SPECTRUM = 0
 MULTIPROCESSING = 0
@@ -221,26 +221,6 @@ def group_by_uniqueness(natives, hybrids):
         unique_merges[(full_seq, 0)].append(merge)
     return unique_merges
             
-# def get_distribution(hybrids):
-#     scores = dict()
-#     score_list, frequency = [], []
-#     for hybrid in hybrids:
-#         score = hybrid[0]
-#         if score not in scores.keys():
-#             scores[score] = 0
-#         scores[score] = scores[score] + 1
-    
-#     for score in scores.keys():
-#         frequency.append(scores[score])
-#         score_list.append(score)
-    
-#     fig1, ax1 = plt.subplots()
-#     ax1.bar(score_list, frequency)
-#     plt.title('Distribution of scores')
-#     plt.xlabel('Scores')
-#     plt.ylabel('Number of merges with this score')
-#     plt.savefig("Score_Distribution.png")
-
 class alignment_info:
     def __init__(self, max_peptide_len, precursor_tolerance, database, ppm_tolerance, results_len, num_hybrids, num_natives) -> None:
         self.max_pep_len = max_peptide_len
@@ -391,15 +371,8 @@ def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, numc
         y = p.map(x, spectra)
     return y
 
-# def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, numcores, digest_left, digest_right): #Version of align for when multiprocessing doesn't work
-#     all_alignment_infos = []
-#     for spectrum in spectra:
-#         spectra_length = len(spectra)
-#         alignment_info = create_alignment_info(spectrum, max_peptide_len,precursor_tolerance,db,ppm_tolerance,spectra_length, (digest_left, digest_right))
-#         all_alignment_infos.append(alignment_info)
-#     return all_alignment_infos
     
-def id_spectra(spectra_files: list, db: database, verbose: bool = True,
+def id_spectra(spectra_files: list, db: computational_pipeline.database, verbose: bool = True,
     min_peptide_len: int = 5, max_peptide_len: int = 10, peak_filter: int = 0, 
     relative_abundance_filter: float = 0.0,ppm_tolerance: int = 20, 
     precursor_tolerance: int = 10, digest_left: str = '', digest_right: str = '', cores: int = 1, make_new: bool = False,

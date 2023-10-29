@@ -11,8 +11,6 @@ prec_tol = 10
 max_pep_len = 10
 
 dataset_id = 'BMEM_searches'    
-
-
 prot_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/UniProt_mouse.fasta'
 proteins = database.build(prot_path)
 

@@ -3,7 +3,7 @@ import argparse
 import sys
 import distutils
 from lookups.objects import Database
-import lookups.utils, runner, src.computational_pipeline.database
+import lookups.utils, runner, computational_pipeline.database
 from config_loader import Config
 from postprocessing import summary, review
 
