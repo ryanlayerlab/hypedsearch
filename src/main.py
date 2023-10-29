@@ -2,8 +2,8 @@ import os
 import argparse
 import sys
 import distutils
-from src.constants.objects import Database
-import src.constants.utils, runner, src.computational_pipeline.database
+from constants.objects import Database
+import constants.utils, runner, src.computational_pipeline.database
 from config_loader import Config
 from postprocessing import summary, review
 
@@ -12,6 +12,11 @@ def string_to_bool(s: str) -> bool:
     if s.lower() == 'false' or 'f' in s.lower():
         return False
     return True
+
+def boolean_string(s):
+    if s not in {'False', 'True'}:
+        raise ValueError('Not a valid boolean string')
+    return s == 'False'
 
 def get_spectra_files(spectra_folder):
     spectra_files = []
@@ -63,11 +68,6 @@ def set_args(args) -> dict:
         'relative_abundance_filter': relative_abundance_filter, 'digest_left': digest_left, 'digest_right': digest_right, 'DEBUG': debug, 
         'cores': cores,'num_hybrids': num_hybrids, 'num_natives': num_natives, 'new_db': make_new}
     
-def boolean_string(s):
-    if s not in {'False', 'True'}:
-        raise ValueError('Not a valid boolean string')
-    return s == 'False'
-
 def main(args: object) -> None:
     arguments = set_args(args)
     runner.run(arguments)
