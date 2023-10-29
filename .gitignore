@@ -130,9 +130,9 @@ dmypy.json
 timelog.txt
 
 # Ignored
-# src/config.yaml
+config.yaml
 data/output
-src/intermediate_files
+intermediate_files
 
 # Hidden attribute files
 *.DS_Store
