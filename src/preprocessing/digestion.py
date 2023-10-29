@@ -1,4 +1,4 @@
-from objects import Database, DatabaseEntry
+from src.constants.objects import Database, DatabaseEntry
 from collections import defaultdict
 
 import json 
@@ -85,79 +85,79 @@ def digest(db: Database, digest_type: str, missed_cleavages: int) -> Database:
     db = db._replace(proteins=new_prots)
     return db
 
-def digestion_filtering(sequences: list, digest_type: str, missed_cleavages: int) -> list:
-    '''
-    Take in a list of sequences, remove any of those that do not follow 
-    one of the rules of the digest, and return. 
+# def digestion_filtering(sequences: list, digest_type: str, missed_cleavages: int) -> list:
+#     '''
+#     Take in a list of sequences, remove any of those that do not follow 
+#     one of the rules of the digest, and return. 
 
-    Example:
-        sequences = [DLAT, MALW, SSWQTK, RRRTRK]
-        digest_type = trypsin
-        missed_cleavages = 2
+#     Example:
+#         sequences = [DLAT, MALW, SSWQTK, RRRTRK]
+#         digest_type = trypsin
+#         missed_cleavages = 2
 
-        outputs = [DLAT, SSWQTK]
+#         outputs = [DLAT, SSWQTK]
 
-    If a sequence is passed in that has more cleavages in it than we can 
-    allow, it is also filtered out
+#     If a sequence is passed in that has more cleavages in it than we can 
+#     allow, it is also filtered out
 
-    Inputs:
-        sequences:          (list) peptide sequences
-        digest_type:        (str) the digest type we are looking at
-        missed_cleavages:   (int) the number of missed cleavages to allow
-    Outputs:    
-        (list) filtered down peptide sequences
-    '''
+#     Inputs:
+#         sequences:          (list) peptide sequences
+#         digest_type:        (str) the digest type we are looking at
+#         missed_cleavages:   (int) the number of missed cleavages to allow
+#     Outputs:    
+#         (list) filtered down peptide sequences
+#     '''
 
-    # first check if the digest type is a valid one
-    if digest_type not in digests:
-        return sequences
+#     # first check if the digest type is a valid one
+#     if digest_type not in digests:
+#         return sequences
 
-    filtered = []
+#     filtered = []
 
-    # an easier way for us to check if the rules are followed
-    digest_rules = digests[digest_type]
+#     # an easier way for us to check if the rules are followed
+#     digest_rules = digests[digest_type]
 
-    # keep track of the digest rules 
-    starts = {s['amino_acid']: s['cut_position'] for s in digest_rules['start']}
-    ends = {s['amino_acid']: s['cut_position'] for s in digest_rules['end']}
+#     # keep track of the digest rules 
+#     starts = {s['amino_acid']: s['cut_position'] for s in digest_rules['start']}
+#     ends = {s['amino_acid']: s['cut_position'] for s in digest_rules['end']}
 
-    # we only care about the starts if cut_position is left 
-    # similarly, we only care about the ends of cut position is right
-    leading = {
-        s['amino_acid']: s['cut_position'] \
-        for s in digest_rules['start'] if s['cut_position'] == 'left'
-    }
-    ending = {
-        s['amino_acid']: s['cut_position'] \
-        for s in digest_rules['end'] if s['cut_position'] == 'right'
-    }
+#     # we only care about the starts if cut_position is left 
+#     # similarly, we only care about the ends of cut position is right
+#     leading = {
+#         s['amino_acid']: s['cut_position'] \
+#         for s in digest_rules['start'] if s['cut_position'] == 'left'
+#     }
+#     ending = {
+#         s['amino_acid']: s['cut_position'] \
+#         for s in digest_rules['end'] if s['cut_position'] == 'right'
+#     }
 
-    for sequence in sequences:
+#     for sequence in sequences:
 
-        # first check if the start or end follow the rules
-        # set to true if we have nothing in the respective dict
-        follows_first = len(leading) == 0 
-        follows_last = len(ending) == 0
+#         # first check if the start or end follow the rules
+#         # set to true if we have nothing in the respective dict
+#         follows_first = len(leading) == 0 
+#         follows_last = len(ending) == 0
 
-        # lets first check left position
-        if len(leading) and sequence[0] in leading:
-            follows_first = True
+#         # lets first check left position
+#         if len(leading) and sequence[0] in leading:
+#             follows_first = True
 
-        # check the end
-        if len(ending) and sequence[-1] in ending:
-            follows_last = True 
+#         # check the end
+#         if len(ending) and sequence[-1] in ending:
+#             follows_last = True 
 
-        # if neither tule is followed, continue
-        if not (follows_first or follows_last):
-            continue
+#         # if neither tule is followed, continue
+#         if not (follows_first or follows_last):
+#             continue
 
-        # make sure that we only have at most missed missed_cleavages number
-        # of both starts and ends
-        num_missed = len([aa for aa in sequence if aa in starts])
-        num_missed += len([aa for aa in sequence if aa in ends])
+#         # make sure that we only have at most missed missed_cleavages number
+#         # of both starts and ends
+#         num_missed = len([aa for aa in sequence if aa in starts])
+#         num_missed += len([aa for aa in sequence if aa in ends])
 
-        # final filtering: if we have missed <= allowed, then add it to filtered
-        if num_missed <= missed_cleavages:
-            filtered.append(sequence)
+#         # final filtering: if we have missed <= allowed, then add it to filtered
+#         if num_missed <= missed_cleavages:
+#             filtered.append(sequence)
 
-    return filtered
+#     return filtered

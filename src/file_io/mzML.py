@@ -1,5 +1,5 @@
 from utils import file_exists
-from objects import Spectrum
+from src.constants.objects import Spectrum
 from preprocessing import spectra_filtering
 from pyteomics import mzml
 import yaml
