@@ -31,7 +31,10 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
 
         else:
             precursor = float(content['precursorList']['precursor'][0]['selectedIonList']['selectedIon'][0]['selected ion m/z'])
-            precursor_abundance = float(content['precursorList']['precursor'][0]['selectedIonList']['selectedIon'][0]['peak intensity'])
+            if 'peak intensity' in content['precursorList']['precursor'][0]['selectedIonList']['selectedIon'][0]:
+                precursor_abundance = float(content['precursorList']['precursor'][0]['selectedIonList']['selectedIon'][0]['peak intensity'])
+            else:
+                precursor_abundance = None
             precursor_charge = int(content['precursorList']['precursor'][0]['selectedIonList']['selectedIon'][0]['charge state'])
         id = content.get('id', '')
         retention_time = content['scanList']['scan'][0]['scan start time']

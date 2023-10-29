@@ -118,7 +118,6 @@ def create_hits(spec_num,spectrum,matched_masses_b,matched_masses_y,b_prec,y_pre
     for tuple in matched_masses_y[y_prec]:
         tup = (spec_num, y_prec, tuple)
         y_hits.append(tup)
-        # write_hits(b_hits, y_hits, location)
     return b_hits, y_hits
 
 def handle_DEV_setup(truth):
@@ -237,29 +236,29 @@ class alignment_info:
 def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len, num_hybrids, num_natives):
     print(f'\rCreating an alignment for {spectrum.num}/{results_len} [{to_percent(spectrum.num + 1, results_len)}%]', end='')
     id_time = time.time()
-    target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = finding_seqs.get_target_data("DPQVAQLELGG-EVEDPQVAQLELGGGPGAG", db, spectrum.mz_values, ppm_tol, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
+    target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = computational_pipeline.finding_seqs.get_target_data("DPQVAQLELGG-EVEDPQVAQLELGGGPGAG", db, spectrum.mz_values, ppm_tol, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
     converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol)
-    good_b_entries, good_y_entries = finding_seqs.check_in_matched_masses(matched_masses_b, matched_masses_y, target_left_pids, target_left_indices, target_right_pids, target_right_indices)
+    good_b_entries, good_y_entries = computational_pipeline.finding_seqs.check_in_matched_masses(matched_masses_b, matched_masses_y, target_left_pids, target_left_indices, target_right_pids, target_right_indices)
     
     best_prec_hit, score_filter = alignment.find_from_prec(converted_b, matched_masses_b, spectrum, ppm_tol, db.proteins)
     
     b_hits, y_hits = do_first_thing(spectrum, converted_b, converted_y, matched_masses_b, matched_masses_y, spectrum.num)
     b_sorted_clusters, y_sorted_clusters = do_second_thing(db, converted_b, converted_y, b_hits, y_hits, spectrum.precursor_charge, ppm_tol, spectrum.num)
-    good_b_clusters, good_y_clusters = finding_seqs.check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_entries, good_y_entries)
+    good_b_clusters, good_y_clusters = computational_pipeline.finding_seqs.check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_entries, good_y_entries)
     
     b_search_space, y_search_space = clustering.get_search_space(b_sorted_clusters, y_sorted_clusters, spectrum.precursor_charge)
-    good_b_searches, good_y_searches = finding_seqs.check_in_searches(b_search_space, y_search_space, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_seq, spectrum.precursor_charge, ppm_tol)
+    good_b_searches, good_y_searches = computational_pipeline.finding_seqs.check_in_searches(b_search_space, y_search_space, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_seq, spectrum.precursor_charge, ppm_tol)
     
     start_time = time.time()
     unique_native_merged_seqs = alignment.pair_natives(b_search_space, y_search_space, spectrum.precursor_mass, prec_tol)
     unique_hybrid_merged_seqs = alignment.pair_indices(b_search_space, y_search_space, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, score_filter)
-    good_merged_seqs = finding_seqs.check_in_merges(unique_hybrid_merged_seqs, unique_native_merged_seqs, good_b_searches, good_y_searches)
+    good_merged_seqs = computational_pipeline.finding_seqs.check_in_merges(unique_hybrid_merged_seqs, unique_native_merged_seqs, good_b_searches, good_y_searches)
     with open('Timing_data.txt', 'a') as t:
         t.write("For spectrum: " + str(spectrum.num) +" pairing took:" + '\t' + str(time.time() - start_time) + "\n")
     
     unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
     unique_rescored = rescore_merges(unique_merges, spectrum, ppm_tol)
-    good_rescored = finding_seqs.check_in_rescored_merges(unique_rescored, good_merged_seqs)
+    good_rescored = computational_pipeline.finding_seqs.check_in_rescored_merges(unique_rescored, good_merged_seqs)
     
     postprocessed_alignments = do_eigth_thing(db, unique_rescored, spectrum, num_hybrids, num_natives)
     with open('Timing_data.txt', 'a') as t:
@@ -364,13 +363,10 @@ def do_first_thing(spectrum, converted_b, converted_y, matched_masses_b, matched
     return b_hits,y_hits
 
 def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, numcores, num_hybrids, num_natives):
-    with Pool(numcores) as p:
-        y, spec_nums = [], []
-        [spec_nums.append(i) for i in range(0, len(spectra))]
-        x = alignment_info(max_peptide_len,precursor_tolerance,db,ppm_tolerance,len(spectra),num_hybrids,num_natives)
-        y = p.map(x, spectra)
-    return y
-
+    y, spec_nums = [], []
+    [spec_nums.append(i) for i in range(0, len(spectra))]
+    x = alignment_info(max_peptide_len,precursor_tolerance,db,ppm_tolerance,len(spectra),num_hybrids,num_natives)
+    y = map(x, spectra)
     
 def id_spectra(spectra_files: list, db: computational_pipeline.database, verbose: bool = True,
     min_peptide_len: int = 5, max_peptide_len: int = 10, peak_filter: int = 0, 

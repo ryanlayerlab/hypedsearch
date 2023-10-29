@@ -90,22 +90,17 @@ def find_by_precursor(spectrum, prec_tol, protein_list, ppm_tol):
     return scored
 
 def arePermutation(str1, str2):
-    # Get lengths of both strings
     n1 = len(str1)
     n2 = len(str2)
  
-    # If length of both strings is not same,
-    # then they cannot be Permutation
     if (n1 != n2):
         return False
  
-    # Sort both strings
     a = sorted(str1)
     str1 = " ".join(a)
     b = sorted(str2)
     str2 = " ".join(b)
  
-    # Compare sorted strings
     for i in range(0, n1, 1):
         if (str1[i] != str2[i]):
             return False
@@ -119,7 +114,7 @@ def check_for_good_hit(scored_hits):
     while arePermutation(top_hit[2], next_hit[2]):
         next_hit = scored_hits[counter]
         counter = counter + 1
-    if top_hit[0] - next_hit[0] > 1: #the constant here can be changed with better data
+    if top_hit[0] - next_hit[0] > 1: 
         return True
     else:
         return False

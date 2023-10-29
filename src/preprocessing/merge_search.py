@@ -34,52 +34,15 @@ def handle_sorting_keys(db_dict_b, db_dict_y, kmer_list):
     for mz in sorted_y_keys:
         modified_sort_masses_in_sorted_keys_y(db_dict_y,mz,kmer_list)
 
-# def encode_kmer(kmer):
-#     # code = ''
-#     # for char in kmer:
-#     #     encoded = ENCODED[char]
-#     #     code = code + encoded
-#     # code = int(code)
-#     mBytes = kmer.encode("utf-8")
-#     code = int.from_bytes(mBytes, byteorder="big")
-#     return code
-
 def get_data(kmer, start, end, protein_num, ion):
     data_list = []
     for charge in [1,2]:
-        # if kmer == "DPQVAQLELGG":
-        #     print("here")
-        mass = gen_spectra.max_mass(kmer, ion=ion, charge=charge) #1108.563316435
+        mass = computational_pipeline.gen_spectra.max_mass(kmer, ion=ion, charge=charge) #1108.563316435
         ion_int = 0 if ion == 'b' else 1
-        # code = encode_kmer(kmer)
         input_tuple = (mass, start, end, ion_int, charge, protein_num)
         data_list.append(input_tuple)
-
     return data_list
             
-# def db_make_set_for_protein(i,prot,max_len, dbf, data, digest):
-#     seq_len = len(prot)
-#     count_max = 1000000
-#     for size in range(2, max_len + 1):
-#         # size -> [2, max_len]
-#         for start in range(0, seq_len - size + 1):
-#             end = start + size
-#             kmer = prot[start:end]
-#             bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
-#             if not any (x in bad_chars for x in kmer):
-                
-#             # last_index = seq - size 6, end = start + size - 1 = 7
-#             # [data.append(x) for x in get_data(kmer, start, end)]
-#                 for ion in 'by':
-#                     data_list = get_data(kmer, start, end, i, ion)
-#                     data.extend(data_list)
-#                 # insertion code
-#                 if len(data) > count_max:
-#                     dbf.insert(data)
-#                     data.clear()
-            
-#     return
-
 def db_make_set_for_protein_digest(i,prot,max_len, dbf, data, digest):
     seq_len = len(prot)
     count_max = 1000000
