@@ -1,10 +1,9 @@
 from file_io import spectra
-from utils import ppm_to_da
-from constants import DOUBLY_CHARGED_B_BASE, DOUBLY_CHARGED_Y_BASE, PROTON_MASS, WATER_MASS
-from gen_spectra import get_total_sum, convert_precursor_to_ion, get_precursor, gen_spectrum
-from sqlite import database_file
+from lookups.utils import ppm_to_da
+from lookups.constants import DOUBLY_CHARGED_B_BASE, DOUBLY_CHARGED_Y_BASE, PROTON_MASS, WATER_MASS
+from computational_pipeline.gen_spectra import get_total_sum, convert_precursor_to_ion, get_precursor, gen_spectrum
+from computational_pipeline.sqlite import database_file
 
-# turn the all spectra list into a list of boundaries
 def make_boundaries(mz, ppm_tol):
     da_tol = ppm_to_da(mz, ppm_tol)
     return [mz - da_tol, mz + da_tol]

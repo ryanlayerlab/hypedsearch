@@ -1,14 +1,14 @@
 from scoring import scoring
-from objects import Spectrum, SequenceAlignment, HybridSequenceAlignment, Database, Alignments, DEVFallOffEntry
-from constants import PROTON_MASS, WATER_MASS
+from lookups.objects import Spectrum, SequenceAlignment, HybridSequenceAlignment, Database, Alignments, DEVFallOffEntry
+from lookups.constants import PROTON_MASS, WATER_MASS
 from alignment import alignment_utils, hybrid_alignment
-from gen_spectra import get_precursor
+from computational_pipeline.gen_spectra import get_precursor
 from preprocessing.clustering import calc_from_sequences
-import objects
-import utils
-import database
-import gen_spectra
-from sqlite import database_file
+import lookups.objects as objects
+import lookups.utils
+import computational_pipeline.database
+import computational_pipeline.gen_spectra
+from computational_pipeline.sqlite import database_file
 
 import math
 import collections

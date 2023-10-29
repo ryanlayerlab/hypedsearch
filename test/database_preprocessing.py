@@ -6,7 +6,7 @@ import sys
 import os
 path_to_src = (os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append(path_to_src)
-from src.objects import Database, Spectrum, MPSpectrumID, DEVFallOffEntry
+from src.constants.objects import Database, Spectrum, MPSpectrumID, DEVFallOffEntry
 from src.preprocessing import merge_search, preprocessing_utils
 from src import database
 from src.file_io import JSON

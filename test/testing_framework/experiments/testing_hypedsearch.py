@@ -19,7 +19,7 @@ if module_path not in sys.path:
 from collections import defaultdict, namedtuple
 from pyteomics import fasta
 
-import identification, objects, runner, utils, gen_spectra, scoring, main
+import identification, src.constants.objects as objects, runner, utils, gen_spectra, scoring, main
 import testing_utils
 # DEFINE THE DATA
 

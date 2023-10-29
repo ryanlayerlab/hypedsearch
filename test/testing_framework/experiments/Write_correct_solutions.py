@@ -15,7 +15,7 @@ import testing_utils
 from constants import WATER_MASS, SINGLY_CHARGED_B_BASE, SINGLY_CHARGED_Y_BASE
 from preprocessing import merge_search, preprocessing_utils
 from collections import defaultdict
-from objects import Spectrum
+from src.constants.objects import Spectrum
 
 #Assumptions:
 max_peptide_length = 20

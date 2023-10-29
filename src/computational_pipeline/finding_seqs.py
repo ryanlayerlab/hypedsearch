@@ -1,5 +1,5 @@
-import gen_spectra
-from utils import ppm_to_da
+import computational_pipeline.gen_spectra
+from lookups.utils import ppm_to_da
 
 def overlap_scoring(sequence, input_masses, ppm_tolerance):
     total_score = 0

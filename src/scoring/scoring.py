@@ -1,24 +1,21 @@
 from scoring import mass_comparisons
-from objects import Spectrum, Database
-from utils import ppm_to_da
+from lookups.objects import Spectrum, Database
+from lookups.utils import ppm_to_da
 from preprocessing import clustering
-from constants import WATER_MASS, AMMONIUM
+from lookups.constants import WATER_MASS, AMMONIUM
 from math import exp
-import gen_spectra
-import utils
-import database
-
+import computational_pipeline.gen_spectra
+import lookups.utils
+import computational_pipeline.database
 import re
-
-# load digests json for digest scoring
 import json 
 import os
 
 script_dir = os.path.dirname(__file__)
 json_dir = '/'.join(script_dir.split('/')[:-1])
-digest_file = os.path.join(json_dir, 'digests.json')
+#digest_file = os.path.join(json_dir, 'digests.json')
 
-digests = json.load(open(digest_file, 'r'))
+#digests = json.load(open(digest_file, 'r'))
 
 def calc_mass_given_other_explanations(unique_m, seq, mz):
     oEXPnum = (len(unique_m[mz]) - 1)/ len(unique_m[mz])
