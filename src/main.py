@@ -2,8 +2,8 @@ import os
 import argparse
 import sys
 import distutils
-from constants.objects import Database
-import constants.utils, runner, src.computational_pipeline.database
+from lookups.objects import Database
+import lookups.utils, runner, src.computational_pipeline.database
 from config_loader import Config
 from postprocessing import summary, review
 
@@ -70,7 +70,7 @@ def set_args(args) -> dict:
     
 def main(args: object) -> None:
     arguments = set_args(args)
-    runner.run(arguments)
+    #runner.run(arguments)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Tool for identifying proteins, both hybrid and non hybrid from MS/MS data')

@@ -2,23 +2,21 @@ from multiprocessing import Pool, set_start_method
 import operator
 from typing import Any
 from collections import ChainMap
-# import matplotlib.pyplot as plt
-
 from postprocessing.postprocessing_utils import postprocessing
 from postprocessing.summary import generate_to_txt
-from src.constants.objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry
+from lookups.objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry
 from alignment import alignment
-from sqlite import database_file
-from utils import ppm_to_da, to_percent, is_json, is_file
+from computational_pipeline.sqlite import database_file
+from lookups.utils import ppm_to_da, to_percent, is_json, is_file
 from preprocessing import merge_search, preprocessing_utils, clustering, evaluation
-import database
+import computational_pipeline.database
 from file_io import JSON
-import src.constants.objects as objects
+import lookups.objects as objects
 import time
 import multiprocessing as mp
 import json
 import os
-from gen_spectra import convert_precursor_to_ion, calc_masses
+from computational_pipeline.gen_spectra import convert_precursor_to_ion, calc_masses
 from scoring.scoring import second_scoring, rescore_merges
 from alignment.alignment import find_alignments
 import finding_seqs

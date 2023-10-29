@@ -1,7 +1,6 @@
 from pyteomics import fasta
 from collections import namedtuple, defaultdict
-
-from src.constants.objects import Database
+from lookups.objects import Database
 
 def extract_protein_name(prot_entry: namedtuple) -> str:
     '''Extract the protein name from a protein entry namedtuple from pyteomics 

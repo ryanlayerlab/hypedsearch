@@ -1,11 +1,9 @@
-from src.constants.objects import Database, Spectrum
-from utils import all_perms_of_s
+from lookups.objects import Database, Spectrum
+from lookups.utils import all_perms_of_s
 from scoring import scoring
 from alignment import alignment_utils
 
-import database
-
-#################### Private functions ####################
+import computational_pipeline.database
 
 def __replace_ambiguous_hybrid(
     hybrid: tuple, 

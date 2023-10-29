@@ -1,5 +1,5 @@
 import gen_spectra
-from utils import ppm_to_da
+from lookups.utils import ppm_to_da
 from sqlite import database_file
 
 ppm_tolerance = 20

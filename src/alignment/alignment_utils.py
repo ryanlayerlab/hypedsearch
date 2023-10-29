@@ -1,14 +1,11 @@
-from src.constants.objects import Database, Spectrum
+from lookups.objects import Database, Spectrum
 from scoring import scoring
 
-import database
-import gen_spectra
-import utils
-
+import computational_pipeline.database
+import computational_pipeline.gen_spectra
+import lookups.utils
 import re
 import math
-
-#################### Private functions ####################
 
 def __get_surrounding_amino_acids(
     parent_sequence: str, 

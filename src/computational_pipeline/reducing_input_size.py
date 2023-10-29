@@ -1,13 +1,13 @@
 import database
 from preprocessing import preprocessing_utils, clustering, merge_search
 from main import get_spectra_files
-from utils import ppm_to_da
+from lookups.utils import ppm_to_da
 from preprocessing.merge_search import modified_match_masses
 import matplotlib.pyplot as plt
 from sqlite import database_file
 from gen_spectra import get_raw_mass
 import matplotlib.pyplot as plt
-from constants import WATER_MASS, PROTON_MASS, AMINO_ACIDS
+from lookups.constants import WATER_MASS, PROTON_MASS, AMINO_ACIDS
 
 ppm_tolerance = 20
 peak_filter = 25
