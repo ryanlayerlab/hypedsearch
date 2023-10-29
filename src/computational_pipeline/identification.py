@@ -6,14 +6,14 @@ from collections import ChainMap
 
 from postprocessing.postprocessing_utils import postprocessing
 from postprocessing.summary import generate_to_txt
-from objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry
+from src.constants.objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry
 from alignment import alignment
 from sqlite import database_file
 from utils import ppm_to_da, to_percent, is_json, is_file
 from preprocessing import merge_search, preprocessing_utils, clustering, evaluation
 import database
 from file_io import JSON
-import objects
+import src.constants.objects as objects
 import time
 import multiprocessing as mp
 import json

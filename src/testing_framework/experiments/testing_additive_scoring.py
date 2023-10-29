@@ -13,7 +13,7 @@ import database, gen_spectra
 import testing_utils
 
 from scoring import mass_comparisons
-from objects import Spectrum
+from src.constants.objects import Spectrum
 from utils import hashable_boundaries
 
 

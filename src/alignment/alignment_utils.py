@@ -1,4 +1,4 @@
-from objects import Database, Spectrum
+from src.constants.objects import Database, Spectrum
 from scoring import scoring
 
 import database

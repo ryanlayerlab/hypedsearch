@@ -2,8 +2,8 @@ import os
 import argparse
 import sys
 import distutils
-from objects import Database
-import utils, runner, database
+from src.constants.objects import Database
+import src.constants.utils, runner, database
 from config_loader import Config
 from postprocessing import summary, review
 

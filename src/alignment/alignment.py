@@ -1,10 +1,10 @@
 from scoring import scoring
-from objects import Spectrum, SequenceAlignment, HybridSequenceAlignment, Database, Alignments, DEVFallOffEntry
+from src.constants.objects import Spectrum, SequenceAlignment, HybridSequenceAlignment, Database, Alignments, DEVFallOffEntry
 from constants import PROTON_MASS, WATER_MASS
 from alignment import alignment_utils, hybrid_alignment
 from gen_spectra import get_precursor
 from preprocessing.clustering import calc_from_sequences
-import objects
+import src.constants.objects as objects
 import utils
 import database
 import gen_spectra

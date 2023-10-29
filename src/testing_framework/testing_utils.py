@@ -14,7 +14,7 @@ if module_path not in sys.path:
     sys.path.append(module_path)
 from preprocessing import preprocessing_utils
 from scoring import mass_comparisons
-from objects import Database
+from src.constants.objects import Database
 import gen_spectra, utils
 
 from collections import defaultdict

@@ -1,6 +1,6 @@
 from sqlite import database_file
 from utils import ppm_to_da
-from objects import Database
+from src.constants.objects import Database
 import sys
 import shutil
 import gen_spectra
