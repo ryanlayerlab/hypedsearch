@@ -1,7 +1,7 @@
 import database
 from preprocessing import preprocessing_utils
 from main import get_spectra_files
-from utils import ppm_to_da
+from lookups.utils import ppm_to_da
 from preprocessing.merge_search import modified_match_masses
 import matplotlib.pyplot as plt
 

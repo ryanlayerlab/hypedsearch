@@ -2,9 +2,9 @@ from preprocessing import preprocessing_utils, clustering, merge_search
 from scoring import scoring
 import gen_spectra
 from main import get_spectra_files
-from utils import ppm_to_da
+from lookups.utils import ppm_to_da
 import database
-from constants import WATER_MASS, PROTON_MASS, AMINO_ACIDS
+from lookups.constants import WATER_MASS, PROTON_MASS, AMINO_ACIDS
 from sqlite import database_file
 import numpy as np
 import matplotlib.pyplot as plt

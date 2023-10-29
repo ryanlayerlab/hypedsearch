@@ -1,6 +1,5 @@
 from os import path
 
-
 def generate_truth_set(path):
     correct_sequences = []
     with open(path, 'r') as truth_set:

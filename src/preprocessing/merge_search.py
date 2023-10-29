@@ -1,14 +1,14 @@
-from sqlite import database_file
-from utils import ppm_to_da
-from src.constants.objects import Database
+from computational_pipeline.sqlite import database_file
+from lookups.utils import ppm_to_da
+from lookups.objects import Database
 import sys
 import shutil
-import gen_spectra
+import computational_pipeline.gen_spectra
 from collections import defaultdict
 import os
 import json
 import time
-from constants import ENCODED
+from lookups.constants import ENCODED
 
 def write_matched_masses(filepath, matched_masses_b, matched_masses_y, kmer_set, debug):
     with open(os.path.join(filepath, "matched_masses_b.txt"),"w+") as b:

@@ -1,8 +1,6 @@
-from src.constants.objects import Database, DatabaseEntry
+from lookups.objects import Database, DatabaseEntry
 from collections import defaultdict
-
 import json 
-
 import os
 
 script_dir = os.path.dirname(__file__)

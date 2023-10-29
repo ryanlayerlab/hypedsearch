@@ -1,16 +1,13 @@
 from scoring import mass_comparisons
-from src.constants.objects import Spectrum, Database
-from utils import ppm_to_da
+from lookups.objects import Spectrum, Database
+from lookups.utils import ppm_to_da
 from preprocessing import clustering
-from constants import WATER_MASS, AMMONIUM
+from lookups.constants import WATER_MASS, AMMONIUM
 from math import exp
-import gen_spectra
-import utils
-import database
-
+import computational_pipeline.gen_spectra
+import lookups.utils
+import computational_pipeline.database
 import re
-
-# load digests json for digest scoring
 import json 
 import os
 

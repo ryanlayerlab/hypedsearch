@@ -1,6 +1,6 @@
-from utils import make_dir, make_valid_dir_string
+from lookups.utils import make_dir, make_valid_dir_string
 from file_io import JSON
-from src.constants.objects import Alignments
+from lookups.objects import Alignments
 
 import pandas as pd
 import json
@@ -10,16 +10,6 @@ SUMMARY_NAME = 'summary'
 HYBRID_PREFIX = 'hybrid_'
 
 def json_file(results: dict, output_dir: str) -> None:
-    '''
-    Generate a summary json file for the results made
-
-    Inputs:
-        results: (dict) containing the results made. The key of each entry is the name
-                        and each entry should be an Alignments namedtuple
-        output_dir: (str) path to the output directory
-    Outputs:
-        None
-    '''
     json_file_name = os.path.join(output_dir, f'{SUMMARY_NAME}.json')
     dictified = {}
     for name, alignment in results.items():
@@ -56,7 +46,6 @@ def get_extensions_strings(extensions):
         b_extension_string += b + "/"
     for y in right:
         y_extension_string += y + "/"
-    
     return b_extension_string[:-1], y_extension_string[:-1]
 
 
@@ -86,20 +75,7 @@ def text_file(results: dict, txt_file_name: str) -> None:
                 t.write(spec_num + '\t' + hybrid + '\t' + sequence + '\t' + str(total_score) + '\t' + fraction_form + "\t" + total_gaussian_score + '\t' + total_mass_error + "\t" + precursor_mass + '\t' + precursor_charge + '\t' + left_protein_string + '\t' + right_protein_string + '\t' + b_score_string + '\t' + y_score_string + '\t' + b_extension_strings + '\t' + y_extension_strings + '\n')
 
 def tsv_file(results: dict, output_dir: str) -> None:
-    '''
-    Write the results of the experiment to 2 tsv files. One tsv file is for 
-    non hybrid identified sequences, the other is for hybrid identified sequences.
-
-    Inputs: 
-        results:    (dict) results of the search. The key of each entry is the name
-                            of each entry and the value is an Alignments namedtuple 
-        output_dir: (str) path to the directory to save the tsvs
-    Outputs:
-        None
-    '''
     mac = 0
-
-    # seperate the hybrids from the nonhybrids
     hybrids, nonhybrids = [], []
     alignment: Alignments
     for name, alignment in results.items():
@@ -116,7 +92,6 @@ def tsv_file(results: dict, output_dir: str) -> None:
         else:
             nonhybrids.append(topalignment)
 
-    # move to pandas dataframe for easy writing
     hybridresults = pd.DataFrame(hybrids)
     with open(f'{output_dir + HYBRID_PREFIX + SUMMARY_NAME}.tsv', 'w') as ho:
         ho.write(hybridresults.to_csv(sep='\t'))
@@ -133,17 +108,6 @@ def tsv_file(results: dict, output_dir: str) -> None:
     print(f'Could not make an alignment for {mac}/{len(results)} spectra ({int(100 * mac / len(results))}%)')
 
 def generate(alignments: dict, output_dir='./') -> None:
-    '''
-    Generate a summary text and json file for the alignments made
-
-    Inputs:
-        alignments: dict containing the alignments made. The key of each entry is the name
-                    of the file appended with scan number, and the values should be Alignments
-    kwargs:
-        output_dir: str path to the output directory. Default=./
-    Outputs:
-        None
-    '''
     output_dir = make_valid_dir_string(output_dir)
     make_dir(output_dir)
 
@@ -151,7 +115,6 @@ def generate(alignments: dict, output_dir='./') -> None:
     tsv_file(alignments, output_dir)
 
 def generate_to_txt(alignments, file, output_dir) -> None:
-
         filename = os.path.basename(file)
         A = filename.split(".")
         base_file = "HS_"+ A[0] + ".txt"
