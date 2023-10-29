@@ -50,17 +50,17 @@ def set_args(args) -> dict:
     num_natives = args.num_natives if not use_params else config['top_natives']
     debug = args.debug if not use_params else config['debug']
 
-    if not lookups.constants.utils.is_dir(spectra_folder):
+    if not lookups.utils.is_dir(spectra_folder):
         print(f'Error: {spectra_folder} is not a real path. Path to directory with spectra files is necessary.')
         sys.exit(0)
-    if not lookups.constants.utils.is_fasta(database_file_path) or not src.constants.utils.is_file(database_file_path):
+    if not lookups.utils.is_fasta(database_file_path) or not lookups.utils.is_file(database_file_path):
         print(f'Error: {database_file_path} is not a valid .fasta file. .fasta file needed.')
         sys.exit(0)
 
     spectra_files = get_spectra_files(spectra_folder)
     database_file = get_database_file(database_file_path)
-    output_dir = lookups.constants.utils.make_valid_dir_string(output_dir)
-    lookups.constants.utils.make_dir(output_dir)
+    output_dir = lookups.utils.make_valid_dir_string(output_dir)
+    lookups.utils.make_dir(output_dir)
 
     return {'spectra_files': spectra_files,'database_file': database_file,'output_dir': output_dir,
         'min_peptide_len': min_peptide_len,'max_peptide_len': max_peptide_len,'tolerance': ppm_tolerance,
@@ -70,7 +70,7 @@ def set_args(args) -> dict:
     
 def main(args: object) -> None:
     arguments = set_args(args)
-    #runner.run(arguments)
+    runner.run(arguments)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Tool for identifying proteins, both hybrid and non hybrid from MS/MS data')
