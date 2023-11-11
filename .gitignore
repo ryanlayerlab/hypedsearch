@@ -142,3 +142,5 @@ intermediate_files
 .ionide
 Timing_data.txt
 *.db
+.fasta
+.mzML
