@@ -141,4 +141,7 @@ intermediate_files
 .fake
 .ionide
 Timing_data.txt
+/data
 *.db
+.fasta
+.mzML
