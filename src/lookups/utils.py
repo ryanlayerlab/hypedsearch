@@ -190,5 +190,7 @@ def DEV_contains_truth_exact(truth_seq: str, hybrid: bool, seqs: list) -> bool:
         ]
 
     contains_exact = any([x == truth_seq for x in seqs])
-
     return contains_exact
+
+
+

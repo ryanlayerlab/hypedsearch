@@ -25,7 +25,6 @@ def set_args(args) -> dict:
     spectra_folder_path = args.spectra_folder_path if not use_params else config['spectra_folder_path']
     database_file_path = args.database_file_path if not use_params else config['database_file_path']
     output_folder_path = args.output_folder_path if not use_params else config['output_folder_path']
-    min_peptide_length = args.min_peptide_length if not use_params else config['min_peptide_length']
     max_peptide_length = args.max_peptide_length if not use_params else config['max_peptide_length']
     ppm_tolerance = args.tolerance if not use_params else config['ppm_tolerance']
     precursor_tolerance = args.precursor_tolerance if not use_params else config['precursor_tolerance']
@@ -57,7 +56,7 @@ def set_args(args) -> dict:
     lookups.utils.make_dir(output_folder_path)
 
     return {'spectra_file_paths': spectra_file_paths,'built_database': built_database,'output_folder_path': output_folder_path,
-        'min_peptide_length': min_peptide_length,'max_peptide_length': max_peptide_length,'ppm_tolerance': ppm_tolerance,
+        'max_peptide_length': max_peptide_length,'ppm_tolerance': ppm_tolerance,
         'precursor_tolerance': precursor_tolerance,'number_peaks': number_peaks, 
         'relative_abundance': relative_abundance, 'digest_left': digest_left, 'digest_right': digest_right, 
         'number_cores': number_cores,'number_hybrids': number_hybrids, 'number_natives': number_natives, 
@@ -72,7 +71,6 @@ if __name__ == '__main__':
     parser.add_argument('--spectra-file-paths', dest='spectra_file_paths', type=str, default='./', help='Path to folder containing spectra files.')
     parser.add_argument('--built-database', dest='built_database', type=str, default='./', help='protein database')
     parser.add_argument('--output-folder-path', dest='output_folder_path', type=str, default='~/', help='Directory to save all figures. Default=~/')
-    parser.add_argument('--min-peptide-length', dest='min_peptide_length', type=int, default=5, help='Minimum peptide length to consider. Default=5')
     parser.add_argument('--max-peptide-length', dest='max_peptide_length', type=int, default=20, help='Maximum peptide length to consider. Default=20')
     parser.add_argument('--ppm-tolerance', dest='ppm_tolerance', type=int, default=20, help='ppm tolerance to allow in search. Deafult=20')
     parser.add_argument('--precursor-tolerance', dest='precursor_tolerance', type=float, default=1, help='ppm tolerance to accept when matching precursor masses. Default=10')
