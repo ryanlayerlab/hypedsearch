@@ -7,6 +7,7 @@ from computational_pipeline.sqlite import database_file
 def make_boundaries(mz, ppm_tol):
     da_tol = ppm_to_da(mz, ppm_tol)
     return [mz - da_tol, mz + da_tol]
+
 def reduce_database(all_spectra, these_spectra, index_list):
     rall_spectra = []
     rthese_spectra = []
@@ -15,24 +16,9 @@ def reduce_database(all_spectra, these_spectra, index_list):
         rthese_spectra.append(these_spectra[index])
     return rall_spectra, rthese_spectra
     
-def load_spectra(
-    spectra_file, ppm_tol: int, peak_filter: int = 0, relative_abundance_filter: float = 0.0):
-    linear_spectra = []
-    all_spectra = []
-    these_spectra = spectra.load(
-        spectra_file, 
-        peak_filter=peak_filter, 
-        relative_abundance_filter=relative_abundance_filter
-    )
-    all_spectra += these_spectra
-    # leave next 2 lines commented; uncomment only to test just specific indices
-    # index_list = [3073] #For using a condensed database
-    # these_spectra, all_spectra = reduce_database(all_spectra, these_spectra, index_list)
-    linear_spectra += list(set([
-        x for spectrum in these_spectra for x in spectrum.mz_values
-    ]))
-    linear_spectra.sort()
-    return (all_spectra)
+def load_spectra(spectra_file, number_peaks: int = 0, relative_abundance: float = 0.0):
+    spectras = spectra.load(spectra_file, peak_filter=number_peaks, relative_abundance_filter=relative_abundance)
+    return spectras
 
 def overlap_scoring(sequence, ppm_tol, input_masses):
     total_score = 0

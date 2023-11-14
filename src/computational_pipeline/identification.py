@@ -324,26 +324,25 @@ def do_create_kmer_database(built_database, max_peptide_length, digest_left, dig
     kv_prots = [(k, v) for k, v in built_database.proteins]    
     merge_search.modified_make_database_set(kv_prots, max_peptide_length, dbf, (digest_left, digest_right))
 
-def get_matched_spectrum(built_database, max_peptide_length, ppm_tolerance, precursor_tolerance, number_peaks, relative_abundance_filter, number_hybrids, number_natives, number_of_cores, verbose, output_folder_path, file):
-    spectra = preprocessing_utils.load_spectra(file, ppm_tolerance, peak_filter=number_peaks, relative_abundance_filter=relative_abundance_filter)
+def get_matched_spectra(spectra, built_database, max_peptide_length, ppm_tolerance, precursor_tolerance, number_peaks, relative_abundance_filter, number_hybrids, number_natives, number_of_cores, verbose, output_folder_path, file):
     results = align(spectra,precursor_tolerance,built_database,ppm_tolerance,max_peptide_length,number_of_cores,number_hybrids,number_natives)
     write_matched_spectrum_to_disk(results, file, output_folder_path)
 
-def get_matched_spectrums(spectra_file_paths: list, built_database: computational_pipeline.database, 
+def get_matched_spectras(spectras, built_database: computational_pipeline.database, 
     max_peptide_length: int = 10, ppm_tolerance: int = 20, 
-    precursor_tolerance: int = 10, number_peaks: int = 0, relative_abundance_filter: float = 0.0, 
+    precursor_tolerance: int = 10, number_peaks: int = 0, relative_abundance: float = 0.0, 
     digest_left: str = '', digest_right: str = '', number_hybrids: int = 5, number_natives: int = 5,
     number_of_cores: int = 1, create_kmer_database: bool = False, verbose: bool = True, 
-    debug: bool = False, output_folder_path: str = ''):
+    output_folder_path: str = ''):
     if create_kmer_database:
         do_create_kmer_database(built_database, max_peptide_length, digest_left, digest_right)
 
-    matched_spectrums = []
+    matched_spectras = []
     set_start_method('forkserver')
-    for spectra_file_path in spectra_file_paths:
-        matched_spectrum = get_matched_spectrum(built_database, max_peptide_length, ppm_tolerance, precursor_tolerance, number_peaks, relative_abundance_filter, number_hybrids, number_natives, number_of_cores, verbose, output_folder_path, spectra_file_path)
-        matched_spectrums.append(matched_spectrum)
-    return matched_spectrums
+    for spectra in spectras:
+        matched_spectra = get_matched_spectra(spectra, built_database, max_peptide_length, ppm_tolerance, precursor_tolerance, number_peaks, relative_abundance_filter, number_hybrids, number_natives, number_of_cores, verbose, output_folder_path)
+        matched_spectras.append(matched_spectra)
+    return matched_spectras
 
 
 
