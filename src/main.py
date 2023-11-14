@@ -14,13 +14,9 @@ def get_spectra_file_paths(spectra_folder_path):
             spectra_file_paths.append(os.path.join(root, file_path))
     return spectra_file_paths
 
-def get_built_database(database_file_path):
-    return computational_pipeline.database.build(database_file_path)
-
-def set_args(args) -> dict:
+def populate_arguments(args) -> dict:
     use_params = lookups.utils.string_to_bool(args.config)
-    if args.config:
-        config = Config()
+    if args.config: config = Config()
     spectra_file_path = args.spectra_file_path if not use_params else config['spectra_file_path']
     spectra_folder_path = args.spectra_folder_path if not use_params else config['spectra_folder_path']
     database_file_path = args.database_file_path if not use_params else config['database_file_path']
@@ -37,39 +33,40 @@ def set_args(args) -> dict:
     number_hybrids = args.number_hybrids if not use_params else config['number_hybrids']
     number_natives = args.number_natives if not use_params else config['number_natives']
     verbose = lookups.utils.string_to_bool(args.verbose) if not use_params else config['verbose']
-    debug = args.debug if not use_params else config['debug']
-
-    if not lookups.utils.is_dir(spectra_folder_path):
-        print(f'Error: {spectra_folder_path} is not a real path. Path to directory with spectra files is necessary.')
-        sys.exit(0)
-    if not lookups.utils.is_fasta(database_file_path) or not lookups.utils.is_file(database_file_path):
-        print(f'Error: {database_file_path} is not a valid .fasta file. .fasta file needed.')
-        sys.exit(0)
 
     if spectra_file_path != '':
         spectra_file_paths = [spectra_file_path]
     else:
         spectra_file_paths = get_spectra_file_paths(spectra_folder_path)
         
-    built_database = get_built_database(database_file_path)
     output_folder_path = lookups.utils.make_valid_dir_string(output_folder_path)
-    lookups.utils.make_dir(output_folder_path)
+    
 
-    return {'spectra_file_paths': spectra_file_paths,'built_database': built_database,'output_folder_path': output_folder_path,
+    return {'spectra_file_paths': spectra_file_paths,'database_file_path': database_file_path,'output_folder_path': output_folder_path,
         'max_peptide_length': max_peptide_length,'ppm_tolerance': ppm_tolerance,
         'precursor_tolerance': precursor_tolerance,'number_peaks': number_peaks, 
         'relative_abundance': relative_abundance, 'digest_left': digest_left, 'digest_right': digest_right, 
         'number_cores': number_cores,'number_hybrids': number_hybrids, 'number_natives': number_natives, 
-        'create_kmer_database': create_kmer_database,'verbose': verbose,'debug': debug}
+        'create_kmer_database': create_kmer_database,'verbose': verbose}
     
+def check_arguments(arguments):
+    are_valid = True
+    database_file_path = arguments['database_file_path']
+    if not lookups.utils.is_fasta(database_file_path) or not lookups.utils.is_file(database_file_path): are_valid = False
+    return are_valid
+
 def main(args: object) -> None:
-    arguments = set_args(args)
-    runner.run(arguments)
+    arguments = populate_arguments(args)
+    arguments_valid = check_arguments(arguments)
+    if arguments_valid:
+        runner.run(arguments)
+    else:
+        sys.exit(0)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Tool for identifying proteins, both hybrid and non hybrid from MS/MS data')
     parser.add_argument('--spectra-file-paths', dest='spectra_file_paths', type=str, default='./', help='Path to folder containing spectra files.')
-    parser.add_argument('--built-database', dest='built_database', type=str, default='./', help='protein database')
+    parser.add_argument('--database-file-path', dest='database-file-path', type=str, default='./', help='protein database path')
     parser.add_argument('--output-folder-path', dest='output_folder_path', type=str, default='~/', help='Directory to save all figures. Default=~/')
     parser.add_argument('--max-peptide-length', dest='max_peptide_length', type=int, default=20, help='Maximum peptide length to consider. Default=20')
     parser.add_argument('--ppm-tolerance', dest='ppm_tolerance', type=int, default=20, help='ppm tolerance to allow in search. Deafult=20')
@@ -83,7 +80,6 @@ if __name__ == '__main__':
     parser.add_argument('--number-hybrids', dest='number_hybrids', type=int, default=5, help='The number of hybrid alignments to keep per spectrum. Default=5')
     parser.add_argument('--number-natives', dest='number_natives', type=int, default=5, help='The number of native alignments to keep per spectrum. Default=5')
     parser.add_argument('--verbose', dest='verbose', type=lambda x:bool(distutils.util.strtobool(x)))
-    parser.add_argument('--debug', dest='debug', type=bool, default=False, help='The number of alignments to keep per spectrum. Default=5')
     parser.add_argument('--config', action='store_true')
     parser.add_argument('--no-config', dest='config', action='store_false')
     parser.set_defaults(config=True)
