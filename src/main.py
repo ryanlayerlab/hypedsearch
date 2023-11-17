@@ -41,7 +41,6 @@ def populate_arguments(args) -> dict:
         
     output_folder_path = lookups.utils.make_valid_dir_string(output_folder_path)
     
-
     return {'spectra_file_paths': spectra_file_paths,'database_file_path': database_file_path,'output_folder_path': output_folder_path,
         'max_peptide_length': max_peptide_length,'ppm_tolerance': ppm_tolerance,
         'precursor_tolerance': precursor_tolerance,'number_peaks': number_peaks, 

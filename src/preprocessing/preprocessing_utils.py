@@ -17,7 +17,7 @@ def reduce_database(all_spectra, these_spectra, index_list):
     return rall_spectra, rthese_spectra
     
 def load_spectra(spectra_file, number_peaks: int = 0, relative_abundance: float = 0.0):
-    spectras = spectra.load(spectra_file, peak_filter=number_peaks, relative_abundance_filter=relative_abundance)
+    spectras = spectra.load(spectra_file, number_peaks, relative_abundance)
     return spectras
 
 def overlap_scoring(sequence, ppm_tol, input_masses):
