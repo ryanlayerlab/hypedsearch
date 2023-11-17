@@ -325,7 +325,7 @@ def get_matched_spectra(spectra, built_database, max_peptide_length, ppm_toleran
 
 def get_matched_spectras(spectras, built_database: computational_pipeline.database, 
     max_peptide_length: int = 10, ppm_tolerance: int = 20, 
-    precursor_tolerance: int = 10, number_peaks: int = 0, relative_abundance: float = 0.0, 
+    precursor_tolerance: int = 10, number_peaks: int = 0, relative_abundance_filter: float = 0.0, 
     digest_left: str = '', digest_right: str = '', number_hybrids: int = 5, number_natives: int = 5,
     number_of_cores: int = 1, verbose: bool = True, output_folder_path: str = ''):
 
