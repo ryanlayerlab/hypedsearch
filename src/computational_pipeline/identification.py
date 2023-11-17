@@ -318,7 +318,6 @@ def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, numc
     x = alignment_info(max_peptide_len,precursor_tolerance,db,ppm_tolerance,len(spectra),num_hybrids,num_natives)
     y = map(x, spectra)
 
-
 def get_matched_spectra(spectra, built_database, max_peptide_length, ppm_tolerance, precursor_tolerance, number_peaks, relative_abundance_filter, number_hybrids, number_natives, number_of_cores, verbose, output_folder_path, file):
     results = align(spectra,precursor_tolerance,built_database,ppm_tolerance,max_peptide_length,number_of_cores,number_hybrids,number_natives)
     write_matched_spectrum_to_disk(results, file, output_folder_path)
