@@ -2,6 +2,8 @@ import computational_pipeline.identification
 import multiprocessing as mp
 import lookups.utils
 from preprocessing import preprocessing_utils
+from computational_pipeline.sqlite import database_file
+from preprocessing import merge_search
 
 def get_built_database(database_file_path):
     return computational_pipeline.database.build(database_file_path)
@@ -18,11 +20,19 @@ def get_spectras(spectra_file_paths,number_peaks,relative_abundance):
         spectras.append(spectra)
     return spectras
 
+def do_create_kmer_database(built_database, max_peptide_length, digest_left, digest_right):
+    dbf = database_file(max_peptide_length, True)
+    kv_prots = [(k, v) for k, v in built_database.proteins]    
+    merge_search.modified_make_database_set(kv_prots, max_peptide_length, dbf, (digest_left, digest_right))
+
+
 def run(args: dict) -> dict:
     number_of_cores = get_number_of_cores(args['number_cores'])
     built_database = get_built_database(args['database_file_path'])
     spectras = get_spectras(args['spectra_file_paths'],args['number_peaks'],args['relative_abundance'])
     lookups.utils.make_dir(args['output_folder_path'])
+    if args['create_kmer_database']:
+        do_create_kmer_database(built_database, args['number_peaks'], args['digest_left'], args['digest_right'])
 
     matched_spectras = computational_pipeline.identification.get_matched_spectras(
         spectras = spectras, 
@@ -37,7 +47,6 @@ def run(args: dict) -> dict:
         number_hybrids=args['number_hybrids'], 
         number_natives=args['number_natives'], 
         number_of_cores=number_of_cores, 
-        create_kmer_database = args["create_kmer_database"],
         verbose=args['verbose'], 
         output_folder_path=args['output_folder_path'])
     return matched_spectras

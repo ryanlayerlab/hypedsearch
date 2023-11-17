@@ -6,7 +6,6 @@ from postprocessing.postprocessing_utils import postprocessing
 from postprocessing.summary import write_matched_spectrum_to_disk
 from lookups.objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry
 from alignment import alignment
-from computational_pipeline.sqlite import database_file
 from lookups.utils import ppm_to_da, to_percent, is_json, is_file
 from preprocessing import merge_search, preprocessing_utils, clustering, evaluation
 import computational_pipeline.database
@@ -319,10 +318,6 @@ def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, numc
     x = alignment_info(max_peptide_len,precursor_tolerance,db,ppm_tolerance,len(spectra),num_hybrids,num_natives)
     y = map(x, spectra)
 
-def do_create_kmer_database(built_database, max_peptide_length, digest_left, digest_right):
-    dbf = database_file(max_peptide_length, True)
-    kv_prots = [(k, v) for k, v in built_database.proteins]    
-    merge_search.modified_make_database_set(kv_prots, max_peptide_length, dbf, (digest_left, digest_right))
 
 def get_matched_spectra(spectra, built_database, max_peptide_length, ppm_tolerance, precursor_tolerance, number_peaks, relative_abundance_filter, number_hybrids, number_natives, number_of_cores, verbose, output_folder_path, file):
     results = align(spectra,precursor_tolerance,built_database,ppm_tolerance,max_peptide_length,number_of_cores,number_hybrids,number_natives)
@@ -332,10 +327,7 @@ def get_matched_spectras(spectras, built_database: computational_pipeline.databa
     max_peptide_length: int = 10, ppm_tolerance: int = 20, 
     precursor_tolerance: int = 10, number_peaks: int = 0, relative_abundance: float = 0.0, 
     digest_left: str = '', digest_right: str = '', number_hybrids: int = 5, number_natives: int = 5,
-    number_of_cores: int = 1, create_kmer_database: bool = False, verbose: bool = True, 
-    output_folder_path: str = ''):
-    if create_kmer_database:
-        do_create_kmer_database(built_database, max_peptide_length, digest_left, digest_right)
+    number_of_cores: int = 1, verbose: bool = True, output_folder_path: str = ''):
 
     matched_spectras = []
     set_start_method('forkserver')
