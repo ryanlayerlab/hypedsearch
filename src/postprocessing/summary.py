@@ -107,9 +107,9 @@ def generate(alignments: dict, output_dir='./') -> None:
     json_file(alignments, output_dir)
     tsv_file(alignments, output_dir)
 
-def write_matched_spectrum_to_disk(alignments, file, output_dir) -> None:
-        filename = os.path.basename(file)
+def write_matched_spectrum_to_disk(alignments, output_folder_path, output_file_name ) -> None:
+        filename = os.path.basename(output_file_name)
         A = filename.split(".")
         base_file = "HS_"+ A[0] + ".txt"
-        output_file = os.path.join(output_dir,base_file)
+        output_file = os.path.join(output_folder_path,base_file)
         create_text_file(alignments, output_file)

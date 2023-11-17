@@ -81,7 +81,6 @@ def db_make_database_set_for_proteins(proteins,max_len,dbf,digest):
         percent = int((i+1) * 100 / plen)
         print(f'\rOn protein {i+1}/{plen} [{int((i+1) * 100 / plen)}%]', end='')
         if percent != last_percent:
-            # print(f'\rInserting {percent}%', end='')
             last_percent = percent
             free = shutil.disk_usage('/')[2]
             free = free/(1024**3)
@@ -94,21 +93,10 @@ def db_make_database_set_for_proteins(proteins,max_len,dbf,digest):
         dbf.insert(data)
         
 def modified_make_database_set(proteins: list, max_len: int, dbf, digest):
-    
-    print("\nBeginning Insertions")
-    start = time.time()
     db_make_database_set_for_proteins(proteins,max_len,dbf,digest)
-    duration = time.time() - start
-    print("Insertion took: ", duration)
-    # db.read() #Only for debugging
-    print('\nIndexing the set of kmers based on mass, ion')
     dbf.index_ion_mass()
-    print('\nIndexing the set of kmers based on protein, start position, end position')
     dbf.index_ion_mass_b()
-    print('\nIndexing the set of kmers based on protein, end position, start position')
     dbf.index_ion_mass_y()
-    print('Done making database')
-    
     return
 
 def in_bounds(int1, interval):
