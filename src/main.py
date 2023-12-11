@@ -41,13 +41,15 @@ def populate_arguments(args) -> dict:
         
     output_folder_path = lookups.utils.make_valid_dir_string(output_folder_path)
     
-    return {'spectra_file_paths': spectra_file_paths,'database_file_path': database_file_path,'output_folder_path': output_folder_path,
+    return {
+        'spectra_file_paths': spectra_file_paths,'database_file_path': database_file_path,'output_folder_path': output_folder_path,
         'max_peptide_length': max_peptide_length,'ppm_tolerance': ppm_tolerance,
         'precursor_tolerance': precursor_tolerance,'number_peaks': number_peaks, 
         'relative_abundance': relative_abundance, 'digest_left': digest_left, 'digest_right': digest_right, 
         'number_cores': number_cores,'number_hybrids': number_hybrids, 'number_natives': number_natives, 
-        'create_kmer_database': create_kmer_database,'verbose': verbose}
-    
+        'create_kmer_database': create_kmer_database,'verbose': verbose
+    }
+
 def check_arguments(arguments):
     are_valid = True
     database_file_path = arguments['database_file_path']
