@@ -1,12 +1,6 @@
-from genericpath import exists
-import os, gzip, shutil, copy, math
-from typing import Iterable, Any, Tuple
+import os, re
 from itertools import product
 import numpy as np
-from collections import namedtuple
-
-import math
-import re
 
 HYBRID_ALIGNMENT_PATTERN = re.compile(r'[-\(\)]')
 
