@@ -171,26 +171,15 @@ def CICD_test():
 
 
 def DEV_contains_truth_exact(truth_seq: str, hybrid: bool, seqs: list) -> bool:
+    def replacer(x):
+        temp = re.sub('I|L', 'B', x)
+        return re.sub('-|(|)', '', temp)
+    
     if hybrid:
-        truth_seq = truth_seq \
-                        .replace('I', 'B') \
-                        .replace('L', 'B') \
-                        .replace('-', '') \
-                        .replace('(', '') \
-                        .replace(')', '')
+        truth_seq = replacer(truth_seq)
+        seqs = [replacer(x) for x in seqs]
 
-        seqs = [
-            x \
-                .replace('I', 'B') \
-                .replace('L', 'B') \
-                .replace('-', '') \
-                .replace('(', '') \
-                .replace(')', '')
-            for x in seqs
-        ]
-
-    contains_exact = any([x == truth_seq for x in seqs])
-    return contains_exact
+    return truth_seq in seqs
 
 
 
