@@ -61,9 +61,9 @@ def is_file(file: str) -> bool:
 def all_perms_of_s(s: str, keyletters: str) -> list:
     seq = list(s)
     perms = []
-    indices = [ i for i, c in enumerate(seq) if c in keyletters ]
-    for t in product(keyletters, repeat=len(indices)):
-        for i, c in zip(indices, t):
+    keyletter_indices = [ i for i, c in enumerate(seq) if c in keyletters ]
+    for t in product(keyletters, repeat=len(keyletter_indices)):
+        for i, c in zip(keyletter_indices, t):
             seq[i] = c
         perms.append(''.join(seq))
     return perms

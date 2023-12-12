@@ -3,7 +3,6 @@ from file_io import JSON
 from lookups.objects import Alignments
 
 import pandas as pd
-import json
 import os
 
 SUMMARY_NAME = 'summary'
@@ -20,51 +19,40 @@ def json_file(results: dict, output_dir: str) -> None:
     JSON.save_dict(json_file_name, dictified)
     
 def get_protein_strings(left_proteins, right_proteins):
-    left_protein_string, right_protein_string = '',''
-    for protein in left_proteins:
-        left_protein_string += protein + "/"
-    for protein in right_proteins:
-        right_protein_string += protein + "/"
+    left_protein_string = '/'.join(left_proteins)
+    right_protein_string = '/'.join(right_proteins)
     
-    return left_protein_string[:-1], right_protein_string[:-1]
+    return left_protein_string, right_protein_string
 
 def get_score_strings(b_scores, y_scores):
-    b_score_string, y_score_string = '',''
-    for score in b_scores:
-        b_score_string += str(score) + "/"
-    for score in y_scores:
-        y_score_string += str(score) + "/"
+    b_score_string = '/'.join(b_scores)
+    y_score_string = '/'.join(y_scores)
         
-    return b_score_string[:-1], y_score_string[:-1]
+    return b_score_string, y_score_string
         
 def get_extensions_strings(extensions):
-    b_extension_string = ''
-    y_extension_string = ''
-    left = extensions[0]
-    right = extensions[1]
-    for b in left:
-        b_extension_string += b + "/"
-    for y in right:
-        y_extension_string += y + "/"
-    return b_extension_string[:-1], y_extension_string[:-1]
+    left, right = extensions[:2]
+    b_extension_string = '/'.join(left)
+    y_extension_string = '/'.join(right)
+
+    return b_extension_string, y_extension_string
 
 def create_text_file(results: dict, txt_file_name: str) -> None:
     with open(txt_file_name, 'w') as t:
         t.write("spectrum_id" + '\t' + "hybrid" + '\t' + "sequence" + '\t' + "total score" + '\t' + "#peaks/length" + '\t' + "total gaussian score" + '\t' + "total mass error" + '\t' + "precursor mass" + '\t' + "precursor charge" + '\t' + "left kmer" + '\t' + "right kmer" + '\t' + "b score" + '\t' + "y score" + '\t' + "prev aa" + '\t' + "next aa" + '\n')
-        if results is None:
-            pass
-        else:
+        if results is not None:
             for i, x in enumerate(results):
                 target_alignments = x
                 for alignment in target_alignments:
                     spec_num = str(i)
                     hybrid = alignment[0]
-                    left_proteins,right_proteins = alignment[1], alignment[2]
+
+                    left_proteins,right_proteins = alignment[1:3]
                     left_protein_string, right_protein_string = get_protein_strings(left_proteins, right_proteins)
-                    sequence = alignment[3]
-                    b_scores = alignment[4]
-                    y_scores = alignment[5]
+
+                    sequence, b_scores, y_scores = alignment[3:6]
                     b_score_string, y_score_string = get_score_strings(b_scores, y_scores)
+
                     total_score = alignment[6]
                     total_gaussian_score = str(alignment[7])
                     extensions = alignment[8]
@@ -84,22 +72,20 @@ def tsv_file(results: dict, output_dir: str) -> None:
         if len(alignment.alignments) == 0:
             mac += 1
             continue
-        topalignment = alignment.alignments[0]._asdict()
-        topalignment['entry name'] = name
-        topalignment['id'] = alignment.spectrum.id
-        if 'hybrid_sequence' in topalignment:
-            hybrids.append(topalignment)
+        top_alignment = alignment.alignments[0]._asdict()
+        top_alignment['entry name'] = name
+        top_alignment['id'] = alignment.spectrum.id
+        if 'hybrid_sequence' in top_alignment:
+            hybrids.append(top_alignment)
         else:
-            nonhybrids.append(topalignment)
-    hybridresults = pd.DataFrame(hybrids)
-    with open(f'{output_dir + HYBRID_PREFIX + SUMMARY_NAME}.tsv', 'w') as ho:
-        ho.write(hybridresults.to_csv(sep='\t'))
-    del hybridresults
-    del hybrids
-    nonhybridresults = pd.DataFrame(nonhybrids)
+            nonhybrids.append(top_alignment)
+    hybrid_results = pd.DataFrame(hybrids)
+    with open(f'{output_dir}{HYBRID_PREFIX}{SUMMARY_NAME}.tsv', 'w') as hybrid_output:
+        hybrid_output.write(hybrid_results.to_csv(sep='\t'))
+    non_hybrid_results = pd.DataFrame(nonhybrids)
     output_file = os.path.join(output_dir, f'{SUMMARY_NAME}.tsv')
-    with open(output_file, 'w') as nho:
-        nho.write(nonhybridresults.to_csv(sep='\t'))
+    with open(output_file, 'w') as non_hybrid_output:
+        non_hybrid_output.write(non_hybrid_results.to_csv(sep='\t'))
 
 def generate(alignments: dict, output_dir='./') -> None:
     output_dir = make_valid_dir_string(output_dir)
@@ -110,6 +96,6 @@ def generate(alignments: dict, output_dir='./') -> None:
 def write_matched_spectrum_to_disk(alignments, output_folder_path, output_file_name ) -> None:
         filename = os.path.basename(output_file_name)
         A = filename.split(".")
-        base_file = "HS_"+ A[0] + ".txt"
+        base_file = f"HS_{A[0]}.txt"
         output_file = os.path.join(output_folder_path,base_file)
         create_text_file(alignments, output_file)

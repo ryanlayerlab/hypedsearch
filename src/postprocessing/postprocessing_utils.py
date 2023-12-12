@@ -1,20 +1,20 @@
-from preprocessing import clustering
+## purpose of this function is unclear. 
+## creates a list and then return a dict with indices mapping to elements
+## couldn't we just return the list? the dict is redundant
+def make_db_mapping(db): 
+    name_list = [x for x in db.proteins]
 
-
-def make_db_mapping(db):
-    name_list = []
-    [name_list.append(x) for x in db.proteins]
-
+    #edit this after testing
     num_to_prot_name = dict()
-    for i, x in enumerate(name_list):
+    for i, name in enumerate(name_list):
         num_to_prot_name[i] = name_list[i]
     
     return num_to_prot_name
 
 def make_db_mapping_by_key(db):
-    name_list = []
-    [name_list.append(x) for x in db.proteins]
+    name_list = [x for x in db.proteins]
 
+    # edit this after testing
     num_to_prot_name = dict()
     for i, x in enumerate(name_list):
         prot_description = x[0]
@@ -28,11 +28,7 @@ def make_db_mapping_by_key(db):
 def label_alignments(alignment):
     #b_mass, b_start, b_end, 1, b_charge, b_pid, b_score
     type = alignment[3]
-    if type:
-        label = "Hybrid"
-    else:
-        label = "Native"
-    return label
+    return "Hybrid" if type else "Native"
 
 def get_scores(alignment_info):
     b_scores, y_scores = set(), set()
@@ -49,7 +45,7 @@ def get_precursor_dist(alignment):
 def get_sequence(alignment_info, label):
     if label == "Hybrid":
         b_seq, y_seq = alignment_info[0][2][0][6], alignment_info[0][2][1][6]
-        total_sequence = b_seq + '-' + y_seq
+        total_sequence = f'{b_seq}-{y_seq}'
     else:
         b_seq = alignment_info[0][2][0][6]
         total_sequence = b_seq
@@ -57,10 +53,10 @@ def get_sequence(alignment_info, label):
     return total_sequence
 
 def find_parent_proteins(alignment_info, db_mapping):
+    get_name = lambda x: x.split('|')[-1].split()[0]
     left_parents, right_parents = set(), set()
     for merge in alignment_info:
         left_num, right_num = merge[2][0][5], merge[2][1][5]
-        get_name = lambda x: x.split('|')[-1].split()[0]
         left_parent, right_parent = get_name(db_mapping[left_num].description), get_name(db_mapping[right_num].description)
         left_parents.add(left_parent)
         right_parents.add(right_parent)
@@ -69,7 +65,6 @@ def find_parent_proteins(alignment_info, db_mapping):
 def get_extensions(alignment_info, protein_list):
     left_extensions, right_extensions = [], []
     for merge in alignment_info:
-        
         b_side, y_side = merge[2][0], merge[2][1]
         b_parent_seq, y_parent_seq = protein_list[b_side[5]][1], protein_list[y_side[5]][1]
         b_extension = b_parent_seq[max(b_side[1]-1, 0):b_side[1]]
@@ -88,7 +83,7 @@ def postprocessing(alignments, db, input_spectrum, num_hybrids, num_natives):
     if (len(sorted_alignments) > 0):
         max = num_hybrids if label_alignments(sorted_alignments[0]) == "Hybrid" else num_natives
         
-        while i < max and i < len(sorted_alignments):
+        while i < len(sorted_alignments) and i < max:
             alignment = sorted_alignments[i]
             alignment_info = alignments[alignment]
             label = label_alignments(alignment)

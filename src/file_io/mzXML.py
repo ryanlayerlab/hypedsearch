@@ -21,16 +21,13 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
         (list) Spectrum namedtuple instances
     '''
     if not file_exists(filename):
-        print('File {} not found. Please make sure that this file exists'.format(filename))
+        print(f'File {filename} not found. Please make sure that this file exists')
         return
 
     spectra = []
-    
     filecontents = mzxml.read(filename)
-
     content: dict
     for spec_num, content in enumerate(filecontents):
-
         masses = list(content['m/z array'])
         abundances = list(content['intensity array'])
 
@@ -48,7 +45,7 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
             masses, abundances = spectra_filtering.relative_abundance_filtering(masses, abundances, relative_abundance_filter)
 
         # get the total intensity
-        ti = sum(abundances)
+        total_intensity = sum(abundances) # unused
 
         # get the precursor and its charge
         # we will assume its the first entry in the list
@@ -61,11 +58,10 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
         # get the id
         id = content.get('id', '')
 
-        ms_level = content['msLevel']
-        scan_number = content['num']
+        ms_level = content['msLevel'] # unused
+        scan_number = content['num'] # unused
 
         other_metadata = content['scanOrigin']
-
         retention_time = content['scan'][0]['scan start time']
 
         spectra.append(Spectrum(

@@ -2,7 +2,6 @@ from lookups.utils import file_exists
 from lookups.objects import Spectrum
 from preprocessing import spectra_filtering
 from pyteomics import mzml
-import yaml
 
 def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
     if not file_exists(filename):
@@ -21,7 +20,7 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
             while relative_abundance_filter > 1:
                 relative_abundance_filter /= 100
             masses, abundances = spectra_filtering.relative_abundance_filtering(masses, abundances, relative_abundance_filter)
-        ti = sum(abundances)
+        total_intensity = sum(abundances) # variable is unused 
         precursor = None
         precursor_charge = 0
 

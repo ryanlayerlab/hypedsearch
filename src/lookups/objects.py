@@ -33,7 +33,6 @@ SequenceAlignment = namedtuple(
     defaults=[[], '', 0.0, 0.0, 0.0, 100, 100]
 )
 
-
 HybridSequenceAlignment = namedtuple(
     'HybridSequenceAlignment', 
     ['left_proteins', 'right_proteins', 'sequence', 'hybrid_sequence', 
@@ -70,7 +69,6 @@ DEVFallOffEntry = namedtuple(
     ['hybrid', 'truth_sequence', 'fall_off_operation', 'meta_data'], 
     defaults=[False, '', '', {}]
 )
-
 
 Identification_Instrumentation = namedtuple(
     'Identification_Instrumentation', 

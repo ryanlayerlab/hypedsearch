@@ -1,4 +1,4 @@
-from lookups.objects import SequenceAlignment, Alignments
+from lookups.objects import Alignments
 
 def __is_swap_up_to_dist(a: str, b: str, i: int, j: int, dist: int, d: list) -> list:
     '''
@@ -54,7 +54,7 @@ def __edit_distance_long_swaps(a: str, b: str, dist: int = 0) -> int:
     for i in range(len(a)):
         d[i][0] = i
         
-    for j in range(len(b)):
+    for j in range(len(b)): # what? why? 
         d[0][1] = j
         
     for i in range(len(a)):
