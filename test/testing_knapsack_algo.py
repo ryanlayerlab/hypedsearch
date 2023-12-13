@@ -87,17 +87,18 @@ def dissect_hit(result, to_mult, weights):
 
 def initialize_table(values):
     for value in values:
-    
-for spectrum in spectra:
-    raw_prec_mass = get_raw_prec(spectrum.precursor_mass, spectrum.precursor_charge)    
-    W = raw_prec_mass + ppm_to_da(spectrum.precursor_mass, spectrum.precursor_charge)
-    vals, weights, conv_W, to_mult = make_data_structures(W)
-    print(str(conv_W))
-    n = len(vals)
-    # We initialize the matrix with -1 at first.
-    t = [[-1 for i in range(conv_W + 1)] for j in range(n + 1)]
-    t = initialize_table()
 
-    aligned_val = knapsack(weights, vals, conv_W, n, t)
-    aligned_seq = dissect_hit(aligned_val, to_mult)
-    print(aligned_seq)
+if __name__ == '__main__':
+    for spectrum in spectra:
+        raw_prec_mass = get_raw_prec(spectrum.precursor_mass, spectrum.precursor_charge)    
+        W = raw_prec_mass + ppm_to_da(spectrum.precursor_mass, spectrum.precursor_charge)
+        vals, weights, conv_W, to_mult = make_data_structures(W)
+        print(str(conv_W))
+        n = len(vals)
+        # We initialize the matrix with -1 at first.
+        t = [[-1 for i in range(conv_W + 1)] for j in range(n + 1)]
+        t = initialize_table(vals)
+
+        aligned_val = knapsack(weights, vals, conv_W, n, t)
+        aligned_seq = dissect_hit(aligned_val, to_mult)
+        print(aligned_seq)
