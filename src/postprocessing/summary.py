@@ -39,10 +39,15 @@ def get_extensions_strings(extensions):
 
 def create_text_file(results: dict, txt_file_name: str) -> None:
     with open(txt_file_name, 'w') as t:
-        t.write("spectrum_id" + '\t' + "hybrid" + '\t' + "sequence" + '\t' + "total score" + '\t' + "#peaks/length" + '\t' + "total gaussian score" + '\t' + "total mass error" + '\t' + "precursor mass" + '\t' + "precursor charge" + '\t' + "left kmer" + '\t' + "right kmer" + '\t' + "b score" + '\t' + "y score" + '\t' + "prev aa" + '\t' + "next aa" + '\n')
+        HEADERS = [
+            'spectrum_id', 'hybrid', 'sequence', 'total score', '#peaks/length', 
+            'total gaussian score', 'total mass error', 'precursor mass', 'precursor charge',
+            'left kmer', 'right kmer', 'b score', 'y score', 
+            'prev aa', 'next aa'
+        ]
+        t.write('\t'.join(HEADERS) + '\n')
         if results is not None:
-            for i, x in enumerate(results):
-                target_alignments = x
+            for i, target_alignments in enumerate(results):
                 for alignment in target_alignments:
                     spec_num = str(i)
                     hybrid = alignment[0]
@@ -60,8 +65,14 @@ def create_text_file(results: dict, txt_file_name: str) -> None:
                     precursor_mass, precursor_charge = str(alignment[9]), str(alignment[10])
                     total_mass_error = str(alignment[11])
                     total_count = int(total_score * len(sequence))
-                    fraction_form = str(total_count) + "/" + str(len(sequence))
-                    t.write(spec_num + '\t' + hybrid + '\t' + sequence + '\t' + str(total_score) + '\t' + fraction_form + "\t" + total_gaussian_score + '\t' + total_mass_error + "\t" + precursor_mass + '\t' + precursor_charge + '\t' + left_protein_string + '\t' + right_protein_string + '\t' + b_score_string + '\t' + y_score_string + '\t' + b_extension_strings + '\t' + y_extension_strings + '\n')
+                    fraction_form = f'{total_count}/{len(sequence)}'
+                    VALUES = [
+                        spec_num, hybrid, sequence, str(total_score), fraction_form, 
+                        total_gaussian_score, total_mass_error, precursor_mass, precursor_charge, 
+                        left_protein_string, right_protein_string, b_score_string, y_score_string,
+                        b_extension_strings, y_extension_strings
+                    ]
+                    t.write('\t'.join(VALUES) + '\n')
 
 
 def tsv_file(results: dict, output_dir: str) -> None:

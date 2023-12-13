@@ -1,20 +1,19 @@
 from lookups.objects import Database, DatabaseEntry
 from collections import defaultdict
-import json 
-import os
+import json, os
 
 script_dir = os.path.dirname(__file__)
-json_dir = '/'.join(script_dir.split('/')[:-1])
-digest_file = os.path.join(json_dir, 'digests.json')
+json_dir = os.path.join(*script_dir.split('/')[:-1])
+digest_filepath = os.path.join(json_dir, 'digests.json')
 
-digests = json.load(open(digest_file, 'r'))
+digests = json.load(open(digest_filepath, 'r'))
 
 def digest(db: Database, digest_type: str, missed_cleavages: int) -> Database:
     '''
     Digest each protein in the database. If no digest is done, then 
     the original database is returned. 
     NOTE: 
-    The entires in the database after digestion are the names of the form
+    The entries in the database after digestion are the names of the form
     <protein_name>_<start_position>_<end_position>
 
     Inputs:
@@ -33,15 +32,12 @@ def digest(db: Database, digest_type: str, missed_cleavages: int) -> Database:
     
     new_prots = defaultdict(list)
     
-    for p_name, entries in db.proteins.items():
-        
+    for p_name, entries in db.proteins.items(): 
         # keep track of what gets digested
         digested = []
 
         for entry in entries:
-        
             for pos, aa in enumerate(entry.sequence):
-                
                 if aa in starts:
                     
                     # get the starting position for this cut based on rule
@@ -66,7 +62,7 @@ def digest(db: Database, digest_type: str, missed_cleavages: int) -> Database:
                             digested.append((entry.sequence[s:], s, len(entry.sequence)))
                             break
                         
-                        # check of this aa is an end
+                        # check if this aa is an end
                         if entry.sequence[j] in ends:
                             
                             # first reduce allowed
