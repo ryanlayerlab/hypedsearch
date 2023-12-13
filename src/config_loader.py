@@ -1,6 +1,4 @@
-import yaml 
-import pathlib
-import os
+import yaml, os, pathlib
 import warnings
 
 parent_dir = pathlib.Path(__file__).resolve().parent
@@ -47,8 +45,8 @@ class Config(dict):
 
     def _finditem(self, obj, key):
         if key in obj: return obj[key]
-        for _, v in obj.items():
-            if isinstance(v,dict):
+        for v in obj.values():
+            if isinstance(v, dict):
                 item = self._finditem(v, key)
                 if item is not None:
                     return item

@@ -21,20 +21,19 @@ def relative_abundance_filtering(
     :rtype: (list, list)
     '''
 
-    # total intensity
-    ti = sum(abundances)
+    total_intensity = sum(abundances)
 
     # find the filter value
-    min_value = ti * percentage
+    min_value = total_intensity * percentage
 
     # zip them up and take values that pass the filter
     filtered_mass_abundances = [x for x in zip(masses, abundances) if x[1] >= min_value]
 
     # split them off and return
-    masses = [float(x) for x, _ in filtered_mass_abundances]
-    abundances = [float(x) for _, x in filtered_mass_abundances]
+    masses, abundances = zip(*filtered_mass_abundances)
+    masses, abundances = map(float, masses), map(float, abundances)
 
-    return (masses, abundances)
+    return list(masses), list(abundances)
 
 
 def peak_filtering(masses: list, abundances: list, num_peaks: int) -> (list, list):
@@ -64,7 +63,7 @@ def peak_filtering(masses: list, abundances: list, num_peaks: int) -> (list, lis
     mass_abundances.sort(key=lambda x: x[0])
 
     # seperate them
-    masses = [float(x) for x, _ in mass_abundances]
-    abundances = [float(x) for _, x in mass_abundances]
+    masses, abundances = zip(*mass_abundances)
+    masses, abundances = map(float, masses), map(float, abundances)
 
-    return (masses, abundances)
+    return list(masses), list(abundances)

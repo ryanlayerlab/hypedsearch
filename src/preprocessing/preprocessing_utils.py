@@ -28,7 +28,7 @@ def overlap_scoring(sequence, ppm_tol, input_masses):
     o_ctr, t_ctr = 0, 0
     observed = input_masses[o_ctr]
     theoretical = masses[t_ctr]
-    while (o_ctr < len(input_masses) and t_ctr < len(masses)):
+    while o_ctr < len(input_masses) and t_ctr < len(masses):
         tol = ppm_to_da(observed, ppm_tol)
         if theoretical < observed - tol:
             t_ctr = t_ctr + 1
@@ -46,7 +46,7 @@ def overlap_scoring(sequence, ppm_tol, input_masses):
                 observed = input_masses[o_ctr]
                 theoretical = masses[t_ctr]
                 
-    return(total_score)
+    return total_score
 
 def distscoring(sequence, prec, prec_charge):
     combined_precursor = get_precursor(sequence, prec_charge)
@@ -75,32 +75,14 @@ def find_by_precursor(spectrum, prec_tol, protein_list, ppm_tol):
     scored = sorted(scored, key = lambda x: (x[0], x[1]), reverse=True)
     return scored
 
-def arePermutation(str1, str2):
-    n1 = len(str1)
-    n2 = len(str2)
- 
-    if (n1 != n2):
-        return False
- 
-    a = sorted(str1)
-    str1 = " ".join(a)
-    b = sorted(str2)
-    str2 = " ".join(b)
- 
-    for i in range(0, n1, 1):
-        if (str1[i] != str2[i]):
-            return False
- 
-    return True
+def are_permutation(str1, str2):
+    return len(str1) == len(str2) and set(str1) == set(str2)
 
 def check_for_good_hit(scored_hits):
     top_hit = scored_hits[0]
     next_hit = scored_hits[1]
     counter = 2
-    while arePermutation(top_hit[2], next_hit[2]):
+    while are_permutation(top_hit[2], next_hit[2]):
         next_hit = scored_hits[counter]
         counter = counter + 1
-    if top_hit[0] - next_hit[0] > 1: 
-        return True
-    else:
-        return False
+    return top_hit[0] - next_hit[0] > 1

@@ -48,7 +48,7 @@ def optimized_compare_masses(
         observed_boundaries += boundaries(obs)
         
     updated_reference = reference      
-    if isinstance(updated_reference,dict):
+    if isinstance(updated_reference, dict):
         reference = updated_reference.get('spectrum')
     
     return_value = 0

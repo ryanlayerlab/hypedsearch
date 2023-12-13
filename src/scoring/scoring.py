@@ -4,7 +4,7 @@ from lookups.utils import ppm_to_da
 from preprocessing import clustering
 from lookups.constants import WATER_MASS, AMMONIUM
 from math import exp
-import computational_pipeline.gen_spectra
+import computational_pipeline.gen_spectra as gen_spectra
 import lookups.utils
 import computational_pipeline.database
 import re
@@ -30,7 +30,7 @@ def calc_mass_given_other_explanations(unique_m, seq, mz):
                 p = p + 1/len(seq2)
         return p
 
-def Bayes_given_mass(pH, seq, mz, unique_m):
+def bayes_given_mass(pH, seq, mz, unique_m):
     pEH = 1/len(seq)
     pnH = 1-pH
     pEnH = calc_mass_given_other_explanations(unique_m, seq, mz)
@@ -40,8 +40,8 @@ def Bayes_given_mass(pH, seq, mz, unique_m):
 
 def calc_bayes_score(seq, mz, unique_m, indices, kmer_set):
     pH = len(seq)/len(kmer_set)
-    for index in reversed(indices):
-        prob = Bayes_given_mass(pH, seq, mz, unique_m)
+    for _ in range(indices):
+        prob = bayes_given_mass(pH, seq, mz, unique_m)
         pH = prob
     return prob
 
@@ -50,10 +50,7 @@ def parse_indices(index_set):
     for index in index_set:
         string = str(index)
         A = string.rstrip().split(',')
-        start = A[0]
-        end = A[1]
-        seq = A[2]
-        mz = A[3]
+        start, end, seq, mz = A[:4]
         disallowed_characters = " ()\'"
         for character in disallowed_characters:
             start = start.replace(character, "")
@@ -63,7 +60,6 @@ def parse_indices(index_set):
         
         target_tuple = (int(start), int(end), seq, float(mz))
         indices.append(target_tuple)
-    
     
     return indices
 
@@ -93,7 +89,7 @@ def rescore_with_seq(sequence, ppm_tolerance, input_masses):
                 observed = input_masses[o_ctr]
                 theoretical = masses[t_ctr]
                 
-    return(total_score)
+    return total_score
     
 def score_by_dist(b_side, y_side, obs_prec, prec_charge, max_len, hybrid, protein_list): #Change bullet points to be a query
     #((bmass,bstart,bend,ion,charge,pid)(ymass,ystart,yend,ion,charge,pid))
@@ -128,11 +124,12 @@ def calc_overlap(masses, input_masses, ppm_tolerance):
                 observed = input_masses[o_ctr]
                 theoretical = masses[t_ctr]
                 
-    return(total_score)
+    return total_score
 
 def overlap_scoring(b_side, y_side, input_masses, ppm_tolerance, hybrid, proteins):
     if hybrid:
-        b_sequence, y_sequence = clustering.find_sequence(b_side.pid, b_side.start, b_side.end, proteins), clustering.find_sequence(y_side.pid, y_side.start, y_side.end, proteins)
+        b_sequence = clustering.find_sequence(b_side.pid, b_side.start, b_side.end, proteins)
+        y_sequence = clustering.find_sequence(y_side.pid, y_side.start, y_side.end, proteins)
         sequence = b_sequence + y_sequence
     else:
         sequence = clustering.find_sequence(b_side.pid, b_side.start, y_side.end, proteins)
@@ -144,15 +141,14 @@ def overlap_scoring(b_side, y_side, input_masses, ppm_tolerance, hybrid, protein
 
 def losing_water(b_side, y_side, input_masses, ppm_tolerance, hybrid, proteins):
     if hybrid:
-        b_sequence, y_sequence = clustering.find_sequence(b_side.pid, b_side.start, b_side.end, proteins), clustering.find_sequence(y_side.pid, y_side.start, y_side.end, proteins)
+        b_sequence = clustering.find_sequence(b_side.pid, b_side.start, b_side.end, proteins)
+        y_sequence = clustering.find_sequence(y_side.pid, y_side.start, y_side.end, proteins)
         sequence = b_sequence + y_sequence
     else:
         sequence = clustering.find_sequence(b_side.pid, b_side.start, y_side.end, proteins)
     spectrum = gen_spectra.gen_spectrum(sequence)
     masses = sorted(spectrum['spectrum'])
-    minus_water = []
-    for mass in masses:
-        minus_water.append(mass - WATER_MASS)
+    minus_water = [mass - WATER_MASS for mass in masses]
     input_masses = sorted(input_masses)
     score = calc_overlap(minus_water, input_masses, ppm_tolerance)
     return score    
@@ -235,8 +231,8 @@ def rescore_merges(unique_merge_space, input_spectrum, ppm_tol):
         minus_ammonium_score, minus_ammonium_tiebreaker, minus_ammonium_ppm_sum = modified_losing_ammonium(key, input_spectrum.mz_values, ppm_tol) # counts again but strip ammonium
         score += minus_water_score + minus_ammonium_score
         ppm_sum += minus_water_ppm_sum + minus_ammonium_ppm_sum
-        tiebreaker * minus_water_tiebreaker * minus_ammonium_tiebreaker
-        if (score/len(key), tiebreaker, key, hyb) not in rescored_unique.keys():
+        tiebreaker *= minus_water_tiebreaker * minus_ammonium_tiebreaker
+        if (score/len(key), tiebreaker, key, hyb) not in rescored_unique:
             rescored_unique[(score, tiebreaker, key, hyb)] = []
         for b, y in unique_merge_space[(key, hyb)]:
             rescored_unique[(score, tiebreaker, key, hyb)].append((score, tiebreaker, (b,y), ppm_sum))

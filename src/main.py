@@ -34,7 +34,7 @@ def populate_arguments(args) -> dict:
     number_natives = args.number_natives if not use_params else config['number_natives']
     verbose = lookups.utils.string_to_bool(args.verbose) if not use_params else config['verbose']
 
-    if spectra_file_path != '':
+    if spectra_file_path:
         spectra_file_paths = [spectra_file_path]
     else:
         spectra_file_paths = get_spectra_file_paths(spectra_folder_path)
@@ -53,7 +53,8 @@ def populate_arguments(args) -> dict:
 def check_arguments(arguments):
     are_valid = True
     database_file_path = arguments['database_file_path']
-    if not lookups.utils.is_fasta(database_file_path) or not lookups.utils.is_file(database_file_path): are_valid = False
+    if not (lookups.utils.is_fasta(database_file_path) and lookups.utils.is_file(database_file_path)): 
+        are_valid = False
     return are_valid
 
 def main(args: object) -> None:

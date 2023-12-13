@@ -22,7 +22,7 @@ def get_spectras(spectra_file_paths,number_peaks,relative_abundance):
         spectras.append(spectra)
     return spectras
 
-def do_create_kmer_database(built_database, max_peptide_length, digest_left, digest_right):
+def create_kmer_database(built_database, max_peptide_length, digest_left, digest_right):
     dbf = database_file(max_peptide_length, True)
     kv_prots = [(k, v) for k, v in built_database.proteins]    
     merge_search.modified_make_database_set(kv_prots, max_peptide_length, dbf, (digest_left, digest_right))
@@ -43,7 +43,7 @@ def run(args: dict) -> dict:
     lookups.utils.make_dir(args['output_folder_path'])
     output_file_name = get_output_file_name(args['spectra_file_paths'])
     if args['create_kmer_database']:
-        do_create_kmer_database(built_database, args['number_peaks'], args['digest_left'], args['digest_right'])
+        create_kmer_database(built_database, args['number_peaks'], args['digest_left'], args['digest_right'])
 
     matched_spectras = computational_pipeline.identification.get_matched_spectras(
         spectras = spectras, 
