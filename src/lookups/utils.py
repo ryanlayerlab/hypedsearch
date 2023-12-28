@@ -1,12 +1,6 @@
-from genericpath import exists
-import os, gzip, shutil, copy, math
-from typing import Iterable, Any, Tuple
+import os, re
 from itertools import product
 import numpy as np
-from collections import namedtuple
-
-import math
-import re
 
 HYBRID_ALIGNMENT_PATTERN = re.compile(r'[-\(\)]')
 
@@ -16,7 +10,7 @@ def string_to_bool(s: str) -> bool:
         return False
     return True
 
-def boolean_string(s):
+def boolean_string(s): # not sure what the purpose of this func is. what is it supposed to return exactly?
     if s not in {'False', 'True'}:
         raise ValueError('Not a valid boolean string')
     return s == 'False'
@@ -25,7 +19,7 @@ def file_exists(file_name: str) -> bool:
     return os.path.isfile(file_name)
 
 def make_valid_dir_string(dir_path: str) -> str:
-    return dir_path + os.path.sep if os.path.sep != dir_path[-1] else dir_path
+    return f'{dir_path}{os.path.sep}' if not dir_path.endswith(os.path.sep) else dir_path
 
 def make_dir(dir_path: str) -> bool:
     dir_path = make_valid_dir_string(dir_path)
@@ -37,26 +31,26 @@ def make_dir(dir_path: str) -> bool:
         return False
 
 def make_valid_text_file(file_name: str) -> str:
-    file_name = file_name + '.txt' if '.txt' not in file_name else file_name
+    if not file_name.endswith('.txt'): file_name += '.txt'
     return file_name
 
 def make_valid_json_file(file_name: str) -> str:
-    file_name = file_name + '.json' if '.json' not in file_name else file_name
+    if not file_name.endswith('.json'): file_name += '.json'
     return file_name
 
 def make_valid_csv_file(file_name: str) -> str:
-    file_name = file_name + '.csv' if '.csv' not in file_name else file_name
+    if not file_name.endswith('.csv'): file_name += '.csv'
     return file_name
 
 def make_valid_fasta_file(file_name: str) -> str:
-    file_name = file_name + '.fasta' if '.fasta' not in file_name else file_name
+    if not file_name.endswith('.fasta'): file_name += '.fasta'
     return file_name
 
 def is_json(file: str) -> bool:
-    return True if '.json' in file else False
+    return file.endswith('.json')
 
 def is_fasta(file: str) -> bool:
-    return True if '.fasta' in file else False
+    return file.endswith('.fasta')
 
 def is_dir(dir_path: str) -> bool:
     return os.path.isdir(dir_path)
@@ -95,38 +89,34 @@ def hashable_boundaries(boundaries: list) -> str:
 
 def cosine_similarity(a: list, b: list) -> float:
     if len(a) > len(b):
-        b = list(b) + [0 for _ in range(len(a) - len(b))]
-        
-    if len(b) > len(a):
-        a = list(a) + [0 for _ in range(len(b) - len(a))]
+        b = list(b) + list(np.zeros(len(a) - len(b), dtype = int))
+    elif len(b) > len(a):
+        a = list(a) + list(np.zeros(len(b) - len(a), dtype = int))
 
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 def split_hybrid(sequence: str):
     if '-' in sequence:
-        return (sequence.split('-')[0], sequence.split('-')[1])
-    
+        return tuple(sequence.split('-', 2)[:2])
     else:
-        left = sequence.split(')')[0].replace('(', '')
-        right = sequence.split('(')[1].replace(')', '')
+        left = sequence.split(')', 1)[0].replace('(', '')
+        right = sequence.split('(', 2)[1].replace(')', '')
         return (left, right)
 
 def find_dir(filename, location):
     filepath = os.path.join(location, filename)
-    if os.path.exists(filepath):
-        return True
-    else:
-        return False
+    return os.path.exists(filepath)
 
 def DEV_contains_truth_parts(truth_seq: str, hybrid: bool, b_seqs: list, y_seqs: list) -> bool:
-    has_left = False
-    has_right = False
-    left_half = ''
-    right_half = ''
+    replacer_small = lambda x: re.sub('I|L', 'B', x)
+    def replacer_big(x):
+        return re.sub('-|(|)', '', replacer_small(x))
+    
+    has_left = has_right = False
+    left_half = right_half = ''
     if hybrid:
         if '-' in truth_seq:
-            left_half = truth_seq.split('-')[0]
-            right_half = truth_seq.split('-')[1]
+            left_half, right_half = truth_seq.split('-', 2)[:2]
 
         elif '(' in truth_seq and ')' in truth_seq:
             left_half = truth_seq.split(')')[0].replace('(', '')
@@ -136,31 +126,27 @@ def DEV_contains_truth_parts(truth_seq: str, hybrid: bool, b_seqs: list, y_seqs:
             left_half = truth_seq[:2]
             right_half = truth_seq[-2:]
 
-        truth_seq = truth_seq.replace('I', 'B').replace('L', 'B').replace('-', '').replace('(', '').replace(')', '')
+        truth_seq = replacer_big(truth_seq)
 
-        b_seqs = [x.replace('I', 'B').replace('L', 'B') for x in b_seqs]
-        y_seqs = [x.replace('I', 'B').replace('L', 'B') for x in y_seqs]
+        b_seqs = [replacer_small(x) for x in b_seqs]
+        y_seqs = [replacer_small(x) for x in y_seqs]
+    
+    filtered_b_seqs = list(filter(lambda x: len(x) > 1), b_seqs)
+    filtered_y_seqs = list(filter(lambda x: len(x) > 1), y_seqs)
+    has_left = any(truth_seq.startswith(x) for x in filtered_b_seqs) or \
+               any(x.startswith(truth_seq) for x in filtered_b_seqs)
 
-    has_left = any(
-        [x == truth_seq[:len(x)] for x in b_seqs if len(x) > 1]
-    ) or any(
-        [truth_seq == x[:len(truth_seq)] for x in b_seqs if len(x) > 1]
-    )
-
-    has_right = any(
-        [x == truth_seq[-len(x):] for x in y_seqs if len(x) > 1]
-    ) or any(
-        [truth_seq == x[-len(truth_seq):] for x in y_seqs if len(x) > 1]
-    )
+    has_right = any(truth_seq.endswith(x) for x in filtered_y_seqs) or \
+                any(x.endswith(truth_seq) for x in filtered_y_seqs)
 
     if hybrid:
         if not has_left:
-            left_half = left_half.replace('I', 'B').replace('L', 'B')
-            has_left = any([left_half == x[:len(left_half)] for x in b_seqs])
+            left_half = replacer_small(left_half)
+            has_left = any(x.startswith(left_half) for x in b_seqs)
 
         if not has_right:
-            right_half = right_half.replace('I', 'B').replace('L', 'B')
-            has_right = any([right_half == x[-len(right_half):] for x in y_seqs])
+            right_half = replacer_small(right_half)
+            has_right = any(x.endswith(right_half) for x in y_seqs)
 
         return has_left and has_right
 
@@ -169,28 +155,16 @@ def DEV_contains_truth_parts(truth_seq: str, hybrid: bool, b_seqs: list, y_seqs:
 def CICD_test():
     return 1
 
-
 def DEV_contains_truth_exact(truth_seq: str, hybrid: bool, seqs: list) -> bool:
+    def replacer(x):
+        temp = re.sub('I|L', 'B', x)
+        return re.sub('-|(|)', '', temp)
+    
     if hybrid:
-        truth_seq = truth_seq \
-                        .replace('I', 'B') \
-                        .replace('L', 'B') \
-                        .replace('-', '') \
-                        .replace('(', '') \
-                        .replace(')', '')
+        truth_seq = replacer(truth_seq)
+        seqs = [replacer(x) for x in seqs]
 
-        seqs = [
-            x \
-                .replace('I', 'B') \
-                .replace('L', 'B') \
-                .replace('-', '') \
-                .replace('(', '') \
-                .replace(')', '')
-            for x in seqs
-        ]
-
-    contains_exact = any([x == truth_seq for x in seqs])
-    return contains_exact
+    return truth_seq in seqs
 
 
 
