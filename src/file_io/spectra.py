@@ -7,8 +7,8 @@ def load(filename: str, number_peaks: int = 0, relative_abundance: float = 0.0) 
     ext = filename.split('.')[-1]
 
     if ext.lower() == 'mzxml':
-        foo = mzXML.read(filename, number_peaks, relative_abundance)
-        return foo
+        mzml_file = mzXML.read(filename, number_peaks, relative_abundance)
+        return mzml_file
 
     elif ext.lower() == 'mzml':
         return mzML.read(filename, number_peaks, relative_abundance)
