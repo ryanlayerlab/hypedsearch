@@ -1,9 +1,6 @@
 import os
 import sys
 
-# module_path = os.path.abspath(os.path.join('..', 'hypedsearch', 'src'))
-# if module_path not in sys.path:
-#     sys.path.append(module_path)
 module_path = os.path.abspath(os.path.join('../..'))
 if module_path not in sys.path:
     sys.path.append(module_path)
@@ -337,11 +334,6 @@ else:
 print('Finished matching masses')
 
 top_natural_scores, top_hybrid_scores = [], []
-
-# hybrid_spectra = [input_spectra[4], input_spectra[5], input_spectra[6], input_spectra[7], input_spectra[8], input_spectra[9], input_spectra[10], input_spectra[11]]
-# hybrid_correct_seqs = [correct_sequences[4], correct_sequences[5], correct_sequences[6], correct_sequences[7], correct_sequences[8], correct_sequences[9], correct_sequences[10], correct_sequences[11]]
-# input_spectra = hybrid_spectra
-# correct_sequences = hybrid_correct_seqs
 
 for spectrum_num,input_spectrum in enumerate(input_spectra):
     input_spectrum = input_spectra[spectrum_num]
