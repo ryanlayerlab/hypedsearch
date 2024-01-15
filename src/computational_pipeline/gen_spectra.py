@@ -29,8 +29,7 @@ def get_y_ions(sequence: str, charge: int = None):
         total = DOUBLY_CHARGED_Y_BASE
         for i in range (0, length):
             total += AMINO_ACIDS[sequence[length-i-1]]
-            masses.append(total/2)
-            
+            masses.append(total/2)            
     return masses
 
 def calc_masses(sequence: str, charge: int =None, ion: str = None):
