@@ -15,7 +15,7 @@ import time
 import multiprocessing as mp
 import json
 import os
-from computational_pipeline.gen_spectra import convert_precursor_to_ion, calc_masses
+from computational_pipeline.gen_spectra import convert_precursor_to_ion, calculate_masses
 from scoring.scoring import second_scoring, rescore_merges
 from alignment.alignment import find_alignments
 import computational_pipeline.finding_seqs

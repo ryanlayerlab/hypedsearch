@@ -1,4 +1,4 @@
-from computational_pipeline.gen_spectra import calc_masses
+from computational_pipeline.gen_spectra import calculate_masses
 from lookups.utils import ppm_to_da, hashable_boundaries
 
 from bisect import bisect
