@@ -1,8 +1,8 @@
 from lookups.objects import Database, Spectrum
 from scoring import scoring
-
-import computational_pipeline.database
-import computational_pipeline.gen_spectra
+import lookups.utils as utils
+import computational_pipeline.database as database
+import computational_pipeline.gen_spectra as gen_spectra
 import lookups.utils
 import re
 import math
@@ -128,7 +128,6 @@ def __add_amino_acids(
         
     # if its nonhybrid, try left and right side
     else:
-
         for p in parents[0]:
 
             # get the parent sequence

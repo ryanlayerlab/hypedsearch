@@ -5,16 +5,12 @@ from alignment import alignment_utils, hybrid_alignment
 from computational_pipeline.gen_spectra import get_precursor
 from preprocessing.clustering import calc_from_sequences
 import lookups.objects as objects
-import lookups.utils
-import computational_pipeline.database
-import computational_pipeline.gen_spectra
+import lookups.utils as utils
+import computational_pipeline.database as database
+import computational_pipeline.gen_spectra as gen_spectra
 from computational_pipeline.sqlite import database_file
 
-import math
-import collections
-import re
-
-import time
+import re, math, collections, time
 
 FIRST_ALIGN_TIME = 0
 AMBIGUOUS_REMOVAL_TIME = 0
@@ -97,8 +93,10 @@ def extend_base_kmers(b_kmers: list, y_kmers: list, spectrum: Spectrum, db: Data
         extended_y += [x for x in alignment_utils.extend_non_hybrid(seq, spectrum, 'y', db)]
     return extended_b, extended_y
 
-def refine_alignments(spectrum: Spectrum, db: Database, alignments: list, precursor_tolerance: int = 10,
-    DEV: bool = False, truth: dict = None, fall_off: dict = None):
+def refine_alignments(
+        spectrum: Spectrum, db: Database, alignments: list, precursor_tolerance: int = 10,
+        DEV: bool = False, truth: dict = None, fall_off: dict = None
+    ):
     global PRECURSOR_MASS_COUNT, AMBIGUOUS_REMOVAL_COUNT, OUT_OF_RANGE_SEQS
     global PRECURSOR_MASS_TIME, AMBIGUOUS_REMOVAL_TIME
     predicted_len = utils.predicted_len(spectrum.precursor_mass, spectrum.precursor_charge)
@@ -167,7 +165,7 @@ def refine_alignments(spectrum: Spectrum, db: Database, alignments: list, precur
 
 def attempt_alignment_dev(spectrum: Spectrum, truth: bool = None, fall_off: bool = None,a: list = None):
     b_seqs = [x[0] for x in a]
-    y_seqs = [x[0] for x in a]
+    y_seqs = [x[0] for x in a] # what?????
     _id = spectrum.id
     is_hybrid = truth[_id]['hybrid']
     truth_seq = truth[_id]['sequence']
@@ -185,9 +183,11 @@ def attempt_alignment_dev(spectrum: Spectrum, truth: bool = None, fall_off: bool
         )
         return Alignments(spectrum, [], None)
 
-def attempt_alignment_first_pass(spectrum: Spectrum, db: Database, n: int = 3, ppm_tolerance: int = 20, 
-    precursor_tolerance: int = 10,digest_type: str = '',truth: bool = None, fall_off: bool = None,
-    DEV: bool = False,OBJECTIFY_COUNT: int = 0,OBJECTIFY_TIME: int = 0,a: list = None,is_last: bool = False):
+def attempt_alignment_first_pass(
+        spectrum: Spectrum, db: Database, n: int = 3, ppm_tolerance: int = 20, 
+        precursor_tolerance: int = 10,digest_type: str = '',truth: bool = None, fall_off: bool = None,
+        DEV: bool = False,OBJECTIFY_COUNT: int = 0,OBJECTIFY_TIME: int = 0,a: list = None,is_last: bool = False
+    ):
     refine_start = time.time()
     non_hybrid_refined = refine_alignments(spectrum, db, [x for x in a if x[1] is None], 
         precursor_tolerance=precursor_tolerance, DEV=DEV, truth=truth, fall_off=fall_off)
@@ -197,40 +197,39 @@ def attempt_alignment_first_pass(spectrum: Spectrum, db: Database, n: int = 3, p
     tracker = {}
     st = time.time()
     for nhr, _ in non_hybrid_refined:
-        if nhr in tracker: 
-            continue
-        tracker[nhr] = True 
-        scoring_start = time.time()
-        p_d = scoring.precursor_distance(
-            spectrum.precursor_mass, 
-            gen_spectra.get_precursor(nhr, spectrum.precursor_charge)
-        )
-        b_score = scoring.score_sequence(
-            spectrum.mz_values, 
-            sorted(gen_spectra.gen_spectrum(nhr, ion='b')['spectrum']), 
-            ppm_tolerance
-        )
-
-        y_score = scoring.score_sequence(
-            spectrum.mz_values, 
-            sorted(gen_spectra.gen_spectrum(nhr, ion='y')['spectrum']), 
-            ppm_tolerance
-        )
-        total_error = scoring.total_mass_error(spectrum, nhr, ppm_tolerance)
-        t_score = b_score + y_score + scoring.digest_score(nhr, db, digest_type)
-        non_hybrid_scoring_times.append(time.time() - scoring_start)
-        parents = alignment_utils.get_parents(nhr, db)
-        non_hybrid_alignments.append(   
-            SequenceAlignment(
-                parents[0], 
-                nhr, 
-                b_score, 
-                y_score, 
-                t_score, 
-                p_d, 
-                total_error
+        if nhr not in tracker: 
+            tracker[nhr] = True 
+            scoring_start = time.time()
+            p_d = scoring.precursor_distance(
+                spectrum.precursor_mass, 
+                gen_spectra.get_precursor(nhr, spectrum.precursor_charge)
             )
-        )
+            b_score = scoring.score_sequence(
+                spectrum.mz_values, 
+                sorted(gen_spectra.gen_spectrum(nhr, ion='b')['spectrum']), 
+                ppm_tolerance
+            )
+
+            y_score = scoring.score_sequence(
+                spectrum.mz_values, 
+                sorted(gen_spectra.gen_spectrum(nhr, ion='y')['spectrum']), 
+                ppm_tolerance
+            )
+            total_error = scoring.total_mass_error(spectrum, nhr, ppm_tolerance)
+            t_score = b_score + y_score + scoring.digest_score(nhr, db, digest_type)
+            non_hybrid_scoring_times.append(time.time() - scoring_start)
+            parents = alignment_utils.get_parents(nhr, db)
+            non_hybrid_alignments.append(
+                SequenceAlignment(
+                    parents[0], 
+                    nhr, 
+                    b_score, 
+                    y_score, 
+                    t_score, 
+                    p_d, 
+                    total_error
+                )
+            )
 
     OBJECTIFY_COUNT += len(non_hybrid_refined)
     OBJECTIFY_TIME += time.time() - st
@@ -251,10 +250,12 @@ def attempt_alignment_first_pass(spectrum: Spectrum, db: Database, n: int = 3, p
     else:
         return None, non_hybrid_alignments        
 
-def attempt_alignment_second_pass(spectrum: Spectrum, db: Database, n: int = 3, 
-    ppm_tolerance: int = 20, precursor_tolerance: int = 10,digest_type: str = '',truth: bool = None, 
-    fall_off: bool = None,DEV: bool = False,OBJECTIFY_COUNT: int = 0,OBJECTIFY_TIME: int = 0,
-    a: list = [],non_hybrid_alignments: list = []):
+def attempt_alignment_second_pass(
+        spectrum: Spectrum, db: Database, n: int = 3, 
+        ppm_tolerance: int = 20, precursor_tolerance: int = 10,digest_type: str = '',truth: bool = None, 
+        fall_off: bool = None,DEV: bool = False,OBJECTIFY_COUNT: int = 0,OBJECTIFY_TIME: int = 0,
+        a: list = [],non_hybrid_alignments: list = []
+    ):
     refine_start = time.time()
     hybrid_refined = refine_alignments(
         spectrum, 
