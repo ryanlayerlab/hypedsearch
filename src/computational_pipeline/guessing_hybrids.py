@@ -190,10 +190,10 @@ for i,hybrid in enumerate(known_hybrids):
     #split to left and right pieces 
     hybrid_seq_split = hybrid_seq.split('-')
     #if len(hybrid_seq) <= 25:
-    spectrum_b_1 = gen_spectra.gen_spectrum(hybrid_seq_split[0], 1, 'b')
-    spectrum_b_2 = gen_spectra.gen_spectrum(hybrid_seq_split[0], 2, 'b')
-    spectrum_y_1 = gen_spectra.gen_spectrum(hybrid_seq_split[1], 1, 'y')
-    spectrum_y_2 = gen_spectra.gen_spectrum(hybrid_seq_split[1], 2, 'y')
+    spectrum_b_1 = gen_spectra.generate_spectrum(hybrid_seq_split[0], 1, 'b')
+    spectrum_b_2 = gen_spectra.generate_spectrum(hybrid_seq_split[0], 2, 'b')
+    spectrum_y_1 = gen_spectra.generate_spectrum(hybrid_seq_split[1], 1, 'y')
+    spectrum_y_2 = gen_spectra.generate_spectrum(hybrid_seq_split[1], 2, 'y')
     score_b1, overlap_masses_b1 = find_overlaps(spectrum_b_1, ppm_tolerance, hybrid.mz_values)
     score_b2, overlap_masses_b2 = find_overlaps(spectrum_b_2, ppm_tolerance, hybrid.mz_values)
     score_y1, overlap_masses_y1 = find_overlaps(spectrum_y_1, ppm_tolerance, hybrid.mz_values)
@@ -244,10 +244,10 @@ scores_nat = list()
 for i,natural in enumerate(known_naturals):
     natural_seq = known_natural_seqs[i]
     #if len(natural_seq) <= 25:
-    spectrum_b_1 = gen_spectra.gen_spectrum(natural_seq, 1, 'b')
-    spectrum_b_2 = gen_spectra.gen_spectrum(natural_seq, 2, 'b')
-    spectrum_y_1 = gen_spectra.gen_spectrum(natural_seq, 1, 'y')
-    spectrum_y_2 = gen_spectra.gen_spectrum(natural_seq, 2, 'y')
+    spectrum_b_1 = gen_spectra.generate_spectrum(natural_seq, 1, 'b')
+    spectrum_b_2 = gen_spectra.generate_spectrum(natural_seq, 2, 'b')
+    spectrum_y_1 = gen_spectra.generate_spectrum(natural_seq, 1, 'y')
+    spectrum_y_2 = gen_spectra.generate_spectrum(natural_seq, 2, 'y')
     score_b1, overlap_masses_b1 = find_overlaps(spectrum_b_1, ppm_tolerance, natural.mz_values)
     score_b2, overlap_masses_b2 = find_overlaps(spectrum_b_2, ppm_tolerance, natural.mz_values)
     score_y1, overlap_masses_y1 = find_overlaps(spectrum_y_1, ppm_tolerance, natural.mz_values)
