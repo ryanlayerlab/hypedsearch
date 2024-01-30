@@ -9,9 +9,7 @@ def extract_protein_name(prot_entry: namedtuple) -> str:
 
 def build(fasta_file: str) -> Database:
     db = Database(fasta_file)
-    prots = []
-    for entry in fasta.read(fasta_file):
-        prots.append(entry)
+    prots = [entry for entry in fasta.read(fasta_file)]
     db = db._replace(proteins=prots)
     return db
 
