@@ -6,7 +6,7 @@ import sys
 import os
 path_to_src = (os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append(path_to_src)
-from src.constants.objects import Database, Spectrum, MPSpectrumID, DEVFallOffEntry
+from src.lookups.objects import Database, Spectrum, MPSpectrumID, DEVFallOffEntry
 from src.preprocessing import merge_search, preprocessing_utils
 from src import database
 from src.file_io import JSON
@@ -56,27 +56,4 @@ def database_and_spectra_preprocessing(
     # get the boundary -> kmer mappings for b and y ions
 
     matched_masses_b, matched_masses_y, db = merge_search.modified_match_masses(boundaries, db, max_peptide_len, DEBUG, write_path)
-
-    # # if we only get 1 core, don't do the multiprocessing bit
-    # if cores == 1:
-    #     # go through and id all spectra
-    #     for i, spectrum in enumerate(spectra):
-
-    #         print(f'Creating alignment for spectrum {i+1}/{len(spectra)} [{to_percent(i+1, len(spectra))}%]', end='\r')
-
-    #         # get b and y hits
-    #         b_hits, y_hits = [], []
-    #         for mz in spectrum.spectrum:
-
-    #             # get the correct boundary
-    #             mapped = mz_mapping[mz]
-    #             b = boundaries[mapped]
-    #             b = hashable_boundaries(b)
-
-    #             if b in matched_masses_b:
-    #                 b_hits += matched_masses_b[b]
-
-    #             if b in matched_masses_y:
-    #                 y_hits += matched_masses_y[b]
-
     return db
