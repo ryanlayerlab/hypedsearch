@@ -105,14 +105,11 @@ def refine_alignments(
     precursor_matches = []
     for sequence_pairs in alignments:
         sequence = sequence_pairs[0] if sequence_pairs[1] is None else sequence_pairs[1]
-        p_ms = [
-            x for x in \
-            alignment_utils.match_precursor(spectrum, sequence, db, gap=allowed_gap, tolerance=precursor_tolerance)
-        ]
+        p_ms = alignment_utils.match_precursor(spectrum, sequence, db, gap=allowed_gap, tolerance=precursor_tolerance)
         if len(p_ms) and p_ms[0] is None:
             OUT_OF_RANGE_SEQS += 1
-            continue
-        precursor_matches += p_ms
+        else:
+            precursor_matches += p_ms
     PRECURSOR_MASS_COUNT += len(alignments)
     PRECURSOR_MASS_TIME += time.time() - st
     if DEV:
