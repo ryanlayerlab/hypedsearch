@@ -74,7 +74,7 @@ Identification_Instrumentation = namedtuple(
     'Identification_Instrumentation', 
     ['average_b_scoring_time', 'average_y_scoring_time', 'time_to_filter_out_top_50_kmers',
      'average_extension_time', 'average_non_hybrid_refinement_time', 'average_non_hybrid_scoring_time',
-      'average_hybrid_refinement_time', 'average_hybrid_scoring_time', 'average_alignment_time'],
+     'average_hybrid_refinement_time', 'average_hybrid_scoring_time', 'average_alignment_time'],
     defaults=[0,0,0,0,0,0,0,0,0]
 )
 
