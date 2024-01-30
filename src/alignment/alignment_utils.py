@@ -3,9 +3,7 @@ from scoring import scoring
 import lookups.utils as utils
 import computational_pipeline.database as database
 import computational_pipeline.gen_spectra as gen_spectra
-import lookups.utils
 import re
-import math
 
 def __get_surrounding_amino_acids(
     parent_sequence: str, 
@@ -302,7 +300,7 @@ def align_overlaps(seq1: str, seq2: str) -> str:
             alignment = seq1 + right_seq
             break
   
-    # if no overlpa exists, just make append seq2 to seq1
+    # if no overlap exists, just make append seq2 to seq1
     if alignment is None:
         alignment = seq1 + '-' + seq2
 
