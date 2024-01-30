@@ -16,14 +16,10 @@ def file_exists(file_name: str) -> bool:
 def make_valid_dir_string(dir_path: str) -> str:
     return f'{dir_path}{os.path.sep}' if not dir_path.endswith(os.path.sep) else dir_path
 
-def make_dir(dir_path: str) -> bool:
+def make_dir(dir_path: str) -> None:
     dir_path = make_valid_dir_string(dir_path)
-    try:
-        if not os.path.exists(dir_path): 
-            os.makedirs(dir_path)
-        return True 
-    except:
-        return False
+    if not os.path.exists(dir_path):
+        os.makedirse(dir_path)
 
 def make_valid_json_file(file_name: str) -> str:
     if not file_name.endswith('.json'): file_name += '.json'
@@ -63,13 +59,10 @@ def make_sparse_array(spectrum: list, width: float, value=50) -> np.ndarray:
     return sparse
 
 def to_percent(index, total):
-    return int(100 * (index)/total)
+    return int(100 * (index/total))
 
 def hashable_boundaries(boundaries: list) -> str:
     if (len(boundaries) == 2):
         return '-'.join([str(x) for x in boundaries])
     else:
         return None
-
-
-
