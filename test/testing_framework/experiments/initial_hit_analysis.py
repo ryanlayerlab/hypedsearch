@@ -148,9 +148,6 @@ def filter_by_missing_mass(mseqs, obs_prec, precursor_tol, charge):
                 
     return filtered_seqs
 
-# def evaluate_top_merges()
-
-
 input_spectra, boundaries, correct_sequences, db = get_spectra_and_db(ppm_tolerance, peak_filter, relative_abundance_filter)
 
 write_path = os.path.abspath(os.path.join(module_path, 'intermediate_files'))
@@ -161,16 +158,12 @@ if get:
 else:
     matched_masses_b, matched_masses_y, kmer_set = merge_search.modified_match_masses(boundaries, db, max_peptide_length, True, write_path)
 print('Finished matching masses')
-# print('Getting unique matched masses...')
-# unique_b, unique_y = testing_utils.get_unique_matched_masses(boundaries, matched_masses_b, matched_masses_y)
-# print('Done')
 
 top_count, top_10_count, top_50_count = False, False, False
 for spectrum_num,input_spectrum in enumerate(input_spectra):
     print(f'Getting seeds for {spectrum_num+1}/{len(input_spectra)} [{to_percent(spectrum_num+1, len(input_spectra))}%]', end='\r')
     correct_sequence = correct_sequences[spectrum_num]
     filtered_mm_b, filtered_mm_y = filter_matched_masses(input_spectrum.mz_values, matched_masses_b, matched_masses_y)
-    # unique_b, unique_y = testing_utils.get_unique_matched_masses(input_spectrum.mz_values, filtered_mm_b, filtered_mm_y)
     b_hits,y_hits = identification.create_hits(spectrum_num, input_spectrum, filtered_mm_b, filtered_mm_y, False, write_path)
     for ion in "by":
             clusters = clustering.create_clusters(ion, b_hits, y_hits)
@@ -184,13 +177,4 @@ for spectrum_num,input_spectrum in enumerate(input_spectra):
     hybrid_merged = clustering.get_hybrid_matches(input_spectrum, b_sorted_clusters, y_sorted_clusters, precursor_tolerance)
     hybrid_merged = filter_by_precursor(hybrid_merged, input_spectrum.precursor_mass, precursor_tolerance, input_spectrum.precursor_charge)
     hybrid_merged = filter_by_missing_mass(hybrid_merged, input_spectrum.precursor_mass, precursor_tolerance, input_spectrum.precursor_charge)  
-
     merged_top = get_top_comb(merged_seqs, hybrid_merged)
-    # top, top_10, top_50 = evaluate_top_merges(merged_top, correct_sequence)
-
-    # if top == True:
-    #     top_count = top_count + 1
-    # if top_10 == True:
-    #     top_10_count = top_10_count + 1
-    # if top_50 == True:
-    #     top_50_count = top_50_count + 1

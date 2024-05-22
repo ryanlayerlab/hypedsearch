@@ -13,9 +13,6 @@ import os
 
 script_dir = os.path.dirname(__file__)
 json_dir = '/'.join(script_dir.split('/')[:-1])
-#digest_file = os.path.join(json_dir, 'digests.json')
-
-#digests = json.load(open(digest_file, 'r'))
 
 def calc_mass_given_other_explanations(unique_m, seq, mz):
     oEXPnum = (len(unique_m[mz]) - 1)/ len(unique_m[mz])
@@ -35,7 +32,6 @@ def Bayes_given_mass(pH, seq, mz, unique_m):
     pnH = 1-pH
     pEnH = calc_mass_given_other_explanations(unique_m, seq, mz)
     prob = (pH * pEH)/((pH*pEH)+(pnH*pEnH))
-#     print(seq,pH,pEH,(pH*pEH),(pnH*pEnH),pnH,pEnH)
     return prob
 
 def calc_bayes_score(seq, mz, unique_m, indices, kmer_set):
@@ -95,8 +91,7 @@ def rescore_with_seq(sequence, ppm_tolerance, input_masses):
                 
     return(total_score)
     
-def score_by_dist(b_side, y_side, obs_prec, prec_charge, max_len, hybrid, protein_list): #Change bullet points to be a query
-    #((bmass,bstart,bend,ion,charge,pid)(ymass,ystart,yend,ion,charge,pid))
+def score_by_dist(b_side, y_side, obs_prec, prec_charge, max_len, hybrid, protein_list):
     if hybrid:
         full_seq = clustering.find_sequence(b_side.pid, b_side.start, b_side.end, protein_list) + clustering.find_sequence(y_side.pid, y_side.start, y_side.end, protein_list)
     else:
@@ -225,9 +220,6 @@ def modified_losing_ammonium(sequence, input_masses, ppm_tolerance):
 
 
 def rescore_merges(unique_merge_space, input_spectrum, ppm_tol):
-    # unique_merge_space
-    # key   -> (sequence (str), 1 hybrid 0 not hybrid)
-    # value -> list of merges objects, each merges is (b, y) 
     rescored_unique = dict()
     for key, hyb in unique_merge_space:
         score, tiebreaker, ppm_sum = modified_overlap_scoring(key, input_spectrum.mz_values, ppm_tol) # counts peaks

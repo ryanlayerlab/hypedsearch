@@ -15,7 +15,7 @@ import time
 import multiprocessing as mp
 import json
 import os
-from computational_pipeline.gen_spectra import convert_precursor_to_ion, calc_masses
+from computational_pipeline.gen_spectra import convert_precursor_to_ion, calculate_masses
 from scoring.scoring import second_scoring, rescore_merges
 from alignment.alignment import find_alignments
 import computational_pipeline.finding_seqs
@@ -266,40 +266,6 @@ def create_rescored_alignments(rescored_naturals, rescored_hybrids):
 def do_eigth_thing(db, rescored_alignments, spectrum, num_hybrids, num_natives):
     postprocessed_alignments = postprocessing(rescored_alignments, db, spectrum, num_hybrids, num_natives)
     return postprocessed_alignments
-
-def do_seventh_thing(spectrum, max_pep_len, db, ppm_tol, natural_alignments, hybrid_alignments):
-    rescored_naturals, rescored_hybrids = second_scoring(natural_alignments, hybrid_alignments, spectrum, ppm_tol, db.proteins, max_pep_len)
-    rescored_naturals = sorted(rescored_naturals, key = lambda x: (x[0], x[1]), reverse=True)
-    rescored_hybrids = sorted(rescored_hybrids, key = lambda x: (x[0], x[1]), reverse=True)
-    return rescored_naturals,rescored_hybrids
-
-def do_sixth_thing(spectrum, db, merged_seqs, prec_tol, hybrid_merged):
-    natural_alignments, hybrid_alignments = find_alignments(merged_seqs, hybrid_merged, spectrum.precursor_mass, spectrum.precursor_charge, prec_tol, db, prec_tol)
-    return natural_alignments,hybrid_alignments
-
-def do_fifth_thing(hybrid_merged, b_sorted_clusters, y_sorted_clusters):
-    hybrid_merged = clustering.distribute_merges(hybrid_merged, b_sorted_clusters, y_sorted_clusters)
-    hybrid_merged = sorted(hybrid_merged, key = lambda x: x[0], reverse=True)
-    return hybrid_merged
-
-def do_fourth_thing(spectrum, b_sorted_clusters, y_sorted_clusters, prec_tol):
-    hybrid_merged = clustering.get_hybrid_matches(b_sorted_clusters, y_sorted_clusters, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
-    return hybrid_merged
-
-def do_third_thing(spectrum, max_pep_len, prec_tol, b_sorted_clusters, y_sorted_clusters):
-    merged_seqs = do_third_thing_A(b_sorted_clusters, y_sorted_clusters)
-    prec_tol, merged_seqs = do_third_thing_B(spectrum, max_pep_len, prec_tol, merged_seqs)
-    return merged_seqs,prec_tol
-
-def do_third_thing_B(spectrum, max_pep_len, prec_tol, merged_seqs):
-    prec_tol = ppm_to_da(spectrum.precursor_mass, prec_tol)
-    updated_merged_seqs = clustering.filter_by_precursor(merged_seqs, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, max_pep_len)
-    return prec_tol,updated_merged_seqs
-
-def do_third_thing_A(b_sorted_clusters, y_sorted_clusters):
-    merged_seqs = clustering.Ryan_merge(b_sorted_clusters, y_sorted_clusters)
-    merged_seqs.sort(key = lambda x: x[0], reverse = True)
-    return merged_seqs
 
 def do_second_thing(db, converted_b, converted_y, b_hits, y_hits, prec_charge, ppm_tol, num):
     b_clusters = clustering.create_clusters('b', b_hits, y_hits)

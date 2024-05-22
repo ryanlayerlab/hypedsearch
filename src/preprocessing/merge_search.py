@@ -37,7 +37,7 @@ def handle_sorting_keys(db_dict_b, db_dict_y, kmer_list):
 def get_data(kmer, start, end, protein_num, ion):
     data_list = []
     for charge in [1,2]:
-        mass = computational_pipeline.gen_spectra.max_mass(kmer, ion=ion, charge=charge) #1108.563316435
+        mass = computational_pipeline.gen_spectra.get_max_mass(kmer, ion=ion, charge=charge) #1108.563316435
         ion_int = 0 if ion == 'b' else 1
         input_tuple = (mass, start, end, ion_int, charge, protein_num)
         data_list.append(input_tuple)

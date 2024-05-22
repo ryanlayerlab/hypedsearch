@@ -70,7 +70,6 @@ class database_file:
     def query_extensions_y(self, target_mass, pid, end, start, ion):
         query_start = time.time()
         rows_cursor = self.connection.execute("SELECT * FROM kmers where protein = ? and location_end = ? and location_start <= ? and mass < ? and ion = ? and charge = 2 order by location_start desc", (pid, end, start, target_mass, ion))
-        # rows_cursor = self.cursor.execute("SELECT * FROM kmers where protein = ? and location_end = ? and location_start < ? and mass < ? and ion = ? and charge = 2 order by location_start desc", (pid, end, start, target_mass, ion))
         query_time = time.time() - query_start
         self.query_protein_average = (self.query_protein_average * self.protein_count + query_time)/ (self.protein_count + 1)
         self.protein_count += 1

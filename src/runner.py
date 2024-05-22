@@ -45,15 +45,14 @@ def run(args: dict) -> dict:
     if args['create_kmer_database']:
         do_create_kmer_database(built_database, args['number_peaks'], args['digest_left'], args['digest_right'])
 
+    max_peptide_length=args['max_peptide_length']
+    ppm_tolerance=args['ppm_tolerance']
+    precursor_tolerance=args['precursor_tolerance']
+    number_hybrids=args['number_hybrids']
+    number_natives=args['number_natives']
+    output_folder_path=args['output_folder_path']
+
     matched_spectras = computational_pipeline.identification.get_matched_spectras(
-        spectras = spectras, 
-        built_database = built_database, 
-        max_peptide_length=args['max_peptide_length'], 
-        ppm_tolerance=args['ppm_tolerance'], 
-        precursor_tolerance=args['precursor_tolerance'],
-        number_hybrids=args['number_hybrids'], 
-        number_natives=args['number_natives'], 
-        number_of_cores=number_of_cores, 
-        output_folder_path=args['output_folder_path'],
-        output_file_name=output_file_name)
+        spectras,built_database,max_peptide_length,ppm_tolerance,precursor_tolerance,
+        number_hybrids,number_natives,number_of_cores,output_folder_path,output_file_name)
     return matched_spectras

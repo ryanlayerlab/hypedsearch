@@ -1,7 +1,7 @@
 from file_io import spectra
 from lookups.utils import ppm_to_da
 from lookups.constants import DOUBLY_CHARGED_B_BASE, DOUBLY_CHARGED_Y_BASE, PROTON_MASS, WATER_MASS
-from computational_pipeline.gen_spectra import get_total_sum, convert_precursor_to_ion, get_precursor, gen_spectrum
+from computational_pipeline.gen_spectra import get_total_sum, convert_precursor_to_ion, get_precursor, generate_spectrum
 from computational_pipeline.sqlite import database_file
 
 def make_boundaries(mz, ppm_tol):
@@ -22,7 +22,7 @@ def load_spectra(spectra_file, number_peaks: int = 0, relative_abundance: float 
 
 def overlap_scoring(sequence, ppm_tol, input_masses):
     total_score = 0
-    spectrum = gen_spectrum(sequence)
+    spectrum = generate_spectrum(sequence)
     masses = sorted(spectrum['spectrum'])
     input_masses = sorted(input_masses)
     o_ctr, t_ctr = 0, 0
