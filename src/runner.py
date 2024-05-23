@@ -6,6 +6,7 @@ from computational_pipeline.sqlite import database_file
 from preprocessing import merge_search
 from datetime import datetime
 import os
+from postprocessing.summary import write_aligned_spectras_to_disk
 
 def get_built_database(database_file_path):
     return computational_pipeline.database.build(database_file_path)
@@ -37,7 +38,6 @@ def get_output_file_name(spectra_file_paths):
     return return_value
 
 def run(args: dict) -> dict:
-    number_of_cores = get_number_of_cores(args['number_cores'])
     built_database = get_built_database(args['database_file_path'])
     spectras = get_spectras(args['spectra_file_paths'],args['number_peaks'],args['relative_abundance'])
     lookups.utils.make_dir(args['output_folder_path'])
@@ -51,8 +51,8 @@ def run(args: dict) -> dict:
     number_hybrids=args['number_hybrids']
     number_natives=args['number_natives']
     output_folder_path=args['output_folder_path']
-
-    matched_spectras = computational_pipeline.identification.get_matched_spectras(
+    aligned_spectras = computational_pipeline.identification.get_aligned_spectras(
         spectras,built_database,max_peptide_length,ppm_tolerance,precursor_tolerance,
-        number_hybrids,number_natives,number_of_cores,output_folder_path,output_file_name)
-    return matched_spectras
+        number_hybrids,number_natives)    
+    write_aligned_spectras_to_disk(aligned_spectras, output_folder_path, output_file_name)
+    

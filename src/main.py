@@ -60,7 +60,8 @@ def main(args: object) -> None:
     arguments = populate_arguments(args)
     arguments_valid = check_arguments(arguments)
     if arguments_valid:
-        runner.run(arguments)
+        matched_spectras = runner.run(arguments)
+        print(matched_spectras)
     else:
         sys.exit(0)
 
