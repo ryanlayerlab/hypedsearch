@@ -64,7 +64,7 @@ def parse_indices(index_set):
     return indices
 
 def rescore_with_seq(sequence, ppm_tolerance, input_masses):
-    spectrum = gen_spectra.gen_spectrum(sequence)
+    spectrum = computational_pipeline.gen_spectra.gen_spectrum(sequence)
     masses = sorted(spectrum['spectrum'])
     input_masses = sorted(input_masses)
     o_ctr, t_ctr = 0, 0
@@ -96,7 +96,7 @@ def score_by_dist(b_side, y_side, obs_prec, prec_charge, max_len, hybrid, protei
         full_seq = clustering.find_sequence(b_side.pid, b_side.start, b_side.end, protein_list) + clustering.find_sequence(y_side.pid, y_side.start, y_side.end, protein_list)
     else:
         full_seq = clustering.find_sequence(b_side.pid, b_side.start, y_side.end, protein_list)
-    combined_precursor = gen_spectra.get_precursor(full_seq, prec_charge)
+    combined_precursor = computational_pipeline.gen_spectra.get_precursor(full_seq, prec_charge)
     dist = abs(combined_precursor - obs_prec)
     return dist
 
@@ -131,7 +131,7 @@ def overlap_scoring(b_side, y_side, input_masses, ppm_tolerance, hybrid, protein
         sequence = b_sequence + y_sequence
     else:
         sequence = clustering.find_sequence(b_side.pid, b_side.start, y_side.end, proteins)
-    spectrum = gen_spectra.gen_spectrum(sequence)
+    spectrum = computational_pipeline.gen_spectra.gen_spectrum(sequence)
     masses = sorted(spectrum['spectrum'])
     input_masses = sorted(input_masses)
     score = calc_overlap(masses, input_masses, ppm_tolerance)
@@ -143,7 +143,7 @@ def losing_water(b_side, y_side, input_masses, ppm_tolerance, hybrid, proteins):
         sequence = b_sequence + y_sequence
     else:
         sequence = clustering.find_sequence(b_side.pid, b_side.start, y_side.end, proteins)
-    spectrum = gen_spectra.gen_spectrum(sequence)
+    spectrum = computational_pipeline.gen_spectra.gen_spectrum(sequence)
     masses = sorted(spectrum['spectrum'])
     minus_water = []
     for mass in masses:
@@ -200,20 +200,20 @@ def calc_overlap(masses, input_masses, ppm_tolerance):
     return total_score, tiebreaker, ppm_sum
 
 def modified_overlap_scoring(sequence, input_masses, ppm_tolerance):
-    spectrum = gen_spectra.gen_spectrum(sequence)
+    spectrum = computational_pipeline.gen_spectra.generate_spectrum(sequence)
     masses = sorted(spectrum['spectrum'])
     input_masses = sorted(input_masses)
     score, tiebreaker, mass_error_sum = calc_overlap(masses, input_masses, ppm_tolerance)
     return score, tiebreaker, mass_error_sum
 
 def modified_losing_water(sequence, input_masses, ppm_tolerance):
-    masses,_ = gen_spectra.calc_masses_no_water(sequence)
+    masses,_ = computational_pipeline.gen_spectra.calculate_masses(sequence)
     input_masses = sorted(input_masses)
     score, tiebreaker, mass_error_sum = calc_overlap(masses, input_masses, ppm_tolerance)
     return score, tiebreaker, mass_error_sum
 
 def modified_losing_ammonium(sequence, input_masses, ppm_tolerance):
-    masses,_ = gen_spectra.calc_masses_no_ammonium(sequence)
+    masses,_ = computational_pipeline.gen_spectra.calculate_masses(sequence)
     input_masses = sorted(input_masses)
     score, tiebreaker, mass_error_sum = calc_overlap(masses, input_masses, ppm_tolerance)
     return score, tiebreaker, mass_error_sum
@@ -236,7 +236,7 @@ def rescore_merges(unique_merge_space, input_spectrum, ppm_tol):
                
 def prec_overlap_scoring(input_masses, ppm_tolerance, pid, start, end, protein_list):
     sequence = clustering.find_sequence(pid, start, end, protein_list)
-    spectrum = gen_spectra.gen_spectrum(sequence)
+    spectrum = computational_pipeline.gen_spectra.generate_spectrum(sequence)
     masses = sorted(spectrum['spectrum'])
     input_masses = sorted(input_masses)
     score, tiebreaker, _ = calc_overlap(masses, input_masses, ppm_tolerance)

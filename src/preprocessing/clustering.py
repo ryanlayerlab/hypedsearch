@@ -136,7 +136,6 @@ def test_digest_match(protein_list, pid, digest, start, end, ion):
     return False
 
 def find_extensions(conv_prec,current_mass,ion,charge,pid,protein_list,start,end,ppm_tolerance,seq,score):
-    #goal is to get a list of all database extensions leading up to the precursor mass
     prot_seq = protein_list[pid][1]
     bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
     extensions = []
@@ -197,7 +196,6 @@ def check_unique(merges):
 def convert_components(component_arr, ion, score, seq):
     Foo = collections.namedtuple('Foo', 'pid start end mz charge')
     converted_components = []
-    #(current_mass, start, end, 1, 2, pid)
     components_rev = list(reversed(component_arr))
     i = 0
     if ion == 0:
@@ -208,7 +206,8 @@ def convert_components(component_arr, ion, score, seq):
                 prev_component = component
             while component.end < prev_component.end:
                 i +=1
-                new_component = Foo(pid = prev_component.pid, start = prev_component.start, end = prev_component.end - 1, mz = gen_spectra.max_mass(seq[:len(seq)-i], 'b', prev_component.charge), charge=prev_component.charge)
+                target_mz = computational_pipeline.gen_spectra.get_max_mass(seq[:len(seq)-i], 'b', prev_component.charge)
+                new_component = Foo(pid = prev_component.pid, start = prev_component.start, end = prev_component.end - 1, mz = target_mz, charge=prev_component.charge)
                 converted_components.append((new_component.mz, new_component.start, new_component.end, ion, new_component.charge, new_component.pid, seq[:len(seq)-i], score-i))
                 prev_component = new_component
     else:
@@ -219,7 +218,8 @@ def convert_components(component_arr, ion, score, seq):
                 prev_component = component
             while component.start > prev_component.start +1:
                 i +=1
-                new_component = Foo(pid = prev_component.pid, start = prev_component.start + 1, end = prev_component.end, mz = gen_spectra.max_mass(seq[i:], 'y', prev_component.charge), charge=prev_component.charge)
+                target_mz = computational_pipeline.gen_spectra.get_max_mass(seq[i:], 'y', prev_component.charge)
+                new_component = Foo(pid = prev_component.pid, start = prev_component.start + 1, end = prev_component.end, mz = target_mz, charge=prev_component.charge)
                 converted_components.append((new_component.mz, new_component.start, new_component.end, ion, new_component.charge, new_component.pid, seq[i:], score-i))
                 prev_component = new_component
 

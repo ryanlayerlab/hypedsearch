@@ -54,5 +54,5 @@ def run(args: dict) -> dict:
     aligned_spectras = computational_pipeline.identification.get_aligned_spectras(
         spectras,built_database,max_peptide_length,ppm_tolerance,precursor_tolerance,
         number_hybrids,number_natives)    
-    write_aligned_spectras_to_disk(aligned_spectras, output_folder_path, output_file_name)
+    #write_aligned_spectras_to_disk(aligned_spectras, output_folder_path, output_file_name)
     

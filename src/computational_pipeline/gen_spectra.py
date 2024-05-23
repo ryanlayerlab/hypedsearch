@@ -43,15 +43,15 @@ def calculate_masses(amino_acids: str, charge: int =None, ion: str = None):
         masses += get_y_ions(amino_acids, charge=charge)
     return masses, pre_mz
 
-def get_max_mass(seqeunce: str, ion: str, charge: int):
+def get_max_mass(sequence: str, ion: str, charge: int):
     if ion == 'y':
         total = SINGLY_CHARGED_Y_BASE if charge == 1 else DOUBLY_CHARGED_Y_BASE
-        total += sum([AMINO_ACIDS[aa] for aa in seqeunce])
+        total += sum([AMINO_ACIDS[aa] for aa in sequence])
         mz = total / charge
         return mz
     else:
         total = SINGLY_CHARGED_B_BASE if charge == 1 else DOUBLY_CHARGED_B_BASE
-        total += sum([AMINO_ACIDS[aa] for aa in seqeunce])
+        total += sum([AMINO_ACIDS[aa] for aa in sequence])
     mz = total / charge
     return mz
 
