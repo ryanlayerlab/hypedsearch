@@ -3,7 +3,7 @@ from lookups.utils import ppm_to_da
 
 def overlap_scoring(sequence, input_masses, ppm_tolerance):
     total_score = 0
-    spectrum = gen_spectra.gen_spectrum(sequence)
+    spectrum = computational_pipeline.gen_spectra.generate_spectrum(sequence)
     masses = sorted(spectrum['spectrum'])
     input_masses = sorted(input_masses)
     o_ctr, t_ctr = 0, 0
@@ -31,7 +31,7 @@ def overlap_scoring(sequence, input_masses, ppm_tolerance):
 
 def get_target_data(target_seq, proteins, input_masses, ppm_tolerance, precursor_mass, precursor_tolerance, precursor_charge):
     prec_tol = ppm_to_da(precursor_mass, precursor_tolerance)
-    theoretical_prec = gen_spectra.get_precursor(target_seq.replace("-", ""), precursor_charge)
+    theoretical_prec = computational_pipeline.gen_spectra.get_precursor(target_seq.replace("-", ""), precursor_charge)
     if abs(theoretical_prec - precursor_mass) <= precursor_tolerance:
         print(target_seq,"is a valid hybrid to find")
     else:
@@ -64,7 +64,6 @@ def get_target_data(target_seq, proteins, input_masses, ppm_tolerance, precursor
     return target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score
 
 def check_in_matched_masses(matched_masses_b, matched_masses_y, left_pids, left_indices, right_pids, right_indices):
-    #left part
     good_b_entries, good_y_entries = [], []
     for i, pid in enumerate(left_pids):
         for key in matched_masses_b.keys():
@@ -74,7 +73,6 @@ def check_in_matched_masses(matched_masses_b, matched_masses_y, left_pids, left_
                 if pid == entry_pid:
                     if left_indices[i][0] == entry_left_start:
                         good_b_entries.append(entry)
-    #right part
     for i, pid in enumerate(right_pids):
         for key in matched_masses_y.keys():
             for entry in matched_masses_y[key]:
@@ -130,7 +128,6 @@ def check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_hits, 
                 if cluster.pid == hit[5]:
                     if cluster.end == hit[2]:
                         good_y_clusters.append((mz, cluster))
-    # want to return good clusters and print whether these good clusters are in our sorted list
 
     if len(good_b_clusters) > 0 and len(good_y_clusters) > 0:
         print("Good hits in b_clusters and y_clusters")
@@ -273,8 +270,8 @@ def check_in_searches(b_searches, y_searches, target_left_pids, target_right_pid
         left_part, right_part = target_seq.split("-")
     else:
         left_part, right_part = target_seq, target_seq
-    left_prec = gen_spectra.get_precursor(left_part, prec_charge)
-    right_prec = gen_spectra.get_precursor(right_part, prec_charge)
+    left_prec = computational_pipeline.gen_spectra.get_precursor(left_part, prec_charge)
+    right_prec = computational_pipeline.gen_spectra.get_precursor(right_part, prec_charge)
     b_tol = ppm_to_da(left_prec, ppm_tol)
     y_tol = ppm_to_da(right_prec, ppm_tol)
     
@@ -368,10 +365,6 @@ def check_in_unique(unique_merges, good_merges):
             good_seq = merge[0][6] + merge[1][6]
         else:
             good_seq = merge[0][6]
-        # for i, (seq, score, abundance, hybrid) in enumerate(sorted(unique_merges, key = lambda x: (x[1], x[2]), reverse=True)):
-        #     if i < 10:
-        #         if seq == good_seq:
-        #             good_unique.append(((seq, score, abundance, hybrid), unique_merges[(seq, score, abundance, hybrid)]))
         for (seq, score) in unique_merges:
             if seq == good_seq:
                 good_unique.append(((seq, score), unique_merges[(seq, score)]))
