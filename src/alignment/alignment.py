@@ -470,11 +470,10 @@ def get_extensions(precursor_mass, precursor_charge, b_side, y_side, prec_tol):
 def find_alignments(native_merged, hybrid_merged, obs_prec, prec_charge, tol, max_len, prec_tol):
     extended_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge')
     natural_alignments, hybrid_alignments = [], []
-    for i, comb_seq in enumerate(native_merged): #Maybe read the top 50 of these, look for matches and go until we find something
+    for i, comb_seq in enumerate(native_merged):
         b_side = comb_seq[1]
         y_side = comb_seq[2]
-        # print("Natural", i)
-        if y_side.start >= b_side.end: #no overlap but b before y
+        if y_side.start >= b_side.end: 
             natural_alignments = natural_alignments + native_get_extensions(obs_prec, prec_charge, b_side, y_side, prec_tol)
         elif b_side.start <= y_side.start and b_side.end <= y_side.end and y_side.start < b_side.end: #some overlap
             combined_precursor = calc_from_sequences(b_side.start, y_side.end, b_side.pid, max_len, prec_charge)
@@ -496,7 +495,7 @@ def find_alignments(native_merged, hybrid_merged, obs_prec, prec_charge, tol, ma
 
 def pair_indices(b_search_space, y_search_space, prec_mass, prec_tol, prec_charge, score_filter):
     unique_merges = dict()
-    tol = utils.ppm_to_da(prec_mass, prec_tol)
+    tol = lookups.utils.ppm_to_da(prec_mass, prec_tol)
     sorted_b_keys = sorted(b_search_space) #might want to produce this outside this function so we don't do this again
     sorted_y_keys = sorted(y_search_space, reverse = True)
             
@@ -559,14 +558,12 @@ def find_from_prec(converted_b, matched_masses_b, input_spectrum, ppm_tolerance,
         return [], 0
     
 def make_native_pair(b, ion):
-    y_cluster = (gen_spectra.max_mass(b[6], 'b' if ion == 0 else 'y', b[4]), b[1], b[2], ion, b[4], b[5], b[6], 0)
+    y_cluster = (computational_pipeline.gen_spectra.get_max_mass(b[6], 'b' if ion == 0 else 'y', b[4]), b[1], b[2], ion, b[4], b[5], b[6], 0)
     return y_cluster
     
 def pair_natives(b_search_space, y_search_space, prec_mass, prec_tol):
-    # in the case of a native, the b must be before the y, the two seqs must come from the same protein, and the two seqs together cannot be less than the max_pep_len. Actually, 
-    # Actually, since we have all the extensions we could just find the good extension
     unique_merges = dict()
-    tol = utils.ppm_to_da(prec_mass, prec_tol)
+    tol = lookups.utils.ppm_to_da(prec_mass, prec_tol)
     for b_prec in sorted(b_search_space):
         if abs(b_prec - prec_mass) < tol:
             for b in b_search_space[b_prec]:
