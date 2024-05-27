@@ -236,9 +236,7 @@ def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_
     unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
     unique_rescored = rescore_merges(unique_merges, spectrum, ppm_tol)
     good_rescored = computational_pipeline.finding_seqs.check_in_rescored_merges(unique_rescored, good_merged_seqs)
-    #TODO start her for the map (not results)
     postprocessed_alignments = do_eigth_thing(db, unique_rescored, spectrum, num_hybrids, num_natives)
-    postprocessed_alignments = None
     return postprocessed_alignments
 
 def prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol):
