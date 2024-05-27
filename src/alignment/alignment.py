@@ -6,7 +6,7 @@ from computational_pipeline.gen_spectra import get_precursor
 from preprocessing.clustering import calc_from_sequences
 import lookups.objects as objects
 import lookups.utils
-import computational_pipeline.database
+import computational_pipeline.database_generator
 import computational_pipeline.gen_spectra
 from computational_pipeline.sqlite import database_file
 
@@ -67,18 +67,18 @@ def same_protein_alignment(seq1: str, seq2: str, parent_sequence: str):
     nonhybrid_alignments.sort(key=lambda x: len(x))
     return (nonhybrid_alignments[0], None)
 
-def align_b_y(b_kmers: list, y_kmers: list, spectrum: Spectrum, db: Database):
+def align_b_y(b_kmers: list, y_kmers: list, spectrum: Spectrum, database: Database):
     spec_alignments = []
     for b_kmer in b_kmers:
         b_seq = b_kmer
-        b_proteins = database.get_proteins_with_subsequence(db, b_seq)
+        b_proteins = database.get_proteins_with_subsequence(database, b_seq)
         for y_kmer in y_kmers:
             y_seq = y_kmer
-            y_proteins = database.get_proteins_with_subsequence(db, y_seq)
+            y_proteins = database.get_proteins_with_subsequence(database, y_seq)
             if any([x in y_proteins for x in b_proteins]):
                 shared_prots = [x for x in y_proteins if x in b_proteins]
                 for sp in shared_prots:
-                    prot_seqs = database.get_entry_by_name(db, sp)
+                    prot_seqs = database.get_entry_by_name(database, sp)
                     for prot_entry in prot_seqs:
                         spec_alignments.append(
                             same_protein_alignment(b_seq, y_seq, prot_entry.sequence)
@@ -101,7 +101,7 @@ def refine_alignments(spectrum: Spectrum, db: Database, alignments: list, precur
     DEV: bool = False, truth: dict = None, fall_off: dict = None):
     global PRECURSOR_MASS_COUNT, AMBIGUOUS_REMOVAL_COUNT, OUT_OF_RANGE_SEQS
     global PRECURSOR_MASS_TIME, AMBIGUOUS_REMOVAL_TIME
-    predicted_len = utils.predicted_len(spectrum.precursor_mass, spectrum.precursor_charge)
+    predicted_len = lookups.utils.predicted_len(spectrum.precursor_mass, spectrum.precursor_charge)
     allowed_gap = math.ceil(predicted_len * .25)
     st = time.time()
     precursor_matches = []
@@ -121,7 +121,7 @@ def refine_alignments(spectrum: Spectrum, db: Database, alignments: list, precur
         _id = spectrum.id
         is_hybrid = truth[_id]['hybrid']
         truth_seq = truth[_id]['sequence']
-        if not utils.DEV_contains_truth_exact(truth_seq, is_hybrid, precursor_matches):
+        if not lookups.utils.DEV_contains_truth_exact(truth_seq, is_hybrid, precursor_matches):
             metadata = {
                 'sequences_before_precursor_filling': alignments, 
                 'sequences_after_precursor_filling': precursor_matches, 
@@ -149,7 +149,7 @@ def refine_alignments(spectrum: Spectrum, db: Database, alignments: list, precur
         _id = spectrum.id
         is_hybrid = truth[_id]['hybrid']
         truth_seq = truth[_id]['sequence']
-        if not utils.DEV_contains_truth_exact(truth_seq, is_hybrid, [x[0] for x in updated_hybrids]):
+        if not lookups.DEV_contains_truth_exact(truth_seq, is_hybrid, [x[0] for x in updated_hybrids]):
             metadata = {
                 'before_ambiguous_removal': hyba, 
                 'after_ambiguous_removal': updated_hybrids
@@ -171,7 +171,7 @@ def attempt_alignment_dev(spectrum: Spectrum, truth: bool = None, fall_off: bool
     _id = spectrum.id
     is_hybrid = truth[_id]['hybrid']
     truth_seq = truth[_id]['sequence']
-    if not utils.DEV_contains_truth_parts(truth_seq, is_hybrid, b_seqs, y_seqs):
+    if not lookups.utils.DEV_contains_truth_parts(truth_seq, is_hybrid, b_seqs, y_seqs):
         metadata = {
             'alignments': a, 
             'before_alignments_b': b_seqs, 
@@ -203,17 +203,17 @@ def attempt_alignment_first_pass(spectrum: Spectrum, db: Database, n: int = 3, p
         scoring_start = time.time()
         p_d = scoring.precursor_distance(
             spectrum.precursor_mass, 
-            gen_spectra.get_precursor(nhr, spectrum.precursor_charge)
+            computational_pipeline.gen_spectra.get_precursor(nhr, spectrum.precursor_charge)
         )
         b_score = scoring.score_sequence(
             spectrum.mz_values, 
-            sorted(gen_spectra.gen_spectrum(nhr, ion='b')['spectrum']), 
+            sorted(computational_pipeline.gen_spectra.gen_spectrum(nhr, ion='b')['spectrum']), 
             ppm_tolerance
         )
 
         y_score = scoring.score_sequence(
             spectrum.mz_values, 
-            sorted(gen_spectra.gen_spectrum(nhr, ion='y')['spectrum']), 
+            sorted(computational_pipeline.gen_spectra.gen_spectrum(nhr, ion='y')['spectrum']), 
             ppm_tolerance
         )
         total_error = scoring.total_mass_error(spectrum, nhr, ppm_tolerance)
@@ -277,16 +277,16 @@ def attempt_alignment_second_pass(spectrum: Spectrum, db: Database, n: int = 3,
         scoring_start = time.time()
         p_d = scoring.precursor_distance(
             spectrum.precursor_mass, 
-            gen_spectra.get_precursor(hr, spectrum.precursor_charge)
+            computational_pipeline.gen_spectra.get_precursor(hr, spectrum.precursor_charge)
         )
         b_score = scoring.score_sequence(
             spectrum.mz_values, 
-            sorted(gen_spectra.gen_spectrum(hr, ion='b')['spectrum']), 
+            sorted(computational_pipeline.gen_spectra.gen_spectrum(hr, ion='b')['spectrum']), 
             ppm_tolerance
         )
         y_score = scoring.score_sequence(
             spectrum.mz_values, 
-            sorted(gen_spectra.gen_spectrum(hr, ion='y')['spectrum']), 
+            sorted(computational_pipeline.gen_spectra.gen_spectrum(hr, ion='y')['spectrum']), 
             ppm_tolerance
         )
         total_error = scoring.total_mass_error(spectrum, hr, ppm_tolerance)
@@ -399,11 +399,10 @@ def make_merge(b, y, b_seq, y_seq):
 
 def native_get_extensions(precursor_mass,prec_charge,b_side,y_side,prec_tol):
     extended_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge')
-    tol = utils.ppm_to_da(precursor_mass, prec_tol)
+    tol = lookups.utils.ppm_to_da(precursor_mass, prec_tol)
     extensions = []
-    #if both the clusters simply glue together
-    if b_side.end -1 == y_side.start: # Does it have to be -1?
-        combined_prec = gen_spectra.calc_precursor_as_disjoint(b_side.mz, y_side.mz, b_side.charge, y_side.charge, prec_charge)
+    if b_side.end -1 == y_side.start:
+        combined_prec = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b_side.mz, y_side.mz, b_side.charge, y_side.charge, prec_charge)
         if abs(combined_prec - precursor_mass) <= tol:
             b_cluster = extended_cluster(b_side.score, b_side.pid, b_side.start, b_side.end, b_side.mz, b_side.charge)
             y_cluster = extended_cluster(y_side.score, y_side.pid, y_side.start, y_side.end, y_side.mz, y_side.charge)
@@ -412,7 +411,7 @@ def native_get_extensions(precursor_mass,prec_charge,b_side,y_side,prec_tol):
     #if the clusters are not h
     for b in b_side.components:
         if b[2]-1 == y_side.start:
-            total_precursor = gen_spectra.calc_precursor_as_disjoint(b[0], y_side.mz, b[4], y_side.charge, prec_charge)
+            total_precursor = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b[0], y_side.mz, b[4], y_side.charge, prec_charge)
             if abs(total_precursor - precursor_mass) < prec_tol:
                 b_half = extended_cluster(score = b_side.score, pid=b[5], start=b[1], end = b[2], mz = b[0], charge= b[4])
                 y_half = extended_cluster(score = y_side.score, pid=y_side.pid, start=y_side.start, end = y_side.end, mz = y_side.mz, charge=y_side.charge)
@@ -421,11 +420,11 @@ def native_get_extensions(precursor_mass,prec_charge,b_side,y_side,prec_tol):
 
 def get_extensions(precursor_mass, precursor_charge, b_side, y_side, prec_tol):
     extended_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge')
-    tol = utils.ppm_to_da(precursor_mass, prec_tol)
+    tol = lookups.utils.ppm_to_da(precursor_mass, prec_tol)
     extensions = []
     
     #Check if the two pieces just go together already  
-    combined_prec = gen_spectra.calc_precursor_as_disjoint(b_side.mz, y_side.mz, b_side.charge, y_side.charge, precursor_charge)
+    combined_prec = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b_side.mz, y_side.mz, b_side.charge, y_side.charge, precursor_charge)
     if abs(combined_prec - precursor_mass) <= tol:
         b_cluster = extended_cluster(b_side.score, b_side.pid, b_side.start, b_side.end, b_side.mz, b_side.charge)
         y_cluster = extended_cluster(y_side.score, y_side.pid, y_side.start, y_side.end, y_side.mz, y_side.charge)
@@ -434,7 +433,7 @@ def get_extensions(precursor_mass, precursor_charge, b_side, y_side, prec_tol):
     #Only extend b
     for b in b_side.components:
         b_mass = b[0]
-        this_prec = gen_spectra.calc_precursor_as_disjoint(b_mass, y_side.mz, b[4], y_side.charge, precursor_charge)
+        this_prec = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b_mass, y_side.mz, b[4], y_side.charge, precursor_charge)
         if this_prec > precursor_mass + tol:
             break
         elif abs(this_prec - precursor_mass) <= tol:
@@ -445,7 +444,7 @@ def get_extensions(precursor_mass, precursor_charge, b_side, y_side, prec_tol):
     #Only extend y
     for y in y_side.components:
         y_mass = y[0]
-        this_prec = gen_spectra.calc_precursor_as_disjoint(b_side.mz, y_mass, b_side.charge, y[4], precursor_charge)
+        this_prec = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b_side.mz, y_mass, b_side.charge, y[4], precursor_charge)
         if this_prec > precursor_mass + tol:
             break
         elif abs(this_prec - precursor_mass) <= tol:
@@ -457,7 +456,7 @@ def get_extensions(precursor_mass, precursor_charge, b_side, y_side, prec_tol):
     for b in b_side.components:
         for y in y_side.components:
             b_mass, y_mass = b[0], y[0]
-            this_prec = gen_spectra.calc_precursor_as_disjoint(b_mass, y_mass, b[4], y[4], precursor_charge)
+            this_prec = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b_mass, y_mass, b[4], y[4], precursor_charge)
             if this_prec > precursor_mass + tol:
                 break
             elif abs(this_prec - precursor_mass) <= tol:

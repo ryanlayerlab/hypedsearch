@@ -7,7 +7,7 @@ def extract_protein_name(prot_entry: namedtuple) -> str:
         return prot_entry.description.split('|')[-1].split(' ')[0]
     return prot_entry.description.split(' ')[0]
 
-def build(fasta_file: str) -> Database:
+def build_database(fasta_file: str) -> Database:
     db = Database(fasta_file)
     prots = []
     for entry in fasta.read(fasta_file):

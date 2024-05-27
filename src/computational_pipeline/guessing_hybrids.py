@@ -3,7 +3,7 @@ from scoring import scoring
 import gen_spectra
 from main import get_spectra_files
 from lookups.utils import ppm_to_da
-import database
+import computational_pipeline.database_generator as database_generator
 from lookups.constants import WATER_MASS, PROTON_MASS, AMINO_ACIDS
 from sqlite import database_file
 import numpy as np
@@ -70,7 +70,7 @@ def find_overlaps(masses, ppm_tol, input_masses):
 
 #Set your filepaths to the database and the spectra folder
 prot_path = '/home/karo9276/HypedSearch/hypedsearch/data/database/sample_database.fasta'
-proteins = database.build(prot_path)
+proteins = database_generator.build_database(prot_path)
 
 dbf = database_file(max_pep_len, make_new_db)
 

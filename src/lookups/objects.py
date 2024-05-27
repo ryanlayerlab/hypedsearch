@@ -80,3 +80,12 @@ Identification_Instrumentation = namedtuple(
     defaults=[0,0,0,0,0,0,0,0,0]
 )
 
+AlignedSpectrasParams = namedtuple('AlignedSpectrasParams', [
+    'spectras',
+    'built_database',
+    'max_peptide_length',
+    'ppm_tolerance',
+    'precursor_tolerance',
+    'number_hybrids',
+    'number_natives'
+])
