@@ -54,10 +54,9 @@ def create_text_file(results: dict, txt_file_name: str) -> None:
         if results is None:
             pass
         else:
-            for i, x in enumerate(results):
-                target_alignments = x
+            for index, target_alignments in enumerate(results):
                 for alignment in target_alignments:
-                    spec_num = str(i)
+                    spec_num = str(index)
                     hybrid = alignment[0]
                     left_proteins,right_proteins = alignment[1], alignment[2]
                     left_protein_string, right_protein_string = get_protein_strings(left_proteins, right_proteins)
@@ -107,7 +106,7 @@ def generate(alignments: dict, output_dir='./') -> None:
     json_file(alignments, output_dir)
     tsv_file(alignments, output_dir)
 
-def write_aligned_spectras_to_disk(alignments, output_folder_path, output_file_name ) -> None:
+def write_aligned_spectras_to_disk(alignments, output_folder_path, output_file_name ):
         filename = os.path.basename(output_file_name)
         A = filename.split(".")
         base_file = "HS_"+ A[0] + ".txt"
