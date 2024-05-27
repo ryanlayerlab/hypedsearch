@@ -1,4 +1,4 @@
-import database
+import computational_pipeline.database_generator as database_generator
 from preprocessing import preprocessing_utils, clustering, merge_search
 from main import get_spectra_files
 from lookups.utils import ppm_to_da
@@ -16,7 +16,7 @@ prec_tol = 10
 max_pep_len = 25
 
 prot_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/sample_database.fasta'
-proteins = database.build(prot_path)
+proteins = database_generator.build_database(prot_path)
 
 spectra_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/spectra/NOD2_E3'
 spectra_files = get_spectra_files(spectra_path)

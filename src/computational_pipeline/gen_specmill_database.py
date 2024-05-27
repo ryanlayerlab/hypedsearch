@@ -1,4 +1,4 @@
-import database
+import computational_pipeline.database_generator as database_generator
 from main import get_spectra_files
 from preprocessing.preprocessing_utils import load_spectra
 import re
@@ -12,7 +12,7 @@ max_pep_len = 10
 
 dataset_id = 'BMEM_searches'    
 prot_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/UniProt_mouse.fasta'
-proteins = database.build(prot_path)
+proteins = database_generator.build_database(prot_path)
 
 def build_specmill_table(filepath):
     sequences, ids = [], []

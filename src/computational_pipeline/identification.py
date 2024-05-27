@@ -7,7 +7,7 @@ from lookups.objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFal
 from alignment import alignment
 from lookups.utils import ppm_to_da, to_percent, is_json, is_file
 from preprocessing import merge_search, preprocessing_utils, clustering, evaluation
-import computational_pipeline.database
+import computational_pipeline.database_generator
 from file_io import JSON
 import lookups.objects as objects
 import time
@@ -220,6 +220,7 @@ def group_by_uniqueness(natives, hybrids):
     return unique_merges
             
 def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len, num_hybrids, num_natives):
+    #TODO: Remove hard-coded peptide
     target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = computational_pipeline.finding_seqs.get_target_data("DPQVAQLELGG-EVEDPQVAQLELGGGPGAG", db, spectrum.mz_values, ppm_tol, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
     converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol)
     good_b_entries, good_y_entries = computational_pipeline.finding_seqs.check_in_matched_masses(matched_masses_b, matched_masses_y, target_left_pids, target_left_indices, target_right_pids, target_right_indices)
@@ -235,6 +236,7 @@ def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_
     unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
     unique_rescored = rescore_merges(unique_merges, spectrum, ppm_tol)
     good_rescored = computational_pipeline.finding_seqs.check_in_rescored_merges(unique_rescored, good_merged_seqs)
+    #TODO start her for the map (not results)
     postprocessed_alignments = do_eigth_thing(db, unique_rescored, spectrum, num_hybrids, num_natives)
     postprocessed_alignments = None
     return postprocessed_alignments
@@ -275,10 +277,6 @@ def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, num_
         all_spec_nums.append(spec_nums)
     return all_y,all_spec_nums
 
-def get_aligned_spectras(spectras, built_database: computational_pipeline.database, 
-    max_peptide_length, ppm_tolerance, precursor_tolerance, number_hybrids, number_natives):
-    all_spectras = []
-    for spectra in spectras:
-        all_spectras.append(spectra)
-    aligned_spectras = align(spectra,precursor_tolerance,built_database,ppm_tolerance,max_peptide_length,number_hybrids,number_natives)
+def get_aligned_spectras(params: objects.AlignedSpectrasParams):
+    aligned_spectras = align(params.spectras,params.precursor_tolerance,params.built_database,params.ppm_tolerance,params.max_peptide_length,params.number_hybrids,params.number_natives)
     return aligned_spectras

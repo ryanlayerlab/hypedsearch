@@ -1,6 +1,6 @@
 import os
 import matplotlib.pyplot as plt
-import database
+import computational_pipeline.database_generator as database_generator
 from postprocessing.postprocessing_utils import make_db_mapping_by_key
 
 open_path = "/home/naco3124/jaime_hypedsearch/hypedsearch/data/truth_table/Results"
@@ -51,7 +51,7 @@ def further_extend(hybrid_list, proteins):
     return new_hybrids
                 
 prot_path = '/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/UniProt_mouse.fasta'
-proteins = database.build(prot_path)
+proteins = database_generator.build_database(prot_path)
 
 hybrid_list = further_extend(hybrid_list, proteins)
                 
