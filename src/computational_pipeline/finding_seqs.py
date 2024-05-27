@@ -60,7 +60,6 @@ def get_target_data(target_seq, proteins, input_masses, ppm_tolerance, precursor
             target_right_indices.append((start, end))
             
     target_score = overlap_scoring(target_seq.replace("-", ""), input_masses, ppm_tolerance)
-    
     return target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score
 
 def check_in_matched_masses(matched_masses_b, matched_masses_y, left_pids, left_indices, right_pids, right_indices):

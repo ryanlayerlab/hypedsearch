@@ -42,7 +42,6 @@ def get_output_file_name(spectra_file_paths):
 def create_aligned_spectras_parameters(args: dict):
     built_database = get_built_database(args['database_file_path'])
     spectras = get_spectras(args['spectra_file_paths'],args['number_peaks'],args['relative_abundance'])
-    print(spectras)
     lookups.utils.make_dir(args['output_folder_path'])
     if args['create_kmer_database']:
         do_create_kmer_database(built_database, args['number_peaks'], args['digest_left'], args['digest_right'])
