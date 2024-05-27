@@ -11,11 +11,8 @@ def generate_truth_set(path):
     return correct_sequences
 
 def check_truth_for_hybrid(b_side, y_side, truth):
-    #TODO
-    #Make sure this is working
     if (b_side == truth[:-(len(truth)-len(b_side))]):
         if (y_side == truth[(len(truth) - len(y_side)):]):
-    # if (b_side == truth[:-(len(truth)-len(b_side))]) and (y_side == truth[(len(truth) - len(y_side)):]):
             return True
     else:
         return False

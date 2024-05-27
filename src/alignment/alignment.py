@@ -423,14 +423,12 @@ def get_extensions(precursor_mass, precursor_charge, b_side, y_side, prec_tol):
     tol = lookups.utils.ppm_to_da(precursor_mass, prec_tol)
     extensions = []
     
-    #Check if the two pieces just go together already  
     combined_prec = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b_side.mz, y_side.mz, b_side.charge, y_side.charge, precursor_charge)
     if abs(combined_prec - precursor_mass) <= tol:
         b_cluster = extended_cluster(b_side.score, b_side.pid, b_side.start, b_side.end, b_side.mz, b_side.charge)
         y_cluster = extended_cluster(y_side.score, y_side.pid, y_side.start, y_side.end, y_side.mz, y_side.charge)
         return [(b_side.score + y_side.score, b_cluster, y_cluster)]
         
-    #Only extend b
     for b in b_side.components:
         b_mass = b[0]
         this_prec = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b_mass, y_side.mz, b[4], y_side.charge, precursor_charge)
@@ -452,7 +450,6 @@ def get_extensions(precursor_mass, precursor_charge, b_side, y_side, prec_tol):
             extended_y_cluster = extended_cluster(score = y_side.score, pid=y[5], start=y[1], end = y[2], mz = y[0], charge= y[4])
             extensions.append((b_side.score + y_side.score, extended_b_cluster, extended_y_cluster))
     
-    #Either side needs to be extended
     for b in b_side.components:
         for y in y_side.components:
             b_mass, y_mass = b[0], y[0]
@@ -489,17 +486,15 @@ def find_alignments(native_merged, hybrid_merged, obs_prec, prec_charge, tol, ma
         extension_time = time.time()
         hybrid_alignments = hybrid_alignments + get_extensions(obs_prec, prec_charge, b_side, y_side, prec_tol)
         total_extension_time = total_extension_time + (time.time() - extension_time)
-    # print("\n Average extension time:",total_extension_time/len(hybrid_merged))
     return natural_alignments, hybrid_alignments
 
 def pair_indices(b_search_space, y_search_space, prec_mass, prec_tol, prec_charge, score_filter):
     unique_merges = dict()
     tol = lookups.utils.ppm_to_da(prec_mass, prec_tol)
-    sorted_b_keys = sorted(b_search_space) #might want to produce this outside this function so we don't do this again
+    sorted_b_keys = sorted(b_search_space)
     sorted_y_keys = sorted(y_search_space, reverse = True)
             
     b_end, y_end = len(sorted_b_keys), len(sorted_y_keys)
-    # try something else. b and y are allowed to increment but there is a range we have to stay in
     b_ctr = 0
     y_low_ctr, y_high_ctr = 0,0
     while b_ctr < b_end and y_high_ctr < y_end:
@@ -508,26 +503,20 @@ def pair_indices(b_search_space, y_search_space, prec_mass, prec_tol, prec_charg
         missing_mass_lower = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge - tol
         y_prec = sorted_y_keys[y_high_ctr]
         
-        if y_prec > missing_mass_upper: #b_prec + y_prec is too big
-            # b_prec or y_prec need to increment. Either b needs to get bigger or y needs to get smaller
+        if y_prec > missing_mass_upper:
             y_high_ctr += 1
             continue
         
-        elif y_prec < missing_mass_lower: #b_prec + y_prec is too small
-            # b_prec needs to get bigger or y_prec needs to get smaller.
+        elif y_prec < missing_mass_lower:
             b_ctr += 1
             continue
         
-        else: #we have a match. Use the low counter to append all y which match. Want this since when we incrememnt b at the end, we can match b+1 with the same y's if compatable
+        else: 
             y_low_ctr = y_high_ctr
             while (y_prec > missing_mass_lower and y_prec < missing_mass_upper and y_low_ctr < len(sorted_y_keys)):
-                for b in b_search_space[b_prec]: #append all the combos here
+                for b in b_search_space[b_prec]: 
                     for y in y_search_space[y_prec]:
-                        # if "DLQTLAL" == b[6] and y[6] == "EVE":
-                        #     print('here')
-                        # if b[7] + y[7] > (len(b[6]) + len(y[6])) / 2: #We see at least 1/8 of the peptides we would expect to
-                        if b[7] + y[7] > max(score_filter, 4): # We see at least 4 ions
-                            #unique_merges[(full_seq, 1)].append(merge)
+                        if b[7] + y[7] > max(score_filter, 4):
                             full_seq = b[6] + y[6]
                             if ((full_seq, 1)) not in unique_merges.keys():
                                 unique_merges[(full_seq, 1)] = []
