@@ -218,8 +218,8 @@ def group_by_uniqueness(natives, hybrids):
             unique_merges[(full_seq, 0)] = []
         unique_merges[(full_seq, 0)].append(merge)
     return unique_merges
-            
-def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len, num_hybrids, num_natives):
+
+def create_alignment_info_with_target(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len, num_hybrids, num_natives):
     original_target_seq = 'DPQVAQLELGG-EVEDPQVAQLELGGGPGAG'
     target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = computational_pipeline.finding_seqs.get_target_data(original_target_seq, db, spectrum.mz_values, ppm_tol, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
     converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol)
@@ -236,6 +236,18 @@ def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_
     unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
     unique_rescored = rescore_merges(unique_merges, spectrum, ppm_tol)
     good_rescored = computational_pipeline.finding_seqs.check_in_rescored_merges(unique_rescored, good_merged_seqs)
+    postprocessed_alignments = do_eigth_thing(db, unique_rescored, spectrum, num_hybrids, num_natives)
+    return postprocessed_alignments
+
+def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len, num_hybrids, num_natives):
+    converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol)
+    b_hits, y_hits = do_first_thing(spectrum, converted_b, converted_y, matched_masses_b, matched_masses_y, spectrum.num)
+    b_sorted_clusters, y_sorted_clusters = do_second_thing(db, converted_b, converted_y, b_hits, y_hits, spectrum.precursor_charge, ppm_tol, spectrum.num)
+    b_search_space, y_search_space = clustering.get_search_space(b_sorted_clusters, y_sorted_clusters, spectrum.precursor_charge)
+    unique_native_merged_seqs = alignment.pair_natives(b_search_space, y_search_space, spectrum.precursor_mass, prec_tol)
+    unique_hybrid_merged_seqs = alignment.pair_indices(b_search_space, y_search_space, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, 0)
+    unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
+    unique_rescored = rescore_merges(unique_merges, spectrum, ppm_tol)
     postprocessed_alignments = do_eigth_thing(db, unique_rescored, spectrum, num_hybrids, num_natives)
     return postprocessed_alignments
 
