@@ -219,8 +219,7 @@ def group_by_uniqueness(natives, hybrids):
         unique_merges[(full_seq, 0)].append(merge)
     return unique_merges
 
-def create_alignment_info_with_target(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len, num_hybrids, num_natives):
-    original_target_seq = 'DPQVAQLELGG-EVEDPQVAQLELGGGPGAG'
+def create_alignment_info_with_target(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len, num_hybrids, num_natives, original_target_seq):
     target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = computational_pipeline.finding_seqs.get_target_data(original_target_seq, db, spectrum.mz_values, ppm_tol, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
     converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol)
     good_b_entries, good_y_entries = computational_pipeline.finding_seqs.check_in_matched_masses(matched_masses_b, matched_masses_y, target_left_pids, target_left_indices, target_right_pids, target_right_indices)
@@ -287,6 +286,20 @@ def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, num_
         all_spec_nums.append(spec_nums)
     return all_y,all_spec_nums
 
+def align_with_target(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, num_hybrids, num_natives, original_target_seq):
+    all_y, all_spec_nums = [], []
+    for spectrum in spectra:
+        spec_nums = len(spectrum)
+        x = create_alignment_info_with_target(spectrum, max_peptide_len, precursor_tolerance, db, ppm_tolerance, len(spectra), num_hybrids, num_natives,original_target_seq)
+        y = map(x, spectra)
+        all_y.append(y)
+        all_spec_nums.append(spec_nums)
+    return all_y,all_spec_nums
+
 def get_aligned_spectras(params: objects.AlignedSpectrasParams):
-    aligned_spectras = align(params.spectras,params.precursor_tolerance,params.built_database,params.ppm_tolerance,params.max_peptide_length,params.number_hybrids,params.number_natives)
+    aligned_spectras = None
+    if len(params.target_seq) > 0:
+        aligned_spectras = align_with_target(params.spectras,params.precursor_tolerance,params.built_database,params.ppm_tolerance,params.max_peptide_length,params.number_hybrids,params.number_natives,params.target_seq)
+    else:
+        aligned_spectras = align(params.spectras,params.precursor_tolerance,params.built_database,params.ppm_tolerance,params.max_peptide_length,params.number_hybrids,params.number_natives)
     return aligned_spectras
