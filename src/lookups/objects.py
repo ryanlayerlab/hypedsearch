@@ -87,5 +87,6 @@ AlignedSpectrasParams = namedtuple('AlignedSpectrasParams', [
     'ppm_tolerance',
     'precursor_tolerance',
     'number_hybrids',
-    'number_natives'
+    'number_natives',
+    'target_seq'
 ])

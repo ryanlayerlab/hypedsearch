@@ -32,6 +32,7 @@ def populate_arguments(args) -> dict:
     create_kmer_database = args.create_kmer_database if not use_params else config['create_kmer_database']
     number_hybrids = args.number_hybrids if not use_params else config['number_hybrids']
     number_natives = args.number_natives if not use_params else config['number_natives']
+    target_seq = args.number_natives if not use_params else config['target_seq']
     verbose = lookups.utils.string_to_bool(args.verbose) if not use_params else config['verbose']
 
     if spectra_file_path != '':
@@ -47,7 +48,7 @@ def populate_arguments(args) -> dict:
         'precursor_tolerance': precursor_tolerance,'number_peaks': number_peaks, 
         'relative_abundance': relative_abundance, 'digest_left': digest_left, 'digest_right': digest_right, 
         'number_cores': number_cores,'number_hybrids': number_hybrids, 'number_natives': number_natives, 
-        'create_kmer_database': create_kmer_database,'verbose': verbose
+        'target_seq': target_seq, 'create_kmer_database': create_kmer_database,'verbose': verbose
     }
 
 def check_arguments(arguments):
@@ -81,6 +82,7 @@ if __name__ == '__main__':
     parser.add_argument('--create_kmer_database', dest='create_kmer_database', type=lambda x:bool(distutils.util.strtobool(x)))
     parser.add_argument('--number-hybrids', dest='number_hybrids', type=int, default=5, help='The number of hybrid alignments to keep per spectrum. Default=5')
     parser.add_argument('--number-natives', dest='number_natives', type=int, default=5, help='The number of native alignments to keep per spectrum. Default=5')
+    parser.add_argument('--target_seq', dest='target_seq', type=str, default='', help='Sequence to check even if not in database.')
     parser.add_argument('--verbose', dest='verbose', type=lambda x:bool(distutils.util.strtobool(x)))
     parser.add_argument('--config', action='store_true')
     parser.add_argument('--no-config', dest='config', action='store_false')

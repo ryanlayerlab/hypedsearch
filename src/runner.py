@@ -50,6 +50,7 @@ def create_aligned_spectras_parameters(args: dict):
     precursor_tolerance=args['precursor_tolerance']
     number_hybrids=args['number_hybrids']
     number_natives=args['number_natives']
+    target_seq = args['target_seq']
     params = lookups.objects.AlignedSpectrasParams(
         spectras=spectras,
         built_database=built_database,
@@ -57,7 +58,8 @@ def create_aligned_spectras_parameters(args: dict):
         ppm_tolerance=ppm_tolerance,
         precursor_tolerance=precursor_tolerance,
         number_hybrids=number_hybrids,
-        number_natives=number_natives
+        number_natives=number_natives,
+        target_seq = target_seq
     )
     return params
 
