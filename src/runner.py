@@ -18,12 +18,12 @@ def get_number_of_cores(number_of_cores):
     min_number_of_cores = min(revised_number_of_cores, mp.cpu_count() - 1)
     return min_number_of_cores
 
-def get_spectras(spectra_file_paths,number_peaks,relative_abundance):
-    spectras = []
+def get_spectrums(spectra_file_paths,number_peaks,relative_abundance):
+    spectrums = []
     for spectra_file_path in spectra_file_paths:
         spectra = preprocessing_utils.load_spectra(spectra_file_path, number_peaks, relative_abundance)
-        spectras.extend(spectra)
-    return spectras
+        spectrums.extend(spectra)
+    return spectrums
 
 def do_create_kmer_database(built_database, max_peptide_length, digest_left, digest_right):
     dbf = database_file(max_peptide_length, True)
@@ -39,9 +39,9 @@ def get_output_file_name(spectra_file_paths):
     return_value = filename + "_" + formatted_datetime
     return return_value
 
-def create_aligned_spectras_parameters(args: dict):
+def run(args: dict) -> dict:
+    spectrums = get_spectrums(args['spectra_file_paths'],args['number_peaks'],args['relative_abundance'])
     built_database = get_built_database(args['database_file_path'])
-    spectras = get_spectras(args['spectra_file_paths'],args['number_peaks'],args['relative_abundance'])
     lookups.utils.make_dir(args['output_folder_path'])
     if args['create_kmer_database']:
         do_create_kmer_database(built_database, args['number_peaks'], args['digest_left'], args['digest_right'])
@@ -51,21 +51,7 @@ def create_aligned_spectras_parameters(args: dict):
     number_hybrids=args['number_hybrids']
     number_natives=args['number_natives']
     target_seq = args['target_seq']
-    params = lookups.objects.AlignedSpectrasParams(
-        spectras=spectras,
-        built_database=built_database,
-        max_peptide_length=max_peptide_length,
-        ppm_tolerance=ppm_tolerance,
-        precursor_tolerance=precursor_tolerance,
-        number_hybrids=number_hybrids,
-        number_natives=number_natives,
-        target_seq = target_seq
-    )
-    return params
-
-def run(args: dict) -> dict:
-    params = create_aligned_spectras_parameters(args)
-    aligned_spectras = computational_pipeline.identification.get_aligned_spectras(params)  
+    aligned_spectras = computational_pipeline.identification.get_aligned_spectrums(spectrums,built_database,max_peptide_length,ppm_tolerance,precursor_tolerance,number_hybrids,number_natives,target_seq)  
     output_file_name = get_output_file_name(args['spectra_file_paths']) 
     output_folder_path=args['output_folder_path']
     # write_aligned_spectras_to_disk(aligned_spectras, output_folder_path, output_file_name)

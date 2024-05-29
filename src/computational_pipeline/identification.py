@@ -286,20 +286,20 @@ def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, num_
         all_spec_nums.append(spec_nums)
     return all_y,all_spec_nums
 
-def align_with_target(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, num_hybrids, num_natives, original_target_seq):
+def align_with_target(spectra, built_database, precursor_tolerance, ppm_tolerance, max_peptide_len, num_hybrids, num_natives, original_target_seq):
     all_y, all_spec_nums = [], []
     for spectrum in spectra:
         spec_nums = len(spectrum)
-        x = create_alignment_info_with_target(spectrum, max_peptide_len, precursor_tolerance, db, ppm_tolerance, len(spectra), num_hybrids, num_natives,original_target_seq)
+        x = create_alignment_info_with_target(spectrum, max_peptide_len, precursor_tolerance, built_database, ppm_tolerance, len(spectra), num_hybrids, num_natives,original_target_seq)
         y = map(x, spectra)
         all_y.append(y)
         all_spec_nums.append(spec_nums)
     return all_y,all_spec_nums
 
-def get_aligned_spectras(params: objects.AlignedSpectrasParams):
-    aligned_spectras = None
-    if len(params.target_seq) > 0:
-        aligned_spectras = align_with_target(params.spectras,params.precursor_tolerance,params.built_database,params.ppm_tolerance,params.max_peptide_length,params.number_hybrids,params.number_natives,params.target_seq)
+def get_aligned_spectrums(spectrums,built_database,max_peptide_length,ppm_tolerance,precursor_tolerance,number_hybrids,number_natives,target_seq):
+    aligned_spectrums = None
+    if len(target_seq) > 0:
+        aligned_spectrums = align_with_target(spectrums,built_database, precursor_tolerance,ppm_tolerance,max_peptide_length,number_hybrids,number_natives,target_seq)
     else:
-        aligned_spectras = align(params.spectras,params.precursor_tolerance,params.built_database,params.ppm_tolerance,params.max_peptide_length,params.number_hybrids,params.number_natives)
-    return aligned_spectras
+        aligned_spectrums = align(spectrums,built_database,precursor_tolerance,ppm_tolerance,max_peptide_length,number_hybrids,number_natives)
+    return aligned_spectrums
