@@ -79,14 +79,3 @@ Identification_Instrumentation = namedtuple(
       'average_hybrid_refinement_time', 'average_hybrid_scoring_time', 'average_alignment_time'],
     defaults=[0,0,0,0,0,0,0,0,0]
 )
-
-AlignedSpectrasParams = namedtuple('AlignedSpectrasParams', [
-    'spectras',
-    'built_database',
-    'max_peptide_length',
-    'ppm_tolerance',
-    'precursor_tolerance',
-    'number_hybrids',
-    'number_natives',
-    'target_seq'
-])
