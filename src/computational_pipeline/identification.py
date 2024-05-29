@@ -276,22 +276,22 @@ def do_first_thing(spectrum, converted_b, converted_y, matched_masses_b, matched
     b_hits,y_hits = create_hits(spectrum.num,spectrum,matched_masses_b,matched_masses_y,converted_b, converted_y)
     return b_hits,y_hits
 
-def align(spectra, precursor_tolerance, db, ppm_tolerance, max_peptide_len, num_hybrids, num_natives):
+def build_aligned_spectrums(spectrums, built_database, precursor_tolerance, ppm_tolerance, max_peptide_len, num_hybrids, num_natives):
     all_y, all_spec_nums = [], []
-    for spectrum in spectra:
+    for spectrum in spectrums:
         spec_nums = len(spectrum)
-        x = create_alignment_info(spectrum, max_peptide_len, precursor_tolerance, db, ppm_tolerance, len(spectra), num_hybrids, num_natives)
-        y = map(x, spectra)
+        x = create_alignment_info(spectrum, max_peptide_len, precursor_tolerance, built_database, ppm_tolerance, len(spectrums), num_hybrids, num_natives)
+        y = map(x, spectrums)
         all_y.append(y)
         all_spec_nums.append(spec_nums)
     return all_y,all_spec_nums
 
-def align_with_target(spectra, built_database, precursor_tolerance, ppm_tolerance, max_peptide_len, num_hybrids, num_natives, original_target_seq):
+def build_aligned_spectrums_with_target(spectrums, built_database, precursor_tolerance, ppm_tolerance, max_peptide_len, num_hybrids, num_natives, original_target_seq):
     all_y, all_spec_nums = [], []
-    for spectrum in spectra:
+    for spectrum in spectrums:
         spec_nums = len(spectrum)
-        x = create_alignment_info_with_target(spectrum, max_peptide_len, precursor_tolerance, built_database, ppm_tolerance, len(spectra), num_hybrids, num_natives,original_target_seq)
-        y = map(x, spectra)
+        x = create_alignment_info_with_target(spectrum, max_peptide_len, precursor_tolerance, built_database, ppm_tolerance, len(spectrums), num_hybrids, num_natives,original_target_seq)
+        y = map(x, spectrums)
         all_y.append(y)
         all_spec_nums.append(spec_nums)
     return all_y,all_spec_nums
@@ -299,7 +299,7 @@ def align_with_target(spectra, built_database, precursor_tolerance, ppm_toleranc
 def get_aligned_spectrums(spectrums,built_database,max_peptide_length,ppm_tolerance,precursor_tolerance,number_hybrids,number_natives,target_seq):
     aligned_spectrums = None
     if len(target_seq) > 0:
-        aligned_spectrums = align_with_target(spectrums,built_database, precursor_tolerance,ppm_tolerance,max_peptide_length,number_hybrids,number_natives,target_seq)
+        aligned_spectrums = build_aligned_spectrums_with_target(spectrums,built_database, precursor_tolerance,ppm_tolerance,max_peptide_length,number_hybrids,number_natives,target_seq)
     else:
-        aligned_spectrums = align(spectrums,built_database,precursor_tolerance,ppm_tolerance,max_peptide_length,number_hybrids,number_natives)
+        aligned_spectrums = build_aligned_spectrums(spectrums,built_database,precursor_tolerance,ppm_tolerance,max_peptide_length,number_hybrids,number_natives)
     return aligned_spectrums
