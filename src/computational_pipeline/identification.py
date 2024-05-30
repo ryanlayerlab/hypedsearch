@@ -238,6 +238,7 @@ def create_alignment_info_with_target(spectrum, max_pep_len, prec_tol, db, ppm_t
     postprocessed_alignments = do_eigth_thing(db, unique_rescored, spectrum, num_hybrids, num_natives)
     return postprocessed_alignments
 
+#TODO: Fix this - callable object or a function?
 def create_alignment_info(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len, num_hybrids, num_natives):
     converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_pep_len, db, ppm_tol)
     b_hits, y_hits = do_first_thing(spectrum, converted_b, converted_y, matched_masses_b, matched_masses_y, spectrum.num)
@@ -277,24 +278,22 @@ def do_first_thing(spectrum, converted_b, converted_y, matched_masses_b, matched
     return b_hits,y_hits
 
 def build_aligned_spectrums(spectrums, built_database, precursor_tolerance, ppm_tolerance, max_peptide_len, num_hybrids, num_natives):
-    all_y, all_spec_nums = [], []
+    all_x, all_spec_nums = [], []
     for spectrum in spectrums:
         spec_nums = len(spectrum)
         x = create_alignment_info(spectrum, max_peptide_len, precursor_tolerance, built_database, ppm_tolerance, len(spectrums), num_hybrids, num_natives)
-        y = map(x, spectrums)
-        all_y.append(y)
+        all_x.append(x)
         all_spec_nums.append(spec_nums)
-    return all_y,all_spec_nums
+    return (all_x,all_spec_nums)
 
 def build_aligned_spectrums_with_target(spectrums, built_database, precursor_tolerance, ppm_tolerance, max_peptide_len, num_hybrids, num_natives, original_target_seq):
-    all_y, all_spec_nums = [], []
+    all_x, all_spec_nums = [], []
     for spectrum in spectrums:
         spec_nums = len(spectrum)
         x = create_alignment_info_with_target(spectrum, max_peptide_len, precursor_tolerance, built_database, ppm_tolerance, len(spectrums), num_hybrids, num_natives,original_target_seq)
-        y = map(x, spectrums)
-        all_y.append(y)
+        all_x.append(x)
         all_spec_nums.append(spec_nums)
-    return all_y,all_spec_nums
+    return all_x,all_spec_nums
 
 def get_aligned_spectrums(spectrums,built_database,max_peptide_length,ppm_tolerance,precursor_tolerance,number_hybrids,number_natives,target_seq):
     aligned_spectrums = None
