@@ -59,13 +59,6 @@ def create_text_file(aligned_spectrums: dict, txt_file_name: str) -> None:
                     alignment = alignments[0]
                     spec_num = str(index)
                     t.write(alignment)
-                    #(hybrid,left_proteins,right_proteins,sequence,b_scores,y_scores,total_score,total_gaussian_score,extensions,precursor_mass, precursor_charge,total_mass_error)=alignment
-                    # left_protein_string, right_protein_string = get_protein_strings(left_proteins, right_proteins)
-                    # b_score_string, y_score_string = get_score_strings(b_scores, y_scores)
-                    # b_extension_strings, y_extension_strings = get_extensions_strings(extensions)
-                    # total_count = int(total_score * len(sequence))
-                    # fraction_form = str(total_count) + "/" + str(len(sequence))
-                    # t.write(spec_num + '\t' + hybrid + '\t' + sequence + '\t' + str(total_score) + '\t' + fraction_form + "\t" + str(total_gaussian_score) + '\t' + str(total_mass_error) + "\t" + str(precursor_mass) + '\t' + str(precursor_charge) + '\t' + left_protein_string + '\t' + right_protein_string + '\t' + b_score_string + '\t' + y_score_string + '\t' + b_extension_strings + '\t' + y_extension_strings + '\n')
 
 def tsv_file(results: dict, output_dir: str) -> None:
     mac = 0

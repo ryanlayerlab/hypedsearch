@@ -41,7 +41,6 @@ def get_output_file_name(spectra_file_paths):
 
 def run(args: dict) -> dict:
     spectrums = get_spectrums(args['spectra_file_paths'],args['number_peaks'],args['relative_abundance'])
-    #print(f"Number of base spectrums: {len(spectrums)}")
     built_database = get_built_database(args['database_file_path'])
     lookups.utils.make_dir(args['output_folder_path'])
     if args['create_kmer_database']:
@@ -53,7 +52,6 @@ def run(args: dict) -> dict:
     number_natives=args['number_natives']
     target_seq = args['target_seq']
     (aligned_spectrums,unused_numbers) = computational_pipeline.identification.get_aligned_spectrums(spectrums,built_database,max_peptide_length,ppm_tolerance,precursor_tolerance,number_hybrids,number_natives,target_seq)  
-    #print(f"Number of aligned spectrums: {len(aligned_spectrums)}")
     output_file_name = get_output_file_name(args['spectra_file_paths']) 
     output_folder_path=args['output_folder_path']
     write_aligned_spectrums_to_disk(aligned_spectrums, output_folder_path, output_file_name)
