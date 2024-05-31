@@ -232,11 +232,13 @@ def get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments
         extensions = postprocessed_alignment[8]
         precursor_mass, precursor_charge = str(postprocessed_alignment[9]), str(postprocessed_alignment[10])
         total_mass_error = str(postprocessed_alignment[11])
+        total_count = str(0)
         aligned_spectrum = objects.Aligned_Spectrum(hybrid,left_proteins,right_proteins,sequence,b_scores,y_scores,
                                     total_score, total_gaussian_score,extensions,precursor_mass,precursor_charge,
-                                    total_mass_error)
+                                    total_mass_error,total_count)
         aligned_spectrums.append(aligned_spectrum)
     return aligned_spectrums
+
 
 def create_aligned_spectrum_with_target(spectrum, max_pep_len, prec_tol, db, ppm_tol, results_len, num_hybrids, num_natives, original_target_seq):
     target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = computational_pipeline.finding_seqs.get_target_data(original_target_seq, db, spectrum.mz_values, ppm_tol, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
@@ -300,7 +302,7 @@ def create_b_and_y_hits(spectrum, converted_b, converted_y, matched_masses_b, ma
 def build_aligned_spectrums(spectrums, built_database, precursor_tolerance, ppm_tolerance, max_peptide_len, num_hybrids, num_natives):
     aligned_spectrums = []
     for spectrum in spectrums:
-        aligned_spectrum = create_aligned_spectrum(spectrum, max_peptide_len, precursor_tolerance, built_database, ppm_tolerance, len(spectrums), num_hybrids, num_natives,original_target_seq)
+        aligned_spectrum = create_aligned_spectrum(spectrum, max_peptide_len, precursor_tolerance, built_database, ppm_tolerance, len(spectrums), num_hybrids, num_natives)
         aligned_spectrums.extend(aligned_spectrum)
     return aligned_spectrums
 
