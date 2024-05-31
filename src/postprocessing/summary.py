@@ -48,17 +48,24 @@ def get_extensions_strings(extensions):
         y_extension_string += y + "/"
     return b_extension_string[:-1], y_extension_string[:-1]
 
-def create_text_file(aligned_spectrums: dict, txt_file_name: str) -> None:
-    with open(txt_file_name, 'w') as t:
-        t.write("spectrum_id" + '\t' + "hybrid" + '\t' + "sequence" + '\t' + "total score" + '\t' + "#peaks/length" + '\t' + "total gaussian score" + '\t' + "total mass error" + '\t' + "precursor mass" + '\t' + "precursor charge" + '\t' + "left kmer" + '\t' + "right kmer" + '\t' + "b score" + '\t' + "y score" + '\t' + "prev aa" + '\t' + "next aa" + '\n')
-        if aligned_spectrums is None:
-            pass
-        else:
-            for index, target_alignments in enumerate(aligned_spectrums):
-                for alignments in target_alignments:
-                    alignment = alignments[0]
-                    spec_num = str(index)
-                    t.write(alignment)
+def get_output_row_from_aligned_spectrums(spectrum_id, aligned_spectrum):
+            hybrid = aligned_spectrum.hybrid
+            left_proteins,right_proteins = aligned_spectrum.left_proteins, aligned_spectrum.right_proteins
+            sequence = aligned_spectrum.sequence
+            b_scores = aligned_spectrum.b_scores
+            y_scores = aligned_spectrum.y_scores
+            total_score = aligned_spectrum.total_score
+            total_gaussian_score = str(aligned_spectrum.total_gaussian_score)
+            extensions = aligned_spectrum.extensions
+            precursor_mass, precursor_charge = str(aligned_spectrum.precursor_mass), str(aligned_spectrum.precursor_charge)
+            total_mass_error = str(aligned_spectrum.total_mass_error)
+            left_protein_string, right_protein_string = get_protein_strings(left_proteins, right_proteins)
+            b_score_string, y_score_string = get_score_strings(b_scores, y_scores)
+            b_extension_strings, y_extension_strings = get_extensions_strings(extensions)
+            total_count = int(total_score * len(sequence))
+            fraction_form = str(total_count) + "/" + str(len(sequence))
+            output_row = str(spectrum_id) + '\t' + hybrid + '\t' + sequence + '\t' + str(total_score) + '\t' + fraction_form + "\t" + total_gaussian_score + '\t' + total_mass_error + "\t" + precursor_mass + '\t' + precursor_charge + '\t' + left_protein_string + '\t' + right_protein_string + '\t' + b_score_string + '\t' + y_score_string + '\t' + b_extension_strings + '\t' + y_extension_strings + '\n' 
+            return output_row
 
 def tsv_file(results: dict, output_dir: str) -> None:
     mac = 0
@@ -92,8 +99,14 @@ def generate(alignments: dict, output_dir='./') -> None:
     tsv_file(alignments, output_dir)
 
 def write_aligned_spectrums_to_disk(aligned_spectrums, output_folder_path, output_file_name ):
-        filename = os.path.basename(output_file_name)
-        A = filename.split(".")
-        base_file = "HS_"+ A[0] + ".txt"
-        output_file = os.path.join(output_folder_path,base_file)        
-        create_text_file(aligned_spectrums, output_file)
+        file_name = os.path.basename(output_file_name)
+        A = file_name.split(".")
+        base_file_name = "HS_"+ A[0] + ".txt"
+        output_file_path = os.path.join(output_folder_path,base_file_name)   
+        with open(output_file_path, 'w') as t:
+            t.write("spectrum_id" + '\t' + "hybrid" + '\t' + "sequence" + '\t' + "total score" + '\t' + "#peaks/length" + '\t' + "total gaussian score" + '\t' + "total mass error" + '\t' + "precursor mass" + '\t' + "precursor charge" + '\t' + "left kmer" + '\t' + "right kmer" + '\t' + "b score" + '\t' + "y score" + '\t' + "prev aa" + '\t' + "next aa" + '\n')
+            spectrum_id = 0
+            for aligned_spectrum in aligned_spectrums:
+                output_row = get_output_row_from_aligned_spectrums(spectrum_id,aligned_spectrum)
+                t.write(output_row)
+                spectrum_id+=1
