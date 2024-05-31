@@ -79,3 +79,9 @@ Identification_Instrumentation = namedtuple(
       'average_hybrid_refinement_time', 'average_hybrid_scoring_time', 'average_alignment_time'],
     defaults=[0,0,0,0,0,0,0,0,0]
 )
+
+Aligned_Spectrum = namedtuple(
+    'Aligned_Spectrum',
+    ['hybrid','left_proteins','right_proteins','sequence','b_scores','y_scores','total_score',
+     'total_gaussian_score','extensions','precursor_mass','precursor_charge','total_mass_error','total_count'])
+
