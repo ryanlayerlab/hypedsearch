@@ -2,7 +2,7 @@ import computational_pipeline.database_generator as database_generator
 from preprocessing import preprocessing_utils, clustering, merge_search
 from main import get_spectra_files
 from lookups.utils import ppm_to_da
-from preprocessing.merge_search import modified_match_masses
+from preprocessing.merge_search import get_modified_match_masses
 import matplotlib.pyplot as plt
 from sqlite import database_file
 from gen_spectra import get_raw_mass
@@ -69,7 +69,7 @@ def create_hits(spec_num,spectrum,matched_masses_b,matched_masses_y):
 
 percentage_list = []
 for spectrum in spectra:
-    matched_masses_b, matched_masses_y = merge_search.modified_match_masses(spectrum.mz_values, proteins, max_pep_len, ppm_tolerance, False)
+    matched_masses_b, matched_masses_y = merge_search.get_modified_match_masses(spectrum.mz_values, proteins, max_pep_len, ppm_tolerance, False)
     b_hits,y_hits = create_hits(spectrum.num,spectrum,matched_masses_b,matched_masses_y)
     clusters = clustering.create_clusters('b', b_hits, y_hits)
     cluster_size = len(clusters)

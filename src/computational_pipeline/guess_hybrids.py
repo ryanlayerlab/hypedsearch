@@ -2,7 +2,7 @@ import computational_pipeline.database_generator as database_generator
 from preprocessing import preprocessing_utils
 from main import get_spectra_files
 from lookups.utils import ppm_to_da
-from preprocessing.merge_search import modified_match_masses
+from preprocessing.merge_search import get_modified_match_masses
 import matplotlib.pyplot as plt
 
 ppm_tolerance = 20
@@ -63,7 +63,7 @@ def guess_hybrids(matched_masses_b, matched_masses_y):
 def mass_guess_hybrids(spectra, proteins, max_pep_len, ppm_tolerance, Natural):
     all_b_masses, all_b_hit_nums, all_y_hit_nums, all_y_masses = [],[],[],[]
     for spectrum in spectra:
-        matched_masses_b, matched_masses_y = modified_match_masses(spectrum.mz_values, proteins, max_pep_len, ppm_tolerance, False)
+        matched_masses_b, matched_masses_y = get_modified_match_masses(spectrum.mz_values, proteins, max_pep_len, ppm_tolerance, False)
         b_masses, b_hit_nums, y_masses, y_hit_nums = guess_hybrids(matched_masses_b, matched_masses_y)
         all_b_masses, all_y_masses = all_b_masses + b_masses, all_y_masses + y_masses
         all_b_hit_nums, all_y_hit_nums = all_b_hit_nums + b_hit_nums, all_y_hit_nums + y_hit_nums
