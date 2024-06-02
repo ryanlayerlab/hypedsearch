@@ -9,7 +9,7 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
         print('File {} not found. Please make sure that this file exists'.format(filename))
         return
 
-    spectra = []
+    spectrums = []
     filecontents = mzml.read(filename)
     content: dict
     for spec_num, content in enumerate(filecontents):
@@ -21,7 +21,6 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
             while relative_abundance_filter > 1:
                 relative_abundance_filter /= 100
             masses, abundances = spectra_filtering.relative_abundance_filtering(masses, abundances, relative_abundance_filter)
-        ti = sum(abundances)
         precursor = None
         precursor_charge = 0
 
@@ -38,18 +37,6 @@ def read(filename: str, peak_filter=0, relative_abundance_filter=0) -> list:
             precursor_charge = int(content['precursorList']['precursor'][0]['selectedIonList']['selectedIon'][0]['charge state'])
         id = content.get('id', '')
         retention_time = content['scanList']['scan'][0]['scan start time']
-        
-        spectra.append(
-            Spectrum(
-            spec_num,
-            masses,
-            abundances,
-            precursor,
-            precursor_charge,
-            filename, 
-            id,
-            retention_time,
-            precursor_abundance
-        ))
-
-    return spectra
+        spectrum = Spectrum(spec_num,masses,abundances,precursor,precursor_charge,filename, id,retention_time,precursor_abundance)
+        spectrums.append(spectrum)
+    return spectrums

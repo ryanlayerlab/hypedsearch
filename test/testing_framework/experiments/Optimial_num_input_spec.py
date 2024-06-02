@@ -113,7 +113,7 @@ for peak_filter in range(25,200):
     input_spectra, boundaries, correct_sequences, db = get_spectra_and_db(ppm_tolerance, peak_filter, relative_abundance_filter)
 
     write_path = os.path.abspath(os.path.join(module_path, 'intermediate_files'))
-    matched_masses_b, matched_masses_y, kmer_set = merge_search.modified_match_masses(boundaries, db, max_peptide_length, True, write_path)
+    matched_masses_b, matched_masses_y, kmer_set = merge_search.get_modified_match_masses(boundaries, db, max_peptide_length, True, write_path)
     unique_b, unique_y = testing_utils.get_unique_matched_masses(boundaries, matched_masses_b, matched_masses_y)
 
     hit_seqs = []
