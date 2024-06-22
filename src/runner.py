@@ -1,7 +1,7 @@
 import os
 import lookups.objects
 import lookups.utils
-import computational_pipeline.identification
+import computational_pipeline.identification as cp_id
 import multiprocessing as mp
 from preprocessing import preprocessing_utils
 from computational_pipeline.sqlite import database_file
@@ -51,8 +51,8 @@ def run(args: dict) -> dict:
     number_hybrids=args['number_hybrids']
     number_natives=args['number_natives']
     target_seq = args['target_seq']
-    aligned_spectrums = computational_pipeline.identification.get_aligned_spectrums(spectrums,built_database,max_peptide_length,ppm_tolerance,precursor_tolerance,number_hybrids,number_natives,target_seq)  
     output_file_name = get_output_file_name(args['spectra_file_paths']) 
     output_folder_path=args['output_folder_path']
+    aligned_spectrums = cp_id.get_aligned_spectrums(spectrums,built_database,max_peptide_length,ppm_tolerance,precursor_tolerance,number_hybrids,number_natives,target_seq)  
     write_aligned_spectrums_to_disk(aligned_spectrums, output_folder_path, output_file_name)
     
