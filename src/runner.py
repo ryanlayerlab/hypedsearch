@@ -1,6 +1,7 @@
 import os
 import lookups.objects
 import lookups.utils
+import computational_pipeline
 import computational_pipeline.identification as cp_id
 import multiprocessing as mp
 from preprocessing import preprocessing_utils
