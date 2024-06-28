@@ -133,17 +133,16 @@ def modified_merge(kmers, boundaries: dict):
             kmer_index = starting_point
     return matched_masses_b, matched_masses_y
 
-def get_modified_match_masses(input_masses, built_database, max_len, ppm_tolerance, b_prec, y_prec):
-    #TODO fix this - we are not using the injected database
-    dbf = database_file(max_len, False)
+def get_modified_match_masses(input_masses, built_database, max_peptide_length, ppm_tolerance, b_precursor, y_precursor):
+    dbf = database_file(max_peptide_length, False)
     matched_masses_b, matched_masses_y = dict(), dict()
     for input_mass in input_masses:
         tol = ppm_to_da(input_mass, ppm_tolerance)
         matched_masses_b[input_mass], matched_masses_y[input_mass] = dbf.query_mass(input_mass, tol)
-    tol = ppm_to_da(b_prec, ppm_tolerance)
-    matched_masses_b[b_prec], _ = dbf.query_mass(b_prec, tol)
-    tol = ppm_to_da(y_prec, ppm_tolerance)
-    _, matched_masses_y[y_prec] = dbf.query_mass(y_prec, tol)
+    tol = ppm_to_da(b_precursor, ppm_tolerance)
+    matched_masses_b[b_precursor], _ = dbf.query_mass(b_precursor, tol)
+    tol = ppm_to_da(y_precursor, ppm_tolerance)
+    _, matched_masses_y[y_precursor] = dbf.query_mass(y_precursor, tol)
     return matched_masses_b, matched_masses_y
 
 def reformat_kmers(kstr):

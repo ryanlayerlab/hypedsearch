@@ -61,9 +61,9 @@ def get_total_sum(precursor_mass,precursor_charge):
 
 def convert_precursor_to_ion(precursor_mass, precursor_charge):
     total_sum = get_total_sum(precursor_mass, precursor_charge)
-    normalized_b = (DOUBLY_CHARGED_B_BASE + total_sum) / 2
-    normalized_y = (DOUBLY_CHARGED_Y_BASE + total_sum) / 2
-    return normalized_b, normalized_y
+    b_precursor = (DOUBLY_CHARGED_B_BASE + total_sum) / 2
+    y_precursor = (DOUBLY_CHARGED_Y_BASE + total_sum) / 2
+    return b_precursor, y_precursor
 
 def normalize_to_two(b_mass, y_mass):
     normalized_b = (DOUBLY_CHARGED_B_BASE + b_mass) / 2
