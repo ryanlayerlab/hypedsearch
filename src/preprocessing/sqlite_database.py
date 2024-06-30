@@ -2,7 +2,7 @@ import sqlite3
 import time
 import os
 
-class database_file:
+class Sqllite_Database:
     def __init__(self, max_len, reset=True):
         self.connection = sqlite3.connect("kmers.db")
         self.cursor = self.connection.cursor()
@@ -28,9 +28,9 @@ class database_file:
         self.cursor.executemany('INSERT INTO kmers VALUES(?, ?, ?, ?, ?, ?)', data)
         self.connection.commit()
         
-    def read(self):
-        rows = self.cursor.execute("SELECT * FROM kmers").fetchall()
-        print(rows)
+    # def read(self):
+    #     rows = self.cursor.execute("SELECT * FROM kmers").fetchall()
+    #     print(rows)
     
     def query_mass(self, mass, tol):
         upper = mass + tol

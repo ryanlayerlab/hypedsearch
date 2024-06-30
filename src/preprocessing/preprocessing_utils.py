@@ -2,7 +2,7 @@ from file_io import spectra
 from lookups.utils import ppm_to_da
 from lookups.constants import DOUBLY_CHARGED_B_BASE, DOUBLY_CHARGED_Y_BASE, PROTON_MASS, WATER_MASS
 from computational_pipeline.gen_spectra import get_total_sum, convert_precursor_to_ion, get_precursor, generate_spectrum
-from preprocessing.sqlite_database import database_file
+from preprocessing.sqlite_database import Sqllite_Database
 
 def make_boundaries(mz, ppm_tol):
     da_tol = ppm_to_da(mz, ppm_tol)
@@ -60,7 +60,7 @@ def find_sequence(hit, protein_list):
     return prot_seq[start:end]  
 
 def find_by_precursor(spectrum, prec_tol, protein_list, ppm_tol):
-    dbf = database_file(10, False)
+    dbf = Sqllite_Database(10, False)
     converted_b, _ = convert_precursor_to_ion(spectrum.precursor_mass, spectrum.precursor_charge)
     conv_prec_tol = ppm_to_da(converted_b, prec_tol)
     prec_hits = dbf.query_mass(converted_b, conv_prec_tol)[0]
