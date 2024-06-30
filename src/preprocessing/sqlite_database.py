@@ -40,43 +40,41 @@ class database_file:
         y_rows = self.cursor.execute("SELECT * FROM temp.mass where ion = 1 order by protein, location_start, location_end").fetchall()
         self.cursor.execute("DROP TABLE temp.mass")
         return b_rows, y_rows
-    
-        
+      
     def query_sequence(self, pid, start, end):
         rows = self.cursor.execute("SELECT * FROM kmers where protein = ? and location_start = ? and location_end = ?", (pid, start, end)).fetchall()
         return rows
     
-    def query_extensions_to_length(self, target_mass, pid, start, end, dist):
-        query_start = time.time()
-        rows_cursor = self.cursor.execute("SELECT * FROM kmers where protein = ? and location_start = ? and location_end = ? and mass <= ? and ion = 0 and charge = 2", (pid, start, end+dist-1, target_mass)) #and ion = 0 and charge = 1
-        query_time = time.time() - query_start
-        fetchall_start = time.time()
-        rows = rows_cursor.fetchall()
-        fetchall_time = time.time() - fetchall_start
-        self.query_protein_average = (self.query_protein_average * self.protein_count + query_time)/ (self.protein_count + 1)
-        self.fetchall_protein_average = (self.fetchall_protein_average * self.protein_count + fetchall_time)/ (self.protein_count + 1)
-        self.protein_count += 1
-        return rows
+    # def query_extensions_to_length(self, target_mass, pid, start, end, dist):
+    #     query_start = time.time()
+    #     rows_cursor = self.cursor.execute("SELECT * FROM kmers where protein = ? and location_start = ? and location_end = ? and mass <= ? and ion = 0 and charge = 2", (pid, start, end+dist-1, target_mass)) #and ion = 0 and charge = 1
+    #     query_time = time.time() - query_start
+    #     fetchall_start = time.time()
+    #     rows = rows_cursor.fetchall()
+    #     fetchall_time = time.time() - fetchall_start
+    #     self.query_protein_average = (self.query_protein_average * self.protein_count + query_time)/ (self.protein_count + 1)
+    #     self.fetchall_protein_average = (self.fetchall_protein_average * self.protein_count + fetchall_time)/ (self.protein_count + 1)
+    #     self.protein_count += 1
+    #     return rows
         
-    def query_extensions_b(self, target_mass, pid, start, end, ion):
-        query_start = time.time()
-        rows_cursor = self.connection.execute("SELECT * FROM kmers where protein = ? and location_start = ? and location_end >= ? and mass < ? and ion = ? and charge = 2 order by location_end", (pid, start, end, target_mass, ion))
-        # rows_cursor = self.cursor.execute("SELECT * FROM kmers where protein = ? and location_start = ? and location_end > ? and mass < ? and ion = ? and charge = 2 order by location_end", (pid, start, end, target_mass, ion))
-        query_time = time.time() - query_start
-        self.query_protein_average = (self.query_protein_average * self.protein_count + query_time)/ (self.protein_count + 1)
-        self.protein_count += 1
-        return rows_cursor
+    # def query_extensions_b(self, target_mass, pid, start, end, ion):
+    #     query_start = time.time()
+    #     rows_cursor = self.connection.execute("SELECT * FROM kmers where protein = ? and location_start = ? and location_end >= ? and mass < ? and ion = ? and charge = 2 order by location_end", (pid, start, end, target_mass, ion))
+    #     query_time = time.time() - query_start
+    #     self.query_protein_average = (self.query_protein_average * self.protein_count + query_time)/ (self.protein_count + 1)
+    #     self.protein_count += 1
+    #     return rows_cursor
     
-    def query_extensions_y(self, target_mass, pid, end, start, ion):
-        query_start = time.time()
-        rows_cursor = self.connection.execute("SELECT * FROM kmers where protein = ? and location_end = ? and location_start <= ? and mass < ? and ion = ? and charge = 2 order by location_start desc", (pid, end, start, target_mass, ion))
-        query_time = time.time() - query_start
-        self.query_protein_average = (self.query_protein_average * self.protein_count + query_time)/ (self.protein_count + 1)
-        self.protein_count += 1
-        return rows_cursor
+    # def query_extensions_y(self, target_mass, pid, end, start, ion):
+    #     query_start = time.time()
+    #     rows_cursor = self.connection.execute("SELECT * FROM kmers where protein = ? and location_end = ? and location_start <= ? and mass < ? and ion = ? and charge = 2 order by location_start desc", (pid, end, start, target_mass, ion))
+    #     query_time = time.time() - query_start
+    #     self.query_protein_average = (self.query_protein_average * self.protein_count + query_time)/ (self.protein_count + 1)
+    #     self.protein_count += 1
+    #     return rows_cursor
     
-    def query_fetchall(self, cursor):
-        return cursor.fetchall()
+    # def query_fetchall(self, cursor):
+    #     return cursor.fetchall()
     
     def index_ion_mass_b(self):
         ctime = time.time()

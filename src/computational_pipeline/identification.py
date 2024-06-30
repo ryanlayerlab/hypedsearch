@@ -266,16 +266,16 @@ def prep_data_structures_for_alignment(spectrum, max_peptide_length, built_datab
     matched_masses_b, matched_masses_y = merge_search.get_modified_match_masses(input_list, built_database, max_peptide_length, ppm_tolerance, b_precursor, y_precursor)
     return b_precursor,y_precursor,matched_masses_b,matched_masses_y
 
-def create_aligned_spectrum_with_target(spectrum, max_peptide_length, prec_tol, db, ppm_tolerance, results_len, num_hybrids, num_natives, original_target_seq):
-    target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = computational_pipeline.finding_seqs.get_target_data(original_target_seq, db, spectrum.mz_values, ppm_tol, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
-    converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_peptide_length, db, ppm_tolerance)
+def create_aligned_spectrum_with_target(spectrum, max_peptide_length, prec_tol, built_database, ppm_tolerance, results_len, num_hybrids, num_natives, original_target_seq):
+    target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score = computational_pipeline.finding_seqs.get_target_data(original_target_seq, built_database, spectrum.mz_values, ppm_tolerance, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge)
+    converted_b, converted_y, matched_masses_b, matched_masses_y = prep_data_structures_for_alignment(spectrum, max_peptide_length, built_database, ppm_tolerance)
     good_b_entries, good_y_entries = computational_pipeline.finding_seqs.check_in_matched_masses(matched_masses_b, matched_masses_y, target_left_pids, target_left_indices, target_right_pids, target_right_indices)
-    best_prec_hit, score_filter = alignment.find_from_prec(converted_b, matched_masses_b, spectrum, ppm_tolerance, db.proteins)
+    best_prec_hit, score_filter = alignment.find_from_prec(converted_b, matched_masses_b, spectrum, ppm_tolerance, built_database.proteins)
     b_hits, y_hits = create_b_and_y_hits(spectrum, converted_b, converted_y, matched_masses_b, matched_masses_y, spectrum.num)
-    b_sorted_clusters, y_sorted_clusters = create_b_and_y_sorted_clusters(db, converted_b, converted_y, b_hits, y_hits, spectrum.precursor_charge, ppm_tolerance, spectrum.num)
+    b_sorted_clusters, y_sorted_clusters = create_b_and_y_sorted_clusters(built_database, converted_b, converted_y, b_hits, y_hits, spectrum.precursor_charge, ppm_tolerance, spectrum.num)
     good_b_clusters, good_y_clusters = computational_pipeline.finding_seqs.check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_entries, good_y_entries)
     b_search_space, y_search_space = clustering.get_search_space(b_sorted_clusters, y_sorted_clusters, spectrum.precursor_charge)
-    good_b_searches, good_y_searches = computational_pipeline.finding_seqs.check_in_searches(b_search_space, y_search_space, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_seq, spectrum.precursor_charge, ppm_tol)
+    good_b_searches, good_y_searches = computational_pipeline.finding_seqs.check_in_searches(b_search_space, y_search_space, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_seq, spectrum.precursor_charge, ppm_tolerance)
     unique_native_merged_seqs = alignment.pair_natives(b_search_space, y_search_space, spectrum.precursor_mass, prec_tol)
     unique_hybrid_merged_seqs = alignment.pair_indices(b_search_space, y_search_space, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, score_filter)
     good_merged_seqs = computational_pipeline.finding_seqs.check_in_merges(unique_hybrid_merged_seqs, unique_native_merged_seqs, good_b_searches, good_y_searches)

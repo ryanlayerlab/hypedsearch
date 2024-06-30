@@ -1,4 +1,4 @@
-from computational_pipeline.sqlite import database_file
+from preprocessing.sqlite_database import database_file
 from lookups.utils import ppm_to_da
 from lookups.objects import Database
 import sys
