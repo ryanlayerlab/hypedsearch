@@ -1,16 +1,7 @@
 from collections import namedtuple
 
-Database = namedtuple(
-    'Database', 
-    ['fasta_file', 'proteins', 'kmers'], 
-    defaults=['', {}, {}]
-)
-
-DatabaseEntry = namedtuple(
-    'DatabaseEntry', 
-    ['sequence', 'description'],
-    defaults=['', '']
-)
+Protein = namedtuple('DatabaseEntry', ['description','sequence'])
+Database = namedtuple('Database', ['fasta_file', 'proteins', 'kmers'])
 
 Spectrum = namedtuple(
     'Spectrum', [

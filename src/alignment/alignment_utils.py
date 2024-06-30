@@ -1,6 +1,6 @@
 from lookups.objects import Database, Spectrum
 from scoring import scoring
-import computational_pipeline.database_generator
+import preprocessing.database_generator
 import computational_pipeline.gen_spectra
 import lookups.utils
 import re
@@ -53,8 +53,8 @@ def __add_amino_acids(
         for l_p in parents[0]:
             for r_p in parents[1]:
                 left_seq, right_seq = lookups.utils.split_hybrid(sequence)
-                left_seqs = computational_pipeline.database_generator.get_entry_by_name(db, l_p)
-                right_seqs = computational_pipeline.database_generator.get_entry_by_name(db, r_p)
+                left_seqs = preprocessing.database_generator.get_entry_by_name(db, l_p)
+                right_seqs = preprocessing.database_generator.get_entry_by_name(db, r_p)
 
                 for left_prot in left_seqs:
                     for right_prot in right_seqs:
@@ -80,7 +80,7 @@ def __add_amino_acids(
     else:
 
         for p in parents[0]:
-            entries = computational_pipeline.database_generator.get_entry_by_name(db, p)
+            entries = preprocessing.database_generator.get_entry_by_name(db, p)
             for entry in entries:
                 p_seq = entry.sequence
                 for flanking_pair in __get_surrounding_amino_acids(p_seq, sequence, gap):
@@ -241,8 +241,8 @@ def get_parents(
     db: Database, 
     ion: str = None
     ):
-    get_sources = lambda s: computational_pipeline.database_generator.get_proteins_with_subsequence(db, s)
-    get_sources_ion = lambda s, i: computational_pipeline.database_generator.get_proteins_with_subsequence_ion(db, s, i)
+    get_sources = lambda s: preprocessing.database_generator.get_proteins_with_subsequence(db, s)
+    get_sources_ion = lambda s, i: preprocessing.database_generator.get_proteins_with_subsequence_ion(db, s, i)
 
     if lookups.utils.HYBRID_ALIGNMENT_PATTERN.findall(seq):
         left_seq, right_seq = lookups.utils.split_hybrid(seq)

@@ -3,6 +3,7 @@ import lookups.objects
 import lookups.utils
 import computational_pipeline
 import computational_pipeline.identification as cp_id
+import preprocessing.database_generator as dg
 import multiprocessing as mp
 from preprocessing import preprocessing_utils
 from preprocessing.sqlite_database import Sqllite_Database
@@ -12,7 +13,7 @@ from postprocessing.summary import write_aligned_spectrums_to_disk
 from collections import namedtuple
 
 def get_built_database(database_file_path):
-    return computational_pipeline.database_generator.build_database(database_file_path)
+    return dg.build_database(database_file_path)
 
 def get_number_of_cores(number_of_cores):
     revised_number_of_cores = number_of_cores = max(1, number_of_cores)

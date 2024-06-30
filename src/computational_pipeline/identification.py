@@ -7,7 +7,7 @@ from lookups.objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFal
 from alignment import alignment
 from lookups.utils import ppm_to_da, to_percent, is_json, is_file
 from preprocessing import merge_search, preprocessing_utils, clustering, evaluation
-import computational_pipeline.database_generator
+import preprocessing.database_generator
 from file_io import JSON
 import lookups.objects as objects
 import time
