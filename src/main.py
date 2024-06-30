@@ -77,7 +77,7 @@ if __name__ == '__main__':
     parser.add_argument('--number-peaks', dest='number_peaks', type=int, default=0, help='The number of peaks to take from a spectrum. The most abundant peaks will be taken. Leave blank if you want no filter or to use relative abundance filter. Defualt=0')
     parser.add_argument('--relative-abundance', dest='relative_abundance', type=float, default=0.0, help='Take only peaks from a spectrum where the abundance of the peak is >= the percentage give. Leave blank if you want no filter or to use peak filter. Default=0.0')
     parser.add_argument('--digest-left', dest='digest_left', nargs='*', default=[''], type = str, help='The Amino Acid for which the digest cuts left of. Default=None')
-    parser.add_argument('--digest-right', dest='digest_right', nargs='*', default=[''], type = str, help='The Amino Acid for which the digest cuts right of. Default=None')
+    parser.add_argument('- -digest-right', dest='digest_right', nargs='*', default=[''], type = str, help='The Amino Acid for which the digest cuts right of. Default=None')
     parser.add_argument('--number-cores', dest='number_cores', type=int, default=1, help='The number of cores allowed to use when searching. Uses at least 1 and at most the number of available cores. Default=1')
     parser.add_argument('--create_kmer_database', dest='create_kmer_database', type=lambda x:bool(distutils.util.strtobool(x)))
     parser.add_argument('--number-hybrids', dest='number_hybrids', type=int, default=5, help='The number of hybrid alignments to keep per spectrum. Default=5')
