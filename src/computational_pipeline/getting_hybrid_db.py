@@ -1,6 +1,6 @@
 import os
 import matplotlib.pyplot as plt
-import computational_pipeline.database_generator as database_generator
+import preprocessing.database_generator as database_generator
 from postprocessing.postprocessing_utils import make_db_mapping_by_key
 
 open_path = "/home/naco3124/jaime_hypedsearch/hypedsearch/data/truth_table/Results"

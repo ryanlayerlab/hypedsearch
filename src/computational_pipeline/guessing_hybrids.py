@@ -3,7 +3,7 @@ from scoring import scoring
 import gen_spectra
 from main import get_spectra_files
 from lookups.utils import ppm_to_da
-import computational_pipeline.database_generator as database_generator
+import preprocessing.database_generator as database_generator
 from lookups.constants import WATER_MASS, PROTON_MASS, AMINO_ACIDS
 from preprocessing.sqlite_database import database_file
 import numpy as np

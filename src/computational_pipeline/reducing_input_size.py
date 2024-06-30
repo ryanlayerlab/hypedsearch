@@ -1,4 +1,4 @@
-import computational_pipeline.database_generator as database_generator
+import preprocessing.database_generator as database_generator
 from preprocessing import preprocessing_utils, clustering, merge_search
 from main import get_spectra_files
 from lookups.utils import ppm_to_da

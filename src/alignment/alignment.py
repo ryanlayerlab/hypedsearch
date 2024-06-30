@@ -6,7 +6,7 @@ from computational_pipeline.gen_spectra import get_precursor
 from preprocessing.clustering import calc_from_sequences
 import lookups.objects as objects
 import lookups.utils
-import computational_pipeline.database_generator
+import preprocessing.database_generator
 import computational_pipeline.gen_spectra
 from preprocessing.sqlite_database import Sqllite_Database
 

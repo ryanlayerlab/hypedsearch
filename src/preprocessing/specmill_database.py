@@ -1,4 +1,4 @@
-import computational_pipeline.database_generator as database_generator
+import preprocessing.database_generator as database_generator
 from main import get_spectra_files
 from preprocessing.preprocessing_utils import load_spectra
 import re
