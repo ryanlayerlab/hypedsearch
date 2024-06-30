@@ -8,7 +8,7 @@ import lookups.objects as objects
 import lookups.utils
 import computational_pipeline.database_generator
 import computational_pipeline.gen_spectra
-from preprocessing.sqlite_database import database_file
+from preprocessing.sqlite_database import Sqllite_Database
 
 import math
 import collections

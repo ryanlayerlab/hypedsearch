@@ -4,7 +4,7 @@ import os
 from lookups.utils import ppm_to_da, to_percent
 import computational_pipeline.gen_spectra
 from lookups.constants import WATER_MASS, PROTON_MASS
-from preprocessing.sqlite_database import database_file
+from preprocessing.sqlite_database import Sqllite_Database
 import time
 from lookups.constants import AMINO_ACIDS
 from scoring.scoring import calc_bayes_score
@@ -328,8 +328,8 @@ def calc_from_total_overlap(side, b_mass, b_charge, y_mass, y_charge, prec_charg
     return precursor
 
 def calc_from_sequences(start, y_end, pid, max_len, prec_charge):
-    db = database_file(max_len, False)
-    entries = db.query_sequence(pid, start, y_end)
+    sqllite_database = Sqlite_Database(max_len, False)
+    entries = sqllite_database.query_sequence(pid, start, y_end)
     if entries == []:
         return 0
     else:

@@ -5,8 +5,8 @@ import computational_pipeline
 import computational_pipeline.identification as cp_id
 import multiprocessing as mp
 from preprocessing import preprocessing_utils
-from preprocessing.sqlite_database import database_file
-from preprocessing import merge_search
+from preprocessing.sqlite_database import Sqllite_Database
+from preprocessing import kmer_database
 from datetime import datetime
 from postprocessing.summary import write_aligned_spectrums_to_disk
 from collections import namedtuple
@@ -27,11 +27,10 @@ def get_spectrums(spectra_file_paths,number_peaks,relative_abundance):
     return spectrums
 
 def do_create_kmer_database(built_database, max_peptide_length, digest_left, digest_right):
-    dbf = database_file(max_peptide_length, True)
+    dbf = Sqllite_Database(max_peptide_length, True)
     kv_prots = [(k, v) for k, v in built_database.proteins]    
-    merge_search.modified_make_database_set(kv_prots, max_peptide_length, dbf, (digest_left, digest_right))
-
-
+    kmer_database.modified_make_database_set(kv_prots, max_peptide_length, dbf, (digest_left, digest_right))
+    
 def get_output_file_name(spectra_file_paths):
     current_datetime = datetime.now()
     formatted_datetime = current_datetime.strftime('%Y%m%d%H%M%S')

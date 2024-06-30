@@ -1,4 +1,4 @@
-from preprocessing.sqlite_database import database_file
+from preprocessing.sqlite_database import Sqllite_Database
 from lookups.utils import ppm_to_da
 from lookups.objects import Database
 import sys
@@ -34,71 +34,6 @@ def handle_sorting_keys(db_dict_b, db_dict_y, kmer_list):
     for mz in sorted_y_keys:
         modified_sort_masses_in_sorted_keys_y(db_dict_y,mz,kmer_list)
 
-def get_data(kmer, start, end, protein_num, ion):
-    data_list = []
-    for charge in [1,2]:
-        mass = computational_pipeline.gen_spectra.get_max_mass(kmer, ion=ion, charge=charge) #1108.563316435
-        ion_int = 0 if ion == 'b' else 1
-        input_tuple = (mass, start, end, ion_int, charge, protein_num)
-        data_list.append(input_tuple)
-    return data_list
-            
-def db_make_set_for_protein_digest(i,prot,max_len, dbf, data, digest):
-    seq_len = len(prot)
-    count_max = 1000000
-    for size in range(2, max_len + 1):
-        # size -> [2, max_len]
-        for start in range(0, seq_len - size + 1):
-            end = start + size
-            kmer = prot[start:end]
-            if kmer[0] in digest[0] or digest[0] == ['-'] or (start > 0 and prot[start-1] in digest[1]): #cuts to the left
-                bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
-                if not any (x in bad_chars for x in kmer):
-                    data_list = get_data(kmer, start, end, i, 'b')
-                    data.extend(data_list)
-                    # insertion code
-                    if len(data) > count_max:
-                        dbf.insert(data)
-                        data.clear()
-            if kmer[-1] in digest[1] or digest[1] == ['-'] or (end < seq_len and prot[end] in digest[0]): #cuts to the right
-                bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
-                if not any (x in bad_chars for x in kmer):
-                    data_list = get_data(kmer, start, end, i, 'y')
-                    data.extend(data_list)
-                    # insertion code
-                    if len(data) > count_max:
-                        dbf.insert(data)
-                        data.clear()
-            
-    return
-
-def db_make_database_set_for_proteins(proteins,max_len,dbf,digest):
-    plen = len(proteins)
-    last_percent = 0
-    data = []
-    
-    for i, (_, prot_entry) in enumerate(proteins):
-        percent = int((i+1) * 100 / plen)
-        print(f'\rOn protein {i+1}/{plen} [{int((i+1) * 100 / plen)}%]', end='')
-        if percent != last_percent:
-            last_percent = percent
-            free = shutil.disk_usage('/')[2]
-            free = free/(1024**3)
-            if free < 10:
-                print("\nUsed too much space, Space available =", free, "GB" )
-                sys.exit(1)
-        db_make_set_for_protein_digest(i,prot_entry,max_len, dbf, data, digest)
-        
-    if len(data) != 0:
-        dbf.insert(data)
-        
-def modified_make_database_set(proteins: list, max_len: int, dbf, digest):
-    db_make_database_set_for_proteins(proteins,max_len,dbf,digest)
-    dbf.index_ion_mass()
-    dbf.index_ion_mass_b()
-    dbf.index_ion_mass_y()
-    return
-
 def in_bounds(int1, interval):
     if int1 >= interval[0] and int1 <= interval[1]:
         return True
@@ -133,16 +68,16 @@ def modified_merge(kmers, boundaries: dict):
             kmer_index = starting_point
     return matched_masses_b, matched_masses_y
 
-def get_modified_match_masses(input_masses, built_database, max_peptide_length, ppm_tolerance, b_precursor, y_precursor):
-    dbf = database_file(max_peptide_length, False)
+def get_modified_match_masses(input_masses, max_peptide_length, ppm_tolerance, b_precursor, y_precursor):
+    sqllite_database = Sqllite_Database(max_peptide_length, False)
     matched_masses_b, matched_masses_y = dict(), dict()
     for input_mass in input_masses:
         tol = ppm_to_da(input_mass, ppm_tolerance)
-        matched_masses_b[input_mass], matched_masses_y[input_mass] = dbf.query_mass(input_mass, tol)
+        matched_masses_b[input_mass], matched_masses_y[input_mass] = sqllite_database.query_mass(input_mass, tol)
     tol = ppm_to_da(b_precursor, ppm_tolerance)
-    matched_masses_b[b_precursor], _ = dbf.query_mass(b_precursor, tol)
+    matched_masses_b[b_precursor], _ = sqllite_database.query_mass(b_precursor, tol)
     tol = ppm_to_da(y_precursor, ppm_tolerance)
-    _, matched_masses_y[y_precursor] = dbf.query_mass(y_precursor, tol)
+    _, matched_masses_y[y_precursor] = sqllite_database.query_mass(y_precursor, tol)
     return matched_masses_b, matched_masses_y
 
 def reformat_kmers(kstr):

@@ -263,7 +263,7 @@ def create_postprocessed_alignments(db, rescored_alignments, spectrum, num_hybri
 def prep_data_structures_for_alignment(spectrum, max_peptide_length, built_database, ppm_tolerance):
     input_list = spectrum.mz_values        
     b_precursor, y_precursor = convert_precursor_to_ion(spectrum.precursor_mass, spectrum.precursor_charge)
-    matched_masses_b, matched_masses_y = merge_search.get_modified_match_masses(input_list, built_database, max_peptide_length, ppm_tolerance, b_precursor, y_precursor)
+    matched_masses_b, matched_masses_y = merge_search.get_modified_match_masses(input_list, max_peptide_length, ppm_tolerance, b_precursor, y_precursor)
     return b_precursor,y_precursor,matched_masses_b,matched_masses_y
 
 def create_aligned_spectrum_with_target(spectrum, max_peptide_length, prec_tol, built_database, ppm_tolerance, results_len, num_hybrids, num_natives, original_target_seq):
