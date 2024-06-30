@@ -30,7 +30,8 @@ def do_create_kmer_database(built_database, max_peptide_length, digest_left, dig
     dbf = Sqllite_Database(max_peptide_length, True)
     kv_prots = [(k, v) for k, v in built_database.proteins]    
     kmer_database.modified_make_database_set(kv_prots, max_peptide_length, dbf, (digest_left, digest_right))
-    
+    return dbf
+
 def get_output_file_name(spectra_file_paths):
     current_datetime = datetime.now()
     formatted_datetime = current_datetime.strftime('%Y%m%d%H%M%S')
@@ -44,8 +45,7 @@ def run(args: dict) -> dict:
     spectrums = get_spectrums(args['spectra_file_paths'],args['number_peaks'],args['relative_abundance'])
     built_database = get_built_database(args['database_file_path'])
     lookups.utils.make_dir(args['output_folder_path'])
-    if args['create_kmer_database']:
-        do_create_kmer_database(built_database, args['number_peaks'], args['digest_left'], args['digest_right'])
+    sqllite_database = do_create_kmer_database(built_database, args['number_peaks'], args['digest_left'], args['digest_right'])
     max_peptide_length=args['max_peptide_length']
     ppm_tolerance=args['ppm_tolerance']
     precursor_tolerance=args['precursor_tolerance']
@@ -54,6 +54,6 @@ def run(args: dict) -> dict:
     target_seq = args['target_seq']
     output_file_name = get_output_file_name(args['spectra_file_paths']) 
     output_folder_path=args['output_folder_path']
-    aligned_spectrums = cp_id.get_aligned_spectrums(spectrums,built_database,max_peptide_length,ppm_tolerance,precursor_tolerance,number_hybrids,number_natives,target_seq)  
+    aligned_spectrums = cp_id.get_aligned_spectrums(spectrums,sqllite_database, built_database,max_peptide_length,ppm_tolerance,precursor_tolerance,number_hybrids,number_natives,target_seq)  
     write_aligned_spectrums_to_disk(aligned_spectrums, output_folder_path, output_file_name)
     

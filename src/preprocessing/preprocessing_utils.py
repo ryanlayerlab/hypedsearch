@@ -59,8 +59,7 @@ def find_sequence(hit, protein_list):
     prot_seq = protein_list[pid][1]
     return prot_seq[start:end]  
 
-def find_by_precursor(spectrum, prec_tol, protein_list, ppm_tol):
-    dbf = Sqllite_Database(10, False)
+def find_by_precursor(spectrum, dbf, prec_tol, protein_list, ppm_tol):
     converted_b, _ = convert_precursor_to_ion(spectrum.precursor_mass, spectrum.precursor_charge)
     conv_prec_tol = ppm_to_da(converted_b, prec_tol)
     prec_hits = dbf.query_mass(converted_b, conv_prec_tol)[0]
