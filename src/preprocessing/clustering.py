@@ -4,7 +4,7 @@ import os
 from lookups.utils import ppm_to_da, to_percent
 import computational_pipeline.gen_spectra
 from lookups.constants import WATER_MASS, PROTON_MASS
-from computational_pipeline.sqlite import database_file
+from preprocessing.sqlite_database import database_file
 import time
 from lookups.constants import AMINO_ACIDS
 from scoring.scoring import calc_bayes_score
@@ -30,14 +30,12 @@ def create_clusters_from_foos(foos):
 
 def parse_foos(Hit, all_hits):
     hits = []
-    #Matched masses data is of form (mass, start, end, ion_int, charge, protein_num)
     for A in all_hits:
         pid = int(A[2][5])
         start = int(A[2][1])
         end = int(A[2][2])
         mz = A[1]
         charge = A[2][4]
-
         hits.append( Hit(pid=pid, start=start, end=end, mz=mz, charge=charge) )
     return hits
 
