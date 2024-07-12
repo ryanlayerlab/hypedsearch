@@ -1,5 +1,6 @@
 import computational_pipeline.gen_spectra
 from lookups.utils import ppm_to_da
+import lookups.objects
 
 def overlap_scoring(sequence, input_masses, ppm_tolerance):
     total_score = 0
@@ -26,10 +27,16 @@ def overlap_scoring(sequence, input_masses, ppm_tolerance):
             if o_ctr < len(input_masses) and t_ctr < len(masses):
                 observed = input_masses[o_ctr]
                 theoretical = masses[t_ctr]
-                
     return(total_score)
 
-def get_target_data(target_seq, proteins, input_masses, ppm_tolerance, precursor_mass, precursor_tolerance, precursor_charge):
+def get_target_data(tdp: lookups.objects.TargetDataParams):
+    target_seq = tdp.target_seq
+    proteins = tdp.proteins
+    input_masses = tdp.input_masses
+    ppm_tolerance = tdp.ppm_tolerance
+    precursor_mass = tdp.precursor_mass
+    precursor_tolerance = tdp.precursor_tolerance
+    precursor_charge = tdp.precursor_charge
     prec_tol = ppm_to_da(precursor_mass, precursor_tolerance)
     theoretical_prec = computational_pipeline.gen_spectra.get_precursor(target_seq.replace("-", ""), precursor_charge)
     if abs(theoretical_prec - precursor_mass) <= precursor_tolerance:
@@ -60,7 +67,15 @@ def get_target_data(target_seq, proteins, input_masses, ppm_tolerance, precursor
             target_right_indices.append((start, end))
             
     target_score = overlap_scoring(target_seq.replace("-", ""), input_masses, ppm_tolerance)
-    return target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score
+
+    target_data = lookups.objects.TargetData(target_seq=target_seq,
+        target_left_pids=target_left_pids,
+        target_right_pids=target_right_pids,
+        target_left_indices=target_left_indices,
+        target_right_indices=target_right_indices,
+        target_score=target_score)
+
+    return target_data
 
 def check_in_matched_masses(matched_masses_b, matched_masses_y, left_pids, left_indices, right_pids, right_indices):
     good_b_entries, good_y_entries = [], []
