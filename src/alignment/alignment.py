@@ -531,7 +531,7 @@ def pair_indices(b_search_space, y_search_space, prec_mass, prec_tol, prec_charg
             
     return unique_merges
         
-def find_from_prec(converted_b, matched_masses_b, input_spectrum, ppm_tolerance, protein_list):
+def find_from_precursor(converted_b, matched_masses_b, input_spectrum, ppm_tolerance, protein_list):
     prec_matches = []
     prec_hits = matched_masses_b[converted_b]
     for hit in prec_hits:

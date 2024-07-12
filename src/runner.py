@@ -27,7 +27,7 @@ def get_spectrums(spectra_file_paths,number_peaks,relative_abundance):
         spectrums.extend(spectra)
     return spectrums
 
-def do_create_kmer_database(built_database, max_peptide_length, digest_left, digest_right):
+def create_sqllite_database(built_database, max_peptide_length, digest_left, digest_right):
     dbf = Sqllite_Database(max_peptide_length, True)
     kv_prots = [(k, v) for k, v in built_database.proteins]    
     kmer_database.modified_make_database_set(kv_prots, max_peptide_length, dbf, (digest_left, digest_right))
@@ -41,20 +41,29 @@ def get_output_file_name(spectra_file_paths):
     filename, extension = os.path.splitext(last_token_with_extension)
     return_value = filename + "_" + formatted_datetime
     return return_value
-
-def run(args: dict) -> dict:
+ 
+def get_aligned_spectrums_params(args: dict):
     spectrums = get_spectrums(args['spectra_file_paths'],args['number_peaks'],args['relative_abundance'])
     built_database = get_built_database(args['database_file_path'])
     lookups.utils.make_dir(args['output_folder_path'])
-    sqllite_database = do_create_kmer_database(built_database, args['number_peaks'], args['digest_left'], args['digest_right'])
+    sqllite_database = create_sqllite_database(built_database, args['number_peaks'], args['digest_left'], args['digest_right'])
     max_peptide_length=args['max_peptide_length']
     ppm_tolerance=args['ppm_tolerance']
     precursor_tolerance=args['precursor_tolerance']
     number_hybrids=args['number_hybrids']
     number_natives=args['number_natives']
     target_seq = args['target_seq']
+    params = AlignedSpectrumsParams(spectrums=spectrums,sqllite_database=sqllite_database,
+    built_database=built_database,max_peptide_length=max_peptide_length,ppm_tolerance=ppm_tolerance,
+    precursor_tolerance=precursor_tolerance,number_hybrids=number_hybrids,number_natives=number_natives,
+    target_seq=target_seq)
+    return params
+
+AlignedSpectrumsParams = namedtuple('AlignedSpectrumsParams', ['spectrums', 'sqllite_database', 'built_database','max_peptide_length', 'ppm_tolerance', 'precursor_tolerance','number_hybrids', 'number_natives', 'target_seq'])
+
+def run(args: dict):
+    aligned_spectrums_params = get_aligned_spectrums_params(args)
     output_file_name = get_output_file_name(args['spectra_file_paths']) 
     output_folder_path=args['output_folder_path']
-    aligned_spectrums = cp_id.get_aligned_spectrums(spectrums,sqllite_database, built_database,max_peptide_length,ppm_tolerance,precursor_tolerance,number_hybrids,number_natives,target_seq)  
+    aligned_spectrums = cp_id.get_aligned_spectrums(aligned_spectrums_params)  
     write_aligned_spectrums_to_disk(aligned_spectrums, output_folder_path, output_file_name)
-    
