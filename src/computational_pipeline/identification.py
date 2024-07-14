@@ -391,7 +391,94 @@ def create_check_sorted_clusters_params(sorted_clusters, good_entries):
     return check_sorted_clusters_params
 
 def create_search_space_params(good_entries):
-    return None
+    b_sorted_clusters = sorted(good_entries.good_b_entries)
+    y_sorted_clusters = sorted(good_entries.good_y_entries)
+    precursor_charge = len(b_sorted_clusters) + len(y_sorted_clusters)
+    search_space_params = objects.SearchSpaceParams(b_sorted_clusters, y_sorted_clusters, precursor_charge)
+    return search_space_params
+
+def create_check_searches_params(search_space):
+    b_search_space = search_space.b_search_space
+    y_search_space = search_space.y_search_space
+    target_left_pids = [1] * len(b_search_space)  # Example data, adjust as needed
+    target_right_pids = [2] * len(y_search_space)  # Example data, adjust as needed
+    target_left_indices = list(range(len(b_search_space)))  # Example data, adjust as needed
+    target_right_indices = list(range(len(y_search_space)))  # Example data, adjust as needed
+    target_seq = "TARGET_SEQUENCE"  # Example sequence, replace with actual logic
+    precursor_charge = len(b_search_space) + len(y_search_space)  # Example calculation
+    ppm_tolerance = 10.0  # Example tolerance, replace with actual logic
+    check_searches_params = objects.CheckSearchesParams(b_search_space, y_search_space, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_seq, precursor_charge, ppm_tolerance)
+    return check_searches_params
+
+def create_pair_natives_params(good_searches):
+    # Extracting b_search_space and y_search_space from GoodSearches
+    b_search_space = good_searches.good_b_searches
+    y_search_space = good_searches.good_y_searches
+    precursor_mass = sum(b_search_space) + sum(y_search_space)  # Example calculation
+    prec_tol = 20.0  # Example tolerance, replace with actual logic
+    pair_natives_params = objects.PairNativesParams(b_search_space, y_search_space, precursor_mass, prec_tol)
+    return pair_natives_params
+
+def create_pair_indices_params(aligned_spectrum_params):
+    # Example calculations/assignments based on the given parameters
+    b_search_space = aligned_spectrum_params.built_database.get('b_search_space', [])
+    y_search_space = aligned_spectrum_params.built_database.get('y_search_space', [])
+    
+    precursor_mass = sum(b_search_space) + sum(y_search_space)  # Example calculation, replace with actual logic
+    prec_tol = aligned_spectrum_params.prec_tol
+    precursor_charge = aligned_spectrum_params.num_hybrids + aligned_spectrum_params.num_natives  # Example calculation, replace with actual logic
+    score_filter = max(aligned_spectrum_params.ppm_tolerance, 0)  # Example filter, replace with actual logic
+    pair_indices_params =  objects.PairIndicesParams(b_search_space, y_search_space, precursor_mass, prec_tol, precursor_charge, score_filter)
+    return pair_indices_params
+
+def create_check_merges_params(unique_native_merged_seqs, unique_hybrid_merged_seqs):
+    good_b_searches = []
+    good_y_searches = []
+
+    check_merges_params = objects.CheckMergesParams(
+        unique_hybrid_merged_seqs=unique_hybrid_merged_seqs,
+        unique_native_merged_seqs=unique_native_merged_seqs,
+        good_b_searches=good_b_searches,
+        good_y_searches=good_y_searches
+    )
+    return check_merges_params
+
+def create_rescore_merges_params(unique_merges):
+    spectrum = None
+    ppm_tolerance = None
+
+    rescore_merges_params = objects.RescoreMergesParams(
+        unique_merges=unique_merges,
+        spectrum=spectrum,
+        ppm_tolerance=ppm_tolerance
+    )
+    return rescore_merges_params
+
+def create_check_rescored_merges_params(unique_rescored):
+    good_merged_seqs = []
+
+    check_rescored_merges_params = objects.CheckRescoredMergesParams(
+        unique_rescored=unique_rescored,
+        good_merged_seqs=good_merged_seqs
+    )  
+
+    return check_rescored_merges_params  
+
+def create_post_processed_alignments_params(good_rescored):
+    built_database = None
+    spectrum = None
+    num_hybrids = 0
+    num_natives = 0
+
+    post_processed_alignments_params = objects.PostprocessedAlignmentsParams(
+        built_database=built_database,
+        unique_rescored=good_rescored,
+        spectrum=spectrum,
+        num_hybrids=num_hybrids,
+        num_natives=num_natives
+    )
+    
+    return post_processed_alignments_params    
 
 
 def create_aligned_spectrum_with_target(aligned_spectrum_params):
@@ -411,17 +498,23 @@ def create_aligned_spectrum_with_target(aligned_spectrum_params):
     good_entries = computational_pipeline.finding_seqs.check_in_sorted_clusters(check_sorted_clusters_params)
     search_space_params = create_search_space_params(good_entries)
     search_space = clustering.get_search_space(search_space_params)
-    return  None
-#     good_searches = computational_pipeline.finding_seqs.check_in_searches(check_searches_params)
-#     unique_native_merged_seqs = alignment.pair_natives(pair_natives_params)
-#     unique_hybrid_merged_seqs = alignment.pair_indices(pair_indices_params)
-#     good_merged_seqs = computational_pipeline.finding_seqs.check_in_merges(check_merges_params)
-#     unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
-#     unique_rescored = rescore_merges(rescore_merges_params)
-#     good_rescored = computational_pipeline.finding_seqs.check_in_rescored_merges(check_rescored_merges_params)
-#     postprocessed_alignments = create_postprocessed_alignments(post_processed_alignments_params)
-#     aligned_spectrums = get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments)
-#     return aligned_spectrums
+    check_searches_params = create_check_searches_params(search_space)
+    good_searches = computational_pipeline.finding_seqs.check_in_searches(check_searches_params)
+    pair_natives_params = create_pair_natives_params(good_searches)
+    unique_native_merged_seqs = alignment.pair_natives(pair_natives_params)
+    pair_indices_params = create_pair_indices_params(unique_native_merged_seqs)
+    unique_hybrid_merged_seqs = alignment.pair_indices(pair_indices_params)
+    check_merges_params = create_check_merges_params(unique_native_merged_seqs,unique_hybrid_merged_seqs)
+    good_merged_seqs = computational_pipeline.finding_seqs.check_in_merges(check_merges_params)
+    unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
+    rescore_merges_params = create_rescore_merges_params(unique_merges)
+    unique_rescored = rescore_merges(rescore_merges_params)
+    check_rescored_merges_params = create_check_rescored_merges_params(unique_rescored)
+    good_rescored = computational_pipeline.finding_seqs.check_in_rescored_merges(check_rescored_merges_params)
+    post_processed_alignments_params = create_post_processed_alignments_params(good_rescored)
+    postprocessed_alignments = create_postprocessed_alignments(post_processed_alignments_params)
+    aligned_spectrums = get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments)
+    return aligned_spectrums
 
 # def create_aligned_spectrum(aligned_spectrum_params):
 #     alignment_data = prep_data_structures_for_alignment(alignment_params)
