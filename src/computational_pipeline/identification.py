@@ -516,18 +516,27 @@ def create_aligned_spectrum_with_target(aligned_spectrum_params):
     aligned_spectrums = get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments)
     return aligned_spectrums
 
-# def create_aligned_spectrum(aligned_spectrum_params):
-#     alignment_data = prep_data_structures_for_alignment(alignment_params)
-#     hits = create_b_and_y_hits(create_hits_params)
-#     sorted_clusters = create_b_and_y_sorted_clusters(sorted_clusters_params)
-#     search_space = clustering.get_search_space(search_space_params)
-#     unique_native_merged_seqs = alignment.pair_natives(pair_natives_params)
-#     unique_hybrid_merged_seqs = alignment.pair_indices(pair_indices_params)
-#     unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
-#     unique_rescored = rescore_merges(rescore_merges_params)
-#     postprocessed_alignments = create_postprocessed_alignments(post_processed_alignments_params)
-#     aligned_spectrums = get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments)
-#     return aligned_spectrums
+def create_aligned_spectrum(aligned_spectrum_params):
+    alignment_params = create_alignment_params(aligned_spectrum_params)
+    alignment_data = prep_data_structures_for_alignment(alignment_params)
+    precursor_hit_result = alignment.find_from_precursor(alignment_data)
+    create_hits_params = create_create_hits_params(precursor_hit_result)
+    hits = create_b_and_y_hits(create_hits_params)
+    sorted_clusters_params = create_sorted_clusters_params(hits)
+    sorted_clusters = create_b_and_y_sorted_clusters(sorted_clusters_params)
+    search_space_params = create_search_space_params(sorted_clusters)
+    search_space = clustering.get_search_space(search_space_params)
+    pair_natives_params = create_pair_natives_params(search_space)
+    unique_native_merged_seqs = alignment.pair_natives(pair_natives_params)
+    pair_indices_params = create_pair_indices_params(unique_native_merged_seqs)
+    unique_hybrid_merged_seqs = alignment.pair_indices(pair_indices_params)
+    unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
+    check_rescored_merges_params = create_check_rescored_merges_params(unique_rescored)
+    unique_rescored = rescore_merges(check_rescored_merges_params)
+    post_processed_alignments_params = create_post_processed_alignments_params(unique_rescored)
+    postprocessed_alignments = create_postprocessed_alignments(post_processed_alignments_params)
+    aligned_spectrums = get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments)
+    return aligned_spectrums
 
 def get_aligned_spectrums(aligned_spectrums_params):
     aligned_spectrums = []
