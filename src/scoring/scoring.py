@@ -18,14 +18,12 @@ def calc_mass_given_other_explanations(unique_m, seq, mz):
     oEXPnum = (len(unique_m[mz]) - 1)/ len(unique_m[mz])
     if oEXPnum == 0:
         return 0
-    else:
-        p = 0
-        for i, seq2 in enumerate(unique_m[mz]):
-            if seq == seq2:
-                continue
-            else:
-                p = p + 1/len(seq2)
-        return p
+
+    p = 0
+    for seq2 in unique_m[mz]:
+        if seq != seq2: 
+            p = p + 1/len(seq2)
+    return p
 
 def Bayes_given_mass(pH, seq, mz, unique_m):
     pEH = 1/len(seq)
