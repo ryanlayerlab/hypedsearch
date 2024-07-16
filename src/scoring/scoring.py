@@ -34,9 +34,8 @@ def Bayes_given_mass(pH, seq, mz, unique_m):
 
 def calc_bayes_score(seq, mz, unique_m, indices, kmer_set):
     pH = len(seq)/len(kmer_set)
-    for index in reversed(indices):
-        prob = Bayes_given_mass(pH, seq, mz, unique_m)
-        pH = prob
+    prob = Bayes_given_mass(pH, seq, mz, unique_m)
+    pH = prob
     return prob
 
 def parse_indices(index_set):
@@ -57,7 +56,6 @@ def parse_indices(index_set):
         
         target_tuple = (int(start), int(end), seq, float(mz))
         indices.append(target_tuple)
-    
     
     return indices
 
