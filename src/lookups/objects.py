@@ -74,14 +74,14 @@ Aligned_Spectrum = namedtuple(
     ['hybrid','left_proteins','right_proteins','sequence','b_scores','y_scores','total_score',
      'total_gaussian_score','extensions','precursor_mass','precursor_charge','total_mass_error','total_count'])
 
-#Jamie
+
 from collections import namedtuple
-AlignedSpectrumParams = namedtuple('AlignedSpectrumParams', ['spectrum', 'sqllite_database', 'max_peptide_length', 'prec_tol', 'built_database', 'ppm_tolerance', 'num_hybrids', 'num_natives', 'original_target_seq'])
+AlignedSpectrumParams = namedtuple('AlignedSpectrumParams', ['spectrum', 'sqllite_database', 'prec_tol', 'built_database', 'ppm_tolerance', 'num_hybrids', 'num_natives', 'original_target_seq'])
 #spectrum, sqllite_database, max_peptide_length, prec_tol, built_database, ppm_tolerance, num_hybrids, num_natives, original_target_seq
 ##spectrums, sqllite_database, built_database,max_peptide_length,ppm_tolerance,precursor_tolerance,number_hybrids,number_natives,target_seq
-TargetDataParams = namedtuple('TargetDataParams', ['original_target_seq', 'built_database', 'mz_values', 'ppm_tolerance', 'precursor_mass', 'prec_tol', 'precursor_charge'])
+TargetDataParams = namedtuple('TargetDataParams', ['original_target_seq', 'mz_values', 'ppm_tolerance', 'precursor_mass', 'prec_tol', 'precursor_charge'])
 #original_target_seq, built_database, spectrum.mz_values, ppm_tolerance, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge
-AlignmentParams = namedtuple('AlignmentParams', ['spectrum', 'sqllite_database', 'max_peptide_length', 'built_database', 'ppm_tolerance'])
+AlignmentParams = namedtuple('AlignmentParams', ['spectrum', 'sqllite_database', 'ppm_tolerance'])
 #spectrum, sqllite_database, max_peptide_length, built_database, ppm_tolerance
 CheckMatchedMassesParams = namedtuple('CheckMatchedMassesParams', ['matched_masses_b', 'matched_masses_y', 'target_left_pids', 'target_left_indices', 'target_right_pids', 'target_right_indices'])
 #matched_masses_b, matched_masses_y, target_left_pids, target_left_indices, target_right_pids, target_right_indices

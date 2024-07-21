@@ -465,7 +465,10 @@ def distribute_merges(merges, b_sorted_clusters, y_sorted_clusters):
 
     return merged_clusters
 
-def get_search_space(b_sorted_clusters, y_sorted_clusters, prec_charge): #This will eventually be reworked throughout the entire codebase but this is for proof of concept
+def get_search_space(search_space_params):
+    b_sorted_clusters = search_space_params.b_sorted_clusters
+    y_sorted_clusters = search_space_params.y_sorted_clusters
+    prec_charge = search_space_params.prec_charge
     b_searches, y_searches = dict(), dict()
     for key in b_sorted_clusters.keys():
         for b in b_sorted_clusters[key]:

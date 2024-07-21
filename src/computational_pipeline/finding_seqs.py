@@ -77,7 +77,13 @@ def get_target_data(tdp: lookups.objects.TargetDataParams):
 
     return target_data
 
-def check_in_matched_masses(matched_masses_b, matched_masses_y, left_pids, left_indices, right_pids, right_indices):
+def check_in_matched_masses(check_matched_masses_params):
+    matched_masses_b = check_matched_masses_params.matched_masses_b
+    matched_masses_y = check_matched_masses_params.matched_masses_y
+    left_pids = check_matched_masses_params.left_pids
+    left_indices = check_matched_masses_params.left_indices
+    right_pids = check_matched_masses_params.right_pids
+    right_indices = check_matched_masses_params.right_indices
     good_b_entries, good_y_entries = [], []
     for i, pid in enumerate(left_pids):
         for key in matched_masses_b.keys():
@@ -105,7 +111,11 @@ def check_in_matched_masses(matched_masses_b, matched_masses_y, left_pids, left_
         print("No good hits in matched_masses_b nor in matched_masses_y")
     return good_b_entries, good_y_entries
     
-def check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_hits, good_y_hits):
+def check_in_sorted_clusters(check_sorted_clusters_params):
+    b_sorted_clusters = check_sorted_clusters_params.b_sorted_clusters
+    y_sorted_clusters = check_sorted_clusters_params.y_sorted_clusters
+    good_b_hits = check_sorted_clusters_params.good_b_hits
+    good_y_hits = check_sorted_clusters_params.good_y_hits
     good_maxb_hit, good_maxy_hit = [], []
     good_maxb_dict, good_maxy_dict = dict(), dict()
     good_b_clusters, good_y_clusters = [], []
@@ -278,7 +288,17 @@ def check_in_rescored(rescored, good_scored):
     else:
         print("Lost in final filtering")
         
-def check_in_searches(b_searches, y_searches, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_seq, prec_charge, ppm_tol):
+        
+def check_in_searches(check_searches_params):
+    b_searches =  check_searches_params.b_searches
+    y_searches = check_searches_params.y_searches
+    target_left_pids = check_searches_params.target_left_pids
+    target_right_pids = check_searches_params.target_right_pids
+    target_left_indices = check_searches_params.target_left_indices
+    target_right_indices = check_searches_params.target_right_indices
+    target_seq = check_searches_params.target_seq
+    prec_charge = check_searches_params.prec_charge
+    ppm_tol = check_searches_params.ppm_tol
     good_b_searches, good_y_searches = [],[]
     if "-" in target_seq:
         left_part, right_part = target_seq.split("-")
@@ -319,7 +339,11 @@ def check_in_searches(b_searches, y_searches, target_left_pids, target_right_pid
         print("No good hits in b_searches nor in y_searches")
     return good_b_searches, good_y_searches
 
-def check_in_merges(hybrid_merges, native_merges, good_b_searches, good_y_searches):
+def check_in_merges(check_merges_params):
+    hybrid_merges = check_merges_params.hybrid_merges
+    native_merges = check_merges_params.native_merges
+    good_b_searches = check_merges_params.good_b_searches
+    good_y_searches = check_merges_params.good_y_searches
     good_merges = []
     for key in hybrid_merges:
         for merge in hybrid_merges[key]:
@@ -344,7 +368,9 @@ def check_in_merges(hybrid_merges, native_merges, good_b_searches, good_y_search
         
     return good_merges
 
-def check_in_rescored_merges(rescored_merges, good_merges):
+def check_in_rescored_merges(check_rescored_merges_params):
+    rescored_merges =  check_rescored_merges_params.rescored_merges
+    good_merges = check_rescored_merges_params.good_merges
     good_rescored = []
     sorted_rescored = sorted(rescored_merges, key=lambda x: (x[0], x[1]), reverse = True)
     for merge in good_merges:

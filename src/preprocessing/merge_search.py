@@ -68,7 +68,8 @@ def modified_merge(kmers, boundaries: dict):
             kmer_index = starting_point
     return matched_masses_b, matched_masses_y
 
-def get_modified_match_masses(input_masses, sqllite_database, max_peptide_length, ppm_tolerance, b_precursor, y_precursor):
+#todo, repalce this with in memory database?
+def get_modified_match_masses(input_masses, sqllite_database, ppm_tolerance, b_precursor, y_precursor):
     matched_masses_b, matched_masses_y = dict(), dict()
     for input_mass in input_masses:
         tol = ppm_to_da(input_mass, ppm_tolerance)
