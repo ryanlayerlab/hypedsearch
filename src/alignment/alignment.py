@@ -488,7 +488,13 @@ def find_alignments(native_merged, hybrid_merged, obs_prec, prec_charge, tol, ma
         total_extension_time = total_extension_time + (time.time() - extension_time)
     return natural_alignments, hybrid_alignments
 
-def pair_indices(b_search_space, y_search_space, prec_mass, prec_tol, prec_charge, score_filter):
+def pair_indices(pair_indices_params):
+    b_search_space = pair_indices_params.b_search_space
+    y_search_space = pair_indices_params.y_search_space
+    prec_mass = pair_indices_params.prec_mass
+    prec_tol = pair_indices_params.prec_tol
+    prec_charge = pair_indices_params.prec_charge
+    score_filter = pair_indices_params.score_filter
     unique_merges = dict()
     tol = lookups.utils.ppm_to_da(prec_mass, prec_tol)
     sorted_b_keys = sorted(b_search_space)
@@ -531,7 +537,12 @@ def pair_indices(b_search_space, y_search_space, prec_mass, prec_tol, prec_charg
             
     return unique_merges
         
-def find_from_precursor(converted_b, matched_masses_b, input_spectrum, ppm_tolerance, protein_list):
+def find_from_precursor(find_from_precursor_params):
+    converted_b = find_from_precursor_params.converted_b
+    matched_masses_b = find_from_precursor_params.matched_masses_b
+    input_spectrum = find_from_precursor_params.input_spectrum
+    ppm_tolerance = find_from_precursor_params.ppm_tolerance
+    protein_list = find_from_precursor_params.protein_list
     prec_matches = []
     prec_hits = matched_masses_b[converted_b]
     for hit in prec_hits:
@@ -549,7 +560,12 @@ def make_native_pair(b, ion):
     y_cluster = (computational_pipeline.gen_spectra.get_max_mass(b[6], 'b' if ion == 0 else 'y', b[4]), b[1], b[2], ion, b[4], b[5], b[6], 0)
     return y_cluster
     
-def pair_natives(b_search_space, y_search_space, prec_mass, prec_tol):
+
+def pair_natives(pair_natives_params):
+    b_search_space = pair_natives_params.b_search_space
+    y_search_space = pair_natives_params.y_search_space
+    prec_mass = pair_natives_params.prec_mass
+    prec_tol = pair_natives_params.prec_tol
     unique_merges = dict()
     tol = lookups.utils.ppm_to_da(prec_mass, prec_tol)
     for b_prec in sorted(b_search_space):

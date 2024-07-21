@@ -240,11 +240,23 @@ def get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments
         aligned_spectrums.append(aligned_spectrum)
     return aligned_spectrums
 
-def create_b_and_y_hits(spectrum, converted_b, converted_y, matched_masses_b, matched_masses_y, num):
+def create_b_and_y_hits(create_hits_params):
+    spectrum = create_hits_params.spectrum
+    converted_b = create_hits_params.converted_b
+    converted_y = create_hits_params.converted_y
+    matched_masses_b = create_hits_params.matched_masses_b
+    matched_masses_y = create_hits_params.matched_masses_y
     b_hits,y_hits = create_hits(spectrum.num,spectrum,matched_masses_b,matched_masses_y,converted_b, converted_y)
     return b_hits,y_hits
 
-def create_b_and_y_sorted_clusters(db, converted_b, converted_y, b_hits, y_hits, prec_charge, ppm_tol, num):
+def create_b_and_y_sorted_clusters(sorted_clusters_params):
+    db = sorted_clusters_params.db,
+    converted_b = sorted_clusters_params.converted_b
+    converted_y = sorted_clusters_params.converted_y
+    b_hits = sorted_clusters_params.b_hits
+    y_hits = sorted_clusters_params.y_hits
+    prec_charge = sorted_clusters_params.prec_charge
+    ppm_tol = sorted_clusters_params.ppm_tol
     b_clusters = clustering.create_clusters('b', b_hits, y_hits)
     b_sorted_clusters = clustering.old_score_clusters(0, b_clusters, converted_b, db.proteins, prec_charge, ppm_tol)
     y_clusters = clustering.create_clusters('y', y_hits, y_hits)
@@ -257,20 +269,23 @@ def create_rescored_alignments(rescored_naturals, rescored_hybrids):
     rescored_alignments = [x for x in rescored_alignments if x[0] > 6]
     return rescored_alignments
 
-def create_postprocessed_alignments(db, rescored_alignments, spectrum, num_hybrids, num_natives):
+def create_postprocessed_alignments(post_processed_alignments_params):
+    db = post_processed_alignments_params.db
+    rescored_alignments = post_processed_alignments_params.rescored_alignments
+    spectrum = post_processed_alignments_params.spectrum
+    num_hybrids = post_processed_alignments_params.num_hybrids
+    num_natives = post_processed_alignments_params.num_natives
     postprocessed_alignments = postprocessing(rescored_alignments, db, spectrum, num_hybrids, num_natives)
     return postprocessed_alignments
 
 def prep_data_structures_for_alignment(alignment_params):
     spectrum = alignment_params.spectrum
     sqllite_database = alignment_params.sqllite_database
-    max_peptide_length = alignment_params.max_peptide_length
-    built_database = alignment_params.built_database
     ppm_tolerance = alignment_params.ppm_tolerance    
     
     input_list = spectrum.mz_values        
     b_precursor, y_precursor = convert_precursor_to_ion(spectrum.precursor_mass, spectrum.precursor_charge)
-    matched_masses_b, matched_masses_y = merge_search.get_modified_match_masses(input_list, sqllite_database, max_peptide_length, ppm_tolerance, b_precursor, y_precursor)
+    matched_masses_b, matched_masses_y = merge_search.get_modified_match_masses(input_list, sqllite_database, ppm_tolerance, b_precursor, y_precursor)
     
     alignment_data = lookups.objects.AlignmentData(
     b_precursor=b_precursor,
@@ -283,7 +298,6 @@ def prep_data_structures_for_alignment(alignment_params):
 def create_target_data_params(aligned_params):
     target_data_params = lookups.objects.TargetDataParams(
         original_target_seq=aligned_params.original_target_seq,
-        built_database=aligned_params.built_database,
         mz_values=aligned_params.spectrum.mz_values, 
         ppm_tolerance=aligned_params.ppm_tolerance,
         precursor_mass=aligned_params.spectrum.precursor_mass, 
