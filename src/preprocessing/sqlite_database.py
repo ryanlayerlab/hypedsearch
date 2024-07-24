@@ -145,7 +145,7 @@ class Sqllite_Database:
 #         return db.proteins[name]    
     
 
-    def get_data(self, kmer, start, end, protein_id, ion):
+    def get_kmers_for_protein(self, kmer, start, end, protein_id, ion):
         data_list = []
         for charge in [1,2]:
             mass = computational_pipeline.gen_spectra.get_max_mass(kmer, ion=ion, charge=charge)
@@ -154,7 +154,8 @@ class Sqllite_Database:
             data_list.append(input_tuple)
         return data_list
     
-    def db_make_set_for_protein_digest(self,protein_id,protein,max_peptide_length, data, digest_left, digest_right):
+    def db_make_set_for_protein_digest(self,protein_id,protein,max_peptide_length, digest_left, digest_right):
+        data = []
         seq_len = len(protein)
         count_max = 1000000
         for size in range(2, max_peptide_length + 1):
@@ -164,7 +165,7 @@ class Sqllite_Database:
                 if kmer[0] in digest_left or digest_left == ['-'] or (start > 0 and protein[start-1] in digest_right):
                     bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
                     if not any (x in bad_chars for x in kmer):
-                        data_list = self.get_data(kmer, start, end, protein_id, 'b')
+                        data_list = self.get_kmers_for_protein(kmer, start, end, protein_id, 'b')
                         data.extend(data_list)
                         if len(data) > count_max:
                             self.insert(data)
@@ -172,36 +173,56 @@ class Sqllite_Database:
                 if kmer[-1] in digest_right or digest_right == ['-'] or (end < seq_len and protein[end] in digest_left):
                     bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
                     if not any (x in bad_chars for x in kmer):
-                        data_list = self.get_data(kmer, start, end, protein_id, 'y')
+                        data_list = self.get_kmers_for_protein(kmer, start, end, protein_id, 'y')
                         data.extend(data_list)
                         if len(data) > count_max:
                             self.insert(data)
                             data.clear()
-        return True
+        return data
     
-    def db_make_database_set_for_proteins(self, kv_proteins, max_peptide_length, digest_left, digest_right):
+    def check_for_enough_disk_space(self, protein_id, plen, last_percent):
+        percent = int((protein_id + 1) * 100 / plen)
+        print(f'\rOn protein {protein_id + 1}/{plen} [{percent}%]', end='')
+        if percent != last_percent:
+            last_percent = percent
+            free = shutil.disk_usage('/')[2]
+            free = free / (1024 ** 3)
+            if free < 10:
+                print("\nUsed too much space, Space available =", free, "GB")
+                return False, last_percent
+            else:
+                return True, last_percent
+        return True, last_percent
+
+    def insert_prepped_kmers(self, kv_proteins, max_peptide_length, digest_left, digest_right):
         plen = len(kv_proteins)
         last_percent = 0
-        data = []
+        all_data = []
         
         for protein_id, (_, protein) in enumerate(kv_proteins):
-            percent = int((protein_id+1) * 100 / plen)
-            print(f'\rOn protein {protein_id+1}/{plen} [{int((protein_id+1) * 100 / plen)}%]', end='')
-            if percent != last_percent:
-                last_percent = percent
-                free = shutil.disk_usage('/')[2]
-                free = free/(1024**3)
-                if free < 10:
-                    print("\nUsed too much space, Space available =", free, "GB" )
-                    sys.exit(1)
-            self.db_make_set_for_protein_digest(protein_id,protein,max_peptide_length, data, digest_left, digest_right)
-            
-        if len(data) != 0:
-            self.insert_kmers(data)
+            enough_space, last_percent = self.check_for_enough_disk_space(protein_id, plen, last_percent)
+            if enough_space:
+                data = self.db_make_set_for_protein_digest(protein_id,protein,max_peptide_length, digest_left, digest_right)
+                all_data.extend(data)
+            else:
+                sys.exit(1)
+
+        if len(all_data) != 0:
+            self.insert_kmers(all_data)
+
+    def insert_prepped_proteins(self,kv_proteins):
+        all_data = []
+        protein_id = 0
+        for kv_protein in kv_proteins:
+            (description,amino_acids) = kv_protein
+            input_tuple = (protein_id,description,amino_acids)
+            all_data.append(input_tuple)
+            protein_id = protein_id + 1
+        self.insert_proteins(all_data)
 
     def populate_database(self, kv_proteins, max_peptide_length, digest_left, digest_right):
-        print('populate_database')
-        self.db_make_database_set_for_proteins(kv_proteins, max_peptide_length, digest_left, digest_right)
+        self.insert_prepped_proteins(kv_proteins)
+        self.insert_prepped_kmers(kv_proteins, max_peptide_length, digest_left, digest_right)
         self.index_ion_mass_kmers()
         self.index_ion_mass_b_kmers()
         self.index_ion_mass_y_kmers()
