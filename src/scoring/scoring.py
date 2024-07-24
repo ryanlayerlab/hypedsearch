@@ -6,7 +6,6 @@ from lookups.constants import WATER_MASS, AMMONIUM
 from math import exp
 import computational_pipeline.gen_spectra
 import lookups.utils
-import preprocessing.database_generator
 import re
 import json 
 import os

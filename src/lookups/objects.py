@@ -74,7 +74,6 @@ Aligned_Spectrum = namedtuple(
     ['hybrid','left_proteins','right_proteins','sequence','b_scores','y_scores','total_score',
      'total_gaussian_score','extensions','precursor_mass','precursor_charge','total_mass_error','total_count'])
 
-
 from collections import namedtuple
 AlignedSpectrumParams = namedtuple('AlignedSpectrumParams', ['spectrum', 'sqllite_database', 'prec_tol', 'built_database', 'ppm_tolerance', 'num_hybrids', 'num_natives', 'original_target_seq'])
 #spectrum, sqllite_database, max_peptide_length, prec_tol, built_database, ppm_tolerance, num_hybrids, num_natives, original_target_seq

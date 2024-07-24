@@ -37,7 +37,6 @@ def get_target_data(tdp: lookups.objects.TargetDataParams):
     precursor_mass = tdp.precursor_mass
     precursor_tolerance = tdp.precursor_tolerance
     precursor_charge = tdp.precursor_charge
-    prec_tol = ppm_to_da(precursor_mass, precursor_tolerance)
     theoretical_prec = computational_pipeline.gen_spectra.get_precursor(target_seq.replace("-", ""), precursor_charge)
     if abs(theoretical_prec - precursor_mass) <= precursor_tolerance:
         print(target_seq,"is a valid hybrid to find")
