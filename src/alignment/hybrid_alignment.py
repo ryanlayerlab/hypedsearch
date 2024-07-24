@@ -3,8 +3,6 @@ from lookups.utils import all_perms_of_s
 from scoring import scoring
 from alignment import alignment_utils
 
-import preprocessing.database_generator
-
 def __replace_ambiguous_hybrid(hybrid: tuple, db: Database, observed: Spectrum):
     nonhyb = hybrid[0]
     if len(preprocessing.database_generator.get_proteins_with_subsequence(db, nonhyb)):

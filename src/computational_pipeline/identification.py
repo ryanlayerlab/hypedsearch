@@ -7,7 +7,6 @@ from lookups.objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFal
 from alignment import alignment
 from lookups.utils import ppm_to_da, to_percent, is_json, is_file
 from preprocessing import merge_search, preprocessing_utils, clustering, evaluation
-import preprocessing.database_generator
 from file_io import JSON
 import lookups.objects as objects
 import time
@@ -250,7 +249,7 @@ def create_b_and_y_hits(create_hits_params):
     return b_hits,y_hits
 
 def create_b_and_y_sorted_clusters(sorted_clusters_params):
-    db = sorted_clusters_params.db,
+    built_database = sorted_clusters_params.built_database
     converted_b = sorted_clusters_params.converted_b
     converted_y = sorted_clusters_params.converted_y
     b_hits = sorted_clusters_params.b_hits
@@ -258,9 +257,9 @@ def create_b_and_y_sorted_clusters(sorted_clusters_params):
     prec_charge = sorted_clusters_params.prec_charge
     ppm_tol = sorted_clusters_params.ppm_tol
     b_clusters = clustering.create_clusters('b', b_hits, y_hits)
-    b_sorted_clusters = clustering.old_score_clusters(0, b_clusters, converted_b, db.proteins, prec_charge, ppm_tol)
+    b_sorted_clusters = clustering.old_score_clusters(0, b_clusters, converted_b, built_database.proteins, prec_charge, ppm_tol)
     y_clusters = clustering.create_clusters('y', y_hits, y_hits)
-    y_sorted_clusters = clustering.old_score_clusters(1, y_clusters, converted_y, db.proteins, prec_charge, ppm_tol)
+    y_sorted_clusters = clustering.old_score_clusters(1, y_clusters, converted_y, built_database.proteins, prec_charge, ppm_tol)
     return b_sorted_clusters,y_sorted_clusters
 
 
