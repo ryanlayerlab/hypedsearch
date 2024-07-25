@@ -116,7 +116,7 @@ PostprocessedAlignmentsParams = namedtuple('PostprocessedAlignmentsParams', ['bu
 
 TargetData = namedtuple('TargetData', ['target_seq', 'target_left_pids', 'target_right_pids', 'target_left_indices', 'target_right_indices', 'target_score'])
 #target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score
-AlignmentData = namedtuple('AlignmentData', ['converted_b', 'converted_y', 'matched_masses_b', 'matched_masses_y'])
+AlignmentData = namedtuple('AlignmentData', ['b_precursor', 'y_precursor', 'matched_masses_b', 'matched_masses_y'])
 #converted_b, converted_y, matched_masses_b, matched_masses_y 
 GoodEntries = namedtuple('GoodEntries', ['good_b_entries', 'good_y_entries'])
 #good_b_entries, good_y_entries

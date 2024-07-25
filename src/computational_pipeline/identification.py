@@ -522,7 +522,7 @@ def create_aligned_spectrum_with_target(create_aligned_spectrum_params):
 
 def create_aligned_spectrum(create_aligned_spectrum_params):
     alignment_data = prep_data_structures_for_alignment(create_aligned_spectrum_params)
-    # precursor_hit_result = alignment.find_from_precursor(alignment_data)
+    precursor_hit_result = alignment.find_from_precursor(alignment_data)
     # create_hits_params = create_create_hits_params(precursor_hit_result)
     # hits = create_b_and_y_hits(create_hits_params)
     # sorted_clusters_params = create_sorted_clusters_params(hits)
@@ -540,6 +540,7 @@ def create_aligned_spectrum(create_aligned_spectrum_params):
     # postprocessed_alignments = create_postprocessed_alignments(post_processed_alignments_params)
     # aligned_spectrums = get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments)
     # return aligned_spectrums
+    return None
 
 def get_aligned_spectrums(aligned_spectrums_params):
     aligned_spectrums = []
@@ -556,5 +557,6 @@ def get_aligned_spectrums(aligned_spectrums_params):
         for spectrum in spectrums:
             create_aligned_spectrum_params = create_create_aligned_spectrum_params(spectrum,sqllite_database,ppm_tolerance)
             aligned_spectrum = create_aligned_spectrum(create_aligned_spectrum_params)
-            aligned_spectrums.extend(aligned_spectrum)
+            if aligned_spectrum is not None:
+                aligned_spectrums.extend(aligned_spectrum)
     return aligned_spectrums
