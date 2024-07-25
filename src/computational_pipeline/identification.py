@@ -560,8 +560,7 @@ def get_aligned_spectrums(aligned_spectrums_params):
             aligned_spectrum = create_aligned_spectrum_with_target(aligned_spectrums_params)
             aligned_spectrums.extend(aligned_spectrum)
     else:
-        print("Not Here")
-        # for spectrum in spectrums:
-        #     aligned_spectrum = create_aligned_spectrum(spectrum, sqllite_database, max_peptide_length, precursor_tolerance, built_database, ppm_tolerance, number_hybrids, number_natives)
-        #     aligned_spectrums.extend(aligned_spectrum)
+        for spectrum in spectrums:
+            aligned_spectrum = create_aligned_spectrum(aligned_spectrums_params)
+            aligned_spectrums.extend(aligned_spectrum)
     return aligned_spectrums

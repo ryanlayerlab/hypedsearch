@@ -62,24 +62,22 @@ def get_aligned_spectrums_params(args: dict):
     if args['create_sqllite_database']:
         sqllite_database = create_sqllite_database(args['database_file_path'],args['max_peptide_length'], args['digest_left'], args['digest_right'])
     else:
-        print('No create')
-        # sqllite_database = get_existing_sqllite_database(args['max_peptide_length'])
-    # lookups.utils.make_dir(args['output_folder_path'])
-    # max_peptide_length=args['max_peptide_length']
-    # ppm_tolerance=args['ppm_tolerance']
-    # precursor_tolerance=args['precursor_tolerance']
-    # number_hybrids=args['number_hybrids']
-    # number_natives=args['number_natives']
-    # target_seq = args['target_seq']
-    # params = lookups.objects.AlignedSpectrumsParams(spectrums=spectrums,max_peptide_length=max_peptide_length,
-    #     ppm_tolerance=ppm_tolerance,precursor_tolerance=precursor_tolerance,number_hybrids=number_hybrids,
-    #     number_natives=number_natives,target_seq=target_seq)
-    # return params
-    return None
+        sqllite_database = get_existing_sqllite_database(args['max_peptide_length'])
+    lookups.utils.make_dir(args['output_folder_path'])
+    max_peptide_length=args['max_peptide_length']
+    ppm_tolerance=args['ppm_tolerance']
+    precursor_tolerance=args['precursor_tolerance']
+    number_hybrids=args['number_hybrids']
+    number_natives=args['number_natives']
+    target_seq = args['target_seq']
+    aligned_spectrums_params = lookups.objects.AlignedSpectrumParams(spectrums=spectrums,sqllite_database=sqllite_database, 
+        max_peptide_length=max_peptide_length, ppm_tolerance=ppm_tolerance,precursor_tolerance=precursor_tolerance,
+        number_hybrids=number_hybrids,number_natives=number_natives,target_seq=target_seq)
+    return aligned_spectrums_params
 
 def run(args: dict):
     aligned_spectrums_params = get_aligned_spectrums_params(args)
-    # output_file_name = get_output_file_name(args['spectra_file_paths']) 
-    # output_folder_path=args['output_folder_path']
-    # aligned_spectrums = cp_id.get_aligned_spectrums(aligned_spectrums_params)  
-    # write_aligned_spectrums_to_disk(aligned_spectrums, output_folder_path, output_file_name)
+    output_file_name = get_output_file_name(args['spectra_file_paths']) 
+    output_folder_path=args['output_folder_path']
+    aligned_spectrums = cp_id.get_aligned_spectrums(aligned_spectrums_params)  
+    write_aligned_spectrums_to_disk(aligned_spectrums, output_folder_path, output_file_name)
