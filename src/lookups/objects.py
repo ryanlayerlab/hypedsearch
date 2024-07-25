@@ -79,6 +79,11 @@ AlignedSpectrumParams = namedtuple(
     ['spectrums', 'sqllite_database', 'max_peptide_length', 'ppm_tolerance', 'precursor_tolerance', 'number_hybrids', 
      'number_natives', 'target_seq'])
 
+CreateAlignedSpectrumParams = namedtuple(
+    'CreateAlignedSpectrumParams',
+    ['spectrum', 'sqllite_database','ppm_tolerance'])
+
+
 TargetDataParams = namedtuple('TargetDataParams', ['target_seq', 'mz_values', 'ppm_tolerance', 'precursor_mass', 'prec_tol', 'precursor_charge'])
 #original_target_seq, built_database, spectrum.mz_values, ppm_tolerance, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge
 AlignmentParams = namedtuple('AlignmentParams', ['spectrum', 'sqllite_database', 'ppm_tolerance'])
