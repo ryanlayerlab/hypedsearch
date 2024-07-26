@@ -538,22 +538,25 @@ def pair_indices(pair_indices_params):
 
 
 def find_from_precursor(spectrum, sqllite_database, ppm_tolerance, alignment_data):
-    b_precursor = alignment_data.b_precursor
+    b_precursor = alignment_data.converted_precursor_b
     matched_masses_b = alignment_data.matched_masses_b
     ppm_tolerance = ppm_tolerance
     prec_matches = []
     prec_hits = matched_masses_b[b_precursor]
+    
     for hit in prec_hits:
         if hit[4] == 2:
             hit_score, tiebreaker = scoring.prec_score(hit, spectrum, ppm_tolerance, sqllite_database)
             prec_matches.append((hit_score, tiebreaker, hit))
         
-    prec_matches = sorted(prec_matches, key = lambda x: (x[0], x[1]), reverse=True)
-    if len(prec_matches) != 0:
-        return prec_matches[0], prec_matches[0][0]
-    else:
-        return [], 0
+    prec_matches = sorted(prec_matches, key=lambda x: (x[0], x[1]), reverse=True)
     
+    if len(prec_matches) != 0:
+        best_match = prec_matches[0]
+        return objects.PrecursorHitResult(best_precursor_hit=best_match, score_filter=best_match[0])
+    else:
+        return objects.PrecursorHitResult(best_precursor_hit=[], score_filter=0)
+        
 def make_native_pair(b, ion):
     y_cluster = (computational_pipeline.gen_spectra.get_max_mass(b[6], 'b' if ion == 0 else 'y', b[4]), b[1], b[2], ion, b[4], b[5], b[6], 0)
     return y_cluster

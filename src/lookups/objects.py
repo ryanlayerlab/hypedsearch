@@ -87,7 +87,7 @@ CheckMatchedMassesParams = namedtuple('CheckMatchedMassesParams', ['matched_mass
 #matched_masses_b, matched_masses_y, target_left_pids, target_left_indices, target_right_pids, target_right_indices
 FindFromPrecursorParams = namedtuple('FindFromPrecursorParams', ['converted_b', 'matched_masses_b', 'spectrum', 'ppm_tolerance', 'proteins_database'])
 #converted_b, matched_masses_b, spectrum, ppm_tolerance, built_database.proteins
-CreateHitsParams = namedtuple('CreateHitsParams', ['spectrum', 'converted_b', 'converted_y', 'matched_masses_b', 'matched_masses_y', 'num'])
+CreateHitsParams = namedtuple('CreateHitsParams', ['spectrum', 'b_precursor', 'y_precursor', 'matched_masses_b', 'matched_masses_y', 'num'])
 #spectrum, converted_b, converted_y, matched_masses_b, matched_masses_y, spectrum.num
 SortedClustersParams = namedtuple('SortedClustersParams', ['built_database', 'converted_b', 'converted_y', 'b_hits', 'y_hits', 'precursor_charge', 'ppm_tolerance', 'num'])
 #built_database, converted_b, converted_y, b_hits, y_hits, spectrum.precursor_charge, ppm_tolerance, spectrum.num
@@ -110,7 +110,8 @@ CheckRescoredMergesParams = namedtuple('CheckRescoredMergesParams', ['unique_res
 PostprocessedAlignmentsParams = namedtuple('PostprocessedAlignmentsParams', ['built_database', 'unique_rescored', 'spectrum', 'num_hybrids', 'num_natives'])
 
 TargetData = namedtuple('TargetData', ['target_seq', 'target_left_pids', 'target_right_pids', 'target_left_indices', 'target_right_indices', 'target_score'])
-AlignmentData = namedtuple('AlignmentData', ['b_precursor', 'y_precursor', 'matched_masses_b', 'matched_masses_y'])
+
+AlignmentData = namedtuple('AlignmentData', ['converted_precursor_b', 'converted_precursor_y', 'matched_masses_b', 'matched_masses_y'])
 
 
 #converted_b, converted_y, matched_masses_b, matched_masses_y 
