@@ -125,6 +125,10 @@ class Sqllite_Database:
         rows = self.cursor.execute("SELECT * FROM proteins").fetchall()
         return rows
     
+    def get_protein(self, pid):
+        row = self.cursor.execute("SELECT * FROM proteins WHERE id = ?", (pid,)).fetchone()        
+        return row       
+    
 #     def get_proteins_with_subsequence(db: Database, sequence: str) -> list:
 #         return list(set(db.kmers[sequence]))
 

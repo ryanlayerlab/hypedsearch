@@ -231,14 +231,14 @@ def rescore_merges(rescore_merges_params):
             rescored_unique[(score, tiebreaker, key, hyb)].append((score, tiebreaker, (b,y), ppm_sum))
     return rescored_unique
                
-def prec_overlap_scoring(input_masses, ppm_tolerance, pid, start, end, protein_list):
-    sequence = clustering.find_sequence(pid, start, end, protein_list)
+def prec_overlap_scoring(input_masses, ppm_tolerance, pid, start, end, sqllite_database):
+    sequence = clustering.find_sequence(pid, start, end, sqllite_database)
     spectrum = computational_pipeline.gen_spectra.generate_spectrum(sequence)
     masses = sorted(spectrum['spectrum'])
     input_masses = sorted(input_masses)
     score, tiebreaker, _ = calc_overlap(masses, input_masses, ppm_tolerance)
     return score, tiebreaker
 
-def prec_score(hit, input_spectrum, ppm_tolerance, protein_list):
-    score, tiebreaker = prec_overlap_scoring(input_spectrum.mz_values, ppm_tolerance, hit[5], hit[1], hit[2], protein_list)
+def prec_score(hit, input_spectrum, ppm_tolerance, sqllite_database):
+    score, tiebreaker = prec_overlap_scoring(input_spectrum.mz_values, ppm_tolerance, hit[5], hit[1], hit[2], sqllite_database)
     return score, tiebreaker

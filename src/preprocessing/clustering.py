@@ -101,9 +101,9 @@ def parse_indices(index_set):
         indices.append(target_tuple)
     return indices
 
-def find_sequence(pid, start_ind, end_ind, proteins):
-    protein = proteins[pid]
-    prot_seq = protein[1]
+def find_sequence(pid, start_ind, end_ind, sqllite_database):
+    protein = sqllite_database.get_protein(pid)
+    prot_seq = protein[2]
     target = prot_seq[start_ind: end_ind]
     return target
 

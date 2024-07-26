@@ -70,7 +70,7 @@ def get_aligned_spectrums_params(args: dict):
     number_hybrids=args['number_hybrids']
     number_natives=args['number_natives']
     target_seq = args['target_seq']
-    aligned_spectrums_params = lookups.objects.AlignedSpectrumParams(spectrums=spectrums,sqllite_database=sqllite_database, 
+    aligned_spectrums_params = lookups.objects.AlignedSpectrumsParams(spectrums=spectrums,sqllite_database=sqllite_database, 
         max_peptide_length=max_peptide_length, ppm_tolerance=ppm_tolerance,precursor_tolerance=precursor_tolerance,
         number_hybrids=number_hybrids,number_natives=number_natives,target_seq=target_seq)
     return aligned_spectrums_params

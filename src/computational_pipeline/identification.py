@@ -276,15 +276,12 @@ def create_postprocessed_alignments(post_processed_alignments_params):
     postprocessed_alignments = postprocessing(rescored_alignments, db, spectrum, num_hybrids, num_natives)
     return postprocessed_alignments
 
-def prep_data_structures_for_alignment(aligned_spectrum_params):
-    spectrum = aligned_spectrum_params.spectrum
-    sqllite_database = aligned_spectrum_params.sqllite_database
-    ppm_tolerance = aligned_spectrum_params.ppm_tolerance    
+def prep_data_structures_for_alignment(spectrum,sqllite_database,ppm_tolerance):
     
     input_list = spectrum.mz_values        
     b_precursor, y_precursor = convert_precursor_to_ion(spectrum.precursor_mass, spectrum.precursor_charge)
     matched_masses_b, matched_masses_y = merge_search.get_modified_match_masses(input_list, sqllite_database, ppm_tolerance, b_precursor, y_precursor)
-    
+ 
     alignment_data = lookups.objects.AlignmentData(
     b_precursor=b_precursor,
     y_precursor=y_precursor,
@@ -292,14 +289,6 @@ def prep_data_structures_for_alignment(aligned_spectrum_params):
     matched_masses_y=matched_masses_y
 )
     return alignment_data
-
-def create_create_aligned_spectrum_params(spectrum,sqllite_database,ppm_tolerance):
-    create_aligned_spectrum_params = lookups.objects.CreateAlignedSpectrumParams(
-        spectrum = spectrum,
-        sqllite_database = sqllite_database,
-        ppm_tolerance = ppm_tolerance
-    )
-    return create_aligned_spectrum_params
 
 def create_target_data_params(aligned_params):
     target_data_params = lookups.objects.TargetDataParams(
@@ -315,8 +304,8 @@ def create_target_data_params(aligned_params):
 def create_check_matched_masses_params(alignment_data):
     matched_masses_b = alignment_data.matched_masses_b
     matched_masses_y = alignment_data.matched_masses_y
-    target_left_pids = alignment_data.converted_b
-    target_right_pids = alignment_data.converted_y
+    target_left_pids = alignment_data.left_pids
+    target_right_pids = alignment_data.right_pids
     target_left_indices = [i for i in range(len(matched_masses_b))]
     target_right_indices = [i for i in range(len(matched_masses_y))]
     
@@ -330,21 +319,6 @@ def create_check_matched_masses_params(alignment_data):
     )
     return check_matched_masses_params
 
-def create_find_from_precursor_params(good_entries,aligned_spectrum_params):
-    converted_b = good_entries.good_b_entries
-    matched_masses_b = [entry.mass for entry in good_entries.good_b_entries]
-    spectrum = aligned_spectrum_params.spectrum
-    ppm_tolerance = aligned_spectrum_params.ppm_tolerance
-    proteins_database = aligned_spectrum_params.proteins_database
-
-    find_from_precursor_params =  lookups.objects.FindFromPrecursorParams(
-        converted_b=converted_b,
-        matched_masses_b=matched_masses_b,
-        spectrum=spectrum,
-        ppm_tolerance=ppm_tolerance,
-        proteins_database=proteins_database
-    )
-    return find_from_precursor_params
 
 def create_create_hits_params(precursor_hit_result):
     best_precursor_hit = precursor_hit_result.best_precursor_hit
@@ -485,44 +459,46 @@ def create_post_processed_alignments_params(good_rescored):
     
     return post_processed_alignments_params    
 
+# def create_aligned_spectrum_with_target(create_aligned_spectrum_params):
+#     target_data_params = create_target_data_params(create_aligned_spectrum_params)
+#     target_data = computational_pipeline.finding_seqs.get_target_data(target_data_params)
+#     alignment_data = prep_data_structures_for_alignment(create_aligned_spectrum_params)
+#     check_matched_masses_params = create_check_matched_masses_params(alignment_data)
+#     good_entries = computational_pipeline.finding_seqs.check_in_matched_masses(check_matched_masses_params)
+#     find_from_precursor_params = create_find_from_precursor_params(good_entries, create_aligned_spectrum_params)
+#     precursor_hit_result = alignment.find_from_precursor(find_from_precursor_params)
+#     create_hits_params = create_create_hits_params(precursor_hit_result)
+#     hits = create_b_and_y_hits(create_hits_params)
+#     sorted_clusters_params = create_sorted_clusters_params(hits)
+#     sorted_clusters = create_b_and_y_sorted_clusters(sorted_clusters_params)
+#     check_sorted_clusters_params = create_check_sorted_clusters_params(sorted_clusters)
+#     good_entries = computational_pipeline.finding_seqs.check_in_sorted_clusters(check_sorted_clusters_params)
+#     search_space_params = create_search_space_params(good_entries)
+#     search_space = clustering.get_search_space(search_space_params)
+#     check_searches_params = create_check_searches_params(search_space)
+#     good_searches = computational_pipeline.finding_seqs.check_in_searches(check_searches_params)
+#     pair_natives_params = create_pair_natives_params(good_searches)
+#     unique_native_merged_seqs = alignment.pair_natives(pair_natives_params)
+#     pair_indices_params = create_pair_indices_params(unique_native_merged_seqs)
+#     unique_hybrid_merged_seqs = alignment.pair_indices(pair_indices_params)
+#     check_merges_params = create_check_merges_params(unique_native_merged_seqs,unique_hybrid_merged_seqs)
+#     good_merged_seqs = computational_pipeline.finding_seqs.check_in_merges(check_merges_params)
+#     unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
+#     rescore_merges_params = create_rescore_merges_params(unique_merges)
+#     unique_rescored = rescore_merges(rescore_merges_params)
+#     check_rescored_merges_params = create_check_rescored_merges_params(unique_rescored)
+#     good_rescored = computational_pipeline.finding_seqs.check_in_rescored_merges(check_rescored_merges_params)
+#     post_processed_alignments_params = create_post_processed_alignments_params(good_rescored)
+#     postprocessed_alignments = create_postprocessed_alignments(post_processed_alignments_params)
+#     aligned_spectrums = get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments)
+#     return aligned_spectrums
 
-def create_aligned_spectrum_with_target(create_aligned_spectrum_params):
-    target_data_params = create_target_data_params(create_aligned_spectrum_params)
-    target_data = computational_pipeline.finding_seqs.get_target_data(target_data_params)
-    alignment_data = prep_data_structures_for_alignment(create_aligned_spectrum_params)
-    check_matched_masses_params = create_check_matched_masses_params(alignment_data)
-    good_entries = computational_pipeline.finding_seqs.check_in_matched_masses(check_matched_masses_params)
-    find_from_precursor_params = create_find_from_precursor_params(good_entries, create_aligned_spectrum_params)
-    precursor_hit_result = alignment.find_from_precursor(find_from_precursor_params)
-    create_hits_params = create_create_hits_params(precursor_hit_result)
-    hits = create_b_and_y_hits(create_hits_params)
-    sorted_clusters_params = create_sorted_clusters_params(hits)
-    sorted_clusters = create_b_and_y_sorted_clusters(sorted_clusters_params)
-    check_sorted_clusters_params = create_check_sorted_clusters_params(sorted_clusters)
-    good_entries = computational_pipeline.finding_seqs.check_in_sorted_clusters(check_sorted_clusters_params)
-    search_space_params = create_search_space_params(good_entries)
-    search_space = clustering.get_search_space(search_space_params)
-    check_searches_params = create_check_searches_params(search_space)
-    good_searches = computational_pipeline.finding_seqs.check_in_searches(check_searches_params)
-    pair_natives_params = create_pair_natives_params(good_searches)
-    unique_native_merged_seqs = alignment.pair_natives(pair_natives_params)
-    pair_indices_params = create_pair_indices_params(unique_native_merged_seqs)
-    unique_hybrid_merged_seqs = alignment.pair_indices(pair_indices_params)
-    check_merges_params = create_check_merges_params(unique_native_merged_seqs,unique_hybrid_merged_seqs)
-    good_merged_seqs = computational_pipeline.finding_seqs.check_in_merges(check_merges_params)
-    unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
-    rescore_merges_params = create_rescore_merges_params(unique_merges)
-    unique_rescored = rescore_merges(rescore_merges_params)
-    check_rescored_merges_params = create_check_rescored_merges_params(unique_rescored)
-    good_rescored = computational_pipeline.finding_seqs.check_in_rescored_merges(check_rescored_merges_params)
-    post_processed_alignments_params = create_post_processed_alignments_params(good_rescored)
-    postprocessed_alignments = create_postprocessed_alignments(post_processed_alignments_params)
-    aligned_spectrums = get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments)
-    return aligned_spectrums
 
-def create_aligned_spectrum(create_aligned_spectrum_params):
-    alignment_data = prep_data_structures_for_alignment(create_aligned_spectrum_params)
-    precursor_hit_result = alignment.find_from_precursor(alignment_data)
+
+
+def create_aligned_spectrum(spectrum,sqllite_database,ppm_tolerance):
+    alignment_data = prep_data_structures_for_alignment(spectrum,sqllite_database,ppm_tolerance)
+    precursor_hit_result = alignment.find_from_precursor(spectrum, sqllite_database, ppm_tolerance, alignment_data)
     # create_hits_params = create_create_hits_params(precursor_hit_result)
     # hits = create_b_and_y_hits(create_hits_params)
     # sorted_clusters_params = create_sorted_clusters_params(hits)
@@ -549,14 +525,14 @@ def get_aligned_spectrums(aligned_spectrums_params):
     sqllite_database = aligned_spectrums_params.sqllite_database
     ppm_tolerance = aligned_spectrums_params.ppm_tolerance
     if len(target_seq) > 0:
-        for spectrum in spectrums:
-            create_aligned_spectrum_params = create_create_aligned_spectrum_params(spectrum,sqllite_database,ppm_tolerance)
-            aligned_spectrum = create_aligned_spectrum_with_target(create_aligned_spectrum_params)
-            aligned_spectrums.extend(aligned_spectrum)
+        print("do nothing for now")
+        # for spectrum in spectrums:
+        #     create_aligned_spectrum_params = create_aligned_spectrum_params(spectrum,sqllite_database,ppm_tolerance)
+            #aligned_spectrum = create_aligned_spectrum_with_target(create_aligned_spectrum_params)
+            #aligned_spectrums.extend(aligned_spectrum)
     else:
         for spectrum in spectrums:
-            create_aligned_spectrum_params = create_create_aligned_spectrum_params(spectrum,sqllite_database,ppm_tolerance)
-            aligned_spectrum = create_aligned_spectrum(create_aligned_spectrum_params)
+            aligned_spectrum = create_aligned_spectrum(spectrum,sqllite_database,ppm_tolerance)
             if aligned_spectrum is not None:
                 aligned_spectrums.extend(aligned_spectrum)
     return aligned_spectrums
