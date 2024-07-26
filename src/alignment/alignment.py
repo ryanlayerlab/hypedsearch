@@ -535,18 +535,17 @@ def pair_indices(pair_indices_params):
             b_ctr += 1
             
     return unique_merges
-        
-def find_from_precursor(find_from_precursor_params):
-    converted_b = find_from_precursor_params.converted_b
-    matched_masses_b = find_from_precursor_params.matched_masses_b
-    input_spectrum = find_from_precursor_params.input_spectrum
-    ppm_tolerance = find_from_precursor_params.ppm_tolerance
-    protein_list = find_from_precursor_params.protein_list
+
+
+def find_from_precursor(spectrum, sqllite_database, ppm_tolerance, alignment_data):
+    b_precursor = alignment_data.b_precursor
+    matched_masses_b = alignment_data.matched_masses_b
+    ppm_tolerance = ppm_tolerance
     prec_matches = []
-    prec_hits = matched_masses_b[converted_b]
+    prec_hits = matched_masses_b[b_precursor]
     for hit in prec_hits:
         if hit[4] == 2:
-            hit_score, tiebreaker = scoring.prec_score(hit, input_spectrum, ppm_tolerance, protein_list)
+            hit_score, tiebreaker = scoring.prec_score(hit, spectrum, ppm_tolerance, sqllite_database)
             prec_matches.append((hit_score, tiebreaker, hit))
         
     prec_matches = sorted(prec_matches, key = lambda x: (x[0], x[1]), reverse=True)

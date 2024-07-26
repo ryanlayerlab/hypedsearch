@@ -74,15 +74,10 @@ Aligned_Spectrum = namedtuple(
     ['hybrid','left_proteins','right_proteins','sequence','b_scores','y_scores','total_score',
      'total_gaussian_score','extensions','precursor_mass','precursor_charge','total_mass_error','total_count'])
 
-AlignedSpectrumParams = namedtuple(
+AlignedSpectrumsParams = namedtuple(
     'AlignedSpectrumParams',
     ['spectrums', 'sqllite_database', 'max_peptide_length', 'ppm_tolerance', 'precursor_tolerance', 'number_hybrids', 
      'number_natives', 'target_seq'])
-
-CreateAlignedSpectrumParams = namedtuple(
-    'CreateAlignedSpectrumParams',
-    ['spectrum', 'sqllite_database','ppm_tolerance'])
-
 
 TargetDataParams = namedtuple('TargetDataParams', ['target_seq', 'mz_values', 'ppm_tolerance', 'precursor_mass', 'prec_tol', 'precursor_charge'])
 #original_target_seq, built_database, spectrum.mz_values, ppm_tolerance, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge
@@ -115,8 +110,9 @@ CheckRescoredMergesParams = namedtuple('CheckRescoredMergesParams', ['unique_res
 PostprocessedAlignmentsParams = namedtuple('PostprocessedAlignmentsParams', ['built_database', 'unique_rescored', 'spectrum', 'num_hybrids', 'num_natives'])
 
 TargetData = namedtuple('TargetData', ['target_seq', 'target_left_pids', 'target_right_pids', 'target_left_indices', 'target_right_indices', 'target_score'])
-#target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score
 AlignmentData = namedtuple('AlignmentData', ['b_precursor', 'y_precursor', 'matched_masses_b', 'matched_masses_y'])
+
+
 #converted_b, converted_y, matched_masses_b, matched_masses_y 
 GoodEntries = namedtuple('GoodEntries', ['good_b_entries', 'good_y_entries'])
 #good_b_entries, good_y_entries
