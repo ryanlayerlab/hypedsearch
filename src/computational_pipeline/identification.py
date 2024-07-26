@@ -493,14 +493,11 @@ def create_post_processed_alignments_params(good_rescored):
 #     aligned_spectrums = get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments)
 #     return aligned_spectrums
 
-
-
-
 def create_aligned_spectrum(spectrum,sqllite_database,ppm_tolerance):
     alignment_data = prep_data_structures_for_alignment(spectrum,sqllite_database,ppm_tolerance)
     precursor_hit_result = alignment.find_from_precursor(spectrum, sqllite_database, ppm_tolerance, alignment_data)
-    # create_hits_params = create_create_hits_params(precursor_hit_result)
-    # hits = create_b_and_y_hits(create_hits_params)
+    create_hits_params = create_create_hits_params(precursor_hit_result)
+    hits = create_b_and_y_hits(create_hits_params)
     # sorted_clusters_params = create_sorted_clusters_params(hits)
     # sorted_clusters = create_b_and_y_sorted_clusters(sorted_clusters_params)
     # search_space_params = create_search_space_params(sorted_clusters)
