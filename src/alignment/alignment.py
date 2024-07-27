@@ -487,7 +487,13 @@ def find_alignments(native_merged, hybrid_merged, obs_prec, prec_charge, tol, ma
         total_extension_time = total_extension_time + (time.time() - extension_time)
     return natural_alignments, hybrid_alignments
 
-def pair_indices(search_space,precursor_mass, precursor_tolerance,precursor_charge,score_filter):
+def pair_indices(aligned_spectrum_params, search_space, score_filter):
+    spectrum = aligned_spectrum_params.spectrum
+    base_alignment_params = aligned_spectrum_params.base_alignment_params
+    precursor_mass = spectrum.precursor_mass
+    precursor_charge = spectrum.precursor_charge
+    precursor_tolerance = base_alignment_params.precursor_tolerance
+
     b_search_space = search_space.b_search_space
     y_search_space = search_space.y_search_space
     unique_merges = dict()
@@ -533,7 +539,10 @@ def pair_indices(search_space,precursor_mass, precursor_tolerance,precursor_char
     return unique_merges
 
 
-def find_from_precursor(spectrum, sqllite_database, ppm_tolerance, alignment_data):
+def find_from_precursor(aligned_spectrum_params, alignment_data):
+    spectrum = aligned_spectrum_params.spectrum
+    sqllite_database = aligned_spectrum_params.base_alignment_params.sqllite_database
+    ppm_tolerance = aligned_spectrum_params.base_alignment_params.ppm_tolerance
     b_precursor = alignment_data.converted_precursor_b
     matched_masses_b = alignment_data.matched_masses_b
     ppm_tolerance = ppm_tolerance

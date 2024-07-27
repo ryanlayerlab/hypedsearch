@@ -213,7 +213,9 @@ def modified_losing_ammonium(sequence, input_masses, ppm_tolerance):
     score, tiebreaker, mass_error_sum = calc_overlap(masses, input_masses, ppm_tolerance)
     return score, tiebreaker, mass_error_sum
 
-def rescore_merges(spectrum,ppm_tolerance,unique_merges):
+def rescore_merges(aligned_spectrum_params,unique_merges):
+    spectrum = aligned_spectrum_params.spectrum
+    ppm_tolerance = aligned_spectrum_params.base_alignment_params.ppm_tolerance
     rescored_unique = dict()
     for key, hyb in unique_merges:
         score, tiebreaker, ppm_sum = modified_overlap_scoring(key, spectrum.mz_values, ppm_tolerance)
