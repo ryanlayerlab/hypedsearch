@@ -87,7 +87,5 @@ PrecursorHitResult = namedtuple('PrecursorHitResult', ['best_precursor_hit', 'sc
 Hits = namedtuple('Hits', ['b_hits', 'y_hits'])
 SortedClusters = namedtuple('SortedClusters', ['b_sorted_clusters', 'y_sorted_clusters'])
 SearchSpace = namedtuple('SearchSpace', ['b_search_space', 'y_search_space'])
-#b_search_space, y_search_space
 GoodSearches = namedtuple('GoodSearches', ['good_b_searches', 'good_y_searches'])
-#good_b_searches, good_y_searches
 
