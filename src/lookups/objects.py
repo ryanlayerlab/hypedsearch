@@ -114,15 +114,10 @@ TargetData = namedtuple('TargetData', ['target_seq', 'target_left_pids', 'target
 AlignmentData = namedtuple('AlignmentData', ['converted_precursor_b', 'converted_precursor_y', 'matched_masses_b', 'matched_masses_y'])
 
 
-#converted_b, converted_y, matched_masses_b, matched_masses_y 
 GoodEntries = namedtuple('GoodEntries', ['good_b_entries', 'good_y_entries'])
-#good_b_entries, good_y_entries
 PrecursorHitResult = namedtuple('PrecursorHitResult', ['best_precursor_hit', 'score_filter'])
-#best_prec_hit, score_filter 
 Hits = namedtuple('Hits', ['b_hits', 'y_hits'])
-#b_hits, y_hits
 SortedClusters = namedtuple('SortedClusters', ['b_sorted_clusters', 'y_sorted_clusters'])
-#b_sorted_clusters, y_sorted_clusters 
 SearchSpace = namedtuple('SearchSpace', ['b_search_space', 'y_search_space'])
 #b_search_space, y_search_space
 GoodSearches = namedtuple('GoodSearches', ['good_b_searches', 'good_y_searches'])

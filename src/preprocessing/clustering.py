@@ -8,6 +8,7 @@ from preprocessing.sqlite_database import Sqllite_Database
 import time
 from lookups.constants import AMINO_ACIDS
 from scoring.scoring import calc_bayes_score
+import lookups.objects as objects
 
 def create_clusters_from_foos(foos):
     if len(foos) == 0 : return None
@@ -466,17 +467,16 @@ def distribute_merges(merges, b_sorted_clusters, y_sorted_clusters):
 
     return merged_clusters
 
-def get_search_space(search_space_params):
-    b_sorted_clusters = search_space_params.b_sorted_clusters
-    y_sorted_clusters = search_space_params.y_sorted_clusters
-    prec_charge = search_space_params.prec_charge
+def get_search_space(sorted_clusters,precursor_charge):
+    b_sorted_clusters = sorted_clusters.b_sorted_clusters
+    y_sorted_clusters = sorted_clusters.y_sorted_clusters
     b_searches, y_searches = dict(), dict()
     for key in b_sorted_clusters.keys():
         for b in b_sorted_clusters[key]:
             for component in b.components:
                 mass = component[0]
                 charge = component[4]
-                prec = computational_pipeline.gen_spectra.convert_ion_to_precursor(mass, 0, charge, prec_charge)
+                prec = computational_pipeline.gen_spectra.convert_ion_to_precursor(mass, 0, charge, precursor_charge)
                 if prec not in b_searches.keys():
                     b_searches[prec] = []
                 b_searches[prec].append(component)
@@ -486,9 +486,9 @@ def get_search_space(search_space_params):
             for component in y.components:
                 mass = component[0]
                 charge = component[4]
-                prec = computational_pipeline.gen_spectra.convert_ion_to_precursor(mass, 1, charge, prec_charge)
+                prec = computational_pipeline.gen_spectra.convert_ion_to_precursor(mass, 1, charge, precursor_charge)
                 if prec not in y_searches.keys():
                     y_searches[prec] = []
                 y_searches[prec].append(component)
-            
-    return b_searches, y_searches
+    search_space = objects.SearchSpace(b_search_space=b_searches,y_search_space=y_searches)
+    return search_space
