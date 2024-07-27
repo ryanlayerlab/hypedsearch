@@ -69,21 +69,15 @@ Identification_Instrumentation = namedtuple(
     defaults=[0,0,0,0,0,0,0,0,0]
 )
 
-Aligned_Spectrum = namedtuple(
-    'Aligned_Spectrum',
-    ['hybrid','left_proteins','right_proteins','sequence','b_scores','y_scores','total_score',
-     'total_gaussian_score','extensions','precursor_mass','precursor_charge','total_mass_error','total_count'])
-
-AlignedSpectrumsParams = namedtuple(
-    'AlignedSpectrumParams',
-    ['spectrums', 'sqllite_database', 'max_peptide_length', 'ppm_tolerance', 'precursor_tolerance', 'number_hybrids', 
-     'number_natives', 'target_seq'])
-
-TargetData = namedtuple('TargetData', ['target_seq', 'target_left_pids', 'target_right_pids', 'target_left_indices', 'target_right_indices', 'target_score'])
+BaseAlignmentParams = namedtuple('BaseAlignmentParams',['sqllite_database', 'max_peptide_length', 'ppm_tolerance', 'precursor_tolerance', 'number_hybrids', 'number_natives', 'target_seq'])
+AlignedSpectrumsParams = namedtuple('AlignedSpectrumsParams',['spectrums', 'base_alignment_params'])
+AlignedSpectrumParams = namedtuple('AlignedSpectrumParams',['spectrum', 'base_alignment_params'])
 AlignmentData = namedtuple('AlignmentData', ['converted_precursor_b', 'converted_precursor_y', 'matched_masses_b', 'matched_masses_y'])
+TargetData = namedtuple('TargetData', ['target_seq', 'target_left_pids', 'target_right_pids', 'target_left_indices', 'target_right_indices', 'target_score'])
 PrecursorHitResult = namedtuple('PrecursorHitResult', ['best_precursor_hit', 'score_filter'])
 Hits = namedtuple('Hits', ['b_hits', 'y_hits'])
 SortedClusters = namedtuple('SortedClusters', ['b_sorted_clusters', 'y_sorted_clusters'])
 SearchSpace = namedtuple('SearchSpace', ['b_search_space', 'y_search_space'])
 GoodSearches = namedtuple('GoodSearches', ['good_b_searches', 'good_y_searches'])
+AlignedSpectrum = namedtuple('AlignedSpectrum',['hybrid','left_proteins','right_proteins','sequence','b_scores','y_scores','total_score','total_gaussian_score','extensions','precursor_mass','precursor_charge','total_mass_error','total_count'])
 
