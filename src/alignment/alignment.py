@@ -562,15 +562,13 @@ def make_native_pair(b, ion):
     return y_cluster
     
 
-def pair_natives(pair_natives_params):
-    b_search_space = pair_natives_params.b_search_space
-    y_search_space = pair_natives_params.y_search_space
-    prec_mass = pair_natives_params.prec_mass
-    prec_tol = pair_natives_params.prec_tol
+def pair_natives(search_space, precursor_mass, precursor_abundance):
+    b_search_space = search_space.b_search_space
+    y_search_space = search_space.y_search_space
     unique_merges = dict()
-    tol = lookups.utils.ppm_to_da(prec_mass, prec_tol)
+    tol = lookups.utils.ppm_to_da(precursor_mass, precursor_abundance)
     for b_prec in sorted(b_search_space):
-        if abs(b_prec - prec_mass) < tol:
+        if abs(b_prec - precursor_mass) < tol:
             for b in b_search_space[b_prec]:
                 y_pair = make_native_pair(b, 0)
                 full_seq = b[6]
@@ -579,7 +577,7 @@ def pair_natives(pair_natives_params):
                 unique_merges[(full_seq,0)].append((b,y_pair))
     
     for y_prec in sorted(y_search_space):
-        if abs(y_prec - prec_mass) < tol:
+        if abs(y_prec - precursor_mass) < tol:
             for y in y_search_space[y_prec]:
                 b_pair = make_native_pair(y, 1)
                 full_seq = y[6]
