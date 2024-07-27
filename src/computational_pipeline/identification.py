@@ -265,7 +265,8 @@ def create_b_and_y_sorted_clusters(sqllite_database, ppm_tolerance, precursor_ch
     b_sorted_clusters = clustering.old_score_clusters(0, b_clusters, converted_b, sqllite_database, precursor_charge, ppm_tolerance)
     y_clusters = clustering.create_clusters('y', y_hits, y_hits)
     y_sorted_clusters = clustering.old_score_clusters(1, y_clusters, converted_y, sqllite_database, precursor_charge, ppm_tolerance)
-    return b_sorted_clusters,y_sorted_clusters
+    sorted_clusters = objects.SortedClusters(b_sorted_clusters=b_sorted_clusters, y_sorted_clusters=y_sorted_clusters)
+    return sorted_clusters
 
 def create_rescored_alignments(rescored_naturals, rescored_hybrids):
     rescored_alignments = sorted(rescored_naturals + rescored_hybrids, key = lambda x: (x[0], x[1]), reverse = True)
@@ -455,6 +456,9 @@ def create_post_processed_alignments_params(good_rescored):
 #     aligned_spectrums = get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments)
 #     return aligned_spectrums
 
+    b_sorted_clusters = search_space_params.b_sorted_clusters
+    y_sorted_clusters = search_space_params.y_sorted_clusters
+    prec_charge = search_space_params.prec_charge
 
 def create_aligned_spectrum(spectrum,sqllite_database,ppm_tolerance):
     alignment_data = prep_data_structures_for_alignment(spectrum,sqllite_database,ppm_tolerance)
@@ -462,8 +466,7 @@ def create_aligned_spectrum(spectrum,sqllite_database,ppm_tolerance):
     hits = create_b_and_y_hits(spectrum, sqllite_database, ppm_tolerance, alignment_data)
     precursor_charge = spectrum.precursor_charge
     sorted_clusters = create_b_and_y_sorted_clusters(sqllite_database, ppm_tolerance, precursor_charge, hits, alignment_data)
-    # search_space_params = create_search_space_params(sorted_clusters)
-    # search_space = clustering.get_search_space(search_space_params)
+    search_space = clustering.get_search_space(sorted_clusters,precursor_charge)
     # pair_natives_params = create_pair_natives_params(search_space)
     # unique_native_merged_seqs = alignment.pair_natives(pair_natives_params)
     # pair_indices_params = create_pair_indices_params(unique_native_merged_seqs)
