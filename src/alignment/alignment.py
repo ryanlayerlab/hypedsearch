@@ -487,15 +487,11 @@ def find_alignments(native_merged, hybrid_merged, obs_prec, prec_charge, tol, ma
         total_extension_time = total_extension_time + (time.time() - extension_time)
     return natural_alignments, hybrid_alignments
 
-def pair_indices(pair_indices_params):
-    b_search_space = pair_indices_params.b_search_space
-    y_search_space = pair_indices_params.y_search_space
-    prec_mass = pair_indices_params.prec_mass
-    prec_tol = pair_indices_params.prec_tol
-    prec_charge = pair_indices_params.prec_charge
-    score_filter = pair_indices_params.score_filter
+def pair_indices(search_space,precursor_mass, precursor_tolerance,precursor_charge,score_filter):
+    b_search_space = search_space.b_search_space
+    y_search_space = search_space.y_search_space
     unique_merges = dict()
-    tol = lookups.utils.ppm_to_da(prec_mass, prec_tol)
+    tol = lookups.utils.ppm_to_da(precursor_mass, precursor_tolerance)
     sorted_b_keys = sorted(b_search_space)
     sorted_y_keys = sorted(y_search_space, reverse = True)
             
@@ -504,8 +500,8 @@ def pair_indices(pair_indices_params):
     y_low_ctr, y_high_ctr = 0,0
     while b_ctr < b_end and y_high_ctr < y_end:
         b_prec = sorted_b_keys[b_ctr]
-        missing_mass_upper = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge + tol
-        missing_mass_lower = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge - tol
+        missing_mass_upper = precursor_mass - b_prec + (precursor_charge * PROTON_MASS)/precursor_charge + WATER_MASS/precursor_charge + tol
+        missing_mass_lower = precursor_mass - b_prec + (precursor_charge * PROTON_MASS)/precursor_charge + WATER_MASS/precursor_charge - tol
         y_prec = sorted_y_keys[y_high_ctr]
         
         if y_prec > missing_mass_upper:
@@ -562,11 +558,11 @@ def make_native_pair(b, ion):
     return y_cluster
     
 
-def pair_natives(search_space, precursor_mass, precursor_abundance):
+def pair_natives(search_space, precursor_mass, precursor_tolerance):
     b_search_space = search_space.b_search_space
     y_search_space = search_space.y_search_space
     unique_merges = dict()
-    tol = lookups.utils.ppm_to_da(precursor_mass, precursor_abundance)
+    tol = lookups.utils.ppm_to_da(precursor_mass, precursor_tolerance)
     for b_prec in sorted(b_search_space):
         if abs(b_prec - precursor_mass) < tol:
             for b in b_search_space[b_prec]:
