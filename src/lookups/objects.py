@@ -79,10 +79,8 @@ AlignedSpectrumsParams = namedtuple(
     ['spectrums', 'sqllite_database', 'max_peptide_length', 'ppm_tolerance', 'precursor_tolerance', 'number_hybrids', 
      'number_natives', 'target_seq'])
 
-
-TargetDataParams = namedtuple('TargetDataParams', ['target_seq', 'mz_values', 'ppm_tolerance', 'precursor_mass', 'prec_tol', 'precursor_charge'])
+TargetData = namedtuple('TargetData', ['target_seq', 'target_left_pids', 'target_right_pids', 'target_left_indices', 'target_right_indices', 'target_score'])
 AlignmentData = namedtuple('AlignmentData', ['converted_precursor_b', 'converted_precursor_y', 'matched_masses_b', 'matched_masses_y'])
-GoodEntries = namedtuple('GoodEntries', ['good_b_entries', 'good_y_entries'])
 PrecursorHitResult = namedtuple('PrecursorHitResult', ['best_precursor_hit', 'score_filter'])
 Hits = namedtuple('Hits', ['b_hits', 'y_hits'])
 SortedClusters = namedtuple('SortedClusters', ['b_sorted_clusters', 'y_sorted_clusters'])

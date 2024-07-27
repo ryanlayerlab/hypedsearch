@@ -29,14 +29,9 @@ def overlap_scoring(sequence, input_masses, ppm_tolerance):
                 theoretical = masses[t_ctr]
     return(total_score)
 
-def get_target_data(tdp: lookups.objects.TargetDataParams):
-    target_seq = tdp.target_seq
-    proteins = tdp.proteins
-    input_masses = tdp.input_masses
-    ppm_tolerance = tdp.ppm_tolerance
-    precursor_mass = tdp.precursor_mass
-    precursor_tolerance = tdp.precursor_tolerance
-    precursor_charge = tdp.precursor_charge
+def get_target_data(target_seq, sqllite_database, spectrum, ppm_tolerance, precursor_mass, precursor_tolerance, precursor_charge):
+    protein_list = sqllite_database.query_proteins()
+    input_masses = spectrum.mz_values
     theoretical_prec = computational_pipeline.gen_spectra.get_precursor(target_seq.replace("-", ""), precursor_charge)
     if abs(theoretical_prec - precursor_mass) <= precursor_tolerance:
         print(target_seq,"is a valid hybrid to find")
@@ -45,7 +40,6 @@ def get_target_data(tdp: lookups.objects.TargetDataParams):
     
     target_left_pids, target_right_pids = [], []
     target_left_indices, target_right_indices = [], []
-    protein_list = proteins.proteins
     if "-" in target_seq:
         b_part, y_part = target_seq.split("-")
     else:
@@ -76,13 +70,15 @@ def get_target_data(tdp: lookups.objects.TargetDataParams):
 
     return target_data
 
-def check_in_matched_masses(check_matched_masses_params):
-    matched_masses_b = check_matched_masses_params.matched_masses_b
-    matched_masses_y = check_matched_masses_params.matched_masses_y
-    left_pids = check_matched_masses_params.left_pids
-    left_indices = check_matched_masses_params.left_indices
-    right_pids = check_matched_masses_params.right_pids
-    right_indices = check_matched_masses_params.right_indices
+def check_in_matched_masses(alignment_data,target_data):
+    converted_precursor_b = alignment_data.converted_precursor_b
+    converted_precursor_y = alignment_data.converted_precursor_y
+    matched_masses_b = alignment_data.matched_masses_b
+    matched_masses_y = alignment_data.matched_masses_y
+    left_pids = target_data.target_left_pids
+    left_indices = target_data.target_left_indices
+    right_pids = target_data.target_right_pids
+    right_indices = target_data.target_right_indices
     good_b_entries, good_y_entries = [], []
     for i, pid in enumerate(left_pids):
         for key in matched_masses_b.keys():
@@ -108,7 +104,8 @@ def check_in_matched_masses(check_matched_masses_params):
         print("No good hits in matched_masses_b but in matched_masses_y")
     if len(good_b_entries) == 0 and len(good_y_entries) == 0:
         print("No good hits in matched_masses_b nor in matched_masses_y")
-    return good_b_entries, good_y_entries
+    target_alignment_data = lookups.objects.AlignmentData(converted_precursor_b=converted_precursor_b,converted_precursor_y=converted_precursor_y,matched_masses_b=good_b_entries,matched_masses_y=good_y_entries)
+    return target_alignment_data
     
 def check_in_sorted_clusters(check_sorted_clusters_params):
     b_sorted_clusters = check_sorted_clusters_params.b_sorted_clusters
