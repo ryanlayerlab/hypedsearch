@@ -286,17 +286,20 @@ def create_aligned_spectrum_with_target(spectrum,sqllite_database,ppm_tolerance,
         precursor_hit_result = alignment.find_from_precursor(spectrum, sqllite_database, ppm_tolerance, target_alignment_data)
         hits = create_b_and_y_hits(spectrum, sqllite_database, ppm_tolerance, target_alignment_data) 
         sorted_clusters = create_b_and_y_sorted_clusters(sqllite_database, ppm_tolerance, precursor_charge, hits, target_alignment_data)
-    #     good_entries = computational_pipeline.finding_seqs.check_in_sorted_clusters(check_sorted_clusters_params)
-        search_space = clustering.get_search_space(sorted_clusters,precursor_charge)
-    #     good_searches = computational_pipeline.finding_seqs.check_in_searches(check_searches_params)
+        target_sorted_clusters = computational_pipeline.finding_seqs.check_in_sorted_clusters(target_alignment_data,sorted_clusters)
+        search_space = clustering.get_search_space(target_sorted_clusters,precursor_charge)
+        good_searches = computational_pipeline.finding_seqs.check_in_searches(target_data,target_alignment_data,ppm_tolerance,precursor_charge,target_seq)
         unique_native_merged_seqs = alignment.pair_natives(search_space, precursor_mass, precursor_tolerance)
         score_filter = precursor_hit_result.score_filter
         unique_hybrid_merged_seqs = alignment.pair_indices(search_space,precursor_mass, precursor_tolerance,precursor_charge,score_filter)
-    #     good_merged_seqs = computational_pipeline.finding_seqs.check_in_merges(check_merges_params)
+        unknown = ([],[])
+        good_merged_seqs = computational_pipeline.finding_seqs.check_in_merges(good_searches,unknown)
         unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
         rescored_alignments = rescore_merges(spectrum,ppm_tolerance,unique_merges)
-    #     good_rescored = computational_pipeline.finding_seqs.check_in_rescored_merges(check_rescored_merges_params)
-        postprocessed_alignments = create_postprocessed_alignments(spectrum, sqllite_database, rescored_alignments, number_hybrids, number_natives)
+        rescored_merges = []
+        good_merges = []
+        good_rescored_alignments = computational_pipeline.finding_seqs.check_in_rescored_merges(rescored_merges,good_merges)
+        postprocessed_alignments = create_postprocessed_alignments(spectrum, sqllite_database, good_rescored_alignments, number_hybrids, number_natives)
         aligned_spectrums = get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments)
         return aligned_spectrums
     else:

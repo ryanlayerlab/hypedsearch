@@ -107,11 +107,11 @@ def check_in_matched_masses(alignment_data,target_data):
     target_alignment_data = lookups.objects.AlignmentData(converted_precursor_b=converted_precursor_b,converted_precursor_y=converted_precursor_y,matched_masses_b=good_b_entries,matched_masses_y=good_y_entries)
     return target_alignment_data
     
-def check_in_sorted_clusters(check_sorted_clusters_params):
-    b_sorted_clusters = check_sorted_clusters_params.b_sorted_clusters
-    y_sorted_clusters = check_sorted_clusters_params.y_sorted_clusters
-    good_b_hits = check_sorted_clusters_params.good_b_hits
-    good_y_hits = check_sorted_clusters_params.good_y_hits
+def check_in_sorted_clusters(target_alignment_data,sorted_clusters):
+    b_sorted_clusters = sorted_clusters.b_sorted_clusters
+    y_sorted_clusters = sorted_clusters.y_sorted_clusters
+    good_b_hits = target_alignment_data.matched_masses_b
+    good_y_hits = target_alignment_data.matched_masses_y
     good_maxb_hit, good_maxy_hit = [], []
     good_maxb_dict, good_maxy_dict = dict(), dict()
     good_b_clusters, good_y_clusters = [], []
@@ -285,25 +285,22 @@ def check_in_rescored(rescored, good_scored):
         print("Lost in final filtering")
         
         
-def check_in_searches(check_searches_params):
-    b_searches =  check_searches_params.b_searches
-    y_searches = check_searches_params.y_searches
-    target_left_pids = check_searches_params.target_left_pids
-    target_right_pids = check_searches_params.target_right_pids
-    target_left_indices = check_searches_params.target_left_indices
-    target_right_indices = check_searches_params.target_right_indices
-    target_seq = check_searches_params.target_seq
-    prec_charge = check_searches_params.prec_charge
-    ppm_tol = check_searches_params.ppm_tol
+def check_in_searches(target_data,target_alignment_data,ppm_tolerance,precursor_charge,target_seq):
+    b_searches =  target_alignment_data.matched_masses_b
+    y_searches = target_alignment_data.matched_masses_y
+    target_left_pids = target_data.target_left_pids
+    target_right_pids = target_data.target_right_pids
+    target_left_indices = target_data.target_left_indices
+    target_right_indices = target_data.target_right_indices
     good_b_searches, good_y_searches = [],[]
     if "-" in target_seq:
         left_part, right_part = target_seq.split("-")
     else:
         left_part, right_part = target_seq, target_seq
-    left_prec = computational_pipeline.gen_spectra.get_precursor(left_part, prec_charge)
-    right_prec = computational_pipeline.gen_spectra.get_precursor(right_part, prec_charge)
-    b_tol = ppm_to_da(left_prec, ppm_tol)
-    y_tol = ppm_to_da(right_prec, ppm_tol)
+    left_prec = computational_pipeline.gen_spectra.get_precursor(left_part, precursor_charge)
+    right_prec = computational_pipeline.gen_spectra.get_precursor(right_part, precursor_charge)
+    b_tol = ppm_to_da(left_prec, ppm_tolerance)
+    y_tol = ppm_to_da(right_prec, ppm_tolerance)
     
     for prec in b_searches.keys():
         if abs(prec - left_prec) < b_tol:
@@ -335,11 +332,11 @@ def check_in_searches(check_searches_params):
         print("No good hits in b_searches nor in y_searches")
     return good_b_searches, good_y_searches
 
-def check_in_merges(check_merges_params):
+def check_in_merges(good_searches):
     hybrid_merges = check_merges_params.hybrid_merges
     native_merges = check_merges_params.native_merges
-    good_b_searches = check_merges_params.good_b_searches
-    good_y_searches = check_merges_params.good_y_searches
+    good_b_searches = good_searches.good_b_searches
+    good_y_searches = good_searches.good_y_searches
     good_merges = []
     for key in hybrid_merges:
         for merge in hybrid_merges[key]:
@@ -361,12 +358,10 @@ def check_in_merges(check_merges_params):
         print("Good merges were found")
     else:
         print("No good merges were found")
-        
+    
     return good_merges
 
-def check_in_rescored_merges(check_rescored_merges_params):
-    rescored_merges =  check_rescored_merges_params.rescored_merges
-    good_merges = check_rescored_merges_params.good_merges
+def check_in_rescored_merges(rescored_merges,good_merges):
     good_rescored = []
     sorted_rescored = sorted(rescored_merges, key=lambda x: (x[0], x[1]), reverse = True)
     for merge in good_merges:
