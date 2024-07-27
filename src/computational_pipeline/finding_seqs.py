@@ -29,7 +29,16 @@ def overlap_scoring(sequence, input_masses, ppm_tolerance):
                 theoretical = masses[t_ctr]
     return(total_score)
 
-def get_target_data(target_seq, sqllite_database, spectrum, ppm_tolerance, precursor_mass, precursor_tolerance, precursor_charge):
+def get_target_data(aligned_spectrum_params):
+    spectrum = aligned_spectrum_params.spectrum
+    base_alignment_params = aligned_spectrum_params.base_alignment_params
+    precursor_charge = spectrum.precursor_charge
+    precursor_mass = spectrum.precursor_mass
+    target_seq = base_alignment_params.target_seq
+    sqllite_database = base_alignment_params.sqllite_database
+    ppm_tolerance = base_alignment_params.ppm_tolerance
+    precursor_tolerance = base_alignment_params.precursor_tolerance
+
     protein_list = sqllite_database.query_proteins()
     input_masses = spectrum.mz_values
     theoretical_prec = computational_pipeline.gen_spectra.get_precursor(target_seq.replace("-", ""), precursor_charge)
