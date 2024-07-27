@@ -133,8 +133,9 @@ def test_digest_match(protein_list, pid, digest, start, end, ion):
     
     return False
 
-def find_extensions(conv_prec,current_mass,ion,charge,pid,protein_list,start,end,ppm_tolerance,seq,score):
-    prot_seq = protein_list[pid][1]
+def find_extensions(conv_prec,current_mass,ion,charge,pid,sqllite_database,start,end,ppm_tolerance,seq,score):
+    protein = sqllite_database.get_protein(pid)
+    prot_seq = protein[2]
     bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
     extensions = []
     repeat = True
@@ -223,7 +224,7 @@ def convert_components(component_arr, ion, score, seq):
 
     return converted_components
 
-def old_score_clusters(ion, clusters, conv_prec, protein_list, prec_charge, ppm_tol):
+def old_score_clusters(ion, clusters, conv_prec, sqllite_database, precursor_charge, ppm_tolerance):
     sorted_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge components seq')
     cluster_dict = dict()
     for i, A in enumerate(clusters):
@@ -232,12 +233,12 @@ def old_score_clusters(ion, clusters, conv_prec, protein_list, prec_charge, ppm_
         start = A[3]
         end = A[4]
         charge = A[5]
-        seq = find_sequence(pid, start, end, protein_list)
+        seq = find_sequence(pid, start, end, sqllite_database)
         score = A[0]
         components = convert_components(A[6], ion, score, seq)
-        extensions = find_extensions(conv_prec,mz,ion,charge,pid,protein_list,start,end,ppm_tol,seq,score)
+        extensions = find_extensions(conv_prec,mz,ion,charge,pid,sqllite_database,start,end,ppm_tolerance,seq,score)
         target_cluster = sorted_cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, components=components + extensions, seq=seq)
-        converted_precursor = computational_pipeline.gen_spectra.convert_ion_to_precursor(mz, ion, charge, prec_charge)
+        converted_precursor = computational_pipeline.gen_spectra.convert_ion_to_precursor(mz, ion, charge, precursor_charge)
         if converted_precursor not in cluster_dict.keys():
             cluster_dict[converted_precursor] = []
         cluster_dict[converted_precursor].append(target_cluster)

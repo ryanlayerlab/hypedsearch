@@ -253,20 +253,18 @@ def create_b_and_y_hits(spectrum, sqllite_database, ppm_tolerance, alignment_dat
     matched_masses_b = alignment_data.matched_masses_b
     matched_masses_y = alignment_data.matched_masses_y
     b_hits,y_hits = create_hits(spectrum.num,spectrum,matched_masses_b,matched_masses_y,converted_b, converted_y)
-    return b_hits,y_hits
+    hits = objects.Hits(b_hits=b_hits,y_hits=y_hits)
+    return hits
 
-def create_b_and_y_sorted_clusters(sorted_clusters_params):
-    built_database = sorted_clusters_params.built_database
-    converted_b = sorted_clusters_params.converted_b
-    converted_y = sorted_clusters_params.converted_y
-    b_hits = sorted_clusters_params.b_hits
-    y_hits = sorted_clusters_params.y_hits
-    prec_charge = sorted_clusters_params.prec_charge
-    ppm_tol = sorted_clusters_params.ppm_tol
+def create_b_and_y_sorted_clusters(sqllite_database, ppm_tolerance, precursor_charge, hits, alignment_data):
+    converted_b = alignment_data.converted_precursor_b
+    converted_y = alignment_data.converted_precursor_y
+    b_hits = hits.b_hits
+    y_hits = hits.y_hits
     b_clusters = clustering.create_clusters('b', b_hits, y_hits)
-    b_sorted_clusters = clustering.old_score_clusters(0, b_clusters, converted_b, built_database.proteins, prec_charge, ppm_tol)
+    b_sorted_clusters = clustering.old_score_clusters(0, b_clusters, converted_b, sqllite_database, precursor_charge, ppm_tolerance)
     y_clusters = clustering.create_clusters('y', y_hits, y_hits)
-    y_sorted_clusters = clustering.old_score_clusters(1, y_clusters, converted_y, built_database.proteins, prec_charge, ppm_tol)
+    y_sorted_clusters = clustering.old_score_clusters(1, y_clusters, converted_y, sqllite_database, precursor_charge, ppm_tolerance)
     return b_sorted_clusters,y_sorted_clusters
 
 def create_rescored_alignments(rescored_naturals, rescored_hybrids):
@@ -319,19 +317,6 @@ def create_check_matched_masses_params(alignment_data):
     )
     return check_matched_masses_params
 
-
-def create_sorted_clusters_params(hits):
-    # b_sorted_clusters = sorted(hits.b_hits, key=lambda x: x.cluster_id)
-    # y_sorted_clusters = sorted(hits.y_hits, key=lambda x: x.cluster_id)
-    # #TODO FIX THIS
-    # sorted_clusters_params = objects.SortedClustersParams(
-    #     b_sorted_clusters=b_sorted_clusters,
-    #     y_sorted_clusters=y_sorted_clusters,
-    #     good_b_entries=good_entries.good_b_entries,
-    #     good_y_entries=good_entries.good_y_entries
-    # )
-    # return sorted_clusters_params
-    return None
 
 def create_check_sorted_clusters_params(sorted_clusters, good_entries):
     b_sorted_clusters = sorted_clusters.b_sorted_clusters
@@ -475,8 +460,8 @@ def create_aligned_spectrum(spectrum,sqllite_database,ppm_tolerance):
     alignment_data = prep_data_structures_for_alignment(spectrum,sqllite_database,ppm_tolerance)
     precursor_hit_result = alignment.find_from_precursor(spectrum, sqllite_database, ppm_tolerance, alignment_data)
     hits = create_b_and_y_hits(spectrum, sqllite_database, ppm_tolerance, alignment_data)
-    # sorted_clusters_params = create_sorted_clusters_params(hits)
-    # sorted_clusters = create_b_and_y_sorted_clusters(sorted_clusters_params)
+    precursor_charge = spectrum.precursor_charge
+    sorted_clusters = create_b_and_y_sorted_clusters(sqllite_database, ppm_tolerance, precursor_charge, hits, alignment_data)
     # search_space_params = create_search_space_params(sorted_clusters)
     # search_space = clustering.get_search_space(search_space_params)
     # pair_natives_params = create_pair_natives_params(search_space)
