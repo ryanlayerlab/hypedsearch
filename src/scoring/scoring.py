@@ -213,21 +213,18 @@ def modified_losing_ammonium(sequence, input_masses, ppm_tolerance):
     score, tiebreaker, mass_error_sum = calc_overlap(masses, input_masses, ppm_tolerance)
     return score, tiebreaker, mass_error_sum
 
-def rescore_merges(rescore_merges_params):
-    unique_merge_space = rescore_merges_params.unique_merge_space
-    input_spectrum = rescore_merges_params.input_spectrum
-    ppm_tol = rescore_merges_params.ppm_tol
+def rescore_merges(spectrum,ppm_tolerance,unique_merges):
     rescored_unique = dict()
-    for key, hyb in unique_merge_space:
-        score, tiebreaker, ppm_sum = modified_overlap_scoring(key, input_spectrum.mz_values, ppm_tol) # counts peaks
-        minus_water_score, minus_water_tiebreaker, minus_water_ppm_sum = modified_losing_water(key, input_spectrum.mz_values, ppm_tol) # counts again but strip water
-        minus_ammonium_score, minus_ammonium_tiebreaker, minus_ammonium_ppm_sum = modified_losing_ammonium(key, input_spectrum.mz_values, ppm_tol) # counts again but strip ammonium
+    for key, hyb in unique_merges:
+        score, tiebreaker, ppm_sum = modified_overlap_scoring(key, spectrum.mz_values, ppm_tolerance)
+        minus_water_score, minus_water_tiebreaker, minus_water_ppm_sum = modified_losing_water(key, spectrum.mz_values, ppm_tolerance)
+        minus_ammonium_score, minus_ammonium_tiebreaker, minus_ammonium_ppm_sum = modified_losing_ammonium(key, spectrum.mz_values, ppm_tolerance)
         score += minus_water_score + minus_ammonium_score
         ppm_sum += minus_water_ppm_sum + minus_ammonium_ppm_sum
         tiebreaker * minus_water_tiebreaker * minus_ammonium_tiebreaker
         if (score/len(key), tiebreaker, key, hyb) not in rescored_unique.keys():
             rescored_unique[(score, tiebreaker, key, hyb)] = []
-        for b, y in unique_merge_space[(key, hyb)]:
+        for b, y in unique_merges[(key, hyb)]:
             rescored_unique[(score, tiebreaker, key, hyb)].append((score, tiebreaker, (b,y), ppm_sum))
     return rescored_unique
                

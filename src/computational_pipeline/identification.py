@@ -338,7 +338,7 @@ def create_aligned_spectrum(spectrum,sqllite_database,ppm_tolerance,precursor_to
     score_filter = precursor_hit_result.score_filter
     unique_hybrid_merged_seqs = alignment.pair_indices(search_space,precursor_mass, precursor_tolerance,precursor_charge,score_filter)
     unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
-    # unique_rescored = rescore_merges(check_rescored_merges_params)
+    unique_rescored = rescore_merges(spectrum,ppm_tolerance,unique_merges)
     # postprocessed_alignments = create_postprocessed_alignments(post_processed_alignments_params)
     # aligned_spectrums = get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments)
     # return aligned_spectrums
