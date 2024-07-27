@@ -323,9 +323,7 @@ def prep_data_structures_for_alignment(spectrum,sqllite_database,ppm_tolerance):
 #     aligned_spectrums = get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments)
 #     return aligned_spectrums
 
-    b_sorted_clusters = search_space_params.b_sorted_clusters
-    y_sorted_clusters = search_space_params.y_sorted_clusters
-    prec_charge = search_space_params.prec_charge
+
 
 def create_aligned_spectrum(spectrum,sqllite_database,ppm_tolerance):
     alignment_data = prep_data_structures_for_alignment(spectrum,sqllite_database,ppm_tolerance)
@@ -334,7 +332,9 @@ def create_aligned_spectrum(spectrum,sqllite_database,ppm_tolerance):
     precursor_charge = spectrum.precursor_charge
     sorted_clusters = create_b_and_y_sorted_clusters(sqllite_database, ppm_tolerance, precursor_charge, hits, alignment_data)
     search_space = clustering.get_search_space(sorted_clusters,precursor_charge)
-    # unique_native_merged_seqs = alignment.pair_natives(pair_natives_params)
+    precursor_mass = spectrum.precursor_mass
+    precursor_abundance = spectrum.precursor_abundance
+    unique_native_merged_seqs = alignment.pair_natives(search_space, precursor_mass, precursor_abundance)
     # unique_hybrid_merged_seqs = alignment.pair_indices(pair_indices_params)
     # unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
     # unique_rescored = rescore_merges(check_rescored_merges_params)
