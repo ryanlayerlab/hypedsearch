@@ -539,12 +539,12 @@ def pair_indices(aligned_spectrum_params, search_space, score_filter):
     return unique_merges
 
 
-def find_from_precursor(aligned_spectrum_params, alignment_data):
+def get_percursor_hits(aligned_spectrum_params, converted_precursors, alighment_data):
     spectrum = aligned_spectrum_params.spectrum
     sqllite_database = aligned_spectrum_params.base_alignment_params.sqllite_database
     ppm_tolerance = aligned_spectrum_params.base_alignment_params.ppm_tolerance
-    b_precursor = alignment_data.converted_precursor_b
-    matched_masses_b = alignment_data.matched_masses_b
+    b_precursor = converted_precursors.converted_precursor_b
+    matched_masses_b = alighment_data.matched_masses_b
     ppm_tolerance = ppm_tolerance
     prec_matches = []
     prec_hits = matched_masses_b[b_precursor]

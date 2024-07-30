@@ -239,21 +239,21 @@ def get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments
         aligned_spectrums.append(aligned_spectrum)
     return aligned_spectrums
 
-def create_b_and_y_hits(aligned_spectrum_params, alignment_data):
+def get_fragment_hits(aligned_spectrum_params, converted_precursors, matched_masses):
     spectrum = aligned_spectrum_params.spectrum
-    converted_b = alignment_data.converted_precursor_b
-    converted_y = alignment_data.converted_precursor_y
-    matched_masses_b = alignment_data.matched_masses_b
-    matched_masses_y = alignment_data.matched_masses_y
+    converted_b = converted_precursors.converted_precursor_b
+    converted_y = converted_precursors.converted_precursor_y
+    matched_masses_b = matched_masses.matched_masses_b
+    matched_masses_y = matched_masses.matched_masses_y
     b_hits,y_hits = create_hits(spectrum.num,spectrum,matched_masses_b,matched_masses_y,converted_b, converted_y)
     hits = objects.Hits(b_hits=b_hits,y_hits=y_hits)
     return hits
 
-def create_b_and_y_sorted_clusters(base_alignment_params, precursor_charge, hits, alignment_data):
+def create_sorted_clusters(base_alignment_params, precursor_charge, hits, converted_precursors):
     sqllite_database = base_alignment_params.sqllite_database
     ppm_tolerance = base_alignment_params.ppm_tolerance
-    converted_b = alignment_data.converted_precursor_b
-    converted_y = alignment_data.converted_precursor_y
+    converted_b = converted_precursors.converted_precursor_b
+    converted_y = converted_precursors.converted_precursor_y
     b_hits = hits.b_hits
     y_hits = hits.y_hits
     b_clusters = clustering.create_clusters('b', b_hits, y_hits)
@@ -277,15 +277,22 @@ def create_postprocessed_alignments(aligned_spectrum_params, rescored_alignments
     postprocessed_alignments = postprocessing(rescored_alignments, sqllite_database, spectrum, number_hybrids, number_natives)
     return postprocessed_alignments
 
-def prep_data_structures_for_alignment(aligned_spectrum_params):
+def get_converted_precursors(aligned_spectrum_params):
+    spectrum = aligned_spectrum_params.spectrum
+    converted_precursor_b, converted_precursor_y = convert_precursor_to_ion(spectrum.precursor_mass, spectrum.precursor_charge)
+    converted_precursors =  objects.ConvertedPrecursors(converted_precursor_b=converted_precursor_b,converted_precursor_y=converted_precursor_y)
+    return converted_precursors
+
+def get_matched_masses(aligned_spectrum_params,converted_precursors):
     spectrum = aligned_spectrum_params.spectrum
     sqllite_database = aligned_spectrum_params.base_alignment_params.sqllite_database
     ppm_tolerance = aligned_spectrum_params.base_alignment_params.ppm_tolerance
     input_masses = spectrum.mz_values        
-    converted_precursor_b, converted_precursor_y = convert_precursor_to_ion(spectrum.precursor_mass, spectrum.precursor_charge)
+    converted_precursor_b = converted_precursors.converted_precursor_b
+    converted_precursor_y = converted_precursors.converted_precursor_y
     matched_masses_b, matched_masses_y = merge_search.get_modified_match_masses(input_masses, sqllite_database, ppm_tolerance, converted_precursor_b, converted_precursor_y)
-    alighment_data = objects.AlignmentData(converted_precursor_b=converted_precursor_b, converted_precursor_y=converted_precursor_y, matched_masses_b=matched_masses_b,matched_masses_y=matched_masses_y,)
-    return alighment_data
+    matched_masses = objects.MatchedMasses(matched_masses_b=matched_masses_b,matched_masses_y=matched_masses_y,)
+    return matched_masses
 
 def create_aligned_spectrum_with_target(aligned_spectrum_params):
     spectrum = aligned_spectrum_params.spectrum
@@ -294,12 +301,13 @@ def create_aligned_spectrum_with_target(aligned_spectrum_params):
     precursor_mass = spectrum.precursor_mass
     precursor_tolerance = base_alignment_params.precursor_tolerance
     target_data = computational_pipeline.finding_seqs.get_target_data(aligned_spectrum_params)
-    alignment_data = prep_data_structures_for_alignment(aligned_spectrum_params)
-    target_alignment_data = computational_pipeline.finding_seqs.check_in_matched_masses(alignment_data,target_data)
+    converted_precursors = get_converted_precursors(aligned_spectrum_params)
+    matched_masses = get_matched_masses(aligned_spectrum_params,converted_precursors, converted_precursors)
+    target_alignment_data = computational_pipeline.finding_seqs.check_in_matched_masses(converted_precursors,matched_masses,target_data)
     if len(target_alignment_data.matched_masses_b) > 0 or len(target_alignment_data.matched_masses_y) > 0:
-        precursor_hit_result = alignment.find_from_precursor(aligned_spectrum_params, target_alignment_data)
-        hits = create_b_and_y_hits(aligned_spectrum_params, target_alignment_data) 
-        sorted_clusters = create_b_and_y_sorted_clusters(base_alignment_params, precursor_charge, hits, alignment_data)
+        precursor_hit_result = alignment.get_percursor_hits(aligned_spectrum_params, target_alignment_data)
+        hits = get_fragment_hits(aligned_spectrum_params, target_alignment_data) 
+        sorted_clusters = create_sorted_clusters(base_alignment_params, precursor_charge, hits, converted_precursors)
         target_sorted_clusters = computational_pipeline.finding_seqs.check_in_sorted_clusters(target_alignment_data,sorted_clusters)
         search_space = clustering.get_search_space(sorted_clusters,precursor_charge)
         good_searches = computational_pipeline.finding_seqs.check_in_searches(aligned_spectrum_params,target_data,target_alignment_data)
@@ -325,13 +333,14 @@ def create_aligned_spectrum(aligned_spectrum_params):
     precursor_charge = spectrum.precursor_charge
     precursor_mass = spectrum.precursor_mass
     precursor_tolerance = base_alignment_params.precursor_tolerance
-    alignment_data = prep_data_structures_for_alignment(aligned_spectrum_params)
-    precursor_hit_result = alignment.find_from_precursor(aligned_spectrum_params, alignment_data)
-    hits = create_b_and_y_hits(aligned_spectrum_params, alignment_data)
-    sorted_clusters = create_b_and_y_sorted_clusters(base_alignment_params, precursor_charge, hits, alignment_data)
+    converted_precursors = get_converted_precursors(aligned_spectrum_params)
+    matched_masses = get_matched_masses(aligned_spectrum_params,converted_precursors)
+    precursor_hits = alignment.get_percursor_hits(aligned_spectrum_params, converted_precursors, matched_masses)
+    fragment_hits = get_fragment_hits(aligned_spectrum_params, converted_precursors, matched_masses)
+    sorted_clusters = create_sorted_clusters(base_alignment_params, precursor_charge, fragment_hits, converted_precursors)
     search_space = clustering.get_search_space(sorted_clusters,precursor_charge)
     unique_native_merged_seqs = alignment.pair_natives(search_space, precursor_mass, precursor_tolerance)
-    score_filter = precursor_hit_result.score_filter
+    score_filter = precursor_hits.score_filter
     unique_hybrid_merged_seqs = alignment.pair_indices(aligned_spectrum_params, search_space, score_filter)
     unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
     rescored_alignments = rescore_merges(aligned_spectrum_params,unique_merges)

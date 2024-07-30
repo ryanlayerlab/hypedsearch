@@ -79,11 +79,11 @@ def get_target_data(aligned_spectrum_params):
 
     return target_data
 
-def check_in_matched_masses(alignment_data,target_data):
-    converted_precursor_b = alignment_data.converted_precursor_b
-    converted_precursor_y = alignment_data.converted_precursor_y
-    matched_masses_b = alignment_data.matched_masses_b
-    matched_masses_y = alignment_data.matched_masses_y
+def check_in_matched_masses(converted_precursors,matched_masses,target_data):
+    converted_precursor_b = converted_precursors.converted_precursor_b
+    converted_precursor_y = converted_precursors.converted_precursor_y
+    matched_masses_b = matched_masses.matched_masses_b
+    matched_masses_y = matched_masses.matched_masses_y
     left_pids = target_data.target_left_pids
     left_indices = target_data.target_left_indices
     right_pids = target_data.target_right_pids
