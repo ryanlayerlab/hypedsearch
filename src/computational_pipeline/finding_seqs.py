@@ -27,7 +27,7 @@ def overlap_scoring(sequence, input_masses, ppm_tolerance):
             if o_ctr < len(input_masses) and t_ctr < len(masses):
                 observed = input_masses[o_ctr]
                 theoretical = masses[t_ctr]
-    return(total_score)
+    return total_score
 
 def get_target_data(aligned_spectrum_params):
     spectrum = aligned_spectrum_params.spectrum

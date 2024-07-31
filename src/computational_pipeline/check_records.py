@@ -9,5 +9,4 @@ with open(filepath, 'r') as r:
     for line in r:
         if line[0] == ">":
             count = count + 1
-            
 print(count)
