@@ -1,9 +1,10 @@
 from preprocessing import clustering
 
 
-def make_db_mapping(db):
+def make_db_mapping(sqllite_database):
     name_list = []
-    [name_list.append(x) for x in db.proteins]
+    proteins = sqllite_database.query_proteins()
+    [name_list.append(x) for x in proteins]
 
     num_to_prot_name = dict()
     for i, x in enumerate(name_list):
@@ -26,7 +27,6 @@ def make_db_mapping_by_key(db):
     return num_to_prot_name
 
 def label_alignments(alignment):
-    #b_mass, b_start, b_end, 1, b_charge, b_pid, b_score
     type = alignment[3]
     if type:
         label = "Hybrid"
@@ -56,22 +56,23 @@ def get_sequence(alignment_info, label):
 
     return total_sequence
 
-def find_parent_proteins(alignment_info, db_mapping):
+def find_parent_proteins(alignment_info, sqllite_database):
     left_parents, right_parents = set(), set()
     for merge in alignment_info:
         left_num, right_num = merge[2][0][5], merge[2][1][5]
         get_name = lambda x: x.split('|')[-1].split()[0]
-        left_parent, right_parent = get_name(db_mapping[left_num].description), get_name(db_mapping[right_num].description)
+        left_parent = sqllite_database.get_protein(left_num)[2]
+        right_parent = sqllite_database.get_protein(right_num)[2]
         left_parents.add(left_parent)
         right_parents.add(right_parent)
     return left_parents, right_parents
 
-def get_extensions(alignment_info, protein_list):
+def get_extensions(alignment_info, sqllite_database):
     left_extensions, right_extensions = [], []
     for merge in alignment_info:
-        
         b_side, y_side = merge[2][0], merge[2][1]
-        b_parent_seq, y_parent_seq = protein_list[b_side[5]][1], protein_list[y_side[5]][1]
+        b_parent_seq = sqllite_database.get_protein(b_side[5])[2]
+        y_parent_seq = sqllite_database.get_protein(y_side[5])[2]
         b_extension = b_parent_seq[max(b_side[1]-1, 0):b_side[1]]
         y_extension = y_parent_seq[y_side[2]:min(y_side[2]+1,len(y_parent_seq))]
         left_extensions.append(b_extension) if b_extension != '' else '-'
@@ -79,27 +80,25 @@ def get_extensions(alignment_info, protein_list):
         
     return left_extensions, right_extensions
 
-# spec_num, non_hybrid, proteins, sequence, b_score, y_score, total_score, precursor_distance, total_mass_error
-def postprocessing(alignments, db, input_spectrum, num_hybrids, num_natives):
+def postprocessing(rescored_alignments, sqllite_database, spectrum, number_hybrids, number_natives):
     postprocessed_alignments = []
-    db_mapping = make_db_mapping(db)
-    sorted_alignments = sorted(alignments, key = lambda x: (x[0], x[1]), reverse=True)
+    sorted_alignments = sorted(rescored_alignments, key = lambda x: (x[0], x[1]), reverse=True)
     i = 0
     if (len(sorted_alignments) > 0):
-        max = num_hybrids if label_alignments(sorted_alignments[0]) == "Hybrid" else num_natives
+        max = number_hybrids if label_alignments(sorted_alignments[0]) == "Hybrid" else number_natives
         
         while i < max and i < len(sorted_alignments):
             alignment = sorted_alignments[i]
-            alignment_info = alignments[alignment]
+            alignment_info = rescored_alignments[alignment]
             label = label_alignments(alignment)
-            left_proteins, right_proteins = find_parent_proteins(alignment_info, db_mapping)
+            left_proteins, right_proteins = find_parent_proteins(alignment_info, sqllite_database)
             sequence = get_sequence(alignment_info, label)
-            extended_sequence = get_extensions(alignment_info, db.proteins)
+            extended_sequence = get_extensions(alignment_info, sqllite_database)
             b_scores, y_scores = get_scores(alignment_info)
             total_score = alignment[0]
             gaussian_score = alignment[1]
-            mass_error_sum = alignments[alignment][0][3]
+            mass_error_sum = rescored_alignments[alignment][0][3]
 
-            postprocessed_alignments.append((label, left_proteins, right_proteins, sequence, b_scores, y_scores, total_score/len(sequence.replace("-","")), gaussian_score, extended_sequence, input_spectrum.precursor_mass, input_spectrum.precursor_charge, mass_error_sum))
+            postprocessed_alignments.append((label, left_proteins, right_proteins, sequence, b_scores, y_scores, total_score/len(sequence.replace("-","")), gaussian_score, extended_sequence, spectrum.precursor_mass, spectrum.precursor_charge, mass_error_sum))
             i += 1
     return postprocessed_alignments

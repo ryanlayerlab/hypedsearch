@@ -6,7 +6,6 @@ from computational_pipeline.gen_spectra import get_precursor
 from preprocessing.clustering import calc_from_sequences
 import lookups.objects as objects
 import lookups.utils
-import preprocessing.database_generator
 import computational_pipeline.gen_spectra
 from preprocessing.sqlite_database import Sqllite_Database
 
@@ -488,9 +487,17 @@ def find_alignments(native_merged, hybrid_merged, obs_prec, prec_charge, tol, ma
         total_extension_time = total_extension_time + (time.time() - extension_time)
     return natural_alignments, hybrid_alignments
 
-def pair_indices(b_search_space, y_search_space, prec_mass, prec_tol, prec_charge, score_filter):
+def pair_indices(aligned_spectrum_params, search_space, score_filter):
+    spectrum = aligned_spectrum_params.spectrum
+    base_alignment_params = aligned_spectrum_params.base_alignment_params
+    precursor_mass = spectrum.precursor_mass
+    precursor_charge = spectrum.precursor_charge
+    precursor_tolerance = base_alignment_params.precursor_tolerance
+
+    b_search_space = search_space.b_search_space
+    y_search_space = search_space.y_search_space
     unique_merges = dict()
-    tol = lookups.utils.ppm_to_da(prec_mass, prec_tol)
+    tol = lookups.utils.ppm_to_da(precursor_mass, precursor_tolerance)
     sorted_b_keys = sorted(b_search_space)
     sorted_y_keys = sorted(y_search_space, reverse = True)
             
@@ -499,8 +506,8 @@ def pair_indices(b_search_space, y_search_space, prec_mass, prec_tol, prec_charg
     y_low_ctr, y_high_ctr = 0,0
     while b_ctr < b_end and y_high_ctr < y_end:
         b_prec = sorted_b_keys[b_ctr]
-        missing_mass_upper = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge + tol
-        missing_mass_lower = prec_mass - b_prec + (prec_charge * PROTON_MASS)/prec_charge + WATER_MASS/prec_charge - tol
+        missing_mass_upper = precursor_mass - b_prec + (precursor_charge * PROTON_MASS)/precursor_charge + WATER_MASS/precursor_charge + tol
+        missing_mass_lower = precursor_mass - b_prec + (precursor_charge * PROTON_MASS)/precursor_charge + WATER_MASS/precursor_charge - tol
         y_prec = sorted_y_keys[y_high_ctr]
         
         if y_prec > missing_mass_upper:
@@ -530,30 +537,43 @@ def pair_indices(b_search_space, y_search_space, prec_mass, prec_tol, prec_charg
             b_ctr += 1
             
     return unique_merges
-        
-def find_from_precursor(converted_b, matched_masses_b, input_spectrum, ppm_tolerance, protein_list):
+
+
+def get_percursor_hits(aligned_spectrum_params, converted_precursors, alighment_data):
+    spectrum = aligned_spectrum_params.spectrum
+    sqllite_database = aligned_spectrum_params.base_alignment_params.sqllite_database
+    ppm_tolerance = aligned_spectrum_params.base_alignment_params.ppm_tolerance
+    b_precursor = converted_precursors.converted_precursor_b
+    matched_masses_b = alighment_data.matched_masses_b
+    ppm_tolerance = ppm_tolerance
     prec_matches = []
-    prec_hits = matched_masses_b[converted_b]
+    prec_hits = matched_masses_b[b_precursor]
+    
     for hit in prec_hits:
         if hit[4] == 2:
-            hit_score, tiebreaker = scoring.prec_score(hit, input_spectrum, ppm_tolerance, protein_list)
+            hit_score, tiebreaker = scoring.prec_score(hit, spectrum, ppm_tolerance, sqllite_database)
             prec_matches.append((hit_score, tiebreaker, hit))
         
-    prec_matches = sorted(prec_matches, key = lambda x: (x[0], x[1]), reverse=True)
-    if len(prec_matches) != 0:
-        return prec_matches[0], prec_matches[0][0]
-    else:
-        return [], 0
+    prec_matches = sorted(prec_matches, key=lambda x: (x[0], x[1]), reverse=True)
     
+    if len(prec_matches) != 0:
+        best_match = prec_matches[0]
+        return objects.PrecursorHitResult(best_precursor_hit=best_match, score_filter=best_match[0])
+    else:
+        return objects.PrecursorHitResult(best_precursor_hit=[], score_filter=0)
+        
 def make_native_pair(b, ion):
     y_cluster = (computational_pipeline.gen_spectra.get_max_mass(b[6], 'b' if ion == 0 else 'y', b[4]), b[1], b[2], ion, b[4], b[5], b[6], 0)
     return y_cluster
     
-def pair_natives(b_search_space, y_search_space, prec_mass, prec_tol):
+
+def pair_natives(search_space, precursor_mass, precursor_tolerance):
+    b_search_space = search_space.b_search_space
+    y_search_space = search_space.y_search_space
     unique_merges = dict()
-    tol = lookups.utils.ppm_to_da(prec_mass, prec_tol)
+    tol = lookups.utils.ppm_to_da(precursor_mass, precursor_tolerance)
     for b_prec in sorted(b_search_space):
-        if abs(b_prec - prec_mass) < tol:
+        if abs(b_prec - precursor_mass) < tol:
             for b in b_search_space[b_prec]:
                 y_pair = make_native_pair(b, 0)
                 full_seq = b[6]
@@ -562,7 +582,7 @@ def pair_natives(b_search_space, y_search_space, prec_mass, prec_tol):
                 unique_merges[(full_seq,0)].append((b,y_pair))
     
     for y_prec in sorted(y_search_space):
-        if abs(y_prec - prec_mass) < tol:
+        if abs(y_prec - precursor_mass) < tol:
             for y in y_search_space[y_prec]:
                 b_pair = make_native_pair(y, 1)
                 full_seq = y[6]

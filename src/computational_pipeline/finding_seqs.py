@@ -29,15 +29,18 @@ def overlap_scoring(sequence, input_masses, ppm_tolerance):
                 theoretical = masses[t_ctr]
     return(total_score)
 
-def get_target_data(tdp: lookups.objects.TargetDataParams):
-    target_seq = tdp.target_seq
-    proteins = tdp.proteins
-    input_masses = tdp.input_masses
-    ppm_tolerance = tdp.ppm_tolerance
-    precursor_mass = tdp.precursor_mass
-    precursor_tolerance = tdp.precursor_tolerance
-    precursor_charge = tdp.precursor_charge
-    prec_tol = ppm_to_da(precursor_mass, precursor_tolerance)
+def get_target_data(aligned_spectrum_params):
+    spectrum = aligned_spectrum_params.spectrum
+    base_alignment_params = aligned_spectrum_params.base_alignment_params
+    precursor_charge = spectrum.precursor_charge
+    precursor_mass = spectrum.precursor_mass
+    target_seq = base_alignment_params.target_seq
+    sqllite_database = base_alignment_params.sqllite_database
+    ppm_tolerance = base_alignment_params.ppm_tolerance
+    precursor_tolerance = base_alignment_params.precursor_tolerance
+
+    protein_list = sqllite_database.query_proteins()
+    input_masses = spectrum.mz_values
     theoretical_prec = computational_pipeline.gen_spectra.get_precursor(target_seq.replace("-", ""), precursor_charge)
     if abs(theoretical_prec - precursor_mass) <= precursor_tolerance:
         print(target_seq,"is a valid hybrid to find")
@@ -46,7 +49,6 @@ def get_target_data(tdp: lookups.objects.TargetDataParams):
     
     target_left_pids, target_right_pids = [], []
     target_left_indices, target_right_indices = [], []
-    protein_list = proteins.proteins
     if "-" in target_seq:
         b_part, y_part = target_seq.split("-")
     else:
@@ -77,7 +79,15 @@ def get_target_data(tdp: lookups.objects.TargetDataParams):
 
     return target_data
 
-def check_in_matched_masses(matched_masses_b, matched_masses_y, left_pids, left_indices, right_pids, right_indices):
+def check_in_matched_masses(converted_precursors,matched_masses,target_data):
+    converted_precursor_b = converted_precursors.converted_precursor_b
+    converted_precursor_y = converted_precursors.converted_precursor_y
+    matched_masses_b = matched_masses.matched_masses_b
+    matched_masses_y = matched_masses.matched_masses_y
+    left_pids = target_data.target_left_pids
+    left_indices = target_data.target_left_indices
+    right_pids = target_data.target_right_pids
+    right_indices = target_data.target_right_indices
     good_b_entries, good_y_entries = [], []
     for i, pid in enumerate(left_pids):
         for key in matched_masses_b.keys():
@@ -103,9 +113,14 @@ def check_in_matched_masses(matched_masses_b, matched_masses_y, left_pids, left_
         print("No good hits in matched_masses_b but in matched_masses_y")
     if len(good_b_entries) == 0 and len(good_y_entries) == 0:
         print("No good hits in matched_masses_b nor in matched_masses_y")
-    return good_b_entries, good_y_entries
+    target_alignment_data = lookups.objects.AlignmentData(converted_precursor_b=converted_precursor_b,converted_precursor_y=converted_precursor_y,matched_masses_b=good_b_entries,matched_masses_y=good_y_entries)
+    return target_alignment_data
     
-def check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_hits, good_y_hits):
+def check_in_sorted_clusters(target_alignment_data,sorted_clusters):
+    b_sorted_clusters = sorted_clusters.b_sorted_clusters
+    y_sorted_clusters = sorted_clusters.y_sorted_clusters
+    good_b_hits = target_alignment_data.matched_masses_b
+    good_y_hits = target_alignment_data.matched_masses_y
     good_maxb_hit, good_maxy_hit = [], []
     good_maxb_dict, good_maxy_dict = dict(), dict()
     good_b_clusters, good_y_clusters = [], []
@@ -278,16 +293,23 @@ def check_in_rescored(rescored, good_scored):
     else:
         print("Lost in final filtering")
         
-def check_in_searches(b_searches, y_searches, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_seq, prec_charge, ppm_tol):
+        
+def check_in_searches(target_data,target_alignment_data,ppm_tolerance,precursor_charge,target_seq):
+    b_searches =  target_alignment_data.matched_masses_b
+    y_searches = target_alignment_data.matched_masses_y
+    target_left_pids = target_data.target_left_pids
+    target_right_pids = target_data.target_right_pids
+    target_left_indices = target_data.target_left_indices
+    target_right_indices = target_data.target_right_indices
     good_b_searches, good_y_searches = [],[]
     if "-" in target_seq:
         left_part, right_part = target_seq.split("-")
     else:
         left_part, right_part = target_seq, target_seq
-    left_prec = computational_pipeline.gen_spectra.get_precursor(left_part, prec_charge)
-    right_prec = computational_pipeline.gen_spectra.get_precursor(right_part, prec_charge)
-    b_tol = ppm_to_da(left_prec, ppm_tol)
-    y_tol = ppm_to_da(right_prec, ppm_tol)
+    left_prec = computational_pipeline.gen_spectra.get_precursor(left_part, precursor_charge)
+    right_prec = computational_pipeline.gen_spectra.get_precursor(right_part, precursor_charge)
+    b_tol = ppm_to_da(left_prec, ppm_tolerance)
+    y_tol = ppm_to_da(right_prec, ppm_tolerance)
     
     for prec in b_searches.keys():
         if abs(prec - left_prec) < b_tol:
@@ -319,7 +341,11 @@ def check_in_searches(b_searches, y_searches, target_left_pids, target_right_pid
         print("No good hits in b_searches nor in y_searches")
     return good_b_searches, good_y_searches
 
-def check_in_merges(hybrid_merges, native_merges, good_b_searches, good_y_searches):
+def check_in_merges(good_searches):
+    hybrid_merges = check_merges_params.hybrid_merges
+    native_merges = check_merges_params.native_merges
+    good_b_searches = good_searches.good_b_searches
+    good_y_searches = good_searches.good_y_searches
     good_merges = []
     for key in hybrid_merges:
         for merge in hybrid_merges[key]:
@@ -341,10 +367,10 @@ def check_in_merges(hybrid_merges, native_merges, good_b_searches, good_y_search
         print("Good merges were found")
     else:
         print("No good merges were found")
-        
+    
     return good_merges
 
-def check_in_rescored_merges(rescored_merges, good_merges):
+def check_in_rescored_merges(rescored_merges,good_merges):
     good_rescored = []
     sorted_rescored = sorted(rescored_merges, key=lambda x: (x[0], x[1]), reverse = True)
     for merge in good_merges:

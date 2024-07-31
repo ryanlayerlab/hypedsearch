@@ -68,15 +68,15 @@ def modified_merge(kmers, boundaries: dict):
             kmer_index = starting_point
     return matched_masses_b, matched_masses_y
 
-def get_modified_match_masses(input_masses, sqllite_database, max_peptide_length, ppm_tolerance, b_precursor, y_precursor):
+def get_modified_match_masses(input_masses, sqllite_database, ppm_tolerance, b_precursor, y_precursor):
     matched_masses_b, matched_masses_y = dict(), dict()
     for input_mass in input_masses:
         tol = ppm_to_da(input_mass, ppm_tolerance)
-        matched_masses_b[input_mass], matched_masses_y[input_mass] = sqllite_database.query_mass(input_mass, tol)
+        matched_masses_b[input_mass], matched_masses_y[input_mass] = sqllite_database.query_mass_kmers(input_mass, tol)
     tol = ppm_to_da(b_precursor, ppm_tolerance)
-    matched_masses_b[b_precursor], _ = sqllite_database.query_mass(b_precursor, tol)
+    matched_masses_b[b_precursor], _ = sqllite_database.query_mass_kmers(b_precursor, tol)
     tol = ppm_to_da(y_precursor, ppm_tolerance)
-    _, matched_masses_y[y_precursor] = sqllite_database.query_mass(y_precursor, tol)
+    _, matched_masses_y[y_precursor] = sqllite_database.query_mass_kmers(y_precursor, tol)
     return matched_masses_b, matched_masses_y
 
 def reformat_kmers(kstr):

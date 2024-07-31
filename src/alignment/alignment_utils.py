@@ -1,6 +1,5 @@
 from lookups.objects import Database, Spectrum
 from scoring import scoring
-import preprocessing.database_generator
 import computational_pipeline.gen_spectra
 import lookups.utils
 import re

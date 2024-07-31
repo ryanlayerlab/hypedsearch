@@ -8,6 +8,7 @@ from preprocessing.sqlite_database import Sqllite_Database
 import time
 from lookups.constants import AMINO_ACIDS
 from scoring.scoring import calc_bayes_score
+import lookups.objects as objects
 
 def create_clusters_from_foos(foos):
     if len(foos) == 0 : return None
@@ -101,9 +102,9 @@ def parse_indices(index_set):
         indices.append(target_tuple)
     return indices
 
-def find_sequence(pid, start_ind, end_ind, proteins):
-    protein = proteins[pid]
-    prot_seq = protein[1]
+def find_sequence(pid, start_ind, end_ind, sqllite_database):
+    protein = sqllite_database.get_protein(pid)
+    prot_seq = protein[2]
     target = prot_seq[start_ind: end_ind]
     return target
 
@@ -133,8 +134,9 @@ def test_digest_match(protein_list, pid, digest, start, end, ion):
     
     return False
 
-def find_extensions(conv_prec,current_mass,ion,charge,pid,protein_list,start,end,ppm_tolerance,seq,score):
-    prot_seq = protein_list[pid][1]
+def find_extensions(conv_prec,current_mass,ion,charge,pid,sqllite_database,start,end,ppm_tolerance,seq,score):
+    protein = sqllite_database.get_protein(pid)
+    prot_seq = protein[2]
     bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
     extensions = []
     repeat = True
@@ -223,7 +225,7 @@ def convert_components(component_arr, ion, score, seq):
 
     return converted_components
 
-def old_score_clusters(ion, clusters, conv_prec, protein_list, prec_charge, ppm_tol):
+def old_score_clusters(ion, clusters, conv_prec, sqllite_database, precursor_charge, ppm_tolerance):
     sorted_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge components seq')
     cluster_dict = dict()
     for i, A in enumerate(clusters):
@@ -232,12 +234,12 @@ def old_score_clusters(ion, clusters, conv_prec, protein_list, prec_charge, ppm_
         start = A[3]
         end = A[4]
         charge = A[5]
-        seq = find_sequence(pid, start, end, protein_list)
+        seq = find_sequence(pid, start, end, sqllite_database)
         score = A[0]
         components = convert_components(A[6], ion, score, seq)
-        extensions = find_extensions(conv_prec,mz,ion,charge,pid,protein_list,start,end,ppm_tol,seq,score)
+        extensions = find_extensions(conv_prec,mz,ion,charge,pid,sqllite_database,start,end,ppm_tolerance,seq,score)
         target_cluster = sorted_cluster(score=score, pid=pid, start=start, end=end, mz=mz, charge=charge, components=components + extensions, seq=seq)
-        converted_precursor = computational_pipeline.gen_spectra.convert_ion_to_precursor(mz, ion, charge, prec_charge)
+        converted_precursor = computational_pipeline.gen_spectra.convert_ion_to_precursor(mz, ion, charge, precursor_charge)
         if converted_precursor not in cluster_dict.keys():
             cluster_dict[converted_precursor] = []
         cluster_dict[converted_precursor].append(target_cluster)
@@ -465,14 +467,16 @@ def distribute_merges(merges, b_sorted_clusters, y_sorted_clusters):
 
     return merged_clusters
 
-def get_search_space(b_sorted_clusters, y_sorted_clusters, prec_charge): #This will eventually be reworked throughout the entire codebase but this is for proof of concept
+def get_search_space(sorted_clusters,precursor_charge):
+    b_sorted_clusters = sorted_clusters.b_sorted_clusters
+    y_sorted_clusters = sorted_clusters.y_sorted_clusters
     b_searches, y_searches = dict(), dict()
     for key in b_sorted_clusters.keys():
         for b in b_sorted_clusters[key]:
             for component in b.components:
                 mass = component[0]
                 charge = component[4]
-                prec = computational_pipeline.gen_spectra.convert_ion_to_precursor(mass, 0, charge, prec_charge)
+                prec = computational_pipeline.gen_spectra.convert_ion_to_precursor(mass, 0, charge, precursor_charge)
                 if prec not in b_searches.keys():
                     b_searches[prec] = []
                 b_searches[prec].append(component)
@@ -482,9 +486,9 @@ def get_search_space(b_sorted_clusters, y_sorted_clusters, prec_charge): #This w
             for component in y.components:
                 mass = component[0]
                 charge = component[4]
-                prec = computational_pipeline.gen_spectra.convert_ion_to_precursor(mass, 1, charge, prec_charge)
+                prec = computational_pipeline.gen_spectra.convert_ion_to_precursor(mass, 1, charge, precursor_charge)
                 if prec not in y_searches.keys():
                     y_searches[prec] = []
                 y_searches[prec].append(component)
-            
-    return b_searches, y_searches
+    search_space = objects.SearchSpace(b_search_space=b_searches,y_search_space=y_searches)
+    return search_space

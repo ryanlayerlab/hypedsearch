@@ -1,6 +1,6 @@
 from collections import namedtuple
 
-Protein = namedtuple('DatabaseEntry', ['description','sequence'])
+Protein = namedtuple('Protein', ['description','sequence'])
 Database = namedtuple('Database', ['fasta_file', 'proteins', 'kmers'])
 
 Spectrum = namedtuple(
@@ -69,60 +69,16 @@ Identification_Instrumentation = namedtuple(
     defaults=[0,0,0,0,0,0,0,0,0]
 )
 
-Aligned_Spectrum = namedtuple(
-    'Aligned_Spectrum',
-    ['hybrid','left_proteins','right_proteins','sequence','b_scores','y_scores','total_score',
-     'total_gaussian_score','extensions','precursor_mass','precursor_charge','total_mass_error','total_count'])
-
-#Jamie
-from collections import namedtuple
-AlignedSpectrumParams = namedtuple('AlignedSpectrumParams', ['spectrum', 'sqllite_database', 'max_peptide_length', 'prec_tol', 'built_database', 'ppm_tolerance', 'num_hybrids', 'num_natives', 'original_target_seq'])
-#spectrum, sqllite_database, max_peptide_length, prec_tol, built_database, ppm_tolerance, num_hybrids, num_natives, original_target_seq
-##spectrums, sqllite_database, built_database,max_peptide_length,ppm_tolerance,precursor_tolerance,number_hybrids,number_natives,target_seq
-TargetDataParams = namedtuple('TargetDataParams', ['original_target_seq', 'built_database', 'mz_values', 'ppm_tolerance', 'precursor_mass', 'prec_tol', 'precursor_charge'])
-#original_target_seq, built_database, spectrum.mz_values, ppm_tolerance, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge
-AlignmentParams = namedtuple('AlignmentParams', ['spectrum', 'sqllite_database', 'max_peptide_length', 'built_database', 'ppm_tolerance'])
-#spectrum, sqllite_database, max_peptide_length, built_database, ppm_tolerance
-CheckMatchedMassesParams = namedtuple('CheckMatchedMassesParams', ['matched_masses_b', 'matched_masses_y', 'target_left_pids', 'target_left_indices', 'target_right_pids', 'target_right_indices'])
-#matched_masses_b, matched_masses_y, target_left_pids, target_left_indices, target_right_pids, target_right_indices
-FindFromPrecursorParams = namedtuple('FindFromPrecursorParams', ['converted_b', 'matched_masses_b', 'spectrum', 'ppm_tolerance', 'proteins_database'])
-#converted_b, matched_masses_b, spectrum, ppm_tolerance, built_database.proteins
-CreateHitsParams = namedtuple('CreateHitsParams', ['spectrum', 'converted_b', 'converted_y', 'matched_masses_b', 'matched_masses_y', 'num'])
-#spectrum, converted_b, converted_y, matched_masses_b, matched_masses_y, spectrum.num
-SortedClustersParams = namedtuple('SortedClustersParams', ['built_database', 'converted_b', 'converted_y', 'b_hits', 'y_hits', 'precursor_charge', 'ppm_tolerance', 'num'])
-#built_database, converted_b, converted_y, b_hits, y_hits, spectrum.precursor_charge, ppm_tolerance, spectrum.num
-CheckSortedClustersParams = namedtuple('CheckSortedClustersParams', ['b_sorted_clusters', 'y_sorted_clusters', 'good_b_entries', 'good_y_entries'])
-#b_sorted_clusters, y_sorted_clusters, good_b_entries, good_y_entries
-SearchSpaceParams = namedtuple('SearchSpaceParams', ['b_sorted_clusters', 'y_sorted_clusters', 'precursor_charge'])
-#b_sorted_clusters, y_sorted_clusters, spectrum.precursor_charge
-CheckSearchesParams = namedtuple('CheckSearchesParams', ['b_search_space', 'y_search_space', 'target_left_pids', 'target_right_pids', 'target_left_indices', 'target_right_indices', 'target_seq', 'precursor_charge', 'ppm_tolerance'])
-#b_search_space, y_search_space, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_seq, spectrum.precursor_charge, ppm_tolerance
-PairNativesParams = namedtuple('PairNativesParams', ['b_search_space', 'y_search_space', 'precursor_mass', 'prec_tol'])
-#b_search_space, y_search_space, spectrum.precursor_mass, prec_tol
-PairIndicesParams = namedtuple('PairIndicesParams', ['b_search_space', 'y_search_space', 'precursor_mass', 'prec_tol', 'precursor_charge', 'score_filter'])
-#b_search_space, y_search_space, spectrum.precursor_mass, prec_tol, spectrum.precursor_charge, score_filter
-CheckMergesParams = namedtuple('CheckMergesParams', ['unique_hybrid_merged_seqs', 'unique_native_merged_seqs', 'good_b_searches', 'good_y_searches'])
-#unique_hybrid_merged_seqs, unique_native_merged_seqs, good_b_searches, good_y_searches
-RescoreMergesParams = namedtuple('RescoreMergesParams', ['unique_merges', 'spectrum', 'ppm_tolerance'])
-#unique_merges, spectrum, ppm_tolerance
-CheckRescoredMergesParams = namedtuple('CheckRescoredMergesParams', ['unique_rescored', 'good_merged_seqs'])
-#unique_rescored, good_merged_seqs
-PostprocessedAlignmentsParams = namedtuple('PostprocessedAlignmentsParams', ['built_database', 'unique_rescored', 'spectrum', 'num_hybrids', 'num_natives'])
-
+BaseAlignmentParams = namedtuple('BaseAlignmentParams',['sqllite_database', 'max_peptide_length', 'ppm_tolerance', 'precursor_tolerance', 'number_hybrids', 'number_natives', 'target_seq'])
+AlignedSpectrumsParams = namedtuple('AlignedSpectrumsParams',['spectrums', 'base_alignment_params'])
+AlignedSpectrumParams = namedtuple('AlignedSpectrumParams',['spectrum', 'base_alignment_params'])
+MatchedMasses = namedtuple('MatchedMasses', ['matched_masses_b', 'matched_masses_y'])
+ConvertedPrecursors = namedtuple('ConvertedPrecursors', ['converted_precursor_b', 'converted_precursor_y'])
 TargetData = namedtuple('TargetData', ['target_seq', 'target_left_pids', 'target_right_pids', 'target_left_indices', 'target_right_indices', 'target_score'])
-#target_seq, target_left_pids, target_right_pids, target_left_indices, target_right_indices, target_score
-AlignmentData = namedtuple('AlignmentData', ['converted_b', 'converted_y', 'matched_masses_b', 'matched_masses_y'])
-#converted_b, converted_y, matched_masses_b, matched_masses_y 
-GoodEntries = namedtuple('GoodEntries', ['good_b_entries', 'good_y_entries'])
-#good_b_entries, good_y_entries
 PrecursorHitResult = namedtuple('PrecursorHitResult', ['best_precursor_hit', 'score_filter'])
-#best_prec_hit, score_filter 
 Hits = namedtuple('Hits', ['b_hits', 'y_hits'])
-#b_hits, y_hits
 SortedClusters = namedtuple('SortedClusters', ['b_sorted_clusters', 'y_sorted_clusters'])
-#b_sorted_clusters, y_sorted_clusters 
 SearchSpace = namedtuple('SearchSpace', ['b_search_space', 'y_search_space'])
-#b_search_space, y_search_space
 GoodSearches = namedtuple('GoodSearches', ['good_b_searches', 'good_y_searches'])
-#good_b_searches, good_y_searches
+AlignedSpectrum = namedtuple('AlignedSpectrum',['hybrid','left_proteins','right_proteins','sequence','b_scores','y_scores','total_score','total_gaussian_score','extensions','precursor_mass','precursor_charge','total_mass_error','total_count'])
 
