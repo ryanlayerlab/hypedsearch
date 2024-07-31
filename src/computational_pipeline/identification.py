@@ -1,5 +1,5 @@
 from multiprocessing import Pool, set_start_method
-import operator
+import operator, time, json, os
 from typing import Any
 from collections import ChainMap
 from postprocessing.postprocessing_utils import postprocessing
@@ -9,10 +9,7 @@ from lookups.utils import ppm_to_da, to_percent, is_json, is_file
 from preprocessing import merge_search, preprocessing_utils, clustering, evaluation
 from file_io import JSON
 import lookups.objects as objects
-import time
 import multiprocessing as mp
-import json
-import os
 from computational_pipeline.gen_spectra import convert_precursor_to_ion, calculate_masses
 from scoring.scoring import second_scoring, rescore_merges
 from alignment.alignment import find_alignments
@@ -170,8 +167,7 @@ def check_top_location(top_naturals, top_hybrids, natural_seqs, hybrid_seqs):
                 break
     
     with open("locations.txt", 'a') as l:
-        l.write(str(top_nat_location) + '\t' + str(top_hyb_location) + '\n')
-            
+        l.write(str(top_nat_location) + '\t' + str(top_hyb_location) + '\n')        
     return
     
 def find_sequence(b_sequence, y_sequence, b_pid, y_pid, protein_list):

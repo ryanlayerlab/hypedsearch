@@ -9,11 +9,7 @@ import lookups.utils
 import computational_pipeline.gen_spectra
 from preprocessing.sqlite_database import Sqllite_Database
 
-import math
-import collections
-import re
-
-import time
+import math, collections, re, time 
 
 FIRST_ALIGN_TIME = 0
 AMBIGUOUS_REMOVAL_TIME = 0
@@ -42,12 +38,10 @@ global hybrid_scoring_times
 hybrid_scoring_times = []
 
 def same_protein_alignment(seq1: str, seq2: str, parent_sequence: str):
-    if seq1 == seq2:
-        return (seq1, None)    
+    if seq1 == seq2 or seq2 in seq1:
+        return (seq1, None)
     if seq1 in seq2:
-        return (seq2, None)    
-    if seq2 in seq1: 
-        return (seq1, None)    
+        return (seq2, None)
     gap_aa = max(1, len(parent_sequence) // 100)
     left_start = [m.start() for m in re.finditer(seq1, parent_sequence)]
     right_start = [m.start() for m in re.finditer(seq2, parent_sequence)]
@@ -68,11 +62,9 @@ def same_protein_alignment(seq1: str, seq2: str, parent_sequence: str):
 
 def align_b_y(b_kmers: list, y_kmers: list, spectrum: Spectrum, database: Database):
     spec_alignments = []
-    for b_kmer in b_kmers:
-        b_seq = b_kmer
+    for b_seq in b_kmers:
         b_proteins = database.get_proteins_with_subsequence(database, b_seq)
-        for y_kmer in y_kmers:
-            y_seq = y_kmer
+        for y_seq in y_kmers:
             y_proteins = database.get_proteins_with_subsequence(database, y_seq)
             if any([x in y_proteins for x in b_proteins]):
                 shared_prots = [x for x in y_proteins if x in b_proteins]
@@ -88,12 +80,11 @@ def align_b_y(b_kmers: list, y_kmers: list, spectrum: Spectrum, database: Databa
     return list(set([x for x in spec_alignments if x is not None]))
 
 def extend_base_kmers(b_kmers: list, y_kmers: list, spectrum: Spectrum, db: Database):
-    extended_b = []
-    extended_y = []
+    extended_b, extended_y = [], []
     for seq in b_kmers:
-        extended_b += [x for x in alignment_utils.extend_non_hybrid(seq, spectrum, 'b', db)]
+        extended_b += alignment_utils.extend_non_hybrid(seq, spectrum, 'b', db)
     for seq in y_kmers:
-        extended_y += [x for x in alignment_utils.extend_non_hybrid(seq, spectrum, 'y', db)]
+        extended_y += alignment_utils.extend_non_hybrid(seq, spectrum, 'y', db)
     return extended_b, extended_y
 
 def refine_alignments(spectrum: Spectrum, db: Database, alignments: list, precursor_tolerance: int = 10,

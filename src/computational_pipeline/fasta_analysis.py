@@ -6,5 +6,4 @@ with open(database_file_path, 'r') as d:
     for line in d:
         if line[0] == '>':
             count = count + 1
-            
 print(count)

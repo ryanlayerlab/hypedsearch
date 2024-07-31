@@ -30,10 +30,10 @@ def __get_surrounding_amino_acids(
     # get all the positions of sequence in the parent sequence
     occurances = [m.start() for m in re.finditer(sequence, parent_sequence)]
 
-    for o in occurances:
+    for occurance in occurances:
         flanking_pairs.append(
-            (parent_sequence[max(0, o - count): o], 
-            parent_sequence[o + len(sequence): min(len(parent_sequence), o + len(sequence) + count)])
+            (parent_sequence[max(0, occurance - count): occurance], 
+            parent_sequence[occurance + len(sequence): min(len(parent_sequence), o + len(sequence) + count)])
         )
 
     return flanking_pairs
@@ -46,8 +46,7 @@ def __add_amino_acids(
     tolerance: float = 1.0
     ) -> list:
     filled_in  = []
-    parents = get_parents(sequence, db, 'b')
-    parents += get_parents(sequence, db, 'y')
+    parents = get_parents(sequence, db, 'b') + get_parents(sequence, db, 'y')
     if lookups.utils.HYBRID_ALIGNMENT_PATTERN.findall(sequence):
         for l_p in parents[0]:
             for r_p in parents[1]:
@@ -77,7 +76,6 @@ def __add_amino_acids(
                                             filled_in.append(new_seq)
         
     else:
-
         for p in parents[0]:
             entries = preprocessing.database_generator.get_entry_by_name(db, p)
             for entry in entries:
@@ -112,20 +110,14 @@ def __remove_amino_acids(
                     spectrum.precursor_charge
                 )
                 
-                # get the new precursor distance
-                pd = scoring.precursor_distance(spectrum.precursor_mass, new_prec)
-                
-                # if the precursor distance is within our tolerance, append it
-                if pd <= tolerance:
+                precursor_distance = scoring.precursor_distance(spectrum.precursor_mass, new_prec)
+                if precursor_distance <= tolerance:
                     attempted.append(new_seq)
-
-    # otherwise, just take up to gap off from the left and the right
     else:
         for i in range(gap + 1):
             new_seq1 = sequence[i:]
             new_seq2 = sequence[:-i]
             
-            # cacluate the new precurosrs and add to attempted if within the tolerance
             new_prec1 = computational_pipeline.gen_spectra.get_precursor(new_seq1, spectrum.precursor_charge)
             new_prec2 = computational_pipeline.gen_spectra.get_precursor(new_seq2, spectrum.precursor_charge)
             
@@ -134,15 +126,12 @@ def __remove_amino_acids(
             
             if pd1 <= tolerance:
                 attempted.append(new_seq1)
-            
             if pd2 <= tolerance:
                 attempted.append(new_seq2)
-
     return list(set(attempted))
      
 
 #################### Public functions ####################
-
 def align_overlaps(seq1: str, seq2: str) -> str:
     '''Attempt to align two string sequences. It will look at the right side of 
     seq1 and left side of seq2 to overlap the two strings. If no overlap is 
@@ -168,7 +157,6 @@ def align_overlaps(seq1: str, seq2: str) -> str:
     '''
 
     alignment = None
-    # if we have a perfect overlap, return it
     if seq1 == seq2:
         return seq1
     
@@ -210,7 +198,6 @@ def align_overlaps(seq1: str, seq2: str) -> str:
     # if no overlpa exists, just make append seq2 to seq1
     if alignment is None:
         alignment = seq1 + '-' + seq2
-
     return alignment
 
 def match_precursor(
@@ -229,10 +216,8 @@ def match_precursor(
         return [None]
 
     if spectrum.precursor_mass > theory_precrusor:
-
         return __add_amino_acids(spectrum, sequence, db, gap, tolerance)
     else:
-
         return __remove_amino_acids(spectrum, sequence, gap, tolerance)
 
 def get_parents(
@@ -249,11 +234,9 @@ def get_parents(
 
     if ion is not None and ion in 'by':
         return (get_sources_ion(seq, ion), None)
-
     return (get_sources(seq), None)
 
-def extend_non_hybrid(kmer, spectrum: Spectrum, ion: str, database: Database) -> list:
-    seq = kmer
+def extend_non_hybrid(seq, spectrum: Spectrum, ion: str, database: Database) -> list:
     extensions = []
     extension_len = lookups.utils.predicted_len_precursor(spectrum, seq) - len(seq)
     if extension_len <= 0:
@@ -270,5 +253,4 @@ def extend_non_hybrid(kmer, spectrum: Spectrum, ion: str, database: Database) ->
                 else:
                     max_idx = min(len(entry.sequence), seq_idx + len(seq) + extension_len)
                     extensions.append(entry.sequence[seq_idx:max_idx])
-
     return extensions

@@ -4,17 +4,16 @@ from scoring import scoring
 from alignment import alignment_utils
 
 def __replace_ambiguous_hybrid(hybrid: tuple, db: Database, observed: Spectrum):
-    nonhyb = hybrid[0]
-    if len(preprocessing.database_generator.get_proteins_with_subsequence(db, nonhyb)):
-        return ((nonhyb, None))
-    possible = all_perms_of_s(nonhyb, 'LI')
+    nonhybrid = hybrid[0]
+    if len(preprocessing.database_generator.get_proteins_with_subsequence(db, nonhybrid)):
+        return ((nonhybrid, None))
+    possible = all_perms_of_s(nonhybrid, 'LI')
     if len(possible) == 0:
         return hybrid
     for p in possible:
         if len(computational_pipeline.database.get_proteins_with_subsequence(db, p)):
             return ((p, None))
     return hybrid
-
 
 def replace_ambiguous_hybrids(
     hybrid_alignments: list, 
@@ -43,5 +42,4 @@ def hybrid_alignment(seq1: str, seq2: str):
     else:
         alignment = seq1 + seq2
         hybalignment = seq1 + '-' + seq2
-        
     return (alignment, hybalignment)

@@ -26,10 +26,8 @@ for file in output_files:
                 right_parent_entry = A[6][:len(A[6])].split(": ")
                 right_parent = str(right_parent_entry[1][1:len(right_parent_entry[1])-1])
                 hybrid_list.add((extended_sequence, left_parent, right_parent, sequence))
-                # hybrid_score_list.append(A[3])
             else:
                 nat_list.append((A[2], A[5], A[6], A[2]))
-                # nat_scores.append(A[3])
                 
 def further_extend(hybrid_list, proteins):
     new_hybrids = set()
@@ -65,23 +63,3 @@ with open("/home/naco3124/jaime_hypedsearch/hypedsearch/data/database/Hybrid_"+o
         else:
             target_string = hybrid[0]
         d.write(target_string.replace("-", "") + "\n\n")
- 
-# hyb_index = []
-# for i in range(0,len(hybrid_score_list)):
-#     hyb_index.append(i)
-# plt1, ax1 = plt.subplots()
-# ax1.scatter(hyb_index, hybrid_score_list)
-# plt.xlabel("Index")
-# plt.ylabel("scores")
-# plt.title("Hybrid scores")
-# plt.savefig("Hybrid_scores")
-
-# nat_index = []
-# for i in range(0,len(nat_list)):
-#     nat_index.append(i)
-# plt2, ax2 = plt.subplots()
-# ax2.scatter(nat_index, nat_scores)
-# plt.xlabel("Index")
-# plt.ylabel("scores")
-# plt.title("Natural scores")
-# plt.savefig("Natural_scores")
