@@ -249,7 +249,7 @@ def get_fragment_hits(aligned_spectrum_params, converted_precursors, matched_mas
     hits = objects.Hits(b_hits=b_hits,y_hits=y_hits)
     return hits
 
-def create_sorted_clusters(base_alignment_params, precursor_charge, hits, converted_precursors):
+def get_sorted_clusters(base_alignment_params, precursor_charge, hits, converted_precursors):
     sqllite_database = base_alignment_params.sqllite_database
     ppm_tolerance = base_alignment_params.ppm_tolerance
     converted_b = converted_precursors.converted_precursor_b
@@ -294,6 +294,11 @@ def get_matched_masses(aligned_spectrum_params,converted_precursors):
     matched_masses = objects.MatchedMasses(matched_masses_b=matched_masses_b,matched_masses_y=matched_masses_y,)
     return matched_masses
 
+def print_named_tuple(tuple_description, named_tuple):
+    file_path = tuple_description + '.txt'
+    with open(file_path, 'w') as file:
+        file.write(str(named_tuple))
+
 def create_aligned_spectrum_with_target(aligned_spectrum_params):
     spectrum = aligned_spectrum_params.spectrum
     base_alignment_params = aligned_spectrum_params.base_alignment_params
@@ -307,7 +312,7 @@ def create_aligned_spectrum_with_target(aligned_spectrum_params):
     if len(target_alignment_data.matched_masses_b) > 0 or len(target_alignment_data.matched_masses_y) > 0:
         precursor_hit_result = alignment.get_percursor_hits(aligned_spectrum_params, target_alignment_data)
         hits = get_fragment_hits(aligned_spectrum_params, target_alignment_data) 
-        sorted_clusters = create_sorted_clusters(base_alignment_params, precursor_charge, hits, converted_precursors)
+        sorted_clusters = get_sorted_clusters(base_alignment_params, precursor_charge, hits, converted_precursors)
         target_sorted_clusters = computational_pipeline.finding_seqs.check_in_sorted_clusters(target_alignment_data,sorted_clusters)
         search_space = clustering.get_search_space(sorted_clusters,precursor_charge)
         good_searches = computational_pipeline.finding_seqs.check_in_searches(aligned_spectrum_params,target_data,target_alignment_data)
@@ -337,7 +342,7 @@ def create_aligned_spectrum(aligned_spectrum_params):
     matched_masses = get_matched_masses(aligned_spectrum_params,converted_precursors)
     precursor_hits = alignment.get_percursor_hits(aligned_spectrum_params, converted_precursors, matched_masses)
     fragment_hits = get_fragment_hits(aligned_spectrum_params, converted_precursors, matched_masses)
-    sorted_clusters = create_sorted_clusters(base_alignment_params, precursor_charge, fragment_hits, converted_precursors)
+    sorted_clusters = get_sorted_clusters(base_alignment_params, precursor_charge, fragment_hits, converted_precursors)
     search_space = clustering.get_search_space(sorted_clusters,precursor_charge)
     unique_native_merged_seqs = alignment.pair_natives(search_space, precursor_mass, precursor_tolerance)
     score_filter = precursor_hits.score_filter
