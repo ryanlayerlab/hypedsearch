@@ -6,7 +6,6 @@ from lookups.constants import WATER_MASS, AMMONIUM
 from math import exp
 import computational_pipeline.gen_spectra
 import lookups.utils
-import preprocessing.database_generator
 import re
 import json 
 import os
@@ -214,30 +213,31 @@ def modified_losing_ammonium(sequence, input_masses, ppm_tolerance):
     score, tiebreaker, mass_error_sum = calc_overlap(masses, input_masses, ppm_tolerance)
     return score, tiebreaker, mass_error_sum
 
-
-def rescore_merges(unique_merge_space, input_spectrum, ppm_tol):
+def rescore_merges(aligned_spectrum_params,unique_merges):
+    spectrum = aligned_spectrum_params.spectrum
+    ppm_tolerance = aligned_spectrum_params.base_alignment_params.ppm_tolerance
     rescored_unique = dict()
-    for key, hyb in unique_merge_space:
-        score, tiebreaker, ppm_sum = modified_overlap_scoring(key, input_spectrum.mz_values, ppm_tol) # counts peaks
-        minus_water_score, minus_water_tiebreaker, minus_water_ppm_sum = modified_losing_water(key, input_spectrum.mz_values, ppm_tol) # counts again but strip water
-        minus_ammonium_score, minus_ammonium_tiebreaker, minus_ammonium_ppm_sum = modified_losing_ammonium(key, input_spectrum.mz_values, ppm_tol) # counts again but strip ammonium
+    for key, hyb in unique_merges:
+        score, tiebreaker, ppm_sum = modified_overlap_scoring(key, spectrum.mz_values, ppm_tolerance)
+        minus_water_score, minus_water_tiebreaker, minus_water_ppm_sum = modified_losing_water(key, spectrum.mz_values, ppm_tolerance)
+        minus_ammonium_score, minus_ammonium_tiebreaker, minus_ammonium_ppm_sum = modified_losing_ammonium(key, spectrum.mz_values, ppm_tolerance)
         score += minus_water_score + minus_ammonium_score
         ppm_sum += minus_water_ppm_sum + minus_ammonium_ppm_sum
         tiebreaker * minus_water_tiebreaker * minus_ammonium_tiebreaker
         if (score/len(key), tiebreaker, key, hyb) not in rescored_unique.keys():
             rescored_unique[(score, tiebreaker, key, hyb)] = []
-        for b, y in unique_merge_space[(key, hyb)]:
+        for b, y in unique_merges[(key, hyb)]:
             rescored_unique[(score, tiebreaker, key, hyb)].append((score, tiebreaker, (b,y), ppm_sum))
     return rescored_unique
                
-def prec_overlap_scoring(input_masses, ppm_tolerance, pid, start, end, protein_list):
-    sequence = clustering.find_sequence(pid, start, end, protein_list)
+def prec_overlap_scoring(input_masses, ppm_tolerance, pid, start, end, sqllite_database):
+    sequence = clustering.find_sequence(pid, start, end, sqllite_database)
     spectrum = computational_pipeline.gen_spectra.generate_spectrum(sequence)
     masses = sorted(spectrum['spectrum'])
     input_masses = sorted(input_masses)
     score, tiebreaker, _ = calc_overlap(masses, input_masses, ppm_tolerance)
     return score, tiebreaker
 
-def prec_score(hit, input_spectrum, ppm_tolerance, protein_list):
-    score, tiebreaker = prec_overlap_scoring(input_spectrum.mz_values, ppm_tolerance, hit[5], hit[1], hit[2], protein_list)
+def prec_score(hit, input_spectrum, ppm_tolerance, sqllite_database):
+    score, tiebreaker = prec_overlap_scoring(input_spectrum.mz_values, ppm_tolerance, hit[5], hit[1], hit[2], sqllite_database)
     return score, tiebreaker
