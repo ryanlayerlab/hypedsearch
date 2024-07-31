@@ -124,7 +124,7 @@ def check_in_sorted_clusters(b_sorted_clusters, y_sorted_clusters, good_b_hits, 
     for key in good_maxb_dict.keys():
         best_hit = max(good_maxb_dict[key], key=lambda x: x[2])
         good_maxb_hit.append(best_hit)
-        
+         
     for key in good_maxy_dict.keys():
         best_hit = min(good_maxy_dict[key], key=lambda x: x[1])
         good_maxy_hit.append(best_hit)
