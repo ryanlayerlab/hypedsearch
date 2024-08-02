@@ -530,7 +530,7 @@ def pair_indices(aligned_spectrum_params, search_space, score_filter):
     return unique_merges
 
 
-def get_percursor_hits(aligned_spectrum_params, converted_precursors, alighment_data):
+def get_percursor_hit(aligned_spectrum_params, converted_precursors, alighment_data):
     spectrum = aligned_spectrum_params.spectrum
     sqllite_database = aligned_spectrum_params.base_alignment_params.sqllite_database
     ppm_tolerance = aligned_spectrum_params.base_alignment_params.ppm_tolerance
@@ -549,9 +549,9 @@ def get_percursor_hits(aligned_spectrum_params, converted_precursors, alighment_
     
     if len(prec_matches) != 0:
         best_match = prec_matches[0]
-        return objects.PrecursorHitResult(best_precursor_hit=best_match, score_filter=best_match[0])
+        return objects.PrecursorHit(best_precursor_hit=best_match, score_filter=best_match[0])
     else:
-        return objects.PrecursorHitResult(best_precursor_hit=[], score_filter=0)
+        return objects.PrecursorHit(best_precursor_hit=[], score_filter=0)
         
 def make_native_pair(b, ion):
     y_cluster = (computational_pipeline.gen_spectra.get_max_mass(b[6], 'b' if ion == 0 else 'y', b[4]), b[1], b[2], ion, b[4], b[5], b[6], 0)
