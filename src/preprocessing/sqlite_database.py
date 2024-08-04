@@ -45,10 +45,10 @@ class Sqllite_Database:
         rows = self.cursor.execute("SELECT * FROM kmers").fetchall()
         print(rows)
     
-    def query_mass_kmers(self, mass, tol):
-        upper = mass + tol
-        lower = mass - tol
-        self.cursor.execute("CREATE TABLE temp.mass AS SELECT * FROM kmers where mass between ? and ? order by protein, location_start", (lower, upper))
+    def query_mass_kmers(self, mass, tolerance):
+        upper_bound = mass + tolerance
+        lower_bound = mass - tolerance
+        self.cursor.execute("CREATE TABLE temp.mass AS SELECT * FROM kmers where mass between ? and ? order by protein, location_start", (lower_bound, upper_bound))
         b_rows = self.cursor.execute("SELECT * FROM temp.mass where ion = 0 order by protein, location_start, location_end").fetchall()
         y_rows = self.cursor.execute("SELECT * FROM temp.mass where ion = 1 order by protein, location_start, location_end").fetchall()
         self.cursor.execute("DROP TABLE temp.mass")
@@ -128,25 +128,6 @@ class Sqllite_Database:
     def get_protein(self, pid):
         row = self.cursor.execute("SELECT * FROM proteins WHERE id = ?", (pid,)).fetchone()        
         return row       
-    
-#     def get_proteins_with_subsequence(db: Database, sequence: str) -> list:
-#         return list(set(db.kmers[sequence]))
-
-#     def get_proteins_with_subsequence_ion(db: Database, sequence: str, ion: str) -> list:
-#         hits = []
-#         subseq = sequence
-#         while len(hits) == 0 and len(subseq) > 0:
-#             hs = get_proteins_with_subsequence(db, subseq)
-#             for h in hs:
-#                 for entry in get_entry_by_name(db, h):
-#                     if sequence in entry.sequence:
-#                         hits.append(h)
-#             if len(hits) == 0:
-#                 subseq = subseq[1:] if ion == 'y' else subseq[:-1]
-#         return hits
-
-#     def get_entry_by_name(db: Database, name: str) -> namedtuple:
-#         return db.proteins[name]    
     
 
     def get_kmers_for_protein(self, kmer, start, end, protein_id, ion):

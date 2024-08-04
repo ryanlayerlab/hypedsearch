@@ -72,7 +72,10 @@ Identification_Instrumentation = namedtuple(
 BaseAlignmentParams = namedtuple('BaseAlignmentParams',['sqllite_database', 'max_peptide_length', 'ppm_tolerance', 'precursor_tolerance', 'number_hybrids', 'number_natives', 'target_seq'])
 AlignedSpectrumsParams = namedtuple('AlignedSpectrumsParams',['spectrums', 'base_alignment_params'])
 AlignedSpectrumParams = namedtuple('AlignedSpectrumParams',['spectrum', 'base_alignment_params'])
-MatchedMasses = namedtuple('MatchedMasses', ['matched_masses_b', 'matched_masses_y'])
+KMer = namedtuple('KMer',['mass','location_start','location_end','ion','charge','protein_id'])
+ClusterItem = namedtuple('ClusterItem',['key','kmer','peptide'])
+Cluster = namedtuple('Cluster',['protein_id','peptide','score','cluster_items'])
+
 ConvertedPrecursors = namedtuple('ConvertedPrecursors', ['converted_precursor_b', 'converted_precursor_y'])
 TargetData = namedtuple('TargetData', ['target_seq', 'target_left_pids', 'target_right_pids', 'target_left_indices', 'target_right_indices', 'target_score'])
 PrecursorHit = namedtuple('PrecursorHit', ['best_precursor_hit', 'score_filter'])

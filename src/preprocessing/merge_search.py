@@ -68,16 +68,15 @@ def modified_merge(kmers, boundaries: dict):
             kmer_index = starting_point
     return matched_masses_b, matched_masses_y
 
-def get_modified_match_masses(input_masses, sqllite_database, ppm_tolerance, b_precursor, y_precursor):
-    matched_masses_b, matched_masses_y = dict(), dict()
+def get_all_matched_rows(input_masses, sqllite_database, ppm_tolerance):
+    all_b_rows = []
+    all_y_rows = []
     for input_mass in input_masses:
-        tol = ppm_to_da(input_mass, ppm_tolerance)
-        matched_masses_b[input_mass], matched_masses_y[input_mass] = sqllite_database.query_mass_kmers(input_mass, tol)
-    tol = ppm_to_da(b_precursor, ppm_tolerance)
-    matched_masses_b[b_precursor], _ = sqllite_database.query_mass_kmers(b_precursor, tol)
-    tol = ppm_to_da(y_precursor, ppm_tolerance)
-    _, matched_masses_y[y_precursor] = sqllite_database.query_mass_kmers(y_precursor, tol)
-    return matched_masses_b, matched_masses_y
+        tolerance = ppm_to_da(input_mass, ppm_tolerance)
+        b_rows, y_rows = sqllite_database.query_mass_kmers(input_mass, tolerance)
+        all_b_rows.extend(b_rows)
+        all_y_rows.extend(y_rows)
+    return all_b_rows, all_y_rows
 
 def reformat_kmers(kstr):
     new_list = []

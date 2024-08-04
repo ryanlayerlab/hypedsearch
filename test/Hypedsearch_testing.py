@@ -5,7 +5,7 @@ import numpy as np
 from preprocessing import preprocessing_utils, clustering, merge_search
 from main import get_spectra_files
 from utils import ppm_to_da
-from preprocessing.merge_search import get_modified_match_masses
+from preprocessing.merge_search import get_all_matched_rows
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from sqlite import database_file
