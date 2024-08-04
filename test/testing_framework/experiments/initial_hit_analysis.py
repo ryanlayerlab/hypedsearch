@@ -156,7 +156,7 @@ if get:
     matched_masses_b, matched_masses_y, kmer_set = merge_search.get_from_file(os.path.join(write_path, 'matched_masses_b.txt'), os.path.join(write_path, 'matched_masses_y.txt'), os.path.join(write_path, 'kmer_set.txt'), no_k)
     print('Done')
 else:
-    matched_masses_b, matched_masses_y, kmer_set = merge_search.get_modified_match_masses(boundaries, db, max_peptide_length, True, write_path)
+    matched_masses_b, matched_masses_y, kmer_set = merge_search.get_all_matched_rows(boundaries, db, max_peptide_length, True, write_path)
 print('Finished matching masses')
 
 top_count, top_10_count, top_50_count = False, False, False

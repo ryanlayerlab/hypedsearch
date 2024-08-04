@@ -1,5 +1,7 @@
 import collections
 import operator
+
+from itertools import groupby
 import os
 from lookups.utils import ppm_to_da, to_percent
 import computational_pipeline.gen_spectra
@@ -8,133 +10,77 @@ from preprocessing.sqlite_database import Sqllite_Database
 import time
 from lookups.constants import AMINO_ACIDS
 from scoring.scoring import calc_bayes_score
-import lookups.objects as objects
+from lookups.objects import ClusterItem, Cluster
 
-def create_clusters_from_foos(foos):
-    if len(foos) == 0 : return None
-    clusters = []
-    clusters.append(len(foos))
-    clusters.append(foos[0].pid)
-    max_len = 0
-    max_hit = None
-    for foo in foos:
-        l = foo.end - foo.start + 1
-        if l > max_len:
-            max_len = l
-            max_hit = foo
-    clusters.append(max_hit.mz)
-    clusters.append(max_hit.start)
-    clusters.append(max_hit.end)
-    clusters.append(max_hit.charge)
-    clusters.append(foos)
-    return clusters
+def get_cluster_id(key):
+    (protein_id, start_position) = key
+    cluster_id = str(protein_id) + ':' + str(start_position)
+    return cluster_id
 
-def parse_foos(Hit, all_hits):
-    hits = []
-    for A in all_hits:
-        pid = int(A[2][5])
-        start = int(A[2][1])
-        end = int(A[2][2])
-        mz = A[1]
-        charge = A[2][4]
-        hits.append( Hit(pid=pid, start=start, end=end, mz=mz, charge=charge) )
-    return hits
+def get_peptide(kmer, sqllite_database):
+    protein_id = kmer.protein_id
+    location_start = kmer.location_start
+    location_end = kmer.location_end
+    protein = sqllite_database.get_protein(protein_id)
+    full_peptide = protein[2]
+    peptide = full_peptide[location_start: location_end]
+    return peptide
 
-def create_clusters(ion, b_hits, y_hits):
+def get_full_peptide(protein_id, sqllite_database):
+    protein = sqllite_database.get_protein(protein_id)
+    full_peptide = protein[2]
+    return full_peptide
+
+def get_score(cluster_peptide,cluster_items):
+    covered_positions = set()
+    for cluster_item in cluster_items:
+        kmer = cluster_item.kmer
+        covered_positions.update(range(kmer.location_start, kmer.location_end + 1))
+    protein_length = len(cluster_peptide)
+    percentage_coverage = (len(covered_positions) / protein_length) * 100
+    return percentage_coverage
+
+def create_b_clusters(b_kmers,sqllite_database):
     all_clusters = []
-    Foo = collections.namedtuple('Foo', 'pid start end mz charge')
-    if ion == 'b':
-        foos = parse_foos(Foo, b_hits)
-        sorted_foos = sorted(foos, key=operator.attrgetter('pid', 'start', 'end'))
-        last_pid = None
-        last_start = None
-        foos = []
-        for foo in sorted_foos:
-            if last_pid == foo.pid and last_start == foo.start:
-                foos.append(foo)
-            else:
-                if foos != []:
-                    clusters = create_clusters_from_foos(foos)
-                    all_clusters.append(clusters)
-                foos = [foo]
-            last_pid = foo.pid
-            last_start = foo.start
-        if foos != []:
-            clusters = create_clusters_from_foos(foos)
-            all_clusters.append(clusters)
-    else:
-        foos = parse_foos(Foo, y_hits)
-        sorted_foos = sorted(foos, key=operator.attrgetter('pid', 'end', 'start'))
-        last_pid = None
-        last_start = None
-        foos = []
-        for foo in sorted_foos:
-            if last_pid == foo.pid and last_end == foo.end:
-                foos.append(foo)
-            else:
-                if foos != []:
-                    clusters = create_clusters_from_foos(foos)
-                    all_clusters.append(clusters)
-                foos = [foo]
-            last_pid = foo.pid
-            last_end = foo.end
-        if foos != []:
-            clusters = create_clusters_from_foos(foos)
-            all_clusters.append(clusters)
+    sorted_b_kmers = sorted(b_kmers, key=operator.attrgetter('protein_id', 'location_start'))
+    for key, kmers in groupby(sorted_b_kmers, key=operator.attrgetter('protein_id', 'location_start')):
+        cluster_items = []
+        cluster_id = get_cluster_id(key)
+        for kmer in kmers:
+            peptide = get_peptide(kmer, sqllite_database)
+            cluster_item = ClusterItem(key=cluster_id,kmer=kmer,peptide=peptide)
+            cluster_items.append(cluster_item)
+        (protein_id, start_position) = key
+        full_peptide = get_full_peptide(protein_id, sqllite_database)
+        score = get_score(full_peptide,cluster_items)
+        cluster = Cluster(protein_id=protein_id,peptide=full_peptide,score=score,cluster_items=cluster_items)
+        all_clusters.append(cluster)
     return all_clusters
 
-def parse_indices(index_set):
-    indices = []
-    for index in index_set:
-        string = str(index)
-        A = string.rstrip().split(',')
-        start = A[0]
-        end = A[1]
-        seq = A[2]
-        mz = A[3]
-        disallowed_characters = " ()\'"
-        for character in disallowed_characters:
-            start = start.replace(character, "")
-            end = end.replace(character, "")
-            seq = seq.replace(character, "")
-            mz = mz.replace(character, "")
-        target_tuple = (int(start), int(end), seq, float(mz))
-        indices.append(target_tuple)
-    return indices
-
-def find_sequence(pid, start_ind, end_ind, sqllite_database):
-    protein = sqllite_database.get_protein(pid)
-    prot_seq = protein[2]
-    target = prot_seq[start_ind: end_ind]
-    return target
+def create_y_clusters(y_kmers,sqllite_database):
+    all_clusters = []
+    sorted_y_kmers = sorted(y_kmers, key=operator.attrgetter('protein_id', 'location_end'))
+    for key, kmers in groupby(sorted_y_kmers, key=operator.attrgetter('protein_id', 'location_end')):
+        cluster_items = []
+        cluster_id = get_cluster_id(key)
+        for kmer in kmers:
+            peptide = get_peptide(kmer, sqllite_database)
+            cluster_item = ClusterItem(key=cluster_id,kmer=kmer,peptide=peptide)
+            cluster_items.append(cluster_item)
+        (protein_id, start_position) = key
+        full_peptide = get_full_peptide(protein_id, sqllite_database)
+        score = get_score(full_peptide,cluster_items)
+        cluster = Cluster(protein_id=protein_id,peptide=full_peptide,score=score,cluster_items=cluster_items)
+        all_clusters.append(cluster)
+    return all_clusters
 
 def append_AA(next_AA, current_mass, ion, charge):
-    
     raw_current_mass = computational_pipeline.gen_spectra.get_raw_mass(current_mass, ion, charge)
     new_raw = raw_current_mass + AMINO_ACIDS[next_AA]
     normalized_raw = computational_pipeline.gen_spectra.calc_combined_mass(new_raw, ion)
     return normalized_raw
 
-def test_digest_match(protein_list, pid, digest, start, end, ion):
-    parent_seq = protein_list[pid][1]
-    if ion == 0:
-        if parent_seq[start] == digest[0]: #if we correctly cut to the left. Means sequence starts with D
-            return True
-        target_position = start - 1
-        if not target_position < 0:
-            if parent_seq[target_position] == digest[1]: #if we correctly cut to the right. Means sequence starts after an R
-                return True
-    else:
-        if parent_seq[end-1] == digest[1]: #if we correctly cut to the right. Means sequence ends in an R
-            return True
-        target_position = end
-        if target_position < len(parent_seq):
-            if parent_seq[target_position] == digest[0]: #if we correctly cut to the left. Means sequence ends to the left of a D
-                return True
-    
-    return False
-
-def find_extensions(conv_prec,current_mass,ion,charge,pid,sqllite_database,start,end,ppm_tolerance,seq,score):
+def find_extensions(percursor,current_mass,ion,charge,pid,sqllite_database,start,end,ppm_tolerance,seq,score):
     protein = sqllite_database.get_protein(pid)
     prot_seq = protein[2]
     bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
@@ -143,55 +89,54 @@ def find_extensions(conv_prec,current_mass,ion,charge,pid,sqllite_database,start
     current_seq = seq
     
     if ion == 0:
-        current_position = end
-        while(repeat):
-            if current_position < len(prot_seq):
-                next_AA = prot_seq[current_position]
-                if next_AA not in bad_chars:
-                    current_mass = append_AA(next_AA, current_mass, ion, charge)
-                    charge = 2
-                    tol = ppm_to_da(current_mass, ppm_tolerance)
-                    if current_mass < conv_prec + tol:
-                        current_seq = current_seq + next_AA
-                        tup = (current_mass, start, current_position+1, 0, 2, pid, current_seq, score)
-                        extensions.append(tup)
-                        current_position += 1
-                    else:
-                        repeat = False
-                else:
-                    repeat = False
-            else:
-                repeat = False
-    
+        current_mass, charge, repeat, current_seq = find_b_ion_extensions(percursor, current_mass, ion, charge, pid, start, end, ppm_tolerance, score, prot_seq, bad_chars, extensions, repeat, current_seq)
     else:
-        current_position = start-1
-        while(repeat):
-            if current_position >= 0:
-                next_AA = prot_seq[current_position]
-                if next_AA not in bad_chars:
-                    current_mass = append_AA(next_AA, current_mass, ion, charge)
-                    charge = 2
-                    tol = ppm_to_da(current_mass, ppm_tolerance)
-                    if current_mass < conv_prec + tol:
-                        current_seq = next_AA + current_seq
-                        tup = (current_mass, current_position, end, 1, 2, pid, current_seq, score)
-                        extensions.append(tup)
-                        current_position = current_position - 1
-                    else:
-                        repeat = False
-                else:
-                    repeat = False
-            else:
-                repeat = False
+        find_y_ion_extension(percursor, current_mass, ion, charge, pid, start, end, ppm_tolerance, score, prot_seq, bad_chars, extensions, repeat, current_seq)
     
     return extensions
 
-def check_unique(merges):
-    for m in merges:
-        if merges.count(m) > 1:
-            print(m,"has a count of", merges.count(m))
-            return True
-    return False                
+def find_y_ion_extension(conv_prec, current_mass, ion, charge, pid, start, end, ppm_tolerance, score, prot_seq, bad_chars, extensions, repeat, current_seq):
+    current_position = start-1
+    while(repeat):
+        if current_position >= 0:
+            next_AA = prot_seq[current_position]
+            if next_AA not in bad_chars:
+                current_mass = append_AA(next_AA, current_mass, ion, charge)
+                charge = 2
+                tol = ppm_to_da(current_mass, ppm_tolerance)
+                if current_mass < conv_prec + tol:
+                    current_seq = next_AA + current_seq
+                    tup = (current_mass, current_position, end, 1, 2, pid, current_seq, score)
+                    extensions.append(tup)
+                    current_position = current_position - 1
+                else:
+                    repeat = False
+            else:
+                repeat = False
+        else:
+            repeat = False
+
+def find_b_ion_extensions(conv_prec, current_mass, ion, charge, pid, start, end, ppm_tolerance, score, prot_seq, bad_chars, extensions, repeat, current_seq):
+    current_position = end
+    while(repeat):
+        if current_position < len(prot_seq):
+            next_AA = prot_seq[current_position]
+            if next_AA not in bad_chars:
+                current_mass = append_AA(next_AA, current_mass, ion, charge)
+                charge = 2
+                tol = ppm_to_da(current_mass, ppm_tolerance)
+                if current_mass < conv_prec + tol:
+                    current_seq = current_seq + next_AA
+                    tup = (current_mass, start, current_position+1, 0, 2, pid, current_seq, score)
+                    extensions.append(tup)
+                    current_position += 1
+                else:
+                    repeat = False
+            else:
+                repeat = False
+        else:
+            repeat = False
+    return current_mass,charge,repeat,current_seq
 
 def convert_components(component_arr, ion, score, seq):
     Foo = collections.namedtuple('Foo', 'pid start end mz charge')
