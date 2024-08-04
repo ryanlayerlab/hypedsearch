@@ -3,7 +3,7 @@ import operator, time, json, os
 from typing import Any
 from collections import ChainMap
 from postprocessing.postprocessing_utils import postprocessing
-from lookups.objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry, KMer, ConvertedPrecursors,AlignedSpectrumsParams,AlignedSpectrumParams
+from lookups.objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry, KMer, ConvertedPrecursors,AlignedSpectrumsParams,AlignedSpectrumParams,AlignedSpectrum
 from alignment import alignment
 from lookups.utils import ppm_to_da, to_percent, is_json, is_file
 from preprocessing import merge_search, preprocessing_utils, clustering, evaluation
@@ -228,7 +228,7 @@ def get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments
         precursor_mass, precursor_charge = str(postprocessed_alignment[9]), str(postprocessed_alignment[10])
         total_mass_error = str(postprocessed_alignment[11])
         total_count = str(0)
-        aligned_spectrum = objects.AlignedSpectrum(hybrid,left_proteins,right_proteins,sequence,b_scores,y_scores,
+        aligned_spectrum = AlignedSpectrum(hybrid,left_proteins,right_proteins,sequence,b_scores,y_scores,
                                     total_score, total_gaussian_score,extensions,precursor_mass,precursor_charge,
                                     total_mass_error,total_count)
         aligned_spectrums.append(aligned_spectrum)
@@ -248,13 +248,8 @@ def get_clusters(base_alignment_params, b_kmers,y_kmers):
     sqllite_database = base_alignment_params.sqllite_database
     ppm_tolerance = base_alignment_params.ppm_tolerance
     b_clusters = clustering.create_b_clusters(b_kmers,sqllite_database)
-    y_clusters = clustering.create_y_clusters(y_kmers,sqllite_database)
-    print(b_clusters)  
-    return None  
-    # b_sorted_clusters = clustering.old_score_clusters(0, b_clusters, converted_b, sqllite_database, precursor_charge, ppm_tolerance)
-    # y_sorted_clusters = clustering.old_score_clusters(1, y_clusters, converted_y, sqllite_database, precursor_charge, ppm_tolerance)
-    # sorted_clusters = objects.SortedClusters(b_sorted_clusters=b_sorted_clusters, y_sorted_clusters=y_sorted_clusters)
-    # return sorted_clusters
+    y_clusters = clustering.create_y_clusters(y_kmers,sqllite_database) 
+    return (b_clusters,y_clusters)
 
 def create_rescored_alignments(rescored_naturals, rescored_hybrids):
     rescored_alignments = sorted(rescored_naturals + rescored_hybrids, key = lambda x: (x[0], x[1]), reverse = True)
@@ -291,7 +286,8 @@ def print_named_tuple(tuple_description, named_tuple):
     with open(file_path, 'w') as file:
         file.write(str(named_tuple))
 
-# def create_aligned_spectrum_with_target(aligned_spectrum_params):
+def create_aligned_spectrum_with_target(aligned_spectrum_params):
+    return None
 #     spectrum = aligned_spectrum_params.spectrum
 #     base_alignment_params = aligned_spectrum_params.base_alignment_params
 #     precursor_charge = spectrum.precursor_charge
@@ -327,12 +323,9 @@ def print_named_tuple(tuple_description, named_tuple):
 def create_aligned_spectrum(aligned_spectrum_params):
     spectrum = aligned_spectrum_params.spectrum
     base_alignment_params = aligned_spectrum_params.base_alignment_params
-    precursor_charge = spectrum.precursor_charge
-    # precursor_mass = spectrum.precursor_mass
-    # precursor_tolerance = base_alignment_params.precursor_tolerance
-    # converted_precursors = get_converted_precursors(aligned_spectrum_params)
     (b_kmers,y_kmers) = get_matched_kmers(aligned_spectrum_params)
-    clusters = get_clusters(base_alignment_params, b_kmers,y_kmers)
+    (b_clusters,y_clusters) = get_clusters(base_alignment_params, b_kmers,y_kmers)
+    print(b_clusters)
     # search_space = clustering.get_search_space(clusters,precursor_charge)
     # unique_native_merged_seqs = alignment.pair_natives(search_space, precursor_mass, precursor_tolerance)
     # unique_hybrid_merged_seqs = alignment.pair_indices(aligned_spectrum_params, search_space, score_filter)
@@ -349,12 +342,11 @@ def get_aligned_spectrums(aligned_spectrums_params:AlignedSpectrumsParams):
     base_alignment_params = aligned_spectrums_params.base_alignment_params
     target_seq = base_alignment_params.target_seq
     if len(target_seq) > 0:
-        return None
-        # for spectrum in spectrums:
-        #     aligned_spectrum_params = AlignedSpectrumParams(spectrum=spectrum,base_alignment_params=base_alignment_params)
-        #     aligned_spectrum = create_aligned_spectrum_with_target(aligned_spectrum_params)
-        #     if aligned_spectrum is not None:
-        #         aligned_spectrums.extend(aligned_spectrum)
+        for spectrum in spectrums:
+            aligned_spectrum_params = AlignedSpectrumParams(spectrum=spectrum,base_alignment_params=base_alignment_params)
+            aligned_spectrum = create_aligned_spectrum_with_target(aligned_spectrum_params)
+            if aligned_spectrum is not None:
+                aligned_spectrums.extend(aligned_spectrum)
     else:
         for spectrum in spectrums:
             aligned_spectrum_params = AlignedSpectrumParams(spectrum=spectrum,base_alignment_params=base_alignment_params)
