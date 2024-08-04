@@ -53,7 +53,7 @@ def create_b_clusters(b_kmers,sqllite_database):
         (protein_id, start_position) = key
         full_peptide = get_full_peptide(protein_id, sqllite_database)
         score = get_score(full_peptide,cluster_items)
-        cluster = Cluster(protein_id=protein_id,peptide=full_peptide,score=score,cluster_items=cluster_items)
+        cluster = Cluster(protein_id=protein_id,score=score,cluster_items=cluster_items)
         all_clusters.append(cluster)
     return all_clusters
 
@@ -70,7 +70,7 @@ def create_y_clusters(y_kmers,sqllite_database):
         (protein_id, start_position) = key
         full_peptide = get_full_peptide(protein_id, sqllite_database)
         score = get_score(full_peptide,cluster_items)
-        cluster = Cluster(protein_id=protein_id,peptide=full_peptide,score=score,cluster_items=cluster_items)
+        cluster = Cluster(protein_id=protein_id,score=score,cluster_items=cluster_items)
         all_clusters.append(cluster)
     return all_clusters
 

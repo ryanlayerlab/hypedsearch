@@ -74,7 +74,7 @@ AlignedSpectrumsParams = namedtuple('AlignedSpectrumsParams',['spectrums', 'base
 AlignedSpectrumParams = namedtuple('AlignedSpectrumParams',['spectrum', 'base_alignment_params'])
 KMer = namedtuple('KMer',['mass','location_start','location_end','ion','charge','protein_id'])
 ClusterItem = namedtuple('ClusterItem',['key','kmer','peptide'])
-Cluster = namedtuple('Cluster',['protein_id','peptide','score','cluster_items'])
+Cluster = namedtuple('Cluster',['protein_id','score','cluster_items'])
 
 ConvertedPrecursors = namedtuple('ConvertedPrecursors', ['converted_precursor_b', 'converted_precursor_y'])
 TargetData = namedtuple('TargetData', ['target_seq', 'target_left_pids', 'target_right_pids', 'target_left_indices', 'target_right_indices', 'target_score'])
