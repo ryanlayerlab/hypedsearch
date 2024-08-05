@@ -3,7 +3,7 @@ import operator, time, json, os
 from typing import Any
 from collections import ChainMap
 from postprocessing.postprocessing_utils import postprocessing
-from lookups.objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry, KMer, ConvertedPrecursors,AlignedSpectrumsParams,AlignedSpectrumParams,AlignedSpectrum
+from lookups.objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry, KMer, ConvertedPrecursors,AlignedSpectrumsParams,AlignedSpectrumParams,AlignedSpectrum,Fragment,Precursor,MatchedFragment,MatchedPrecursor
 from alignment import alignment
 from lookups.utils import ppm_to_da, to_percent, is_json, is_file
 from preprocessing import merge_search, preprocessing_utils, clustering, evaluation
@@ -271,15 +271,6 @@ def get_converted_precursors(aligned_spectrum_params):
     converted_precursors =  ConvertedPrecursors(converted_precursor_b=converted_precursor_b,converted_precursor_y=converted_precursor_y)
     return converted_precursors
 
-def get_matched_kmers(aligned_spectrum_params):
-    spectrum = aligned_spectrum_params.spectrum
-    sqllite_database = aligned_spectrum_params.base_alignment_params.sqllite_database
-    ppm_tolerance = aligned_spectrum_params.base_alignment_params.ppm_tolerance
-    input_masses = spectrum.mz_values        
-    b_rows, y_rows = merge_search.get_all_matched_rows(input_masses, sqllite_database, ppm_tolerance)
-    b_kmers = [KMer(*row) for row in b_rows]
-    y_kmers = [KMer(*row) for row in y_rows]
-    return (b_kmers,y_kmers)
 
 def print_named_tuple(tuple_description, named_tuple):
     file_path = tuple_description + '.txt'
@@ -320,12 +311,43 @@ def create_aligned_spectrum_with_target(aligned_spectrum_params):
 #     else:
 #         return None
 
-def create_aligned_spectrum(aligned_spectrum_params):
+def create_precursor(aligned_spectrum_params):
     spectrum = aligned_spectrum_params.spectrum
-    base_alignment_params = aligned_spectrum_params.base_alignment_params
-    (b_kmers,y_kmers) = get_matched_kmers(aligned_spectrum_params)
-    (b_clusters,y_clusters) = get_clusters(base_alignment_params, b_kmers,y_kmers)
-    print(b_clusters)
+    precursor_id = spectrum.id
+    precursor_mass = spectrum.precursor_mass
+    precursor_charge = spectrum.precursor_charge
+    mz_values = spectrum.mz_values
+    abundances = spectrum.abundance
+    zipped_fragments = list(zip(mz_values, abundances))
+    fragments = [Fragment(id=index, mz_value=mz, abundance=abundance) for index, (mz, abundance) in enumerate(zipped_fragments)]
+    precursor = Precursor(id=precursor_id,mass=precursor_mass,charge=precursor_charge,fragments=fragments)
+    return precursor
+
+def get_matched_fragment(aligned_spectrum_params, fragment):
+    sqllite_database = aligned_spectrum_params.base_alignment_params.sqllite_database
+    ppm_tolerance = aligned_spectrum_params.base_alignment_params.ppm_tolerance
+    input_mass = fragment.mz_value        
+    tolerance = ppm_to_da(input_mass, ppm_tolerance)
+    b_rows, y_rows = sqllite_database.query_mass_kmers(input_mass, tolerance)
+    b_kmers = [KMer(*row) for row in b_rows]
+    y_kmers = [KMer(*row) for row in y_rows]
+
+    matched_fragment = MatchedFragment(fragment=fragment, b_kmers=b_kmers, y_kmers=y_kmers)
+    return matched_fragment
+
+def get_matched_precursor(aligned_spectrum_params, precursor):
+    matched_fragments = []
+    for fragment in precursor.fragments:
+        matched_fragment = get_matched_fragment(aligned_spectrum_params,fragment)
+        matched_fragments.append(matched_fragment)
+    matched_precursor = MatchedPrecursor(precursor=precursor,matched_fragments=matched_fragments)
+    return matched_precursor
+
+def create_aligned_spectrum(aligned_spectrum_params):
+    precursor = create_precursor(aligned_spectrum_params)
+    matched_precursor = get_matched_precursor(aligned_spectrum_params,precursor)
+    print(matched_precursor)
+    # (b_clusters,y_clusters) = get_clusters(base_alignment_params, b_kmers,y_kmers)
     # search_space = clustering.get_search_space(clusters,precursor_charge)
     # unique_native_merged_seqs = alignment.pair_natives(search_space, precursor_mass, precursor_tolerance)
     # unique_hybrid_merged_seqs = alignment.pair_indices(aligned_spectrum_params, search_space, score_filter)

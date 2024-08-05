@@ -3,6 +3,7 @@ from collections import namedtuple
 Protein = namedtuple('Protein', ['description','sequence'])
 Database = namedtuple('Database', ['fasta_file', 'proteins', 'kmers'])
 
+
 Spectrum = namedtuple(
     'Spectrum', [
         'num',
@@ -72,10 +73,14 @@ Identification_Instrumentation = namedtuple(
 BaseAlignmentParams = namedtuple('BaseAlignmentParams',['sqllite_database', 'max_peptide_length', 'ppm_tolerance', 'precursor_tolerance', 'number_hybrids', 'number_natives', 'target_seq'])
 AlignedSpectrumsParams = namedtuple('AlignedSpectrumsParams',['spectrums', 'base_alignment_params'])
 AlignedSpectrumParams = namedtuple('AlignedSpectrumParams',['spectrum', 'base_alignment_params'])
+Fragment = namedtuple('Fragment',['id','mz_value', 'abundance'])
+Precursor = namedtuple('Precursor',['id','mass','charge','fragments'])
 KMer = namedtuple('KMer',['mass','location_start','location_end','ion','charge','protein_id'])
+MatchedFragment = namedtuple('MatchedFragment',['fragment','b_kmers','y_kmers'])
+MatchedPrecursor = namedtuple('MatchedPrecursor',['precursor','matched_fragments'])
+
 ClusterItem = namedtuple('ClusterItem',['key','kmer','peptide'])
 Cluster = namedtuple('Cluster',['protein_id','score','cluster_items'])
-
 ConvertedPrecursors = namedtuple('ConvertedPrecursors', ['converted_precursor_b', 'converted_precursor_y'])
 TargetData = namedtuple('TargetData', ['target_seq', 'target_left_pids', 'target_right_pids', 'target_left_indices', 'target_right_indices', 'target_score'])
 PrecursorHit = namedtuple('PrecursorHit', ['best_precursor_hit', 'score_filter'])
