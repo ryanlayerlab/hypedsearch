@@ -77,7 +77,7 @@ Fragment = namedtuple('Fragment',['id','mz_value', 'abundance'])
 Precursor = namedtuple('Precursor',['id','mass','charge','fragments'])
 KMer = namedtuple('KMer',['mass','location_start','location_end','ion','charge','protein_id'])
 MatchedFragment = namedtuple('MatchedFragment',['fragment','b_kmers','y_kmers'])
-MatchedPrecursor = namedtuple('MatchedPrecursor',['precursor','matched_fragments'])
+MatchedPrecursor = namedtuple('MatchedPrecursor',['id','mass','charge','matched_fragments'])
 
 ClusterItem = namedtuple('ClusterItem',['key','kmer','peptide'])
 Cluster = namedtuple('Cluster',['protein_id','score','cluster_items'])
