@@ -40,7 +40,7 @@ def get_score(cluster_peptide,cluster_items):
     percentage_coverage = (len(covered_positions) / protein_length) * 100
     return percentage_coverage
 
-def create_b_clusters(b_kmers,sqllite_database):
+def create_b_clusters(b_kmers,precursor_tolerance,sqllite_database):
     all_clusters = []
     sorted_b_kmers = sorted(b_kmers, key=operator.attrgetter('protein_id', 'location_start'))
     for key, kmers in groupby(sorted_b_kmers, key=operator.attrgetter('protein_id', 'location_start')):
