@@ -336,11 +336,14 @@ def get_matched_fragment(aligned_spectrum_params, fragment):
     return matched_fragment
 
 def get_matched_precursor(aligned_spectrum_params, precursor):
+    id = precursor.id
+    mass = precursor.mass
+    charge = precursor.charge
     matched_fragments = []
     for fragment in precursor.fragments:
         matched_fragment = get_matched_fragment(aligned_spectrum_params,fragment)
         matched_fragments.append(matched_fragment)
-    matched_precursor = MatchedPrecursor(precursor=precursor,matched_fragments=matched_fragments)
+    matched_precursor = MatchedPrecursor(id=id,mass=mass,charge=charge,matched_fragments=matched_fragments)
     return matched_precursor
 
 def create_aligned_spectrum(aligned_spectrum_params):
