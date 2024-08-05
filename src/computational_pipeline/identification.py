@@ -331,7 +331,6 @@ def get_matched_fragment(aligned_spectrum_params, fragment):
     b_rows, y_rows = sqllite_database.query_mass_kmers(input_mass, tolerance)
     b_kmers = [KMer(*row) for row in b_rows]
     y_kmers = [KMer(*row) for row in y_rows]
-
     matched_fragment = MatchedFragment(fragment=fragment, b_kmers=b_kmers, y_kmers=y_kmers)
     return matched_fragment
 
@@ -349,7 +348,7 @@ def get_matched_precursor(aligned_spectrum_params, precursor):
 def create_aligned_spectrum(aligned_spectrum_params):
     precursor = create_precursor(aligned_spectrum_params)
     matched_precursor = get_matched_precursor(aligned_spectrum_params,precursor)
-    print(matched_precursor)
+    print(matched_precursor.matched_fragments[5])
     # (b_clusters,y_clusters) = get_clusters(base_alignment_params, b_kmers,y_kmers)
     # search_space = clustering.get_search_space(clusters,precursor_charge)
     # unique_native_merged_seqs = alignment.pair_natives(search_space, precursor_mass, precursor_tolerance)
