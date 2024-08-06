@@ -362,7 +362,6 @@ def get_all_kmers(matched_precursor, sqllite_database):
         for kmer in y_kmers:
             synthetic_y_kmers = clustering.get_synthetic_kmers(matched_precursor, kmer, sqllite_database)
             all_y_kmers.extend(synthetic_y_kmers)
-        
     return (all_b_kmers,all_y_kmers)
 
 def get_complete_precursor(aligned_spectrum_params, matched_precursor):
@@ -396,7 +395,7 @@ def create_aligned_spectrum(aligned_spectrum_params):
     precursor = create_precursor(aligned_spectrum_params)
     matched_precursor = get_matched_precursor(aligned_spectrum_params,precursor)
     complete_precursor = get_complete_precursor(aligned_spectrum_params, matched_precursor)
-    print(complete_precursor)
+    print(complete_precursor.b_kmers[4:6])
     # (b_clusters,y_clusters) = get_clusters(base_alignment_params, b_kmers,y_kmers)
     # search_space = clustering.get_search_space(clusters,precursor_charge)
     # unique_native_merged_seqs = alignment.pair_natives(search_space, precursor_mass, precursor_tolerance)
