@@ -49,8 +49,8 @@ class Sqllite_Database:
         upper_bound = mass + tolerance
         lower_bound = mass - tolerance
         self.cursor.execute("CREATE TABLE temp.mass AS SELECT * FROM kmers where mass between ? and ? order by protein, location_start", (lower_bound, upper_bound))
-        b_rows = self.cursor.execute("SELECT * FROM temp.mass where ion = 0 order by protein, location_start, location_end").fetchall()
-        y_rows = self.cursor.execute("SELECT * FROM temp.mass where ion = 1 order by protein, location_start, location_end").fetchall()
+        b_rows = self.cursor.execute("SELECT *, 'N' FROM temp.mass where ion = 0 order by protein, location_start, location_end").fetchall()
+        y_rows = self.cursor.execute("SELECT *, 'N' FROM temp.mass where ion = 1 order by protein, location_start, location_end").fetchall()
         self.cursor.execute("DROP TABLE temp.mass")
         return b_rows, y_rows
       
