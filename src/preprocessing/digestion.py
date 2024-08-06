@@ -34,7 +34,7 @@ def digest(db: Database, digest_type: str, missed_cleavages: int) -> Database:
                         if entry.sequence[j] in ends:
                             allowed_misses -= 1
         for d in digested:
-            new_prots[p_name].append(Protein(d[0], entry.description))
+            new_prots[p_name].append(Protein(d[1], entry.description))
     db = db._replace(proteins=new_prots)
     return db
 

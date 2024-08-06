@@ -10,7 +10,7 @@ from preprocessing.sqlite_database import Sqllite_Database
 import time
 from lookups.constants import AMINO_ACIDS
 from scoring.scoring import calc_bayes_score
-from lookups.objects import ClusterItem, Cluster, KMer
+from lookups.objects import ClusterItem, Cluster, KMer, Protein
 
 def get_cluster_id(key):
     (protein_id, start_position) = key
@@ -443,12 +443,13 @@ def calculate_mass(sequence):
 
 def get_synthetic_kmers(matched_precursor, kmer, sqllite_database):
     protein_id = kmer.protein_id
-    protein_sequence = sqllite_database.get_protein(protein_id)
+    protein_row = sqllite_database.get_protein(protein_id)
+    protein = Protein(*protein_row)
     ion = kmer.ion
     if ion == 0:
-        return get_synthetic_b_kmers(matched_precursor, kmer, protein_sequence)
+        return get_synthetic_b_kmers(matched_precursor, kmer, protein.sequence)
     elif ion == 1:
-        return get_synthetic_y_kmers(matched_precursor, kmer, protein_sequence)
+        return get_synthetic_y_kmers(matched_precursor, kmer, protein.sequence)
 
 def get_synthetic_b_kmers(matched_precursor, kmer, protein_sequence):
     bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
@@ -456,25 +457,28 @@ def get_synthetic_b_kmers(matched_precursor, kmer, protein_sequence):
     start_index = kmer.location_start
     precursor_mass = matched_precursor.mass
     i = 0
-        
+
     while start_index - i >= 0:
-        if protein_sequence[start_index - i] in bad_chars:
+        current_char = protein_sequence[start_index - i]
+        
+        if current_char in bad_chars:
             i += 1
             continue
         
-        new_fragment = protein_sequence[start_index - i:start_index]
+        new_fragment = protein_sequence[start_index - i:start_index + 1]
         new_mass = calculate_mass(new_fragment)
         
-        if new_mass > precursor_mass:
+        if new_mass <= precursor_mass:
             new_kmer = KMer(
-                    mass=new_mass,
-                    location_start=start_index - i,
-                    location_end=start_index - 1,
-                    ion=kmer.ion,
-                    charge=kmer.charge,
-                    protein_id=kmer.protein_id,
-                    kmer_type='S'
-                )
+                mass=new_mass,
+                location_start=start_index - i,
+                location_end=start_index,
+                ion=kmer.ion,
+                charge=kmer.charge,
+                protein_id=kmer.protein_id,
+                sequence=new_fragment,
+                kmer_type='S'
+            )
             synthetic_kmers.append(new_kmer)
         
         if new_mass >= precursor_mass:
@@ -488,32 +492,35 @@ def get_synthetic_y_kmers(matched_precursor, kmer, protein_sequence):
     bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
     synthetic_kmers = []
     start_index = kmer.location_end
-    current_sequence = protein_sequence[start_index:]
-    percursor_mass = matched_precursor.mass
+    precursor_mass = matched_precursor.mass
     i = 0
+
+    while start_index + i < len(protein_sequence):
+        current_char = protein_sequence[start_index + i]
         
-    while i < len(current_sequence):
-        if current_sequence[i] in bad_chars:
+        if current_char in bad_chars:
             i += 1
             continue
         
-        new_fragment = current_sequence[:i+1]
+        new_fragment = protein_sequence[start_index:start_index + i + 1]
         new_mass = calculate_mass(new_fragment)
             
-        if new_mass > matched_precursor.mass:
+        if new_mass <= precursor_mass:
             new_kmer = KMer(
-                    mass=new_mass,
-                    location_start=kmer.location_end,
-                    location_end=kmer.location_end + i,
-                    ion=kmer.ion,
-                    charge=kmer.charge,
-                    protein_id=kmer.protein_id,
-                    kmer_type='S'
-                )
+                mass=new_mass,
+                location_start=start_index,
+                location_end=start_index + i,
+                ion=kmer.ion,
+                charge=kmer.charge,
+                protein_id=kmer.protein_id,
+                sequence=new_fragment,
+                kmer_type='S'
+            )
             synthetic_kmers.append(new_kmer)
         
-        if new_mass >= percursor_mass:
+        if new_mass >= precursor_mass:
             break
+            
         i += 1
 
     return synthetic_kmers

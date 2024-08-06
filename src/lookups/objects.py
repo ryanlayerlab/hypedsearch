@@ -1,6 +1,5 @@
 from collections import namedtuple
 
-Protein = namedtuple('Protein', ['description','sequence'])
 Database = namedtuple('Database', ['fasta_file', 'proteins', 'kmers'])
 
 
@@ -70,16 +69,16 @@ Identification_Instrumentation = namedtuple(
     defaults=[0,0,0,0,0,0,0,0,0]
 )
 
+Protein = namedtuple('Protein', ['id','description','sequence'])
 BaseAlignmentParams = namedtuple('BaseAlignmentParams',['sqllite_database', 'max_peptide_length', 'ppm_tolerance', 'precursor_tolerance', 'number_hybrids', 'number_natives', 'target_seq'])
 AlignedSpectrumsParams = namedtuple('AlignedSpectrumsParams',['spectrums', 'base_alignment_params'])
 AlignedSpectrumParams = namedtuple('AlignedSpectrumParams',['spectrum', 'base_alignment_params'])
 Fragment = namedtuple('Fragment',['id','mz_value', 'abundance'])
 Precursor = namedtuple('Precursor',['id','mass','charge','fragments'])
-KMer = namedtuple('KMer',['mass','location_start','location_end','ion','charge','protein_id','kmer_type'])
+KMer = namedtuple('KMer',['mass','location_start','location_end','ion','charge','protein_id','sequence','kmer_type'])
 MatchedFragment = namedtuple('MatchedFragment',['fragment','b_kmers','y_kmers'])
 MatchedPrecursor = namedtuple('MatchedPrecursor',['id','mass','charge','matched_fragments'])
 CompletePrecursor = namedtuple('CompletePrecursor',['id','mass','charge','b_kmers','y_kmers'])
-
 
 ClusterItem = namedtuple('ClusterItem',['key','kmers'])
 Cluster = namedtuple('Cluster',['id','cluster_items','score'])
