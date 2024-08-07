@@ -40,39 +40,6 @@ def get_score(cluster_peptide,cluster_items):
     percentage_coverage = (len(covered_positions) / protein_length) * 100
     return percentage_coverage
 
-def create_b_clusters(b_kmers,precursor_tolerance,sqllite_database):
-    all_clusters = []
-    sorted_b_kmers = sorted(b_kmers, key=operator.attrgetter('protein_id', 'location_start'))
-    for key, kmers in groupby(sorted_b_kmers, key=operator.attrgetter('protein_id', 'location_start')):
-        cluster_items = []
-        cluster_id = get_cluster_id(key)
-        for kmer in kmers:
-            peptide = get_peptide(kmer, sqllite_database)
-            cluster_item = ClusterItem(key=cluster_id,kmer=kmer,peptide=peptide)
-            cluster_items.append(cluster_item)
-        (protein_id, start_position) = key
-        full_peptide = get_full_peptide(protein_id, sqllite_database)
-        score = get_score(full_peptide,cluster_items)
-        cluster = Cluster(protein_id=protein_id,score=score,cluster_items=cluster_items)
-        all_clusters.append(cluster)
-    return all_clusters
-
-def create_y_clusters(y_kmers,sqllite_database):
-    all_clusters = []
-    sorted_y_kmers = sorted(y_kmers, key=operator.attrgetter('protein_id', 'location_end'))
-    for key, kmers in groupby(sorted_y_kmers, key=operator.attrgetter('protein_id', 'location_end')):
-        cluster_items = []
-        cluster_id = get_cluster_id(key)
-        for kmer in kmers:
-            peptide = get_peptide(kmer, sqllite_database)
-            cluster_item = ClusterItem(key=cluster_id,kmer=kmer,peptide=peptide)
-            cluster_items.append(cluster_item)
-        (protein_id, start_position) = key
-        full_peptide = get_full_peptide(protein_id, sqllite_database)
-        score = get_score(full_peptide,cluster_items)
-        cluster = Cluster(protein_id=protein_id,score=score,cluster_items=cluster_items)
-        all_clusters.append(cluster)
-    return all_clusters
 
 def append_AA(next_AA, current_mass, ion, charge):
     raw_current_mass = computational_pipeline.gen_spectra.get_raw_mass(current_mass, ion, charge)
@@ -524,3 +491,37 @@ def get_synthetic_y_kmers(matched_precursor, kmer, protein_sequence):
         i += 1
 
     return synthetic_kmers
+
+def create_b_clusters(b_kmers,sqllite_database):
+    all_clusters = []
+    sorted_b_kmers = sorted(b_kmers, key=operator.attrgetter('protein_id', 'location_start'))
+    for key, kmers in groupby(sorted_b_kmers, key=operator.attrgetter('protein_id', 'location_start')):
+        cluster_items = []
+        cluster_id = get_cluster_id(key)
+        for kmer in kmers:
+            peptide = get_peptide(kmer, sqllite_database)
+            cluster_item = ClusterItem(key=cluster_id,kmer=kmer,peptide=peptide)
+            cluster_items.append(cluster_item)
+        (protein_id, start_position) = key
+        full_peptide = get_full_peptide(protein_id, sqllite_database)
+        score = get_score(full_peptide,cluster_items)
+        cluster = Cluster(protein_id=protein_id,score=score,cluster_items=cluster_items)
+        all_clusters.append(cluster)
+    return all_clusters
+
+def create_y_clusters(y_kmers,sqllite_database):
+    all_clusters = []
+    sorted_y_kmers = sorted(y_kmers, key=operator.attrgetter('protein_id', 'location_end'))
+    for key, kmers in groupby(sorted_y_kmers, key=operator.attrgetter('protein_id', 'location_end')):
+        cluster_items = []
+        cluster_id = get_cluster_id(key)
+        for kmer in kmers:
+            peptide = get_peptide(kmer, sqllite_database)
+            cluster_item = ClusterItem(key=cluster_id,kmer=kmer,peptide=peptide)
+            cluster_items.append(cluster_item)
+        (protein_id, start_position) = key
+        full_peptide = get_full_peptide(protein_id, sqllite_database)
+        score = get_score(full_peptide,cluster_items)
+        cluster = Cluster(protein_id=protein_id,score=score,cluster_items=cluster_items)
+        all_clusters.append(cluster)
+    return all_clusters
