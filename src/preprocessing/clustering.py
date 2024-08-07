@@ -525,3 +525,4 @@ def create_y_clusters(y_kmers,sqllite_database):
         cluster = Cluster(protein_id=protein_id,score=score,cluster_items=cluster_items)
         all_clusters.append(cluster)
     return all_clusters
+
