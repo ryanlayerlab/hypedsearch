@@ -10,12 +10,8 @@ from preprocessing.sqlite_database import Sqllite_Database
 import time
 from lookups.constants import AMINO_ACIDS
 from scoring.scoring import calc_bayes_score
-from lookups.objects import ClusterItem, Cluster, KMer, Protein
+from lookups.objects import Cluster, KMer, Protein
 
-def get_cluster_id(key):
-    (protein_id, start_position) = key
-    cluster_id = str(protein_id) + ':' + str(start_position)
-    return cluster_id
 
 def get_peptide(kmer, sqllite_database):
     protein_id = kmer.protein_id
@@ -30,16 +26,6 @@ def get_full_peptide(protein_id, sqllite_database):
     protein = sqllite_database.get_protein(protein_id)
     full_peptide = protein[2]
     return full_peptide
-
-def get_score(cluster_peptide,cluster_items):
-    covered_positions = set()
-    for cluster_item in cluster_items:
-        kmer = cluster_item.kmer
-        covered_positions.update(range(kmer.location_start, kmer.location_end + 1))
-    protein_length = len(cluster_peptide)
-    percentage_coverage = (len(covered_positions) / protein_length) * 100
-    return percentage_coverage
-
 
 def append_AA(next_AA, current_mass, ion, charge):
     raw_current_mass = computational_pipeline.gen_spectra.get_raw_mass(current_mass, ion, charge)
@@ -408,6 +394,9 @@ def get_search_space(sorted_clusters,precursor_charge):
 def calculate_mass(sequence):
     return sum(AMINO_ACIDS.get(aa, 0) for aa in sequence)
 
+def calculate_score(new_fragment,protein_sequence):
+        return len(new_fragment)/len(protein_sequence)
+
 def get_synthetic_kmers(matched_precursor, kmer, sqllite_database):
     protein_id = kmer.protein_id
     protein_row = sqllite_database.get_protein(protein_id)
@@ -434,6 +423,7 @@ def get_synthetic_b_kmers(matched_precursor, kmer, protein_sequence):
         
         new_fragment = protein_sequence[start_index - i:start_index + 1]
         new_mass = calculate_mass(new_fragment)
+        score = calculate_score(new_fragment,protein_sequence)
         
         if new_mass <= precursor_mass:
             new_kmer = KMer(
@@ -444,6 +434,7 @@ def get_synthetic_b_kmers(matched_precursor, kmer, protein_sequence):
                 charge=kmer.charge,
                 protein_id=kmer.protein_id,
                 sequence=new_fragment,
+                score = score,
                 kmer_type='S'
             )
             synthetic_kmers.append(new_kmer)
@@ -471,6 +462,7 @@ def get_synthetic_y_kmers(matched_precursor, kmer, protein_sequence):
         
         new_fragment = protein_sequence[start_index:start_index + i + 1]
         new_mass = calculate_mass(new_fragment)
+        score = calculate_score(new_fragment,protein_sequence)
             
         if new_mass <= precursor_mass:
             new_kmer = KMer(
@@ -481,6 +473,7 @@ def get_synthetic_y_kmers(matched_precursor, kmer, protein_sequence):
                 charge=kmer.charge,
                 protein_id=kmer.protein_id,
                 sequence=new_fragment,
+                score=score,
                 kmer_type='S'
             )
             synthetic_kmers.append(new_kmer)
@@ -492,37 +485,33 @@ def get_synthetic_y_kmers(matched_precursor, kmer, protein_sequence):
 
     return synthetic_kmers
 
-def create_b_clusters(b_kmers,sqllite_database):
+def get_cluster_id(key):
+    (protein_id, begin_position) = key
+    cluster_id = str(protein_id) + ':' + str(begin_position)
+    return cluster_id
+
+def create_cluster(key,kmers):
+    cluster_id = get_cluster_id(key)
+    max_difference_kmer = max(kmers, key=lambda kmer: kmer.location_end - kmer.location_start)
+    score = (max_difference_kmer.location_end - max_difference_kmer.location_start)/len(max_difference_kmer.sequence)
+    cluster = Cluster(id=cluster_id,score=score,kmers=kmers)
+    return cluster
+
+def create_b_clusters(b_kmers):
     all_clusters = []
-    sorted_b_kmers = sorted(b_kmers, key=operator.attrgetter('protein_id', 'location_start'))
-    for key, kmers in groupby(sorted_b_kmers, key=operator.attrgetter('protein_id', 'location_start')):
-        cluster_items = []
-        cluster_id = get_cluster_id(key)
-        for kmer in kmers:
-            peptide = get_peptide(kmer, sqllite_database)
-            cluster_item = ClusterItem(key=cluster_id,kmer=kmer,peptide=peptide)
-            cluster_items.append(cluster_item)
-        (protein_id, start_position) = key
-        full_peptide = get_full_peptide(protein_id, sqllite_database)
-        score = get_score(full_peptide,cluster_items)
-        cluster = Cluster(protein_id=protein_id,score=score,cluster_items=cluster_items)
+    sorted_b_kmers = sorted(b_kmers, key=operator.attrgetter('protein_id', 'location_end'))
+    for key, kmers_group in groupby(sorted_b_kmers, key=operator.attrgetter('protein_id', 'location_end')):
+        kmers_list = list(kmers_group) 
+        cluster = create_cluster(key, kmers_list)
         all_clusters.append(cluster)
     return all_clusters
 
-def create_y_clusters(y_kmers,sqllite_database):
+def create_y_clusters(y_kmers):
     all_clusters = []
-    sorted_y_kmers = sorted(y_kmers, key=operator.attrgetter('protein_id', 'location_end'))
-    for key, kmers in groupby(sorted_y_kmers, key=operator.attrgetter('protein_id', 'location_end')):
-        cluster_items = []
-        cluster_id = get_cluster_id(key)
-        for kmer in kmers:
-            peptide = get_peptide(kmer, sqllite_database)
-            cluster_item = ClusterItem(key=cluster_id,kmer=kmer,peptide=peptide)
-            cluster_items.append(cluster_item)
-        (protein_id, start_position) = key
-        full_peptide = get_full_peptide(protein_id, sqllite_database)
-        score = get_score(full_peptide,cluster_items)
-        cluster = Cluster(protein_id=protein_id,score=score,cluster_items=cluster_items)
+    sorted_y_kmers = sorted(y_kmers, key=operator.attrgetter('protein_id', 'location_start'))
+    for key, kmers_group in groupby(sorted_y_kmers, key=operator.attrgetter('protein_id', 'location_start')):
+        kmers_list = list(kmers_group) 
+        cluster = create_cluster(key, kmers_list)
         all_clusters.append(cluster)
     return all_clusters
 

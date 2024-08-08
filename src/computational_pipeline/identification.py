@@ -4,7 +4,7 @@ from typing import Any
 from itertools import groupby
 from collections import ChainMap
 from postprocessing.postprocessing_utils import postprocessing
-from lookups.objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry, KMer, ConvertedPrecursors,AlignedSpectrumsParams,AlignedSpectrumParams,AlignedSpectrum,Fragment,Precursor,MatchedFragment,MatchedPrecursor,CompletePrecursor
+from lookups.objects import Database, Spectrum, Alignments, MPSpectrumID, DEVFallOffEntry, KMer, ConvertedPrecursors,AlignedSpectrumsParams,AlignedSpectrumParams,AlignedSpectrum,Fragment,Precursor,MatchedFragment,MatchedPrecursor,CompletePrecursor,ClusteredPrecursor
 from alignment import alignment
 from lookups.utils import ppm_to_da, to_percent, is_json, is_file
 from preprocessing import merge_search, preprocessing_utils, clustering, evaluation
@@ -373,30 +373,24 @@ def get_complete_precursor(aligned_spectrum_params, matched_precursor):
     complete_precursor = CompletePrecursor(id=id,mass=mass,charge=charge,b_kmers=all_b_kmers,y_kmers=all_y_kmers)
     return complete_precursor
 
-
-# def get_clusters(matched_precursor):
-#     all_clusters = []
-#     b_kmers = matched_precursor.matched_fragments.b_kmers
-#     y_kmers = matched_precursor.matched_fragments.y_kmers
-
-#     b_sorted_kmers = sorted(b_kmers, key=operator.attrgetter('protein_id', 'location_start', 'location_end'))
-#     b_group_key = operator.attrgetter('protein_id', 'location_start')
-#     y_sorted_kmers = sorted(y_kmers, key=operator.attrgetter('protein_id', 'location_end', 'location_start'))
-#     y_group_key = operator.attrgetter('protein_id', 'location_end')
-
-#     for key, group in groupby(sorted_kmers, key=group_key):
-#         kmers_group = list(group)
-#         cluster_items = ClusterItem(key=key, kmers=kmers_group)
-#         clusters = create_clusters_from_kmers([cluster_items])
-#         all_clusters.extend(clusters)
-
+def get_clustered_precursor(complete_precursor):
+    id = complete_precursor.id
+    mass = complete_precursor.mass
+    charge = complete_precursor.charge
+    b_kmers = complete_precursor.b_kmers
+    y_kmers = complete_precursor.y_kmers
+    b_clusters = clustering.create_b_clusters(b_kmers)
+    y_clusters = clustering.create_y_clusters(y_kmers)
+    clustered_precursor = ClusteredPrecursor(id=id,mass=mass,charge=charge,b_clusters=b_clusters,y_clusters=y_clusters)
+    return clustered_precursor
 
 def create_aligned_spectrum(aligned_spectrum_params):
     precursor = create_precursor(aligned_spectrum_params)
     matched_precursor = get_matched_precursor(aligned_spectrum_params,precursor)
     complete_precursor = get_complete_precursor(aligned_spectrum_params, matched_precursor)
-    print(complete_precursor.b_kmers[4:6])
-    # (b_clusters,y_clusters) = get_clusters(base_alignment_params, b_kmers,y_kmers)
+    print(complete_precursor)
+    clustered_precursor = get_clustered_precursor(complete_precursor)
+    print(clustered_precursor)
     # search_space = clustering.get_search_space(clusters,precursor_charge)
     # unique_native_merged_seqs = alignment.pair_natives(search_space, precursor_mass, precursor_tolerance)
     # unique_hybrid_merged_seqs = alignment.pair_indices(aligned_spectrum_params, search_space, score_filter)
@@ -425,3 +419,20 @@ def get_aligned_spectrums(aligned_spectrums_params:AlignedSpectrumsParams):
             if aligned_spectrum is not None:
                 aligned_spectrums.extend(aligned_spectrum)
     return aligned_spectrums
+
+
+# def get_clusters(matched_precursor):
+#     all_clusters = []
+#     b_kmers = matched_precursor.matched_fragments.b_kmers
+#     y_kmers = matched_precursor.matched_fragments.y_kmers
+
+#     b_sorted_kmers = sorted(b_kmers, key=operator.attrgetter('protein_id', 'location_start', 'location_end'))
+#     b_group_key = operator.attrgetter('protein_id', 'location_start')
+#     y_sorted_kmers = sorted(y_kmers, key=operator.attrgetter('protein_id', 'location_end', 'location_start'))
+#     y_group_key = operator.attrgetter('protein_id', 'location_end')
+
+#     for key, group in groupby(sorted_kmers, key=group_key):
+#         kmers_group = list(group)
+#         cluster_items = ClusterItem(key=key, kmers=kmers_group)
+#         clusters = create_clusters_from_kmers([cluster_items])
+#         all_clusters.extend(clusters)
