@@ -75,14 +75,12 @@ AlignedSpectrumsParams = namedtuple('AlignedSpectrumsParams',['spectrums', 'base
 AlignedSpectrumParams = namedtuple('AlignedSpectrumParams',['spectrum', 'base_alignment_params'])
 Fragment = namedtuple('Fragment',['id','mz_value', 'abundance'])
 Precursor = namedtuple('Precursor',['id','mass','charge','fragments'])
-KMer = namedtuple('KMer',['mass','location_start','location_end','ion','charge','protein_id','sequence','kmer_type'])
+KMer = namedtuple('KMer',['mass','location_start','location_end','ion','charge','protein_id','sequence','score','kmer_type'])
 MatchedFragment = namedtuple('MatchedFragment',['fragment','b_kmers','y_kmers'])
 MatchedPrecursor = namedtuple('MatchedPrecursor',['id','mass','charge','matched_fragments'])
 CompletePrecursor = namedtuple('CompletePrecursor',['id','mass','charge','b_kmers','y_kmers'])
-
-ClusterItem = namedtuple('ClusterItem',['key','kmers'])
-Cluster = namedtuple('Cluster',['id','cluster_items','score'])
-ClusteredPrecursor = namedtuple('ClusteredPrecursor',['id','mass','charge','clusters'])
+Cluster = namedtuple('Cluster',['id','score','kmers'])
+ClusteredPrecursor = namedtuple('ClusteredPrecursor',['id','mass','charge','b_clusters','y_clusters'])
 
 ConvertedPrecursors = namedtuple('ConvertedPrecursors', ['converted_precursor_b', 'converted_precursor_y'])
 TargetData = namedtuple('TargetData', ['target_seq', 'target_left_pids', 'target_right_pids', 'target_left_indices', 'target_right_indices', 'target_score'])
