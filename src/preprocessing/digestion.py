@@ -1,4 +1,4 @@
-from lookups.objects import FastaDatabase, Protein
+from objects import FastaDatabase, Protein
 from collections import defaultdict
 import json 
 import os

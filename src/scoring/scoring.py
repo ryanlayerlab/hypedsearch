@@ -1,5 +1,5 @@
 from scoring import mass_comparisons
-from lookups.objects import FastaDatabase
+from objects import FastaDatabase
 from lookups.utils import ppm_to_da
 from preprocessing import clustering
 from lookups.constants import WATER_MASS, AMMONIUM

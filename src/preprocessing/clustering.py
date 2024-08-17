@@ -10,7 +10,7 @@ from lookups.sqlite_database import Sqllite_Database
 import time
 from lookups.constants import AMINO_ACIDS
 from scoring.scoring import calc_bayes_score
-from lookups.objects import KMer
+from objects import KMer
 
 
 def get_peptide(kmer, sqllite_database):

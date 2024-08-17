@@ -1,4 +1,4 @@
-from lookups.objects import FastaDatabase, Spectrum
+from objects import FastaDatabase, Spectrum
 from lookups.utils import all_perms_of_s
 from scoring import scoring
 from alignment import alignment_utils

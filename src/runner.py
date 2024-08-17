@@ -1,16 +1,12 @@
+
 import os
-import sys
 from pyteomics import fasta
-from lookups.objects import FastaDatabase, ExperimentParameters, Fragment, Precursor
+from objects import FastaDatabase, ExperimentParameters, Fragment, Precursor
 from lookups.sqlite_database import Sqllite_Database
-import lookups.objects
+import identification
 import lookups.utils
-import computational_pipeline
-import computational_pipeline.identification as cp_id
 import multiprocessing as mp
-from preprocessing import preprocessing_utils
 from datetime import datetime
-from collections import namedtuple
 from lookups.utils import file_exists
 from pyteomics import mzml
 
@@ -184,7 +180,7 @@ def get_experiment_parameters(args: dict):
     number_hybrids=args['number_hybrids']
     number_natives=args['number_natives']
     target_seq = args['target_seq']
-    experiment_parameters = ExperimentParameters(id=0,precurors=all_precursors,sqllite_database=sqllite_database,
+    experiment_parameters = ExperimentParameters(id=0,precursors=all_precursors,sqllite_database=sqllite_database,
                                                 max_peptide_length=max_peptide_length, ppm_tolerance=ppm_tolerance,
                                                 precursor_tolerance=precursor_tolerance,number_hybrids=number_hybrids,
                                                 number_natives=number_natives,target_seq=target_seq)
@@ -198,7 +194,6 @@ def handle_results(args, aligned_peptides):
 
 def run(args: dict):
     experiment_parameters = get_experiment_parameters(args)
-    print(experiment_parameters)
-    # aligned_peptides = cp_id.get_aligned_peptides(experiment_parameters)  
+    aligned_peptides = identification.get_aligned_peptides(experiment_parameters)  
     # handle_results(args,aligned_peptides)
     # return aligned_peptides
