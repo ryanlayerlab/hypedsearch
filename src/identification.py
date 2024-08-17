@@ -1,3 +1,5 @@
+from objects import ExperimentParameters, Precursor, KMer, MatchedFragment
+
 # from multiprocessing import Pool, set_start_method
 # import operator, time, json, os
 # from typing import Any
@@ -270,7 +272,6 @@
 #     converted_precursors =  ConvertedPrecursors(converted_precursor_b=converted_precursor_b,converted_precursor_y=converted_precursor_y)
 #     return converted_precursors
 
-
 # def print_named_tuple(tuple_description, named_tuple):
 #     file_path = tuple_description + '.txt'
 #     with open(file_path, 'w') as file:
@@ -310,17 +311,7 @@
 # #     else:
 # #         return None
 
-# def create_precursor(aligned_spectrum_params):
-#     spectrum = aligned_spectrum_params.spectrum
-#     precursor_id = spectrum.id
-#     precursor_mass = spectrum.precursor_mass
-#     precursor_charge = spectrum.precursor_charge
-#     mz_values = spectrum.mz_values
-#     abundances = spectrum.abundance
-#     zipped_fragments = list(zip(mz_values, abundances))
-#     fragments = [Fragment(id=index, mz_value=mz, abundance=abundance) for index, (mz, abundance) in enumerate(zipped_fragments)]
-#     precursor = Precursor(id=precursor_id,mass=precursor_mass,charge=precursor_charge,fragments=fragments)
-#     return precursor
+
 
 # def get_matched_fragment(aligned_spectrum_params, fragment):
 #     sqllite_database = aligned_spectrum_params.base_alignment_params.sqllite_database
@@ -382,36 +373,62 @@
 #     clustered_precursor = ClusteredPrecursor(id=id,mass=mass,charge=charge,b_clusters=b_clusters,y_clusters=y_clusters)
 #     return clustered_precursor
 
-# def create_aligned_spectrum(aligned_spectrum_params):
-#     precursor = create_precursor(aligned_spectrum_params)
-#     matched_precursor = get_matched_precursor(aligned_spectrum_params,precursor)
-#     complete_precursor = get_complete_precursor(aligned_spectrum_params, matched_precursor)
-#     clustered_precursor = get_clustered_precursor(complete_precursor)
-#     unique_native_merged_seqs = alignment.get_paired_natives(aligned_spectrum_params,clustered_precursor)
-#     print(unique_native_merged_seqs)
-#     # unique_hybrid_merged_seqs = alignment.pair_indices(aligned_spectrum_params, search_space, score_filter)
-#     # unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
-#     # rescored_alignments = rescore_merges(aligned_spectrum_params,unique_merges)
-#     # postprocessed_alignments = create_postprocessed_alignments(aligned_spectrum_params, rescored_alignments)
-#     # aligned_spectrums = get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments)
-#     # return aligned_spectrums
-#     return None
+def get_filtered_fragments(precursors, ppm_tolerance):
+    filtered_fragments = []
+    for precursor in precursors:
+        for fragment in precursor.fragments:
+            if fragment.abundance >= ppm_tolerance:
+                filtered_fragments.append(fragment)
+    return filtered_fragments
 
-# def get_aligned_spectrums(aligned_spectrums_params:AlignedSpectrumsParams):
-#     aligned_spectrums = []
-#     spectrums = aligned_spectrums_params.spectrums
-#     base_alignment_params = aligned_spectrums_params.base_alignment_params
-#     target_seq = base_alignment_params.target_seq
-#     if len(target_seq) > 0:
-#         for spectrum in spectrums:
-#             aligned_spectrum_params = AlignedSpectrumParams(spectrum=spectrum,base_alignment_params=base_alignment_params)
-#             aligned_spectrum = create_aligned_spectrum_with_target(aligned_spectrum_params)
-#             if aligned_spectrum is not None:
-#                 aligned_spectrums.extend(aligned_spectrum)
-#     else:
-#         for spectrum in spectrums:
-#             aligned_spectrum_params = AlignedSpectrumParams(spectrum=spectrum,base_alignment_params=base_alignment_params)
-#             aligned_spectrum = create_aligned_spectrum(aligned_spectrum_params)
-#             if aligned_spectrum is not None:
-#                 aligned_spectrums.extend(aligned_spectrum)
-#     return aligned_spectrums
+def ppm_to_da(mz_value, ppm_tolerance):
+    return 0.0
+
+def get_matched_fragment(fragment, sqllite_database, ppm_tolerance):
+    mz_value = fragment.mz_value        
+    ppm_tolerance = ppm_to_da(mz_value, ppm_tolerance)
+    b_rows, y_rows = sqllite_database.query_mass_kmers(mz_value, ppm_tolerance)
+    b_kmers = [KMer(*row) for row in b_rows]
+    y_kmers = [KMer(*row) for row in y_rows]
+    matched_fragment = MatchedFragment(fragment=fragment, b_kmers=b_kmers, y_kmers=y_kmers)
+    return matched_fragment    
+
+def get_matched_fragments(fragments,sqllite_database,ppm_tolerance):
+    matched_fragments = []
+    for fragment in fragments:
+        matched_fragment = get_matched_fragment(fragment,sqllite_database,ppm_tolerance)
+        if len(matched_fragment.b_kmers) + len(matched_fragment.y_kmers) > 0:
+            matched_fragments.append(matched_fragment)
+    return matched_fragments
+
+def create_aligned_peptides(experiment_parameters):
+    precursors = experiment_parameters.precursors
+    ppm_tolerance = experiment_parameters.ppm_tolerance    
+    filtered_fragments = get_filtered_fragments(precursors, ppm_tolerance)
+    sqllite_database = experiment_parameters.sqllite_database
+    matched_fragments = get_matched_fragments(filtered_fragments,sqllite_database,ppm_tolerance)
+    print(matched_fragments)
+    # matched_precursor = get_matched_precursor(aligned_spectrum_params,precursor)
+    # complete_precursor = get_complete_precursor(aligned_spectrum_params, matched_precursor)
+    # clustered_precursor = get_clustered_precursor(complete_precursor)
+    # unique_native_merged_seqs = alignment.get_paired_natives(aligned_spectrum_params,clustered_precursor)
+    # print(unique_native_merged_seqs)
+    # unique_hybrid_merged_seqs = alignment.pair_indices(aligned_spectrum_params, search_space, score_filter)
+    # unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
+    # rescored_alignments = rescore_merges(aligned_spectrum_params,unique_merges)
+    # postprocessed_alignments = create_postprocessed_alignments(aligned_spectrum_params, rescored_alignments)
+    # aligned_spectrums = get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments)
+    # return aligned_spectrums
+    return None
+
+def create_aligned_peptides_with_target(experiment_parameters):
+    return None
+
+def get_aligned_peptides(experiment_parameters):
+    target_seq = experiment_parameters.target_seq
+    if len(target_seq) > 0:
+        aligned_peptides = create_aligned_peptides_with_target(experiment_parameters)
+        return aligned_peptides
+    else:
+        aligned_peptides = create_aligned_peptides(experiment_parameters)
+        return aligned_peptides

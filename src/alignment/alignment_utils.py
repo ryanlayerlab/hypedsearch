@@ -1,4 +1,4 @@
-from lookups.objects import FastaDatabase, Spectrum
+from objects import FastaDatabase, Spectrum
 from scoring import scoring
 import computational_pipeline.gen_spectra
 import lookups.utils
