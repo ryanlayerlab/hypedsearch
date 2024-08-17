@@ -6,11 +6,11 @@ import os
 from lookups.utils import ppm_to_da, to_percent
 import computational_pipeline.gen_spectra
 from lookups.constants import WATER_MASS, PROTON_MASS
-from preprocessing.sqlite_database import Sqllite_Database
+from lookups.sqlite_database import Sqllite_Database
 import time
 from lookups.constants import AMINO_ACIDS
 from scoring.scoring import calc_bayes_score
-from lookups.objects import Cluster, KMer, Protein
+from lookups.objects import KMer
 
 
 def get_peptide(kmer, sqllite_database):
@@ -494,7 +494,8 @@ def create_cluster(key,kmers):
     cluster_id = get_cluster_id(key)
     max_difference_kmer = max(kmers, key=lambda kmer: kmer.location_end - kmer.location_start)
     score = (max_difference_kmer.location_end - max_difference_kmer.location_start)/len(max_difference_kmer.sequence)
-    cluster = Cluster(id=cluster_id,score=score,kmers=kmers)
+    mass = max_difference_kmer.mass
+    cluster = Cluster(id=cluster_id,mass=mass,score=score,kmers=kmers)
     return cluster
 
 def create_b_clusters(b_kmers):

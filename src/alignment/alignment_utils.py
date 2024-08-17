@@ -1,4 +1,4 @@
-from lookups.objects import Database, Spectrum
+from lookups.objects import FastaDatabase, Spectrum
 from scoring import scoring
 import computational_pipeline.gen_spectra
 import lookups.utils
@@ -41,7 +41,7 @@ def __get_surrounding_amino_acids(
 def __add_amino_acids(
     spectrum: Spectrum, 
     sequence: str, 
-    db: Database, 
+    db: FastaDatabase, 
     gap: int = 3, 
     tolerance: float = 1.0
     ) -> list:
@@ -203,7 +203,7 @@ def align_overlaps(seq1: str, seq2: str) -> str:
 def match_precursor(
     spectrum: Spectrum, 
     sequence: str, 
-    db: Database, 
+    db: FastaDatabase, 
     gap: int = 3, 
     tolerance: float = 1
     ) -> list:
@@ -222,7 +222,7 @@ def match_precursor(
 
 def get_parents(
     seq: str, 
-    db: Database, 
+    db: FastaDatabase, 
     ion: str = None
     ):
     get_sources = lambda s: preprocessing.database_generator.get_proteins_with_subsequence(db, s)
@@ -236,7 +236,7 @@ def get_parents(
         return (get_sources_ion(seq, ion), None)
     return (get_sources(seq), None)
 
-def extend_non_hybrid(seq, spectrum: Spectrum, ion: str, database: Database) -> list:
+def extend_non_hybrid(seq, spectrum: Spectrum, ion: str, database: FastaDatabase) -> list:
     extensions = []
     extension_len = lookups.utils.predicted_len_precursor(spectrum, seq) - len(seq)
     if extension_len <= 0:

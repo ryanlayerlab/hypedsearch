@@ -2,7 +2,7 @@ from file_io import spectra
 from lookups.utils import ppm_to_da
 from lookups.constants import DOUBLY_CHARGED_B_BASE, DOUBLY_CHARGED_Y_BASE, PROTON_MASS, WATER_MASS
 from computational_pipeline.gen_spectra import get_total_sum, convert_precursor_to_ion, get_precursor, generate_spectrum
-from preprocessing.sqlite_database import Sqllite_Database
+from lookups.sqlite_database import Sqllite_Database
 
 def make_boundaries(mz, ppm_tol):
     da_tol = ppm_to_da(mz, ppm_tol)

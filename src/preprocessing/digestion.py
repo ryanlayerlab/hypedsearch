@@ -1,4 +1,4 @@
-from lookups.objects import Database, Protein
+from lookups.objects import FastaDatabase, Protein
 from collections import defaultdict
 import json 
 import os
@@ -8,7 +8,7 @@ json_dir = '/'.join(script_dir.split('/')[:-1])
 digest_file = os.path.join(json_dir, 'digests.json')
 digests = json.load(open(digest_file, 'r'))
 
-def digest(db: Database, digest_type: str, missed_cleavages: int) -> Database:
+def digest(db: FastaDatabase, digest_type: str, missed_cleavages: int) -> FastaDatabase:
     if digest_type not in digests:
         return db
     digest_rules = digests[digest_type]

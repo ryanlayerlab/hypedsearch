@@ -2,7 +2,7 @@ import os
 import argparse
 import sys
 import distutils
-from lookups.objects import Database
+from lookups.objects import FastaDatabase
 import lookups.utils, runner
 from config_loader import Config
 from postprocessing import summary, review
