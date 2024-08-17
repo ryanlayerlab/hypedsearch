@@ -1,584 +1,664 @@
-from scoring import scoring
-from lookups.objects import Spectrum, SequenceAlignment, HybridSequenceAlignment, Database, Alignments, DEVFallOffEntry
-from lookups.constants import PROTON_MASS, WATER_MASS
-from alignment import alignment_utils, hybrid_alignment
-from computational_pipeline.gen_spectra import get_precursor
-from preprocessing.clustering import calc_from_sequences
-import lookups.objects as objects
-import lookups.utils
-import computational_pipeline.gen_spectra
-from preprocessing.sqlite_database import Sqllite_Database
+# from scoring import scoring
+# from lookups.constants import PROTON_MASS, WATER_MASS, AMINO_ACIDS
+# from alignment import alignment_utils, hybrid_alignment
+# from computational_pipeline.gen_spectra import get_precursor
+# from preprocessing.clustering import calc_from_sequences
+# from lookups.objects import KMer,Alignment_Instrumentation,PrecursorHit,Merged_Kmer
+# import lookups.utils
+# import computational_pipeline.gen_spectra
+# from lookups.sqlite_database import Sqllite_Database
 
-import math, collections, re, time 
+# import math, collections, re, time 
 
-FIRST_ALIGN_TIME = 0
-AMBIGUOUS_REMOVAL_TIME = 0
-PRECURSOR_MASS_TIME = 0
-OBJECTIFY_TIME = 0
+# FIRST_ALIGN_TIME = 0
+# AMBIGUOUS_REMOVAL_TIME = 0
+# PRECURSOR_MASS_TIME = 0
+# OBJECTIFY_TIME = 0
 
-FIRST_ALIGN_COUNT = 0
-AMBIGUOUS_REMOVAL_COUNT = 0
-PRECURSOR_MASS_COUNT = 0
-OBJECTIFY_COUNT = 0
+# FIRST_ALIGN_COUNT = 0
+# AMBIGUOUS_REMOVAL_COUNT = 0
+# PRECURSOR_MASS_COUNT = 0
+# OBJECTIFY_COUNT = 0
 
-OUT_OF_RANGE_SEQS = 0
-TOTAL_ITERATIONS = 0
+# OUT_OF_RANGE_SEQS = 0
+# TOTAL_ITERATIONS = 0
 
-global extension_times
-extension_times = []
-global initial_alignment_times
-initial_alignment_times = []
-global Non_hybrid_refine_time
-Non_hybrid_refine_time = []
-global non_hybrid_scoring_times
-non_hybrid_scoring_times = []
-global Hybrid_refine_times
-Hybrid_refine_times = []
-global hybrid_scoring_times
-hybrid_scoring_times = []
+# global extension_times
+# extension_times = []
+# global initial_alignment_times
+# initial_alignment_times = []
+# global Non_hybrid_refine_time
+# Non_hybrid_refine_time = []
+# global non_hybrid_scoring_times
+# non_hybrid_scoring_times = []
+# global Hybrid_refine_times
+# Hybrid_refine_times = []
+# global hybrid_scoring_times
+# hybrid_scoring_times = []
 
-def same_protein_alignment(seq1: str, seq2: str, parent_sequence: str):
-    if seq1 == seq2 or seq2 in seq1:
-        return (seq1, None)
-    if seq1 in seq2:
-        return (seq2, None)
-    gap_aa = max(1, len(parent_sequence) // 100)
-    left_start = [m.start() for m in re.finditer(seq1, parent_sequence)]
-    right_start = [m.start() for m in re.finditer(seq2, parent_sequence)]
-    if all([r < l for r in right_start for l in left_start]):
-        return hybrid_alignment.hybrid_alignment(seq1, seq2)
-    nonhybrid_alignments = []
-    for l in left_start:
-        for r in right_start:
-            if r < l:
-                continue
-            if r - (l + len(seq1)) <= gap_aa:
-                overlapped = parent_sequence[l: r + len(seq2)]
-                nonhybrid_alignments.append(overlapped)
-    if len(nonhybrid_alignments) == 0:
-        return hybrid_alignment.hybrid_alignment(seq1, seq2)
-    nonhybrid_alignments.sort(key=lambda x: len(x))
-    return (nonhybrid_alignments[0], None)
+# def same_protein_alignment(seq1: str, seq2: str, parent_sequence: str):
+#     if seq1 == seq2 or seq2 in seq1:
+#         return (seq1, None)
+#     if seq1 in seq2:
+#         return (seq2, None)
+#     gap_aa = max(1, len(parent_sequence) // 100)
+#     left_start = [m.start() for m in re.finditer(seq1, parent_sequence)]
+#     right_start = [m.start() for m in re.finditer(seq2, parent_sequence)]
+#     if all([r < l for r in right_start for l in left_start]):
+#         return hybrid_alignment.hybrid_alignment(seq1, seq2)
+#     nonhybrid_alignments = []
+#     for l in left_start:
+#         for r in right_start:
+#             if r < l:
+#                 continue
+#             if r - (l + len(seq1)) <= gap_aa:
+#                 overlapped = parent_sequence[l: r + len(seq2)]
+#                 nonhybrid_alignments.append(overlapped)
+#     if len(nonhybrid_alignments) == 0:
+#         return hybrid_alignment.hybrid_alignment(seq1, seq2)
+#     nonhybrid_alignments.sort(key=lambda x: len(x))
+#     return (nonhybrid_alignments[0], None)
 
-def align_b_y(b_kmers: list, y_kmers: list, spectrum: Spectrum, database: Database):
-    spec_alignments = []
-    for b_seq in b_kmers:
-        b_proteins = database.get_proteins_with_subsequence(database, b_seq)
-        for y_seq in y_kmers:
-            y_proteins = database.get_proteins_with_subsequence(database, y_seq)
-            if any([x in y_proteins for x in b_proteins]):
-                shared_prots = [x for x in y_proteins if x in b_proteins]
-                for sp in shared_prots:
-                    prot_seqs = database.get_entry_by_name(database, sp)
-                    for prot_entry in prot_seqs:
-                        spec_alignments.append(
-                            same_protein_alignment(b_seq, y_seq, prot_entry.sequence)
-                        )
-                spec_alignments.append((f'{b_seq}{y_seq}', f'{b_seq}-{y_seq}'))
-            else: 
-                spec_alignments.append(hybrid_alignment.hybrid_alignment(b_seq, y_seq))
-    return list(set([x for x in spec_alignments if x is not None]))
+# def align_b_y(b_kmers: list, y_kmers: list, spectrum: Spectrum, database: FastaDatabase):
+#     spec_alignments = []
+#     for b_seq in b_kmers:
+#         b_proteins = database.get_proteins_with_subsequence(database, b_seq)
+#         for y_seq in y_kmers:
+#             y_proteins = database.get_proteins_with_subsequence(database, y_seq)
+#             if any([x in y_proteins for x in b_proteins]):
+#                 shared_prots = [x for x in y_proteins if x in b_proteins]
+#                 for sp in shared_prots:
+#                     prot_seqs = database.get_entry_by_name(database, sp)
+#                     for prot_entry in prot_seqs:
+#                         spec_alignments.append(
+#                             same_protein_alignment(b_seq, y_seq, prot_entry.sequence)
+#                         )
+#                 spec_alignments.append((f'{b_seq}{y_seq}', f'{b_seq}-{y_seq}'))
+#             else: 
+#                 spec_alignments.append(hybrid_alignment.hybrid_alignment(b_seq, y_seq))
+#     return list(set([x for x in spec_alignments if x is not None]))
 
-def extend_base_kmers(b_kmers: list, y_kmers: list, spectrum: Spectrum, db: Database):
-    extended_b, extended_y = [], []
-    for seq in b_kmers:
-        extended_b += alignment_utils.extend_non_hybrid(seq, spectrum, 'b', db)
-    for seq in y_kmers:
-        extended_y += alignment_utils.extend_non_hybrid(seq, spectrum, 'y', db)
-    return extended_b, extended_y
+# def extend_base_kmers(b_kmers: list, y_kmers: list, spectrum: Spectrum, db: FastaDatabase):
+#     extended_b, extended_y = [], []
+#     for seq in b_kmers:
+#         extended_b += alignment_utils.extend_non_hybrid(seq, spectrum, 'b', db)
+#     for seq in y_kmers:
+#         extended_y += alignment_utils.extend_non_hybrid(seq, spectrum, 'y', db)
+#     return extended_b, extended_y
 
-def refine_alignments(spectrum: Spectrum, db: Database, alignments: list, precursor_tolerance: int = 10,
-    DEV: bool = False, truth: dict = None, fall_off: dict = None):
-    global PRECURSOR_MASS_COUNT, AMBIGUOUS_REMOVAL_COUNT, OUT_OF_RANGE_SEQS
-    global PRECURSOR_MASS_TIME, AMBIGUOUS_REMOVAL_TIME
-    predicted_len = lookups.utils.predicted_len(spectrum.precursor_mass, spectrum.precursor_charge)
-    allowed_gap = math.ceil(predicted_len * .25)
-    st = time.time()
-    precursor_matches = []
-    for sequence_pairs in alignments:
-        sequence = sequence_pairs[0] if sequence_pairs[1] is None else sequence_pairs[1]
-        p_ms = [
-            x for x in \
-            alignment_utils.match_precursor(spectrum, sequence, db, gap=allowed_gap, tolerance=precursor_tolerance)
-        ]
-        if len(p_ms) and p_ms[0] is None:
-            OUT_OF_RANGE_SEQS += 1
-            continue
-        precursor_matches += p_ms
-    PRECURSOR_MASS_COUNT += len(alignments)
-    PRECURSOR_MASS_TIME += time.time() - st
-    if DEV:
-        _id = spectrum.id
-        is_hybrid = truth[_id]['hybrid']
-        truth_seq = truth[_id]['sequence']
-        if not lookups.utils.DEV_contains_truth_exact(truth_seq, is_hybrid, precursor_matches):
-            metadata = {
-                'sequences_before_precursor_filling': alignments, 
-                'sequences_after_precursor_filling': precursor_matches, 
-                'observed_precursor_mass': spectrum.precursor_mass, 
-                'observed_percursor_charge': spectrum.precursor_charge, 
-                'allowed_gap': allowed_gap
-            }
+# def refine_alignments(spectrum: Spectrum, db: FastaDatabase, alignments: list, precursor_tolerance: int = 10,
+#     DEV: bool = False, truth: dict = None, fall_off: dict = None):
+#     global PRECURSOR_MASS_COUNT, AMBIGUOUS_REMOVAL_COUNT, OUT_OF_RANGE_SEQS
+#     global PRECURSOR_MASS_TIME, AMBIGUOUS_REMOVAL_TIME
+#     predicted_len = lookups.utils.predicted_len(spectrum.precursor_mass, spectrum.precursor_charge)
+#     allowed_gap = math.ceil(predicted_len * .25)
+#     st = time.time()
+#     precursor_matches = []
+#     for sequence_pairs in alignments:
+#         sequence = sequence_pairs[0] if sequence_pairs[1] is None else sequence_pairs[1]
+#         p_ms = [
+#             x for x in \
+#             alignment_utils.match_precursor(spectrum, sequence, db, gap=allowed_gap, tolerance=precursor_tolerance)
+#         ]
+#         if len(p_ms) and p_ms[0] is None:
+#             OUT_OF_RANGE_SEQS += 1
+#             continue
+#         precursor_matches += p_ms
+#     PRECURSOR_MASS_COUNT += len(alignments)
+#     PRECURSOR_MASS_TIME += time.time() - st
+#     if DEV:
+#         _id = spectrum.id
+#         is_hybrid = truth[_id]['hybrid']
+#         truth_seq = truth[_id]['sequence']
+#         if not lookups.utils.DEV_contains_truth_exact(truth_seq, is_hybrid, precursor_matches):
+#             metadata = {
+#                 'sequences_before_precursor_filling': alignments, 
+#                 'sequences_after_precursor_filling': precursor_matches, 
+#                 'observed_precursor_mass': spectrum.precursor_mass, 
+#                 'observed_percursor_charge': spectrum.precursor_charge, 
+#                 'allowed_gap': allowed_gap
+#             }
 
-            fall_off[_id] = DEVFallOffEntry(
-                is_hybrid, 
-                truth_seq, 
-                'precursor_filling', 
-                metadata
-            )
-            return Alignments(spectrum, [])
-    nonhyba, hyba = [], []
-    for p_m in precursor_matches:
-        if '-' in p_m or '(' in p_m or ')' in p_m:
-            hyba.append((p_m.replace('-', '').replace('(', '').replace(')', ''), p_m))
-        else:
-            nonhyba.append((p_m, None))
-    st = time.time()
-    updated_hybrids = [] if len(hyba) == 0 else hybrid_alignment.replace_ambiguous_hybrids(hyba, db, spectrum)
-    if DEV and truth[spectrum.id]['hybrid']:
-        _id = spectrum.id
-        is_hybrid = truth[_id]['hybrid']
-        truth_seq = truth[_id]['sequence']
-        if not lookups.DEV_contains_truth_exact(truth_seq, is_hybrid, [x[0] for x in updated_hybrids]):
-            metadata = {
-                'before_ambiguous_removal': hyba, 
-                'after_ambiguous_removal': updated_hybrids
-            }
-            fall_off[_id] = DEVFallOffEntry(
-                is_hybrid, 
-                truth_seq, 
-                'removing_ambiguous_hybrids', 
-                metadata
-            )
-            return Alignments(spectrum, [])
-    AMBIGUOUS_REMOVAL_COUNT += len(hyba)
-    AMBIGUOUS_REMOVAL_TIME += time.time() - st
-    return nonhyba + updated_hybrids
+#             fall_off[_id] = DEVFallOffEntry(
+#                 is_hybrid, 
+#                 truth_seq, 
+#                 'precursor_filling', 
+#                 metadata
+#             )
+#             return Alignments(spectrum, [])
+#     nonhyba, hyba = [], []
+#     for p_m in precursor_matches:
+#         if '-' in p_m or '(' in p_m or ')' in p_m:
+#             hyba.append((p_m.replace('-', '').replace('(', '').replace(')', ''), p_m))
+#         else:
+#             nonhyba.append((p_m, None))
+#     st = time.time()
+#     updated_hybrids = [] if len(hyba) == 0 else hybrid_alignment.replace_ambiguous_hybrids(hyba, db, spectrum)
+#     if DEV and truth[spectrum.id]['hybrid']:
+#         _id = spectrum.id
+#         is_hybrid = truth[_id]['hybrid']
+#         truth_seq = truth[_id]['sequence']
+#         if not lookups.DEV_contains_truth_exact(truth_seq, is_hybrid, [x[0] for x in updated_hybrids]):
+#             metadata = {
+#                 'before_ambiguous_removal': hyba, 
+#                 'after_ambiguous_removal': updated_hybrids
+#             }
+#             fall_off[_id] = DEVFallOffEntry(
+#                 is_hybrid, 
+#                 truth_seq, 
+#                 'removing_ambiguous_hybrids', 
+#                 metadata
+#             )
+#             return Alignments(spectrum, [])
+#     AMBIGUOUS_REMOVAL_COUNT += len(hyba)
+#     AMBIGUOUS_REMOVAL_TIME += time.time() - st
+#     return nonhyba + updated_hybrids
 
-def attempt_alignment_dev(spectrum: Spectrum, truth: bool = None, fall_off: bool = None,a: list = None):
-    b_seqs = [x[0] for x in a]
-    y_seqs = [x[0] for x in a]
-    _id = spectrum.id
-    is_hybrid = truth[_id]['hybrid']
-    truth_seq = truth[_id]['sequence']
-    if not lookups.utils.DEV_contains_truth_parts(truth_seq, is_hybrid, b_seqs, y_seqs):
-        metadata = {
-            'alignments': a, 
-            'before_alignments_b': b_seqs, 
-            'before_alignments_y': y_seqs
-        }
-        fall_off[_id] = DEVFallOffEntry(
-            is_hybrid, 
-            truth_seq, 
-            'first_alignment_round', 
-            metadata
-        )
-        return Alignments(spectrum, [], None)
+# def attempt_alignment_dev(spectrum: Spectrum, truth: bool = None, fall_off: bool = None,a: list = None):
+#     b_seqs = [x[0] for x in a]
+#     y_seqs = [x[0] for x in a]
+#     _id = spectrum.id
+#     is_hybrid = truth[_id]['hybrid']
+#     truth_seq = truth[_id]['sequence']
+#     if not lookups.utils.DEV_contains_truth_parts(truth_seq, is_hybrid, b_seqs, y_seqs):
+#         metadata = {
+#             'alignments': a, 
+#             'before_alignments_b': b_seqs, 
+#             'before_alignments_y': y_seqs
+#         }
+#         fall_off[_id] = DEVFallOffEntry(
+#             is_hybrid, 
+#             truth_seq, 
+#             'first_alignment_round', 
+#             metadata
+#         )
+#         return Alignments(spectrum, [], None)
 
-def attempt_alignment_first_pass(spectrum: Spectrum, db: Database, n: int = 3, ppm_tolerance: int = 20, 
-    precursor_tolerance: int = 10,digest_type: str = '',truth: bool = None, fall_off: bool = None,
-    DEV: bool = False,OBJECTIFY_COUNT: int = 0,OBJECTIFY_TIME: int = 0,a: list = None,is_last: bool = False):
-    refine_start = time.time()
-    non_hybrid_refined = refine_alignments(spectrum, db, [x for x in a if x[1] is None], 
-        precursor_tolerance=precursor_tolerance, DEV=DEV, truth=truth, fall_off=fall_off)
-    refine_time = time.time() - refine_start
-    Non_hybrid_refine_time.append(refine_time)
-    non_hybrid_alignments = []
-    tracker = {}
-    st = time.time()
-    for nhr, _ in non_hybrid_refined:
-        if nhr in tracker: 
-            continue
-        tracker[nhr] = True 
-        scoring_start = time.time()
-        p_d = scoring.precursor_distance(
-            spectrum.precursor_mass, 
-            computational_pipeline.gen_spectra.get_precursor(nhr, spectrum.precursor_charge)
-        )
-        b_score = scoring.score_sequence(
-            spectrum.mz_values, 
-            sorted(computational_pipeline.gen_spectra.gen_spectrum(nhr, ion='b')['spectrum']), 
-            ppm_tolerance
-        )
+# def attempt_alignment_first_pass(spectrum: Spectrum, db: FastaDatabase, n: int = 3, ppm_tolerance: int = 20, 
+#     precursor_tolerance: int = 10,digest_type: str = '',truth: bool = None, fall_off: bool = None,
+#     DEV: bool = False,OBJECTIFY_COUNT: int = 0,OBJECTIFY_TIME: int = 0,a: list = None,is_last: bool = False):
+#     refine_start = time.time()
+#     non_hybrid_refined = refine_alignments(spectrum, db, [x for x in a if x[1] is None], 
+#         precursor_tolerance=precursor_tolerance, DEV=DEV, truth=truth, fall_off=fall_off)
+#     refine_time = time.time() - refine_start
+#     Non_hybrid_refine_time.append(refine_time)
+#     non_hybrid_alignments = []
+#     tracker = {}
+#     st = time.time()
+#     for nhr, _ in non_hybrid_refined:
+#         if nhr in tracker: 
+#             continue
+#         tracker[nhr] = True 
+#         scoring_start = time.time()
+#         p_d = scoring.precursor_distance(
+#             spectrum.precursor_mass, 
+#             computational_pipeline.gen_spectra.get_precursor(nhr, spectrum.precursor_charge)
+#         )
+#         b_score = scoring.score_sequence(
+#             spectrum.mz_values, 
+#             sorted(computational_pipeline.gen_spectra.gen_spectrum(nhr, ion='b')['spectrum']), 
+#             ppm_tolerance
+#         )
 
-        y_score = scoring.score_sequence(
-            spectrum.mz_values, 
-            sorted(computational_pipeline.gen_spectra.gen_spectrum(nhr, ion='y')['spectrum']), 
-            ppm_tolerance
-        )
-        total_error = scoring.total_mass_error(spectrum, nhr, ppm_tolerance)
-        t_score = b_score + y_score + scoring.digest_score(nhr, db, digest_type)
-        non_hybrid_scoring_times.append(time.time() - scoring_start)
-        parents = alignment_utils.get_parents(nhr, db)
-        non_hybrid_alignments.append(   
-            SequenceAlignment(
-                parents[0], 
-                nhr, 
-                b_score, 
-                y_score, 
-                t_score, 
-                p_d, 
-                total_error
-            )
-        )
+#         y_score = scoring.score_sequence(
+#             spectrum.mz_values, 
+#             sorted(computational_pipeline.gen_spectra.gen_spectrum(nhr, ion='y')['spectrum']), 
+#             ppm_tolerance
+#         )
+#         total_error = scoring.total_mass_error(spectrum, nhr, ppm_tolerance)
+#         t_score = b_score + y_score + scoring.digest_score(nhr, db, digest_type)
+#         non_hybrid_scoring_times.append(time.time() - scoring_start)
+#         parents = alignment_utils.get_parents(nhr, db)
+#         non_hybrid_alignments.append(   
+#             SequenceAlignment(
+#                 parents[0], 
+#                 nhr, 
+#                 b_score, 
+#                 y_score, 
+#                 t_score, 
+#                 p_d, 
+#                 total_error
+#             )
+#         )
 
-    OBJECTIFY_COUNT += len(non_hybrid_refined)
-    OBJECTIFY_TIME += time.time() - st
-    if any([x.total_score >= 1.5 * len(x.sequence) for x in non_hybrid_alignments]):
-        sorted_alignments = sorted(
-            non_hybrid_alignments, 
-            key=lambda x: (
-                x.total_score, 
-                math.inf if x.total_mass_error <= 0 else 1/x.total_mass_error, 
-                math.inf if x.precursor_distance <= 0 else 1/x.precursor_distance, 
-                x.b_score, 
-                x.y_score
-            ), 
-            reverse=True
-        )
-        top_n_alignments = sorted_alignments[:n]
-        return top_n_alignments
-    else:
-        return None, non_hybrid_alignments        
+#     OBJECTIFY_COUNT += len(non_hybrid_refined)
+#     OBJECTIFY_TIME += time.time() - st
+#     if any([x.total_score >= 1.5 * len(x.sequence) for x in non_hybrid_alignments]):
+#         sorted_alignments = sorted(
+#             non_hybrid_alignments, 
+#             key=lambda x: (
+#                 x.total_score, 
+#                 math.inf if x.total_mass_error <= 0 else 1/x.total_mass_error, 
+#                 math.inf if x.precursor_distance <= 0 else 1/x.precursor_distance, 
+#                 x.b_score, 
+#                 x.y_score
+#             ), 
+#             reverse=True
+#         )
+#         top_n_alignments = sorted_alignments[:n]
+#         return top_n_alignments
+#     else:
+#         return None, non_hybrid_alignments        
 
-def attempt_alignment_second_pass(spectrum: Spectrum, db: Database, n: int = 3, 
-    ppm_tolerance: int = 20, precursor_tolerance: int = 10,digest_type: str = '',truth: bool = None, 
-    fall_off: bool = None,DEV: bool = False,OBJECTIFY_COUNT: int = 0,OBJECTIFY_TIME: int = 0,
-    a: list = [],non_hybrid_alignments: list = []):
-    refine_start = time.time()
-    hybrid_refined = refine_alignments(
-        spectrum, 
-        db, 
-        [x for x in a if x[1] is not None], 
-        precursor_tolerance=precursor_tolerance, 
-        DEV=DEV, 
-        truth=truth, 
-        fall_off=fall_off
-    )
-    refine_time = time.time() - refine_start
-    Hybrid_refine_times.append(refine_time)
-    hybrid_alignments = []
-    tracker = {}
-    st = time.time()
-    for hr, special_hr in hybrid_refined:
-        if hr in tracker: 
-            continue
-        tracker[hr] = True 
-        scoring_start = time.time()
-        p_d = scoring.precursor_distance(
-            spectrum.precursor_mass, 
-            computational_pipeline.gen_spectra.get_precursor(hr, spectrum.precursor_charge)
-        )
-        b_score = scoring.score_sequence(
-            spectrum.mz_values, 
-            sorted(computational_pipeline.gen_spectra.gen_spectrum(hr, ion='b')['spectrum']), 
-            ppm_tolerance
-        )
-        y_score = scoring.score_sequence(
-            spectrum.mz_values, 
-            sorted(computational_pipeline.gen_spectra.gen_spectrum(hr, ion='y')['spectrum']), 
-            ppm_tolerance
-        )
-        total_error = scoring.total_mass_error(spectrum, hr, ppm_tolerance)
-        hybrid_scoring_times.append(time.time() - scoring_start)
-        parents = alignment_utils.get_parents(hr, db)
-        t_score = None
-        if special_hr is None:
-            t_score = b_score + y_score + scoring.digest_score(hr, db, digest_type)
-            non_hybrid_alignments.append(
-                 SequenceAlignment(
-                    parents[0], 
-                    hr, 
-                    b_score, 
-                    y_score, 
-                    t_score, 
-                    p_d, 
-                    total_error
-                )
-            )
-            i = 0
-            avg_b_score = 0
-            avg_y_score = 0
-            avg_total_score = 0
-            for score in non_hybrid_alignments:
-                 avg_b_score = avg_b_score + score[2]
-                 avg_y_score = avg_y_score + score[3]
-                 avg_total_score = avg_total_score + score[4]
-                 i = i + 1
-            alignment_instrumentation = objects.Alignment_Instrumentation(
-            avg_b_score = avg_b_score/i,
-            avg_y_score = avg_y_score/i,
-            avg_total_score = avg_total_score/i
-            )
-        else: 
+# def attempt_alignment_second_pass(spectrum: Spectrum, db: FastaDatabase, n: int = 3, 
+#     ppm_tolerance: int = 20, precursor_tolerance: int = 10,digest_type: str = '',truth: bool = None, 
+#     fall_off: bool = None,DEV: bool = False,OBJECTIFY_COUNT: int = 0,OBJECTIFY_TIME: int = 0,
+#     a: list = [],non_hybrid_alignments: list = []):
+#     refine_start = time.time()
+#     hybrid_refined = refine_alignments(
+#         spectrum, 
+#         db, 
+#         [x for x in a if x[1] is not None], 
+#         precursor_tolerance=precursor_tolerance, 
+#         DEV=DEV, 
+#         truth=truth, 
+#         fall_off=fall_off
+#     )
+#     refine_time = time.time() - refine_start
+#     Hybrid_refine_times.append(refine_time)
+#     hybrid_alignments = []
+#     tracker = {}
+#     st = time.time()
+#     for hr, special_hr in hybrid_refined:
+#         if hr in tracker: 
+#             continue
+#         tracker[hr] = True 
+#         scoring_start = time.time()
+#         p_d = scoring.precursor_distance(
+#             spectrum.precursor_mass, 
+#             computational_pipeline.gen_spectra.get_precursor(hr, spectrum.precursor_charge)
+#         )
+#         b_score = scoring.score_sequence(
+#             spectrum.mz_values, 
+#             sorted(computational_pipeline.gen_spectra.gen_spectrum(hr, ion='b')['spectrum']), 
+#             ppm_tolerance
+#         )
+#         y_score = scoring.score_sequence(
+#             spectrum.mz_values, 
+#             sorted(computational_pipeline.gen_spectra.gen_spectrum(hr, ion='y')['spectrum']), 
+#             ppm_tolerance
+#         )
+#         total_error = scoring.total_mass_error(spectrum, hr, ppm_tolerance)
+#         hybrid_scoring_times.append(time.time() - scoring_start)
+#         parents = alignment_utils.get_parents(hr, db)
+#         t_score = None
+#         if special_hr is None:
+#             t_score = b_score + y_score + scoring.digest_score(hr, db, digest_type)
+#             non_hybrid_alignments.append(
+#                  SequenceAlignment(
+#                     parents[0], 
+#                     hr, 
+#                     b_score, 
+#                     y_score, 
+#                     t_score, 
+#                     p_d, 
+#                     total_error
+#                 )
+#             )
+#             i = 0
+#             avg_b_score = 0
+#             avg_y_score = 0
+#             avg_total_score = 0
+#             for score in non_hybrid_alignments:
+#                  avg_b_score = avg_b_score + score[2]
+#                  avg_y_score = avg_y_score + score[3]
+#                  avg_total_score = avg_total_score + score[4]
+#                  i = i + 1
+#             alignment_instrumentation = Alignment_Instrumentation(
+#             avg_b_score = avg_b_score/i,
+#             avg_y_score = avg_y_score/i,
+#             avg_total_score = avg_total_score/i
+#             )
+#         else: 
 
-            t_score = scoring.hybrid_score(spectrum, special_hr, ppm_tolerance)\
-            + scoring.digest_score(special_hr, db, digest_type)
-            hybrid_alignments.append(
-                HybridSequenceAlignment(
-                    parents[0], 
-                    parents[1], 
-                    hr, 
-                    special_hr, 
-                    b_score, 
-                    y_score, 
-                    t_score, 
-                    p_d, 
-                    total_error
-                )
-            )
-            i = 0
-            avg_b_score = 0
-            avg_y_score = 0
-            avg_total_score = 0
-            for score in hybrid_alignments:
-                avg_b_score = avg_b_score + score[4]
-                avg_y_score = avg_y_score + score[5]
-                avg_total_score = avg_total_score + score[6]
-                i = i + 1
-            alignment_instrumentation = objects.Alignment_Instrumentation(
-            avg_b_score = avg_b_score/i,
-            avg_y_score = avg_y_score/i,
-            avg_total_score = avg_total_score/i
-            )
+#             t_score = scoring.hybrid_score(spectrum, special_hr, ppm_tolerance)\
+#             + scoring.digest_score(special_hr, db, digest_type)
+#             hybrid_alignments.append(
+#                 HybridSequenceAlignment(
+#                     parents[0], 
+#                     parents[1], 
+#                     hr, 
+#                     special_hr, 
+#                     b_score, 
+#                     y_score, 
+#                     t_score, 
+#                     p_d, 
+#                     total_error
+#                 )
+#             )
+#             i = 0
+#             avg_b_score = 0
+#             avg_y_score = 0
+#             avg_total_score = 0
+#             for score in hybrid_alignments:
+#                 avg_b_score = avg_b_score + score[4]
+#                 avg_y_score = avg_y_score + score[5]
+#                 avg_total_score = avg_total_score + score[6]
+#                 i = i + 1
+#             alignment_instrumentation = Alignment_Instrumentation(
+#             avg_b_score = avg_b_score/i,
+#             avg_y_score = avg_y_score/i,
+#             avg_total_score = avg_total_score/i
+#             )
 
 
-    OBJECTIFY_COUNT += len(hybrid_refined)
-    OBJECTIFY_TIME += time.time() - st
-    all_alignments = non_hybrid_alignments + hybrid_alignments
-    sorted_alignments = sorted(
-            all_alignments, 
-            key=lambda x: (
-                x.total_score, 
-                math.inf if x.total_mass_error <= 0 else 1/x.total_mass_error, 
-                math.inf if x.precursor_distance <= 0 else 1/x.precursor_distance, 
-                1/len(x),
-                x.b_score, 
-                x.y_score
-            ), 
-            reverse=True
-        )
+#     OBJECTIFY_COUNT += len(hybrid_refined)
+#     OBJECTIFY_TIME += time.time() - st
+#     all_alignments = non_hybrid_alignments + hybrid_alignments
+#     sorted_alignments = sorted(
+#             all_alignments, 
+#             key=lambda x: (
+#                 x.total_score, 
+#                 math.inf if x.total_mass_error <= 0 else 1/x.total_mass_error, 
+#                 math.inf if x.precursor_distance <= 0 else 1/x.precursor_distance, 
+#                 1/len(x),
+#                 x.b_score, 
+#                 x.y_score
+#             ), 
+#             reverse=True
+#         )
 
-    top_n_alignments = sorted_alignments[:n]
-    return Alignments(spectrum, top_n_alignments) 
+#     top_n_alignments = sorted_alignments[:n]
+#     return Alignments(spectrum, top_n_alignments) 
 
-def attempt_alignment(spectrum: Spectrum, db: Database, b_hits: list,y_hits: list, n: int = 3, 
-    ppm_tolerance: int = 20, precursor_tolerance: int = 10,digest_type: str = '',DEBUG: bool = False, 
-    truth: bool = None, fall_off: bool = None):
-    global FIRST_ALIGN_TIME, AMBIGUOUS_REMOVAL_TIME, PRECURSOR_MASS_TIME, OBJECTIFY_TIME
-    global FIRST_ALIGN_COUNT, AMBIGUOUS_REMOVAL_COUNT, PRECURSOR_MASS_COUNT, OBJECTIFY_COUNT
-    global TOTAL_ITERATIONS
-    TOTAL_ITERATIONS += 1
-    DEV = truth is not None and fall_off is not None
-    b_non_hybrids, y_non_hybrids = extend_base_kmers(b_hits, y_hits, spectrum, db)
-    non_hybrids = b_non_hybrids + y_non_hybrids
-    a = align_b_y(b_hits, y_hits, spectrum, db) + [(kmer, None) for kmer in non_hybrids]
-    FIRST_ALIGN_COUNT += len(b_hits) + len(y_hits)
-    if DEV:
-        return attempt_alignment_dev(spectrum,truth,fall_off,a)
-    alignments, non_hybrid_alignments = attempt_alignment_first_pass(spectrum,db,n,ppm_tolerance,precursor_tolerance,digest_type,truth,fall_off,DEV,OBJECTIFY_COUNT,OBJECTIFY_TIME,a)
-    if alignments is not None:
-        return alignments
-    else:
-        return attempt_alignment_second_pass(spectrum,db,n,ppm_tolerance,precursor_tolerance,digest_type,truth,fall_off,DEV,OBJECTIFY_COUNT,OBJECTIFY_TIME,a,non_hybrid_alignments)
+# def attempt_alignment(spectrum: Spectrum, db: FastaDatabase, b_hits: list,y_hits: list, n: int = 3, 
+#     ppm_tolerance: int = 20, precursor_tolerance: int = 10,digest_type: str = '',DEBUG: bool = False, 
+#     truth: bool = None, fall_off: bool = None):
+#     global FIRST_ALIGN_TIME, AMBIGUOUS_REMOVAL_TIME, PRECURSOR_MASS_TIME, OBJECTIFY_TIME
+#     global FIRST_ALIGN_COUNT, AMBIGUOUS_REMOVAL_COUNT, PRECURSOR_MASS_COUNT, OBJECTIFY_COUNT
+#     global TOTAL_ITERATIONS
+#     TOTAL_ITERATIONS += 1
+#     DEV = truth is not None and fall_off is not None
+#     b_non_hybrids, y_non_hybrids = extend_base_kmers(b_hits, y_hits, spectrum, db)
+#     non_hybrids = b_non_hybrids + y_non_hybrids
+#     a = align_b_y(b_hits, y_hits, spectrum, db) + [(kmer, None) for kmer in non_hybrids]
+#     FIRST_ALIGN_COUNT += len(b_hits) + len(y_hits)
+#     if DEV:
+#         return attempt_alignment_dev(spectrum,truth,fall_off,a)
+#     alignments, non_hybrid_alignments = attempt_alignment_first_pass(spectrum,db,n,ppm_tolerance,precursor_tolerance,digest_type,truth,fall_off,DEV,OBJECTIFY_COUNT,OBJECTIFY_TIME,a)
+#     if alignments is not None:
+#         return alignments
+#     else:
+#         return attempt_alignment_second_pass(spectrum,db,n,ppm_tolerance,precursor_tolerance,digest_type,truth,fall_off,DEV,OBJECTIFY_COUNT,OBJECTIFY_TIME,a,non_hybrid_alignments)
 
-def make_merge(b, y, b_seq, y_seq):
-    new_b = (b[0], b[1], b[2], b[3], b_seq)
-    new_y = (y[0], y[1], y[2], y[3], y_seq)
-    return (b[3] + y[3], b[1] - y[2], y[2]-b[1], new_b, new_y)
+# def make_merge(b, y, b_seq, y_seq):
+#     new_b = (b[0], b[1], b[2], b[3], b_seq)
+#     new_y = (y[0], y[1], y[2], y[3], y_seq)
+#     return (b[3] + y[3], b[1] - y[2], y[2]-b[1], new_b, new_y)
 
-def native_get_extensions(precursor_mass,prec_charge,b_side,y_side,prec_tol):
-    extended_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge')
-    tol = lookups.utils.ppm_to_da(precursor_mass, prec_tol)
-    extensions = []
-    if b_side.end -1 == y_side.start:
-        combined_prec = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b_side.mz, y_side.mz, b_side.charge, y_side.charge, prec_charge)
-        if abs(combined_prec - precursor_mass) <= tol:
-            b_cluster = extended_cluster(b_side.score, b_side.pid, b_side.start, b_side.end, b_side.mz, b_side.charge)
-            y_cluster = extended_cluster(y_side.score, y_side.pid, y_side.start, y_side.end, y_side.mz, y_side.charge)
-            return [(b_side.score + y_side.score, b_cluster, y_cluster)]
+# def native_get_extensions(precursor_mass,prec_charge,b_side,y_side,prec_tol):
+#     extended_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge')
+#     tol = lookups.utils.ppm_to_da(precursor_mass, prec_tol)
+#     extensions = []
+#     if b_side.end -1 == y_side.start:
+#         combined_prec = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b_side.mz, y_side.mz, b_side.charge, y_side.charge, prec_charge)
+#         if abs(combined_prec - precursor_mass) <= tol:
+#             b_cluster = extended_cluster(b_side.score, b_side.pid, b_side.start, b_side.end, b_side.mz, b_side.charge)
+#             y_cluster = extended_cluster(y_side.score, y_side.pid, y_side.start, y_side.end, y_side.mz, y_side.charge)
+#             return [(b_side.score + y_side.score, b_cluster, y_cluster)]
     
-    #if the clusters are not h
-    for b in b_side.components:
-        if b[2]-1 == y_side.start:
-            total_precursor = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b[0], y_side.mz, b[4], y_side.charge, prec_charge)
-            if abs(total_precursor - precursor_mass) < prec_tol:
-                b_half = extended_cluster(score = b_side.score, pid=b[5], start=b[1], end = b[2], mz = b[0], charge= b[4])
-                y_half = extended_cluster(score = y_side.score, pid=y_side.pid, start=y_side.start, end = y_side.end, mz = y_side.mz, charge=y_side.charge)
-                extensions.append((b[0] + y_side.score, b_half, y_half))
-    return extensions
+#     #if the clusters are not h
+#     for b in b_side.components:
+#         if b[2]-1 == y_side.start:
+#             total_precursor = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b[0], y_side.mz, b[4], y_side.charge, prec_charge)
+#             if abs(total_precursor - precursor_mass) < prec_tol:
+#                 b_half = extended_cluster(score = b_side.score, pid=b[5], start=b[1], end = b[2], mz = b[0], charge= b[4])
+#                 y_half = extended_cluster(score = y_side.score, pid=y_side.pid, start=y_side.start, end = y_side.end, mz = y_side.mz, charge=y_side.charge)
+#                 extensions.append((b[0] + y_side.score, b_half, y_half))
+#     return extensions
 
-def get_extensions(precursor_mass, precursor_charge, b_side, y_side, prec_tol):
-    extended_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge')
-    tol = lookups.utils.ppm_to_da(precursor_mass, prec_tol)
-    extensions = []
+# def get_extensions(precursor_mass, precursor_charge, b_side, y_side, prec_tol):
+#     extended_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge')
+#     tol = lookups.utils.ppm_to_da(precursor_mass, prec_tol)
+#     extensions = []
     
-    combined_prec = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b_side.mz, y_side.mz, b_side.charge, y_side.charge, precursor_charge)
-    if abs(combined_prec - precursor_mass) <= tol:
-        b_cluster = extended_cluster(b_side.score, b_side.pid, b_side.start, b_side.end, b_side.mz, b_side.charge)
-        y_cluster = extended_cluster(y_side.score, y_side.pid, y_side.start, y_side.end, y_side.mz, y_side.charge)
-        return [(b_side.score + y_side.score, b_cluster, y_cluster)]
+#     combined_prec = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b_side.mz, y_side.mz, b_side.charge, y_side.charge, precursor_charge)
+#     if abs(combined_prec - precursor_mass) <= tol:
+#         b_cluster = extended_cluster(b_side.score, b_side.pid, b_side.start, b_side.end, b_side.mz, b_side.charge)
+#         y_cluster = extended_cluster(y_side.score, y_side.pid, y_side.start, y_side.end, y_side.mz, y_side.charge)
+#         return [(b_side.score + y_side.score, b_cluster, y_cluster)]
         
-    for b in b_side.components:
-        b_mass = b[0]
-        this_prec = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b_mass, y_side.mz, b[4], y_side.charge, precursor_charge)
-        if this_prec > precursor_mass + tol:
-            break
-        elif abs(this_prec - precursor_mass) <= tol:
-            extended_b_cluster = extended_cluster(score = b_side.score, pid=b[5], start=b[1], end = b[2], mz = b[0], charge= b[4])
-            extended_y_cluster = extended_cluster(score = y_side.score, pid=y_side.pid, start=y_side.start, end = y_side.end, mz = y_side.mz, charge = y_side.charge)
-            extensions.append((b_side.score + y_side.score, extended_b_cluster, extended_y_cluster))
+#     for b in b_side.components:
+#         b_mass = b[0]
+#         this_prec = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b_mass, y_side.mz, b[4], y_side.charge, precursor_charge)
+#         if this_prec > precursor_mass + tol:
+#             break
+#         elif abs(this_prec - precursor_mass) <= tol:
+#             extended_b_cluster = extended_cluster(score = b_side.score, pid=b[5], start=b[1], end = b[2], mz = b[0], charge= b[4])
+#             extended_y_cluster = extended_cluster(score = y_side.score, pid=y_side.pid, start=y_side.start, end = y_side.end, mz = y_side.mz, charge = y_side.charge)
+#             extensions.append((b_side.score + y_side.score, extended_b_cluster, extended_y_cluster))
     
-    #Only extend y
-    for y in y_side.components:
-        y_mass = y[0]
-        this_prec = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b_side.mz, y_mass, b_side.charge, y[4], precursor_charge)
-        if this_prec > precursor_mass + tol:
-            break
-        elif abs(this_prec - precursor_mass) <= tol:
-            extended_b_cluster = extended_cluster(score = b_side.score, pid=b_side.pid, start=b_side.start, end = b_side.end, mz = b_side.mz, charge = b_side.charge)
-            extended_y_cluster = extended_cluster(score = y_side.score, pid=y[5], start=y[1], end = y[2], mz = y[0], charge= y[4])
-            extensions.append((b_side.score + y_side.score, extended_b_cluster, extended_y_cluster))
+#     #Only extend y
+#     for y in y_side.components:
+#         y_mass = y[0]
+#         this_prec = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b_side.mz, y_mass, b_side.charge, y[4], precursor_charge)
+#         if this_prec > precursor_mass + tol:
+#             break
+#         elif abs(this_prec - precursor_mass) <= tol:
+#             extended_b_cluster = extended_cluster(score = b_side.score, pid=b_side.pid, start=b_side.start, end = b_side.end, mz = b_side.mz, charge = b_side.charge)
+#             extended_y_cluster = extended_cluster(score = y_side.score, pid=y[5], start=y[1], end = y[2], mz = y[0], charge= y[4])
+#             extensions.append((b_side.score + y_side.score, extended_b_cluster, extended_y_cluster))
     
-    for b in b_side.components:
-        for y in y_side.components:
-            b_mass, y_mass = b[0], y[0]
-            this_prec = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b_mass, y_mass, b[4], y[4], precursor_charge)
-            if this_prec > precursor_mass + tol:
-                break
-            elif abs(this_prec - precursor_mass) <= tol:
-                extended_b_cluster = extended_cluster(score = b_side.score, pid=b[5], start=b[1], end = b[2], mz = b[0], charge= b[4])
-                extended_y_cluster = extended_cluster(score = y_side.score, pid=y[5], start=y[1], end = y[2], mz = y[0], charge= y[4])
-                extensions.append((b_side.score + y_side.score, extended_b_cluster, extended_y_cluster))
+#     for b in b_side.components:
+#         for y in y_side.components:
+#             b_mass, y_mass = b[0], y[0]
+#             this_prec = computational_pipeline.gen_spectra.calc_precursor_as_disjoint(b_mass, y_mass, b[4], y[4], precursor_charge)
+#             if this_prec > precursor_mass + tol:
+#                 break
+#             elif abs(this_prec - precursor_mass) <= tol:
+#                 extended_b_cluster = extended_cluster(score = b_side.score, pid=b[5], start=b[1], end = b[2], mz = b[0], charge= b[4])
+#                 extended_y_cluster = extended_cluster(score = y_side.score, pid=y[5], start=y[1], end = y[2], mz = y[0], charge= y[4])
+#                 extensions.append((b_side.score + y_side.score, extended_b_cluster, extended_y_cluster))
             
-    return extensions
+#     return extensions
 
-def find_alignments(native_merged, hybrid_merged, obs_prec, prec_charge, tol, max_len, prec_tol):
-    extended_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge')
-    natural_alignments, hybrid_alignments = [], []
-    for i, comb_seq in enumerate(native_merged):
-        b_side = comb_seq[1]
-        y_side = comb_seq[2]
-        if y_side.start >= b_side.end: 
-            natural_alignments = natural_alignments + native_get_extensions(obs_prec, prec_charge, b_side, y_side, prec_tol)
-        elif b_side.start <= y_side.start and b_side.end <= y_side.end and y_side.start < b_side.end: #some overlap
-            combined_precursor = calc_from_sequences(b_side.start, y_side.end, b_side.pid, max_len, prec_charge)
-            if abs(combined_precursor - obs_prec) < tol:
-                b_cluster = extended_cluster(b_side.score, b_side.pid, b_side.start, b_side.end, b_side.mz, b_side.charge)
-                y_cluster = extended_cluster(y_side.score, y_side.pid, y_side.start, y_side.end, y_side.mz, y_side.charge)
-                natural_alignments.append((b_side.score + y_side.score, b_cluster, y_cluster))
-        else:
-            hybrid_alignments = hybrid_alignments + get_extensions(obs_prec, prec_charge, b_side, y_side, prec_tol)
+# def find_alignments(native_merged, hybrid_merged, obs_prec, prec_charge, tol, max_len, prec_tol):
+#     extended_cluster = collections.namedtuple('sorted_cluster', 'score pid start end mz charge')
+#     natural_alignments, hybrid_alignments = [], []
+#     for i, comb_seq in enumerate(native_merged):
+#         b_side = comb_seq[1]
+#         y_side = comb_seq[2]
+#         if y_side.start >= b_side.end: 
+#             natural_alignments = natural_alignments + native_get_extensions(obs_prec, prec_charge, b_side, y_side, prec_tol)
+#         elif b_side.start <= y_side.start and b_side.end <= y_side.end and y_side.start < b_side.end: #some overlap
+#             combined_precursor = calc_from_sequences(b_side.start, y_side.end, b_side.pid, max_len, prec_charge)
+#             if abs(combined_precursor - obs_prec) < tol:
+#                 b_cluster = extended_cluster(b_side.score, b_side.pid, b_side.start, b_side.end, b_side.mz, b_side.charge)
+#                 y_cluster = extended_cluster(y_side.score, y_side.pid, y_side.start, y_side.end, y_side.mz, y_side.charge)
+#                 natural_alignments.append((b_side.score + y_side.score, b_cluster, y_cluster))
+#         else:
+#             hybrid_alignments = hybrid_alignments + get_extensions(obs_prec, prec_charge, b_side, y_side, prec_tol)
 
-    total_extension_time = 0
-    for i, comb_seq in enumerate(hybrid_merged):
-        b_side, y_side = comb_seq[1], comb_seq[2]
-        extension_time = time.time()
-        hybrid_alignments = hybrid_alignments + get_extensions(obs_prec, prec_charge, b_side, y_side, prec_tol)
-        total_extension_time = total_extension_time + (time.time() - extension_time)
-    return natural_alignments, hybrid_alignments
+#     total_extension_time = 0
+#     for i, comb_seq in enumerate(hybrid_merged):
+#         b_side, y_side = comb_seq[1], comb_seq[2]
+#         extension_time = time.time()
+#         hybrid_alignments = hybrid_alignments + get_extensions(obs_prec, prec_charge, b_side, y_side, prec_tol)
+#         total_extension_time = total_extension_time + (time.time() - extension_time)
+#     return natural_alignments, hybrid_alignments
 
-def pair_indices(aligned_spectrum_params, search_space, score_filter):
-    spectrum = aligned_spectrum_params.spectrum
-    base_alignment_params = aligned_spectrum_params.base_alignment_params
-    precursor_mass = spectrum.precursor_mass
-    precursor_charge = spectrum.precursor_charge
-    precursor_tolerance = base_alignment_params.precursor_tolerance
+# def pair_indices(aligned_spectrum_params, search_space, score_filter):
+#     spectrum = aligned_spectrum_params.spectrum
+#     base_alignment_params = aligned_spectrum_params.base_alignment_params
+#     precursor_mass = spectrum.precursor_mass
+#     precursor_charge = spectrum.precursor_charge
+#     precursor_tolerance = base_alignment_params.precursor_tolerance
 
-    b_search_space = search_space.b_search_space
-    y_search_space = search_space.y_search_space
-    unique_merges = dict()
-    tol = lookups.utils.ppm_to_da(precursor_mass, precursor_tolerance)
-    sorted_b_keys = sorted(b_search_space)
-    sorted_y_keys = sorted(y_search_space, reverse = True)
+#     b_search_space = search_space.b_search_space
+#     y_search_space = search_space.y_search_space
+#     unique_merges = dict()
+#     tol = lookups.utils.ppm_to_da(precursor_mass, precursor_tolerance)
+#     sorted_b_keys = sorted(b_search_space)
+#     sorted_y_keys = sorted(y_search_space, reverse = True)
             
-    b_end, y_end = len(sorted_b_keys), len(sorted_y_keys)
-    b_ctr = 0
-    y_low_ctr, y_high_ctr = 0,0
-    while b_ctr < b_end and y_high_ctr < y_end:
-        b_prec = sorted_b_keys[b_ctr]
-        missing_mass_upper = precursor_mass - b_prec + (precursor_charge * PROTON_MASS)/precursor_charge + WATER_MASS/precursor_charge + tol
-        missing_mass_lower = precursor_mass - b_prec + (precursor_charge * PROTON_MASS)/precursor_charge + WATER_MASS/precursor_charge - tol
-        y_prec = sorted_y_keys[y_high_ctr]
+#     b_end, y_end = len(sorted_b_keys), len(sorted_y_keys)
+#     b_ctr = 0
+#     y_low_ctr, y_high_ctr = 0,0
+#     while b_ctr < b_end and y_high_ctr < y_end:
+#         b_prec = sorted_b_keys[b_ctr]
+#         missing_mass_upper = precursor_mass - b_prec + (precursor_charge * PROTON_MASS)/precursor_charge + WATER_MASS/precursor_charge + tol
+#         missing_mass_lower = precursor_mass - b_prec + (precursor_charge * PROTON_MASS)/precursor_charge + WATER_MASS/precursor_charge - tol
+#         y_prec = sorted_y_keys[y_high_ctr]
         
-        if y_prec > missing_mass_upper:
-            y_high_ctr += 1
-            continue
+#         if y_prec > missing_mass_upper:
+#             y_high_ctr += 1
+#             continue
         
-        elif y_prec < missing_mass_lower:
-            b_ctr += 1
-            continue
+#         elif y_prec < missing_mass_lower:
+#             b_ctr += 1
+#             continue
         
-        else: 
-            y_low_ctr = y_high_ctr
-            while (y_prec > missing_mass_lower and y_prec < missing_mass_upper and y_low_ctr < len(sorted_y_keys)):
-                for b in b_search_space[b_prec]: 
-                    for y in y_search_space[y_prec]:
-                        if b[7] + y[7] > max(score_filter, 4):
-                            full_seq = b[6] + y[6]
-                            if ((full_seq, 1)) not in unique_merges.keys():
-                                unique_merges[(full_seq, 1)] = []
-                            unique_merges[(full_seq,1)].append((b,y))
-                y_low_ctr += 1
-                if y_low_ctr < len(sorted_y_keys):
-                    y_prec = sorted_y_keys[y_low_ctr]
-                else:
-                    break
+#         else: 
+#             y_low_ctr = y_high_ctr
+#             while (y_prec > missing_mass_lower and y_prec < missing_mass_upper and y_low_ctr < len(sorted_y_keys)):
+#                 for b in b_search_space[b_prec]: 
+#                     for y in y_search_space[y_prec]:
+#                         if b[7] + y[7] > max(score_filter, 4):
+#                             full_seq = b[6] + y[6]
+#                             if ((full_seq, 1)) not in unique_merges.keys():
+#                                 unique_merges[(full_seq, 1)] = []
+#                             unique_merges[(full_seq,1)].append((b,y))
+#                 y_low_ctr += 1
+#                 if y_low_ctr < len(sorted_y_keys):
+#                     y_prec = sorted_y_keys[y_low_ctr]
+#                 else:
+#                     break
 
-            b_ctr += 1
+#             b_ctr += 1
             
-    return unique_merges
+#     return unique_merges
 
 
-def get_percursor_hit(aligned_spectrum_params, converted_precursors, matched_kmers):
-    spectrum = aligned_spectrum_params.spectrum
-    sqllite_database = aligned_spectrum_params.base_alignment_params.sqllite_database
-    ppm_tolerance = aligned_spectrum_params.base_alignment_params.ppm_tolerance
-    b_precursor = converted_precursors.converted_precursor_b
-    matched_masses_b = matched_kmers.b_kmers
-    ppm_tolerance = ppm_tolerance
-    prec_matches = []
-    prec_hits = matched_masses_b[b_precursor]
+# def get_percursor_hit(aligned_spectrum_params, converted_precursors, matched_kmers):
+#     spectrum = aligned_spectrum_params.spectrum
+#     sqllite_database = aligned_spectrum_params.base_alignment_params.sqllite_database
+#     ppm_tolerance = aligned_spectrum_params.base_alignment_params.ppm_tolerance
+#     b_precursor = converted_precursors.converted_precursor_b
+#     matched_masses_b = matched_kmers.b_kmers
+#     ppm_tolerance = ppm_tolerance
+#     prec_matches = []
+#     prec_hits = matched_masses_b[b_precursor]
     
-    for hit in prec_hits:
-        if hit[4] == 2:
-            hit_score, tiebreaker = scoring.prec_score(hit, spectrum, ppm_tolerance, sqllite_database)
-            prec_matches.append((hit_score, tiebreaker, hit))
+#     for hit in prec_hits:
+#         if hit[4] == 2:
+#             hit_score, tiebreaker = scoring.prec_score(hit, spectrum, ppm_tolerance, sqllite_database)
+#             prec_matches.append((hit_score, tiebreaker, hit))
         
-    prec_matches = sorted(prec_matches, key=lambda x: (x[0], x[1]), reverse=True)
+#     prec_matches = sorted(prec_matches, key=lambda x: (x[0], x[1]), reverse=True)
     
-    if len(prec_matches) != 0:
-        best_match = prec_matches[0]
-        return objects.PrecursorHit(best_precursor_hit=best_match, score_filter=best_match[0])
-    else:
-        return objects.PrecursorHit(best_precursor_hit=[], score_filter=0)
-        
-def make_native_pair(b, ion):
-    y_cluster = (computational_pipeline.gen_spectra.get_max_mass(b[6], 'b' if ion == 0 else 'y', b[4]), b[1], b[2], ion, b[4], b[5], b[6], 0)
-    return y_cluster
-    
+#     if len(prec_matches) != 0:
+#         best_match = prec_matches[0]
+#         return PrecursorHit(best_precursor_hit=best_match, score_filter=best_match[0])
+#     else:
+#         return PrecursorHit(best_precursor_hit=[], score_filter=0)
 
-def pair_natives(search_space, precursor_mass, precursor_tolerance):
-    b_search_space = search_space.b_search_space
-    y_search_space = search_space.y_search_space
-    unique_merges = dict()
-    tol = lookups.utils.ppm_to_da(precursor_mass, precursor_tolerance)
-    for b_prec in sorted(b_search_space):
-        if abs(b_prec - precursor_mass) < tol:
-            for b in b_search_space[b_prec]:
-                y_pair = make_native_pair(b, 0)
-                full_seq = b[6]
-                if (full_seq, 1) not in unique_merges.keys():
-                    unique_merges[(full_seq, 0)] = []
-                unique_merges[(full_seq,0)].append((b,y_pair))
+
+# def get_complimentary_amino_acids(sequence, start_position, target_mass):
+#     current_mass = 0.0
+#     complimentary_sequence = ""
+#     location_end = start_position
+#     for i in range(start_position, len(sequence)):
+#         amino_acid = sequence[i]
+#         if amino_acid in AMINO_ACIDS:
+#             amino_acid_mass = AMINO_ACIDS[amino_acid]
+#             current_mass += amino_acid_mass
+#             complimentary_sequence += amino_acid
+#             location_end = i
+#             if current_mass >= target_mass:
+#                 break
+#         else:
+#             raise ValueError(f"Unknown amino acid '{amino_acid}' in sequence.")
+
+#     return complimentary_sequence, location_end
+
+
+
+# def get_complimentary_amino_acids_reverse(sequence, end_position, target_mass):
+#     current_mass = 0.0
+#     complimentary_sequence = ""
+#     location_start = end_position
+
+#     for i in range(end_position, -1, -1): 
+#         amino_acid = sequence[i]
+#         if amino_acid in AMINO_ACIDS:
+#             amino_acid_mass = AMINO_ACIDS[amino_acid]
+#             current_mass += amino_acid_mass
+#             complimentary_sequence = amino_acid + complimentary_sequence 
+#             location_start = i
+#             if current_mass >= target_mass:
+#                 break
+#         else:
+#             raise ValueError(f"Unknown amino acid '{amino_acid}' in sequence.")
+
+#     return complimentary_sequence, location_start
+
+# def calculate_score(amino_acids,sequence):
+#     amino_acids_length = len(amino_acids)
+#     sequence_length = len(sequence)
+#     return amino_acids_length/sequence_length
+
+# #Merged_Kmer = namedtuple('Merged_Kmer',['mass','location_start','location_end','ion','charge','protein_id','sequence','score','kmer_type','b_kmer','y_kmer'])
+
+# def construct_merged_kmer(b_kmer,y_kmer):
+#     mass = b_kmer.mass + y_kmer.mass
+#     sequence = b_kmer.sequence
+#     charge = b_kmer.charge
+#     protein_id = b_kmer.protein_id
+#     location_start = b_kmer.location_start
+#     location_end = y_kmer.location_end
+#     amino_acids = sequence[location_start:location_end]
+#     score = calculate_score(amino_acids, sequence)
+#     merged_kmer = Merged_Kmer(mass=mass,location_start=location_start,location_end=location_end,charge=charge,protein_id=protein_id,sequence=sequence,kmer_type=)
+
+#     return None
+
+# def get_merged_kmer(kmer):
+#     target_mass = kmer.mass
+#     sequence = kmer.sequence
+#     charge = kmer.charge
+#     protein_id = kmer.protein_id
+#     start_position = 0
+#     ion = kmer.ion
+#     if ion == 0:
+#         start_position = kmer.location_end + 1
+#         amino_acids, location_end = get_complimentary_amino_acids(sequence, start_position, target_mass)
+#         score = calculate_score(amino_acids, sequence)
+#         y_kmer = KMer(mass=target_mass,location_start=start_position, location_end=location_end, ion = 0, charge=charge,protein_id=protein_id, sequence=sequence,score=score,kmer_type='C')
+#         merged_kmer = construct_merged_kmer(kmer,y_kmer)
+#     else:  
+#         end_position = kmer.location_start - 1
+#         amino_acids, location_start = get_complimentary_amino_acids_reverse(sequence, end_position, target_mass)
+#         score = calculate_score(amino_acids, sequence)
+#         b_kmer = KMer(mass=target_mass, location_start=location_start, location_end=end_position, ion=1, charge=charge, protein_id=protein_id, sequence=complimentary_amino_acids, score=score, kmer_type='C')
+#         merged_kmer = construct_merged_kmer(b_kmer,kmer)
+#     return merged_kmer
+
+
+# def get_paired_natives(aligned_spectrum_params,clustered_precursor):
+#     precursor_tolerance = aligned_spectrum_params.base_alignment_params.precursor_tolerance
+#     precursor_mass = clustered_precursor.mass
+#     b_clusters = clustered_precursor.b_clusters
+#     y_clusters = clustered_precursor.y_clusters
+#     unique_merges = dict()
+#     adjusted_tolerance = lookups.utils.ppm_to_da(precursor_mass, precursor_tolerance)
+#     for b_cluster in sorted(b_clusters):
+#         if abs(b_cluster.mass - precursor_mass) < adjusted_tolerance:
+#             for kmer in b_cluster.kmers:
+#                 complimentary_kmer = get_complimentary_kmer(kmer)
+
+
+#     #             full_seq = b[6]
+#     #             if (full_seq, 1) not in unique_merges.keys():
+#     #                 unique_merges[(full_seq, 0)] = []
+#     #             unique_merges[(full_seq,0)].append((b,y_pair))
     
-    for y_prec in sorted(y_search_space):
-        if abs(y_prec - precursor_mass) < tol:
-            for y in y_search_space[y_prec]:
-                b_pair = make_native_pair(y, 1)
-                full_seq = y[6]
-                if (full_seq, 1) not in unique_merges.keys():
-                    unique_merges[(full_seq, 0)] = []
-                unique_merges[(full_seq,0)].append((b_pair,y))
+#     # for y_prec in sorted(y_search_space):
+#     #     if abs(y_prec - precursor_mass) < tol:
+#     #         for y in y_search_space[y_prec]:
+#     #             b_pair = make_native_pair(y, 1)
+#     #             full_seq = y[6]
+#     #             if (full_seq, 1) not in unique_merges.keys():
+#     #                 unique_merges[(full_seq, 0)] = []
+#     #             unique_merges[(full_seq,0)].append((b_pair,y))
                 
-    return unique_merges
+#     return unique_merges

@@ -4,7 +4,7 @@ from main import get_spectra_files
 from lookups.utils import ppm_to_da
 from preprocessing.merge_search import get_all_matched_rows
 import matplotlib.pyplot as plt
-from preprocessing.sqlite_database import database_file
+from lookups.sqlite_database import database_file
 from gen_spectra import get_raw_mass
 import matplotlib.pyplot as plt
 from lookups.constants import WATER_MASS, PROTON_MASS, AMINO_ACIDS

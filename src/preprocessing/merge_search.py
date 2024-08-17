@@ -1,6 +1,6 @@
-from preprocessing.sqlite_database import Sqllite_Database
+from lookups.sqlite_database import Sqllite_Database
 from lookups.utils import ppm_to_da
-from lookups.objects import Database
+from lookups.objects import FastaDatabase
 import sys
 import shutil
 import computational_pipeline.gen_spectra
