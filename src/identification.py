@@ -381,8 +381,8 @@ def get_filtered_fragments(precursors, ppm_tolerance):
                 filtered_fragments.append(fragment)
     return filtered_fragments
 
-def ppm_to_da(mz_value, ppm_tolerance):
-    return 0.0
+def ppm_to_da(mass, ppm_tolerance):
+    return abs((ppm_tolerance / 1000000)*mass)
 
 def reverse_y_kmer(y_kmer):
     reversed_kmer = KMer(
@@ -407,7 +407,7 @@ def reverse_y_kmers(y_kmers):
 
 def get_matched_fragment(fragment, sqllite_database, ppm_tolerance):
     mz_value = fragment.mz_value
-    adjusted_tolerance = ppm_tolerance/10        
+    adjusted_tolerance =  ppm_to_da(mz_value, ppm_tolerance) 
     b_rows, y_rows = sqllite_database.query_mass_kmers(mz_value, adjusted_tolerance)
     b_kmers = [KMer(*row) for row in b_rows]
     y_kmers = [KMer(*row) for row in y_rows]
@@ -429,10 +429,11 @@ def create_aligned_peptides(experiment_parameters):
     filtered_fragments = get_filtered_fragments(precursors, ppm_tolerance)
     sqllite_database = experiment_parameters.sqllite_database
     matched_fragments = get_matched_fragments(filtered_fragments,sqllite_database,ppm_tolerance)
-    matched_fragment = matched_fragments[10]
-    print(matched_fragment.fragment.mz_value)
-    b_mer = matched_fragment.y_kmers[0]
-    print(b_mer)
+    print(matched_fragments[0])
+    # matched_fragment = matched_fragments[0]
+    # print(matched_fragment.fragment.mz_value)
+    # b_mer = matched_fragment.y_kmers[0]
+    # print(b_mer)
     # matched_precursor = get_matched_precursor(aligned_spectrum_params,precursor)
     # complete_precursor = get_complete_precursor(aligned_spectrum_params, matched_precursor)
     # clustered_precursor = get_clustered_precursor(complete_precursor)
