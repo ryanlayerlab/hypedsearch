@@ -4,7 +4,7 @@ FastaDatabase = namedtuple('FastaDatabase', ['file_path', 'proteins', 'kmers'])
 Fragment = namedtuple('Fragment',['id','mz_value', 'abundance'])
 Precursor = namedtuple('Precursor',['id','mass','charge','retention_time','abundance','fragments'])
 ExperimentParameters = namedtuple('ExperimentParameters',['id','precursors','sqllite_database', 'max_peptide_length','ppm_tolerance','precursor_tolerance','number_hybrids','number_natives','target_seq'])
-KMer = namedtuple('KMer',['fragment_mass','protein_id','location_start','location_end','ion','charge','sequence','score','kmer_type'])
+KMer = namedtuple('KMer',['mass','protein_id','location_start','location_end','ion','charge','subsequence','score','kmer_type'])
 MatchedFragment = namedtuple('MatchedFragment',['fragment','b_kmers','y_kmers'])
 AlignedPeptides = namedtuple('AlignedPeptides',['hybrid','left_proteins','right_proteins','sequence','b_scores','y_scores','total_score','total_gaussian_score','extensions','precursor_mass','precursor_charge','total_mass_error','total_count'])
 
