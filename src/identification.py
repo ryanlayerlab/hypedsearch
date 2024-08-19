@@ -1,4 +1,5 @@
-from objects import ExperimentParameters, Precursor, KMer, MatchedFragment
+from objects import ExperimentParameters, Precursor, KMer, MatchedFragment, Protein
+from lookups.constants import AMINO_ACIDS
 
 # from multiprocessing import Pool, set_start_method
 # import operator, time, json, os
@@ -277,52 +278,6 @@ from objects import ExperimentParameters, Precursor, KMer, MatchedFragment
 #     with open(file_path, 'w') as file:
 #         file.write(str(named_tuple))
 
-# def create_aligned_spectrum_with_target(aligned_spectrum_params):
-#     return None
-# #     spectrum = aligned_spectrum_params.spectrum
-# #     base_alignment_params = aligned_spectrum_params.base_alignment_params
-# #     precursor_charge = spectrum.precursor_charge
-# #     precursor_mass = spectrum.precursor_mass
-# #     precursor_tolerance = base_alignment_params.precursor_tolerance
-# #     target_data = computational_pipeline.finding_seqs.get_target_data(aligned_spectrum_params)
-# #     converted_precursors = get_converted_precursors(aligned_spectrum_params)
-# #     matched_masses = get_matched_kmers(aligned_spectrum_params,converted_precursors, converted_precursors)
-# #     target_alignment_data = computational_pipeline.finding_seqs.check_in_matched_masses(converted_precursors,matched_masses,target_data)
-# #     if len(target_alignment_data.matched_masses_b) > 0 or len(target_alignment_data.matched_masses_y) > 0:
-# #         precursor_hit_result = alignment.get_percursor_hit(aligned_spectrum_params, target_alignment_data)
-# #         hits = get_fragment_hits(aligned_spectrum_params, target_alignment_data) 
-# #         sorted_clusters = get_clusters(base_alignment_params, precursor_charge, hits, converted_precursors)
-# #         target_sorted_clusters = computational_pipeline.finding_seqs.check_in_sorted_clusters(target_alignment_data,sorted_clusters)
-# #         search_space = clustering.get_search_space(sorted_clusters,precursor_charge)
-# #         good_searches = computational_pipeline.finding_seqs.check_in_searches(aligned_spectrum_params,target_data,target_alignment_data)
-# #         unique_native_merged_seqs = alignment.pair_natives(search_space, precursor_mass, precursor_tolerance)
-# #         score_filter = precursor_hit_result.score_filter
-# #         unique_hybrid_merged_seqs = alignment.pair_indices(aligned_spectrum_params, search_space, score_filter)
-# #         unknown = ([],[])
-# #         good_merged_seqs = computational_pipeline.finding_seqs.check_in_merges(good_searches,unknown)
-# #         unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
-# #         rescored_alignments = rescore_merges(aligned_spectrum_params,unique_merges)
-# #         rescored_merges = []
-# #         good_merges = []
-# #         good_rescored_alignments = computational_pipeline.finding_seqs.check_in_rescored_merges(rescored_merges,good_merges)
-# #         postprocessed_alignments = create_postprocessed_alignments(aligned_spectrum_params, good_rescored_alignments)
-# #         aligned_spectrums = get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments)
-# #         return aligned_spectrums
-# #     else:
-# #         return None
-
-
-
-# def get_matched_fragment(aligned_spectrum_params, fragment):
-#     sqllite_database = aligned_spectrum_params.base_alignment_params.sqllite_database
-#     ppm_tolerance = aligned_spectrum_params.base_alignment_params.ppm_tolerance
-#     input_mass = fragment.mz_value        
-#     tolerance = ppm_to_da(input_mass, ppm_tolerance)
-#     b_rows, y_rows = sqllite_database.query_mass_kmers(input_mass, tolerance)
-#     b_kmers = [KMer(*row) for row in b_rows]
-#     y_kmers = [KMer(*row) for row in y_rows]
-#     matched_fragment = MatchedFragment(fragment=fragment, b_kmers=b_kmers, y_kmers=y_kmers)
-#     return matched_fragment
 
 # def get_matched_precursor(aligned_spectrum_params, precursor):
 #     id = precursor.id
@@ -415,7 +370,7 @@ def get_matched_fragment(fragment, sqllite_database, ppm_tolerance):
     matched_fragment = MatchedFragment(fragment=fragment, b_kmers=b_kmers, y_kmers=reversed_y_kmers)
     return matched_fragment    
 
-def get_matched_fragments(fragments,sqllite_database,ppm_tolerance):
+def get_native_matched_fragments(fragments,sqllite_database,ppm_tolerance):
     matched_fragments = []
     for fragment in fragments:
         matched_fragment = get_matched_fragment(fragment,sqllite_database,ppm_tolerance)
@@ -423,18 +378,116 @@ def get_matched_fragments(fragments,sqllite_database,ppm_tolerance):
             matched_fragments.append(matched_fragment)
     return matched_fragments
 
+def calculate_mass(sequence):
+    return sum(AMINO_ACIDS.get(aa, 0) for aa in sequence)
+
+def calculate_score(new_fragment,protein_sequence):
+        return len(new_fragment)/len(protein_sequence)
+
+def get_synthetic_b_kmers(matched_precursor, kmer, protein_sequence):
+    bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
+    synthetic_kmers = []
+    start_index = kmer.location_start
+    precursor_mass = matched_precursor.mass
+    i = 0
+
+    while start_index - i >= 0:
+        current_char = protein_sequence[start_index - i]
+        
+        if current_char in bad_chars:
+            i += 1
+            continue
+        
+        new_fragment = protein_sequence[start_index - i:start_index + 1]
+        new_mass = calculate_mass(new_fragment)
+        score = calculate_score(new_fragment,protein_sequence)
+        
+        if new_mass <= precursor_mass:
+            new_kmer = KMer(
+                mass=new_mass,
+                location_start=start_index - i,
+                location_end=start_index,
+                ion=kmer.ion,
+                charge=kmer.charge,
+                protein_id=kmer.protein_id,
+                sequence=new_fragment,
+                score = score,
+                kmer_type='S'
+            )
+            synthetic_kmers.append(new_kmer)
+        
+        if new_mass >= precursor_mass:
+            break
+            
+        i += 1
+
+    return synthetic_kmers
+
+def get_synthetic_y_kmers(matched_precursor, kmer, protein_sequence):
+    bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
+    synthetic_kmers = []
+    start_index = kmer.location_end
+    precursor_mass = matched_precursor.mass
+    i = 0
+
+    while start_index + i < len(protein_sequence):
+        current_char = protein_sequence[start_index + i]
+        
+        if current_char in bad_chars:
+            i += 1
+            continue
+        
+        new_fragment = protein_sequence[start_index:start_index + i + 1]
+        new_mass = calculate_mass(new_fragment)
+        score = calculate_score(new_fragment,protein_sequence)
+            
+        if new_mass <= precursor_mass:
+            new_kmer = KMer(
+                mass=new_mass,
+                location_start=start_index,
+                location_end=start_index + i,
+                ion=kmer.ion,
+                charge=kmer.charge,
+                protein_id=kmer.protein_id,
+                sequence=new_fragment,
+                score=score,
+                kmer_type='S'
+            )
+            synthetic_kmers.append(new_kmer)
+        
+        if new_mass >= precursor_mass:
+            break
+            
+        i += 1
+
+    return synthetic_kmers
+
+def get_synthetic_kmers(matched_precursor, kmer, sqllite_database):
+    protein_id = kmer.protein_id
+    protein_row = sqllite_database.get_protein(protein_id)
+    protein = Protein(*protein_row)
+    ion = kmer.ion
+    if ion == 0:
+        return get_synthetic_b_kmers(matched_precursor, kmer, protein.sequence)
+    elif ion == 1:
+        return get_synthetic_y_kmers(matched_precursor, kmer, protein.sequence)
+
+def get_synthetic_matched_fragments(native_matched_fragments,sqllite_database):
+    all_synthetic_matched_fragments = []
+    for native_matched_fragment in native_matched_fragments:
+        synthetic_matched_fragments = get_synthetic_kmers(native_matched_fragment,sqllite_database)
+        all_synthetic_matched_fragments.extend(synthetic_matched_fragments)
+    return all_synthetic_matched_fragments
+
 def create_aligned_peptides(experiment_parameters):
     precursors = experiment_parameters.precursors
     ppm_tolerance = experiment_parameters.ppm_tolerance    
     filtered_fragments = get_filtered_fragments(precursors, ppm_tolerance)
     sqllite_database = experiment_parameters.sqllite_database
-    matched_fragments = get_matched_fragments(filtered_fragments,sqllite_database,ppm_tolerance)
-    print(matched_fragments[0])
-    # matched_fragment = matched_fragments[0]
-    # print(matched_fragment.fragment.mz_value)
-    # b_mer = matched_fragment.y_kmers[0]
-    # print(b_mer)
-    # matched_precursor = get_matched_precursor(aligned_spectrum_params,precursor)
+    native_matched_fragments = get_native_matched_fragments(filtered_fragments,sqllite_database,ppm_tolerance)
+    synthetic_matched_fragments = get_synthetic_matched_fragments(native_matched_fragments,sqllite_database)
+    
+    #matched_precursor = get_matched_precursor(aligned_spectrum_params,precursor)
     # complete_precursor = get_complete_precursor(aligned_spectrum_params, matched_precursor)
     # clustered_precursor = get_clustered_precursor(complete_precursor)
     # unique_native_merged_seqs = alignment.get_paired_natives(aligned_spectrum_params,clustered_precursor)

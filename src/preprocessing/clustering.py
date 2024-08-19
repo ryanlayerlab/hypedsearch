@@ -407,6 +407,7 @@ def get_synthetic_kmers(matched_precursor, kmer, sqllite_database):
     elif ion == 1:
         return get_synthetic_y_kmers(matched_precursor, kmer, protein.sequence)
 
+#TODO Start here
 def get_synthetic_b_kmers(matched_precursor, kmer, protein_sequence):
     bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
     synthetic_kmers = []
