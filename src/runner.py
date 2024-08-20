@@ -67,20 +67,7 @@ def get_precursors(spectra_file_path,number_peaks):
     precursors = []
     filecontents = mzml.read(spectra_file_path)
     content: dict
-    for spec_num, content in enumerate(filecontents):
-        masses = list(content['m/z array'])
-        abundances = list(content['intensity array'])
-        if number_peaks > 0:
-            adjusted_masses, adjusted_abundances = peak_filtering(masses, abundances, number_peaks)
-        elif relative_abundance_filter > 0:
-            while relative_abundance_filter > 1:
-                relative_abundance_filter /= 100
-            adjusted_masses, adjusted_abundances = relative_abundance_filtering(masses, abundances, relative_abundance_filter)
-        fragments = []
-        for i, adjusted_mass in enumerate(adjusted_masses):
-            adjusted_abundance = adjusted_abundances[i]
-            fragment = Fragment(id=i,mz_value=adjusted_mass,abundance=adjusted_abundance)       
-            fragments.append(fragment)
+    for precursor_id, content in enumerate(filecontents):
         precursor_mass = None
         precursor_charge = 0
         if not len(content['precursorList']['precursor']) or not len(content['precursorList']['precursor'][0]['selectedIonList']['selectedIon']):
@@ -93,9 +80,22 @@ def get_precursors(spectra_file_path,number_peaks):
             else:
                 precursor_abundance = None
             precursor_charge = int(content['precursorList']['precursor'][0]['selectedIonList']['selectedIon'][0]['charge state'])
-        id = content.get('id', '')
+        precursor_description = content.get('id', '')
         retention_time = content['scanList']['scan'][0]['scan start time']
-        precursor = Precursor(id=id,mass=precursor_mass,charge=precursor_charge,retention_time=retention_time,abundance=precursor_abundance,fragments=fragments)
+        masses = list(content['m/z array'])
+        abundances = list(content['intensity array'])
+        if number_peaks > 0:
+            adjusted_masses, adjusted_abundances = peak_filtering(masses, abundances, number_peaks)
+        elif relative_abundance_filter > 0:
+            while relative_abundance_filter > 1:
+                relative_abundance_filter /= 100
+            adjusted_masses, adjusted_abundances = relative_abundance_filtering(masses, abundances, relative_abundance_filter)
+        fragments = []
+        for fragment_id, adjusted_mass in enumerate(adjusted_masses):
+            adjusted_abundance = adjusted_abundances[fragment_id]
+            fragment = Fragment(id=fragment_id,precursor_id=precursor_id, mz_value=adjusted_mass,abundance=adjusted_abundance)       
+            fragments.append(fragment)
+        precursor = Precursor(id=precursor_id,description=precursor_description,mass=precursor_mass,charge=precursor_charge,retention_time=retention_time,abundance=precursor_abundance,fragments=fragments)
         precursors.append(precursor)
     return precursors
 
@@ -112,7 +112,6 @@ def get_protein_strings(left_proteins, right_proteins):
         left_protein_string += protein + "/"
     for protein in right_proteins:
         right_protein_string += protein + "/"
-    
     return left_protein_string[:-1], right_protein_string[:-1]
 
 def get_score_strings(b_scores, y_scores):

@@ -384,7 +384,13 @@ def calculate_mass(sequence):
 def calculate_score(new_fragment,protein_sequence):
         return len(new_fragment)/len(protein_sequence)
 
-def get_synthetic_b_kmers(matched_precursor, kmer, protein_sequence):
+def find_precursor_by_id(precursor_list, target_id):
+    for precursor in precursor_list:
+        if precursor.id == target_id:
+            return precursor
+    return None
+
+def get_synthetic_b_kmer(matched_precursor, kmer, protein_sequence):
     bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
     synthetic_kmers = []
     start_index = kmer.location_start
@@ -405,12 +411,12 @@ def get_synthetic_b_kmers(matched_precursor, kmer, protein_sequence):
         if new_mass <= precursor_mass:
             new_kmer = KMer(
                 mass=new_mass,
+                protein_id=kmer.protein_id,
                 location_start=start_index - i,
                 location_end=start_index,
                 ion=kmer.ion,
                 charge=kmer.charge,
-                protein_id=kmer.protein_id,
-                sequence=new_fragment,
+                subsequence=new_fragment,
                 score = score,
                 kmer_type='S'
             )
@@ -421,9 +427,12 @@ def get_synthetic_b_kmers(matched_precursor, kmer, protein_sequence):
             
         i += 1
 
-    return synthetic_kmers
+    if len(synthetic_kmers) > 0:
+        return synthetic_kmers[-1]
+    else:
+        return None
 
-def get_synthetic_y_kmers(matched_precursor, kmer, protein_sequence):
+def get_synthetic_y_kmer(matched_precursor, kmer, protein_sequence):
     bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
     synthetic_kmers = []
     start_index = kmer.location_end
@@ -444,12 +453,12 @@ def get_synthetic_y_kmers(matched_precursor, kmer, protein_sequence):
         if new_mass <= precursor_mass:
             new_kmer = KMer(
                 mass=new_mass,
+                protein_id=kmer.protein_id,
                 location_start=start_index,
                 location_end=start_index + i,
                 ion=kmer.ion,
                 charge=kmer.charge,
-                protein_id=kmer.protein_id,
-                sequence=new_fragment,
+                subsequence=new_fragment,
                 score=score,
                 kmer_type='S'
             )
@@ -460,24 +469,41 @@ def get_synthetic_y_kmers(matched_precursor, kmer, protein_sequence):
             
         i += 1
 
-    return synthetic_kmers
+    if len(synthetic_kmers) > 0:
+        return synthetic_kmers[-1]
+    else:
+        return None
 
-def get_synthetic_kmers(matched_precursor, kmer, sqllite_database):
-    protein_id = kmer.protein_id
+def get_protein_sequence(protein_id,sqllite_database):
     protein_row = sqllite_database.get_protein(protein_id)
     protein = Protein(*protein_row)
-    ion = kmer.ion
-    if ion == 0:
-        return get_synthetic_b_kmers(matched_precursor, kmer, protein.sequence)
-    elif ion == 1:
-        return get_synthetic_y_kmers(matched_precursor, kmer, protein.sequence)
+    return protein.sequence
 
-def get_synthetic_matched_fragments(native_matched_fragments,sqllite_database):
-    all_synthetic_matched_fragments = []
+def add_synthetic_kmers_to_fragment(matched_fragment,precursors,sqllite_database):
+    precursor_id = matched_fragment.fragment.precursor_id
+    precursor = find_precursor_by_id(precursors, precursor_id)
+    synthetic_b_kmers = []
+    synthetic_y_kmers = []
+    for b_kmer in matched_fragment.b_kmers:
+        protein_id = b_kmer.protein_id
+        protein_sequence = get_protein_sequence(protein_id,sqllite_database)
+        synthetic_b_kmer =  get_synthetic_b_kmer(precursor, b_kmer, protein_sequence)
+        synthetic_b_kmers.append(synthetic_b_kmer)
+    for y_kmer in matched_fragment.y_kmers:
+        protein_id = y_kmer.protein_id
+        protein_sequence = get_protein_sequence(protein_id,sqllite_database)
+        synthetic_y_kmer = get_synthetic_y_kmer(precursor, y_kmer, protein_sequence)
+        synthetic_y_kmers.append(synthetic_y_kmer)
+    matched_fragment.b_kmers.extend(synthetic_b_kmers)
+    matched_fragment.y_kmers.extend(synthetic_y_kmers)
+    return matched_fragment
+
+def get_all_matched_fragments(native_matched_fragments, precursors, sqllite_database):
+    matched_fragments = []
     for native_matched_fragment in native_matched_fragments:
-        synthetic_matched_fragments = get_synthetic_kmers(native_matched_fragment,sqllite_database)
-        all_synthetic_matched_fragments.extend(synthetic_matched_fragments)
-    return all_synthetic_matched_fragments
+        matched_fragment = add_synthetic_kmers_to_fragment(native_matched_fragment,precursors,sqllite_database)
+        matched_fragments.append(matched_fragment)
+    return matched_fragments
 
 def create_aligned_peptides(experiment_parameters):
     precursors = experiment_parameters.precursors
@@ -485,8 +511,8 @@ def create_aligned_peptides(experiment_parameters):
     filtered_fragments = get_filtered_fragments(precursors, ppm_tolerance)
     sqllite_database = experiment_parameters.sqllite_database
     native_matched_fragments = get_native_matched_fragments(filtered_fragments,sqllite_database,ppm_tolerance)
-    synthetic_matched_fragments = get_synthetic_matched_fragments(native_matched_fragments,sqllite_database)
-    
+    matched_fragments = get_all_matched_fragments(native_matched_fragments, precursors, sqllite_database)
+    print(matched_fragments)
     #matched_precursor = get_matched_precursor(aligned_spectrum_params,precursor)
     # complete_precursor = get_complete_precursor(aligned_spectrum_params, matched_precursor)
     # clustered_precursor = get_clustered_precursor(complete_precursor)
