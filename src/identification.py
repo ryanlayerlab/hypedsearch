@@ -512,7 +512,7 @@ def create_aligned_peptides(experiment_parameters):
     sqllite_database = experiment_parameters.sqllite_database
     native_matched_fragments = get_native_matched_fragments(filtered_fragments,sqllite_database,ppm_tolerance)
     matched_fragments = get_all_matched_fragments(native_matched_fragments, precursors, sqllite_database)
-    print(matched_fragments)
+    print(matched_fragments[2])
     #matched_precursor = get_matched_precursor(aligned_spectrum_params,precursor)
     # complete_precursor = get_complete_precursor(aligned_spectrum_params, matched_precursor)
     # clustered_precursor = get_clustered_precursor(complete_precursor)

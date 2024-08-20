@@ -8,7 +8,6 @@ KMer = namedtuple('KMer',['mass','protein_id','location_start','location_end','i
 MatchedFragment = namedtuple('MatchedFragment',['fragment','b_kmers','y_kmers'])
 Protein = namedtuple('Protein', ['id','description','sequence'])
 
-
 AlignedPeptides = namedtuple('AlignedPeptides',['hybrid','left_proteins','right_proteins','sequence','b_scores','y_scores','total_score','total_gaussian_score','extensions','precursor_mass','precursor_charge','total_mass_error','total_count'])
 
 # SequenceAlignment = namedtuple(
