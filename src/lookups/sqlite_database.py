@@ -45,12 +45,12 @@ class Sqllite_Database:
         rows = self.cursor.execute("SELECT * FROM kmers").fetchall()
         print(rows)
     
-    def query_mass_kmers(self, mass, tolerance):
+    def query_mass_kmers(self, fragment_id, mass, tolerance):
         upper_bound = mass + tolerance
         lower_bound = mass - tolerance
-        self.cursor.execute("CREATE TABLE temp.mass AS SELECT k.*,SUBSTR(p.sequence, k.location_start, k.location_end - k.location_start + 1) AS subsequence, ROUND(((location_end - location_start + 1) / CAST(LENGTH(p.sequence) AS REAL)), 3) AS score FROM kmers as k inner join proteins as p on k.protein = p.id where k.mass between ? and ? order by k.protein, k.location_start", (lower_bound, upper_bound))
-        b_rows = self.cursor.execute("SELECT mass,protein as protein_id,location_start,location_end,ion,charge,subsequence,score, 'N' FROM temp.mass where ion = 0 order by protein, location_start, location_end").fetchall()
-        y_rows = self.cursor.execute("SELECT mass,protein as protein_id,location_start,location_end,ion,charge,subsequence,score, 'N' FROM temp.mass where ion = 1 order by protein, location_start, location_end").fetchall()
+        self.cursor.execute("CREATE TABLE temp.mass AS SELECT ? as fragment_id, k.*, SUBSTR(p.sequence, k.location_start, k.location_end - k.location_start + 1) AS subsequence FROM kmers as k inner join proteins as p on k.protein = p.id where k.mass between ? and ? order by k.protein, k.location_start", (fragment_id, lower_bound, upper_bound))
+        b_rows = self.cursor.execute("SELECT fragment_id, protein as protein_id, mass,location_start,location_end,ion,charge,subsequence, 'N' FROM temp.mass where ion = 0 order by protein, location_start, location_end").fetchall()
+        y_rows = self.cursor.execute("SELECT fragment_id, protein as protein_id, mass,location_start,location_end,ion,charge,subsequence, 'N' FROM temp.mass where ion = 1 order by protein, location_start, location_end").fetchall()
         self.cursor.execute("DROP TABLE temp.mass")
         return b_rows, y_rows
       
