@@ -1,7 +1,8 @@
-from objects import ExperimentParameters, Precursor, KMer, MatchedFragment, Protein, MatchedProtein
+from objects import ExperimentParameters, Precursor, KMer, MatchedFragment, Protein, MatchedProtein, Cluster
 from lookups.constants import AMINO_ACIDS
 from itertools import groupby
 from operator import itemgetter
+from collections import defaultdict
 
 # from multiprocessing import Pool, set_start_method
 # import operator, time, json, os
@@ -341,27 +342,6 @@ def get_filtered_fragments(precursors, ppm_tolerance):
 def ppm_to_da(mass, ppm_tolerance):
     return abs((ppm_tolerance / 1000000)*mass)
 
-def reverse_y_kmer(y_kmer):
-    reversed_kmer = KMer(
-        fragment_id = y_kmer.fragment_id,
-        protein_id=y_kmer.protein_id,
-        mass=y_kmer.mass,
-        location_start=y_kmer.location_end,
-        location_end=y_kmer.location_start,
-        ion=y_kmer.ion,
-        charge=y_kmer.charge,
-        subsequence=y_kmer.subsequence[::-1],
-        kmer_type=y_kmer.kmer_type
-    )    
-    return reversed_kmer
-
-def reverse_y_kmers(y_kmers):
-    reversed_y_kmers = []
-    for y_kmer in y_kmers:
-        reversed_y_kmer = reverse_y_kmer(y_kmer)
-        reversed_y_kmers.append(reversed_y_kmer)
-    return reversed_y_kmers
-
 def get_matched_fragment(fragment, sqllite_database, ppm_tolerance):
     fragment_id = fragment.id
     mz_value = fragment.mz_value
@@ -369,7 +349,7 @@ def get_matched_fragment(fragment, sqllite_database, ppm_tolerance):
     b_rows, y_rows = sqllite_database.query_mass_kmers(fragment_id, mz_value, adjusted_tolerance)
     b_kmers = [KMer(*row) for row in b_rows]
     y_kmers = [KMer(*row) for row in y_rows]
-    reversed_y_kmers = reverse_y_kmers(y_kmers)
+    reversed_y_kmers = y_kmers
     matched_fragment = MatchedFragment(fragment=fragment, b_kmers=b_kmers, y_kmers=reversed_y_kmers)
     return matched_fragment    
 
@@ -505,26 +485,14 @@ def get_all_matched_fragments(native_matched_fragments, precursors, sqllite_data
         matched_fragments.append(matched_fragment)
     return matched_fragments
 
-def calculate_kmer_score(kmers, protein_sequence):
-    protein_length = len(protein_sequence)
-    if kmers and all(kmer is not None for kmer in kmers):
-        location_start = min(kmer.location_start for kmer in kmers)
-        location_end = max(kmer.location_end for kmer in kmers)
-        return (location_end - location_start) / protein_length
-    return None
-
 def get_matched_protein(protein_id, group, sqllite_database):
     protein_row = sqllite_database.get_protein(protein_id)
     protein = Protein(*protein_row)    
     for fragment_id, mf in enumerate(group):
-        b_kmer_score = calculate_kmer_score(mf.b_kmers, protein.sequence)
-        y_kmer_score = calculate_kmer_score(mf.y_kmers, protein.sequence)
         matched_protein = MatchedProtein(
             protein=protein,
             b_kmers=mf.b_kmers,
-            y_kmers=mf.y_kmers,
-            b_kmer_score=b_kmer_score,
-            y_kmer_score=y_kmer_score
+            y_kmers=mf.y_kmers
         )
     return matched_protein
 
@@ -545,6 +513,28 @@ def get_matched_proteins(matched_fragments,sqllite_database):
         matched_proteins.append(matched_protein)    
     return matched_proteins
 
+
+def get_clusters(matched_proteins):
+    clusters = []
+    
+    for matched_protein in matched_proteins:
+        protein = matched_protein.protein
+        kmer_groups = defaultdict(list)
+        
+        for kmer in filter(None, matched_protein.b_kmers):
+            kmer_groups[('b', protein, kmer.location_start)].append(kmer)
+        
+        for kmer in filter(None, matched_protein.y_kmers):
+            kmer_groups[('y', protein, kmer.location_end)].append(kmer)
+
+        for (cluster_type, protein, start), kmers in kmer_groups.items():
+            ending_index = max(kmer.location_end for kmer in kmers)
+            score = len(kmers)
+            cluster = Cluster(protein=protein,cluster_type=cluster_type,starting_index=start,ending_index=ending_index,kmers=kmers,score=score)
+            clusters.append(cluster)
+    
+    return clusters
+
 def create_aligned_peptides(experiment_parameters):
     precursors = experiment_parameters.precursors
     ppm_tolerance = experiment_parameters.ppm_tolerance    
@@ -553,7 +543,8 @@ def create_aligned_peptides(experiment_parameters):
     native_matched_fragments = get_native_matched_fragments(filtered_fragments,sqllite_database,ppm_tolerance)
     matched_fragments = get_all_matched_fragments(native_matched_fragments, precursors, sqllite_database)
     matched_proteins = get_matched_proteins(matched_fragments,sqllite_database)
-    print(matched_proteins[0].y_kmer_score)
+    clusters = get_clusters(matched_proteins)
+    print(clusters[0])
     #matched_precursor = get_matched_precursor(aligned_spectrum_params,precursor)
     # complete_precursor = get_complete_precursor(aligned_spectrum_params, matched_precursor)
     # clustered_precursor = get_clustered_precursor(complete_precursor)
