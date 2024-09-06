@@ -7,9 +7,15 @@ ExperimentParameters = namedtuple('ExperimentParameters',['id','precursors','sql
 KMer = namedtuple('KMer',['fragment_id','protein_id','mass','location_start','location_end','ion','charge','subsequence','kmer_type'])
 MatchedFragment = namedtuple('MatchedFragment',['fragment','b_kmers','y_kmers'])
 Protein = namedtuple('Protein', ['id','description','sequence'])
-MatchedProtein = namedtuple('MatchedProtein',['protein','b_kmers','y_kmers', 'b_kmer_score', 'y_kmer_score' ])
+MatchedProtein = namedtuple('MatchedProtein',['protein','b_kmers','y_kmers'])
+Cluster = namedtuple('Cluster', ['protein', 'cluster_type', 'starting_index', 'ending_index', 'kmers', 'score'])
 
 AlignedPeptides = namedtuple('AlignedPeptides',['hybrid','left_proteins','right_proteins','sequence','b_scores','y_scores','total_score','total_gaussian_score','extensions','precursor_mass','precursor_charge','total_mass_error','total_count'])
+
+#need to calculate:
+#precursor_distance
+#total_mass_error
+
 
 # SequenceAlignment = namedtuple(
 #     'SequenceAlignment', 
