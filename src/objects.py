@@ -9,6 +9,8 @@ MatchedFragment = namedtuple('MatchedFragment',['fragment','b_kmers','y_kmers'])
 Protein = namedtuple('Protein', ['id','description','sequence'])
 MatchedProtein = namedtuple('MatchedProtein',['protein','b_kmers','y_kmers'])
 Cluster = namedtuple('Cluster', ['protein', 'cluster_type', 'starting_index', 'ending_index', 'kmers', 'score'])
+Peptide = namedtuple('MatchedCluster', ['peptide_type', 'b_cluster','y_cluster'])
+
 
 AlignedPeptides = namedtuple('AlignedPeptides',['hybrid','left_proteins','right_proteins','sequence','b_scores','y_scores','total_score','total_gaussian_score','extensions','precursor_mass','precursor_charge','total_mass_error','total_count'])
 
@@ -77,7 +79,6 @@ AlignedPeptides = namedtuple('AlignedPeptides',['hybrid','left_proteins','right_
 # Cluster = namedtuple('Cluster',['id','mass','score','kmers'])
 # ClusteredPrecursor = namedtuple('ClusteredPrecursor',['id','mass','charge','b_clusters','y_clusters'])
 # Peptide = namedtuple('Merged_Kmer',['protein_id','mass','location_start','location_end','charge','score','peptide_type'])
-
 
 # ConvertedPrecursors = namedtuple('ConvertedPrecursors', ['converted_precursor_b', 'converted_precursor_y'])
 # TargetData = namedtuple('TargetData', ['target_seq', 'target_left_pids', 'target_right_pids', 'target_left_indices', 'target_right_indices', 'target_score'])
