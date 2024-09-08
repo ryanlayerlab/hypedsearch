@@ -129,7 +129,6 @@ class Sqllite_Database:
         row = self.cursor.execute("SELECT * FROM proteins WHERE id = ?", (pid,)).fetchone()        
         return row       
     
-
     def get_kmers_for_protein(self, kmer, start, end, protein_id, ion):
         data_list = []
         for charge in [1,2]:

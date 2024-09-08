@@ -1,4 +1,4 @@
-from objects import ExperimentParameters, Precursor, KMer, MatchedFragment, Protein, MatchedProtein, Cluster
+from objects import ExperimentParameters, Precursor, KMer, MatchedFragment, Protein, MatchedProtein, Cluster, Peptide
 from lookups.constants import AMINO_ACIDS
 from itertools import groupby
 from operator import itemgetter
@@ -535,6 +535,47 @@ def get_clusters(matched_proteins):
     
     return clusters
 
+def get_best_cluster_match(target_cluster, complimentary_clusters):
+    #passing target_cluster in assuming that there is real logic to find the best complimenary cluster
+    #versus just taking the complimentary with the best score
+    complimentary_cluster = None
+    highest_score = float('-inf')
+    for cluster in complimentary_clusters:
+        if cluster.score > highest_score:
+            complimentary_cluster = cluster
+            highest_score = cluster.score
+    return complimentary_cluster
+
+def get_peptide_type(b_cluster,y_cluster, sqllite_database):
+    start_index = b_cluster.starting_index
+    end_index = y_cluster.ending_index
+    #TODO implement levenshine distance here
+    return 'h'
+
+def get_peptide(target_cluster, complimentary_clusters,sqllite_database):    
+    if target_cluster.cluster_type == 'b':
+        y_cluster = get_best_cluster_match(target_cluster, complimentary_clusters)
+        peptide_type = get_peptide_type(target_cluster,y_cluster,sqllite_database)
+        peptide = Peptide(peptide_type = peptide_type, b_cluster = target_cluster, y_cluster=y_cluster)
+        return peptide
+    else:
+        b_cluster = get_best_cluster_match(target_cluster, complimentary_clusters)
+        peptide_type = get_peptide_type(b_cluster,target_cluster,sqllite_database)
+        peptide = Peptide(peptide_type = peptide_type, b_cluster = b_cluster, y_cluster=target_cluster)
+        return peptide
+
+def get_peptides(clusters,sqllite_database):
+    peptides = []
+    b_clusters = [cluster for cluster in clusters if cluster.cluster_type == 'b']
+    y_clusters = [cluster for cluster in clusters if cluster.cluster_type == 'y']
+    for b_cluster in b_clusters:
+        peptide = get_peptide(b_cluster, y_clusters,sqllite_database)
+        peptides.append(peptide)
+    for y_cluster in y_clusters:
+        peptide = get_peptide(y_cluster,b_clusters,sqllite_database)
+        peptides.append(peptide)
+    return peptides        
+
 def create_aligned_peptides(experiment_parameters):
     precursors = experiment_parameters.precursors
     ppm_tolerance = experiment_parameters.ppm_tolerance    
@@ -544,7 +585,8 @@ def create_aligned_peptides(experiment_parameters):
     matched_fragments = get_all_matched_fragments(native_matched_fragments, precursors, sqllite_database)
     matched_proteins = get_matched_proteins(matched_fragments,sqllite_database)
     clusters = get_clusters(matched_proteins)
-    print(clusters[0])
+    peptides = get_peptides(clusters,sqllite_database)
+    print(peptides[0])
     #matched_precursor = get_matched_precursor(aligned_spectrum_params,precursor)
     # complete_precursor = get_complete_precursor(aligned_spectrum_params, matched_precursor)
     # clustered_precursor = get_clustered_precursor(complete_precursor)
