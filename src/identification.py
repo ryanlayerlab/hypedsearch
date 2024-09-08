@@ -344,9 +344,10 @@ def ppm_to_da(mass, ppm_tolerance):
 
 def get_matched_fragment(fragment, sqllite_database, ppm_tolerance):
     fragment_id = fragment.id
+    precursor_mass = fragment.precursor_mass
     mz_value = fragment.mz_value
     adjusted_tolerance =  ppm_to_da(mz_value, ppm_tolerance) 
-    b_rows, y_rows = sqllite_database.query_mass_kmers(fragment_id, mz_value, adjusted_tolerance)
+    b_rows, y_rows = sqllite_database.query_mass_kmers(fragment_id, precursor_mass, mz_value, adjusted_tolerance)
     b_kmers = [KMer(*row) for row in b_rows]
     y_kmers = [KMer(*row) for row in y_rows]
     reversed_y_kmers = y_kmers
@@ -391,8 +392,9 @@ def get_synthetic_b_kmer(matched_precursor, kmer, protein_sequence):
         if new_mass <= precursor_mass:
             new_kmer = KMer(
                 fragment_id = kmer.fragment_id,
+                precursor_mass = kmer.precursor_mass,
                 protein_id=kmer.protein_id,
-                mass=new_mass,
+                kmer_mass=new_mass,
                 location_start=kmer_start,
                 location_end=index,
                 ion=kmer.ion,
@@ -433,8 +435,9 @@ def get_synthetic_y_kmer(matched_precursor, kmer, protein_sequence):
         if new_mass <= precursor_mass:
             new_kmer = KMer(
                 fragment_id = kmer.fragment_id,
+                precursor_mass = kmer.precursor_mass,
                 protein_id=kmer.protein_id,
-                mass=new_mass,
+                kmer_mass=new_mass,
                 location_start=kmer_start,
                 location_end=index,
                 ion=kmer.ion,
@@ -513,14 +516,12 @@ def get_matched_proteins(matched_fragments,sqllite_database):
         matched_proteins.append(matched_protein)    
     return matched_proteins
 
-
 def get_clusters(matched_proteins):
     clusters = []
     
     for matched_protein in matched_proteins:
         protein = matched_protein.protein
         kmer_groups = defaultdict(list)
-        
         for kmer in filter(None, matched_protein.b_kmers):
             kmer_groups[('b', protein, kmer.location_start)].append(kmer)
         
@@ -528,29 +529,43 @@ def get_clusters(matched_proteins):
             kmer_groups[('y', protein, kmer.location_end)].append(kmer)
 
         for (cluster_type, protein, start), kmers in kmer_groups.items():
-            ending_index = max(kmer.location_end for kmer in kmers)
+            longest_kmer = max(kmers, key=lambda k: k.location_end - k.location_start)
+            ending_index = longest_kmer.location_end
             score = len(kmers)
-            cluster = Cluster(protein=protein,cluster_type=cluster_type,starting_index=start,ending_index=ending_index,kmers=kmers,score=score)
+            cluster = Cluster(
+                protein=protein,
+                cluster_type=cluster_type,
+                starting_index=start,
+                ending_index=ending_index,
+                longest_kmer=longest_kmer, 
+                score=score  
+            )
             clusters.append(cluster)
     
     return clusters
 
 def get_best_cluster_match(target_cluster, complimentary_clusters):
-    #passing target_cluster in assuming that there is real logic to find the best complimenary cluster
-    #versus just taking the complimentary with the best score
-    complimentary_cluster = None
-    highest_score = float('-inf')
+    target_precursor_maas = target_cluster.longest_kmer.precursor_mass
+    target_weight = target_cluster.longest_kmer.kmer_mass
+    best_cluster = None
+    max_peptide_weight = 0
+
     for cluster in complimentary_clusters:
-        if cluster.score > highest_score:
-            complimentary_cluster = cluster
-            highest_score = cluster.score
-    return complimentary_cluster
+        compliment_weight = cluster.longest_kmer.kmer_mass
+        peptide_weight = target_weight + compliment_weight
+        if peptide_weight <= target_precursor_maas and peptide_weight > max_peptide_weight:
+            best_cluster = cluster
+            max_peptide_weight = peptide_weight
+
+    return best_cluster
 
 def get_peptide_type(b_cluster,y_cluster, sqllite_database):
-    start_index = b_cluster.starting_index
-    end_index = y_cluster.ending_index
-    #TODO implement levenshine distance here
-    return 'h'
+    if b_cluster is None or y_cluster is None:
+        return 'u'
+    if b_cluster.protein.id != y_cluster.protein.id:
+        return 'h'
+    else:
+        return 'n'
 
 def get_peptide(target_cluster, complimentary_clusters,sqllite_database):    
     if target_cluster.cluster_type == 'b':

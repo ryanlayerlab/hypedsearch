@@ -1,15 +1,15 @@
 from collections import namedtuple
 
 FastaDatabase = namedtuple('FastaDatabase', ['file_path', 'proteins', 'kmers'])
-Fragment = namedtuple('Fragment',['id','precursor_id','mz_value', 'abundance'])
 Precursor = namedtuple('Precursor',['id','description','mass','charge','retention_time','abundance','fragments'])
+Fragment = namedtuple('Fragment',['id','precursor_id','precursor_mass','mz_value', 'abundance'])
 ExperimentParameters = namedtuple('ExperimentParameters',['id','precursors','sqllite_database', 'max_peptide_length','ppm_tolerance','precursor_tolerance','number_hybrids','number_natives','target_seq'])
-KMer = namedtuple('KMer',['fragment_id','protein_id','mass','location_start','location_end','ion','charge','subsequence','kmer_type'])
+KMer = namedtuple('KMer',['fragment_id','precursor_mass','protein_id','kmer_mass','location_start','location_end','ion','charge','subsequence','kmer_type'])
 MatchedFragment = namedtuple('MatchedFragment',['fragment','b_kmers','y_kmers'])
 Protein = namedtuple('Protein', ['id','description','sequence'])
 MatchedProtein = namedtuple('MatchedProtein',['protein','b_kmers','y_kmers'])
-Cluster = namedtuple('Cluster', ['protein', 'cluster_type', 'starting_index', 'ending_index', 'kmers', 'score'])
-Peptide = namedtuple('MatchedCluster', ['peptide_type', 'b_cluster','y_cluster'])
+Cluster = namedtuple('Cluster', ['protein', 'cluster_type', 'starting_index', 'ending_index', 'longest_kmer', 'score'])
+Peptide = namedtuple('Peptide', ['peptide_type', 'b_cluster','y_cluster'])
 
 
 AlignedPeptides = namedtuple('AlignedPeptides',['hybrid','left_proteins','right_proteins','sequence','b_scores','y_scores','total_score','total_gaussian_score','extensions','precursor_mass','precursor_charge','total_mass_error','total_count'])

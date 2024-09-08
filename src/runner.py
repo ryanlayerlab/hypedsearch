@@ -93,7 +93,7 @@ def get_precursors(spectra_file_path,number_peaks):
         fragments = []
         for fragment_id, adjusted_mass in enumerate(adjusted_masses):
             adjusted_abundance = adjusted_abundances[fragment_id]
-            fragment = Fragment(id=fragment_id,precursor_id=precursor_id, mz_value=adjusted_mass,abundance=adjusted_abundance)       
+            fragment = Fragment(id=fragment_id,precursor_id=precursor_id, precursor_mass=precursor_mass, mz_value=adjusted_mass,abundance=adjusted_abundance)       
             fragments.append(fragment)
         precursor = Precursor(id=precursor_id,description=precursor_description,mass=precursor_mass,charge=precursor_charge,retention_time=retention_time,abundance=precursor_abundance,fragments=fragments)
         precursors.append(precursor)
