@@ -591,6 +591,16 @@ def get_peptides(clusters,sqllite_database):
         peptides.append(peptide)
     return peptides        
 
+def get_rescored_peptide(peptide,sqllite_database):
+    return None
+
+def get_rescored_peptides(peptides,sqllite_database):
+    rescored_peptides = []
+    for peptide in peptides:
+        rescored_peptide = get_rescored_peptide(peptide,sqllite_database)
+        rescored_peptides.append(rescored_peptide)
+    return rescored_peptides
+
 def create_aligned_peptides(experiment_parameters):
     precursors = experiment_parameters.precursors
     ppm_tolerance = experiment_parameters.ppm_tolerance    
@@ -601,7 +611,8 @@ def create_aligned_peptides(experiment_parameters):
     matched_proteins = get_matched_proteins(matched_fragments,sqllite_database)
     clusters = get_clusters(matched_proteins)
     peptides = get_peptides(clusters,sqllite_database)
-    print(peptides[0])
+    rescored_peptides = get_rescored_peptides(peptides,sqllite_database)
+    print(rescored_peptides[0])
     #matched_precursor = get_matched_precursor(aligned_spectrum_params,precursor)
     # complete_precursor = get_complete_precursor(aligned_spectrum_params, matched_precursor)
     # clustered_precursor = get_clustered_precursor(complete_precursor)
