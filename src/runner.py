@@ -23,11 +23,11 @@ def create_fasta_database(database_file_path):
     fasta_database = fasta_database._replace(proteins=prots)
     return fasta_database  
 
-def create_sqllite_database(database_file_path,max_peptide_length,digest_left,digest_right):
+def create_sqllite_database(database_file_path,max_peptide_length,digest_left,digest_right, number_decimal_places):
     fasta_database = create_fasta_database(database_file_path)
     sqllite_database = Sqllite_Database(max_peptide_length, True)
     kv_proteins = [(k, v) for k, v in fasta_database.proteins]  
-    sqllite_database.populate_database(kv_proteins, max_peptide_length, digest_left, digest_right)
+    sqllite_database.populate_database(kv_proteins, max_peptide_length, digest_left, digest_right, number_decimal_places)
     return sqllite_database
 
 def get_existing_sqllite_database(max_peptide_length):
@@ -59,7 +59,7 @@ def peak_filtering(masses, abundances, num_peaks):
     abundances = [float(x) for _, x in mass_abundances]
     return (masses, abundances)
 
-def get_precursors(spectra_file_path,number_peaks):
+def get_precursors(spectra_file_path,number_peaks,number_decimal_places):
     if not file_exists(spectra_file_path):
         print('File {} not found. Please make sure that this file exists'.format(spectra_file_path))
         return
@@ -80,6 +80,7 @@ def get_precursors(spectra_file_path,number_peaks):
             else:
                 precursor_abundance = None
             precursor_charge = int(content['precursorList']['precursor'][0]['selectedIonList']['selectedIon'][0]['charge state'])
+        rounded_precursor_mass = round(precursor_mass, number_decimal_places)
         precursor_description = content.get('id', '')
         retention_time = content['scanList']['scan'][0]['scan start time']
         masses = list(content['m/z array'])
@@ -93,16 +94,18 @@ def get_precursors(spectra_file_path,number_peaks):
         fragments = []
         for fragment_id, adjusted_mass in enumerate(adjusted_masses):
             adjusted_abundance = adjusted_abundances[fragment_id]
-            fragment = Fragment(id=fragment_id,precursor_id=precursor_id, precursor_mass=precursor_mass, mz_value=adjusted_mass,abundance=adjusted_abundance)       
+            rounded_abundance = round(adjusted_abundance, number_decimal_places)
+            rounded_mz_value = round(adjusted_mass, number_decimal_places)
+            fragment = Fragment(id=fragment_id,precursor_id=precursor_id, precursor_mass=rounded_precursor_mass, mz_value=rounded_mz_value,abundance=rounded_abundance)       
             fragments.append(fragment)
-        precursor = Precursor(id=precursor_id,description=precursor_description,mass=precursor_mass,charge=precursor_charge,retention_time=retention_time,abundance=precursor_abundance,fragments=fragments)
+        precursor = Precursor(id=precursor_id,description=precursor_description,mass=rounded_precursor_mass,charge=precursor_charge,retention_time=retention_time,abundance=precursor_abundance,fragments=fragments)
         precursors.append(precursor)
     return precursors
 
-def get_all_precursors(spectra_file_paths,number_peaks):
+def get_all_precursors(spectra_file_paths,number_peaks,number_decimal_places):
     all_precursors = []
     for spectra_file_path in spectra_file_paths:
-        precursors = get_precursors(spectra_file_path,number_peaks)
+        precursors = get_precursors(spectra_file_path,number_peaks,number_decimal_places)
         all_precursors.append(precursors)
     return precursors
 
@@ -120,7 +123,6 @@ def get_score_strings(b_scores, y_scores):
         b_score_string += str(score) + "/"
     for score in y_scores:
         y_score_string += str(score) + "/"
-        
     return b_score_string[:-1], y_score_string[:-1]
         
 def get_extensions_strings(extensions):
@@ -167,10 +169,10 @@ def write_aligned_peptides_to_disk(aligned_peptides, output_folder_path, output_
             spectrum_id+=1
  
 def get_experiment_parameters(args: dict):
-    all_precursors = get_all_precursors(args['spectra_file_paths'],args['number_peaks'])
+    all_precursors = get_all_precursors(args['spectra_file_paths'],args['number_peaks'],args['number_decimal_places'])
     sqllite_database = None
     if args['create_sqllite_database']:
-        sqllite_database = create_sqllite_database(args['database_file_path'],args['max_peptide_length'], args['digest_left'], args['digest_right'])
+        sqllite_database = create_sqllite_database(args['database_file_path'],args['max_peptide_length'], args['digest_left'], args['digest_right'], args['number_decimal_places']) 
     else:
         sqllite_database = get_existing_sqllite_database(args['max_peptide_length'])
     max_peptide_length=args['max_peptide_length']
@@ -179,10 +181,12 @@ def get_experiment_parameters(args: dict):
     number_hybrids=args['number_hybrids']
     number_natives=args['number_natives']
     target_seq = args['target_seq']
+    number_decimal_places = args['number_decimal_places']
     experiment_parameters = ExperimentParameters(id=0,precursors=all_precursors,sqllite_database=sqllite_database,
                                                 max_peptide_length=max_peptide_length, ppm_tolerance=ppm_tolerance,
                                                 precursor_tolerance=precursor_tolerance,number_hybrids=number_hybrids,
-                                                number_natives=number_natives,target_seq=target_seq)
+                                                number_natives=number_natives,target_seq=target_seq, 
+                                                number_decimal_places=number_decimal_places)
     return experiment_parameters
 
 def handle_results(args, aligned_peptides):

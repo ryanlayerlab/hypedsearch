@@ -3,7 +3,7 @@ from collections import namedtuple
 FastaDatabase = namedtuple('FastaDatabase', ['file_path', 'proteins', 'kmers'])
 Precursor = namedtuple('Precursor',['id','description','mass','charge','retention_time','abundance','fragments'])
 Fragment = namedtuple('Fragment',['id','precursor_id','precursor_mass','mz_value', 'abundance'])
-ExperimentParameters = namedtuple('ExperimentParameters',['id','precursors','sqllite_database', 'max_peptide_length','ppm_tolerance','precursor_tolerance','number_hybrids','number_natives','target_seq'])
+ExperimentParameters = namedtuple('ExperimentParameters',['id','precursors','sqllite_database', 'max_peptide_length','ppm_tolerance','precursor_tolerance','number_hybrids','number_natives','target_seq','number_decimal_places'])
 KMer = namedtuple('KMer',['fragment_id','precursor_mass','protein_id','kmer_mass','location_start','location_end','ion','charge','subsequence','kmer_type'])
 MatchedFragment = namedtuple('MatchedFragment',['fragment','b_kmers','y_kmers'])
 Protein = namedtuple('Protein', ['id','description','sequence'])
