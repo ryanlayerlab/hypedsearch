@@ -342,22 +342,21 @@ def get_filtered_fragments(precursors, ppm_tolerance):
 def ppm_to_da(mass, ppm_tolerance):
     return abs((ppm_tolerance / 1000000)*mass)
 
-def get_matched_fragment(fragment, sqllite_database, ppm_tolerance):
+def get_matched_fragment(fragment, sqllite_database, ppm_tolerance, number_decimal_places):
     fragment_id = fragment.id
     precursor_mass = fragment.precursor_mass
     mz_value = fragment.mz_value
     adjusted_tolerance =  ppm_to_da(mz_value, ppm_tolerance) 
-    b_rows, y_rows = sqllite_database.query_mass_kmers(fragment_id, precursor_mass, mz_value, adjusted_tolerance)
+    b_rows, y_rows = sqllite_database.query_mass_kmers(fragment_id, precursor_mass, mz_value, adjusted_tolerance, number_decimal_places)
     b_kmers = [KMer(*row) for row in b_rows]
     y_kmers = [KMer(*row) for row in y_rows]
-    reversed_y_kmers = y_kmers
-    matched_fragment = MatchedFragment(fragment=fragment, b_kmers=b_kmers, y_kmers=reversed_y_kmers)
+    matched_fragment = MatchedFragment(fragment=fragment, b_kmers=b_kmers, y_kmers=y_kmers)
     return matched_fragment    
 
-def get_native_matched_fragments(fragments,sqllite_database,ppm_tolerance):
+def get_native_matched_fragments(fragments,sqllite_database,ppm_tolerance,number_decimal_places):
     matched_fragments = []
     for fragment in fragments:
-        matched_fragment = get_matched_fragment(fragment,sqllite_database,ppm_tolerance)
+        matched_fragment = get_matched_fragment(fragment,sqllite_database,ppm_tolerance,number_decimal_places)
         if len(matched_fragment.b_kmers) + len(matched_fragment.y_kmers) > 0:
             matched_fragments.append(matched_fragment)
     return matched_fragments
@@ -601,29 +600,23 @@ def get_rescored_peptides(peptides,sqllite_database):
         rescored_peptides.append(rescored_peptide)
     return rescored_peptides
 
+def aligned_spectrums(rescored_peptides):
+    return None
+
 def create_aligned_peptides(experiment_parameters):
     precursors = experiment_parameters.precursors
     ppm_tolerance = experiment_parameters.ppm_tolerance    
     filtered_fragments = get_filtered_fragments(precursors, ppm_tolerance)
     sqllite_database = experiment_parameters.sqllite_database
-    native_matched_fragments = get_native_matched_fragments(filtered_fragments,sqllite_database,ppm_tolerance)
+    number_decimal_places = experiment_parameters.number_decimal_places
+    native_matched_fragments = get_native_matched_fragments(filtered_fragments,sqllite_database,ppm_tolerance, number_decimal_places)
     matched_fragments = get_all_matched_fragments(native_matched_fragments, precursors, sqllite_database)
     matched_proteins = get_matched_proteins(matched_fragments,sqllite_database)
     clusters = get_clusters(matched_proteins)
     peptides = get_peptides(clusters,sqllite_database)
-    rescored_peptides = get_rescored_peptides(peptides,sqllite_database)
-    print(rescored_peptides[0])
-    #matched_precursor = get_matched_precursor(aligned_spectrum_params,precursor)
-    # complete_precursor = get_complete_precursor(aligned_spectrum_params, matched_precursor)
-    # clustered_precursor = get_clustered_precursor(complete_precursor)
-    # unique_native_merged_seqs = alignment.get_paired_natives(aligned_spectrum_params,clustered_precursor)
-    # print(unique_native_merged_seqs)
-    # unique_hybrid_merged_seqs = alignment.pair_indices(aligned_spectrum_params, search_space, score_filter)
-    # unique_merges = ChainMap(unique_hybrid_merged_seqs, unique_native_merged_seqs)
-    # rescored_alignments = rescore_merges(aligned_spectrum_params,unique_merges)
-    # postprocessed_alignments = create_postprocessed_alignments(aligned_spectrum_params, rescored_alignments)
-    # aligned_spectrums = get_aligned_spectrums_from_postprocessed_alignments(postprocessed_alignments)
-    # return aligned_spectrums
+    #rescored_peptides = get_rescored_peptides(peptides,sqllite_database)
+    # aligned_spectrums = aligned_spectrums(rescored_peptides)
+    print(matched_fragments[0])
     return None
 
 def create_aligned_peptides_with_target(experiment_parameters):

@@ -3,7 +3,7 @@ import time
 import os
 import sys
 import shutil
-import computational_pipeline
+import computational_pipeline.gen_spectra
 
 class Sqllite_Database:
     def __init__(self, max_len, reset=True):
@@ -45,12 +45,12 @@ class Sqllite_Database:
         rows = self.cursor.execute("SELECT * FROM kmers").fetchall()
         print(rows)
     
-    def query_mass_kmers(self, fragment_id, precursor_mass, mass, tolerance):
+    def query_mass_kmers(self, fragment_id, precursor_mass, mass, tolerance, number_decimal_places):
         upper_bound = mass + tolerance
         lower_bound = mass - tolerance
         self.cursor.execute("CREATE TABLE temp.mass AS SELECT ? as fragment_id, ? as precursor_mass, k.*, SUBSTR(p.sequence, k.location_start, k.location_end - k.location_start + 1) AS subsequence FROM kmers as k inner join proteins as p on k.protein = p.id where k.mass between ? and ? order by k.protein, k.location_start", (fragment_id, precursor_mass, lower_bound, upper_bound))
-        b_rows = self.cursor.execute("SELECT fragment_id, precursor_mass, protein as protein_id, mass,location_start,location_end,ion,charge,subsequence, 'N' FROM temp.mass where ion = 0 order by protein, location_start, location_end").fetchall()
-        y_rows = self.cursor.execute("SELECT fragment_id, precursor_mass, protein as protein_id, mass,location_start,location_end,ion,charge,subsequence, 'N' FROM temp.mass where ion = 1 order by protein, location_start, location_end").fetchall()
+        b_rows = self.cursor.execute("SELECT fragment_id, precursor_mass, protein as protein_id, ROUND(mass,?),location_start,location_end,ion,charge,subsequence, 'N' FROM temp.mass where ion = 0 order by protein, location_start, location_end",(number_decimal_places,)).fetchall()
+        y_rows = self.cursor.execute("SELECT fragment_id, precursor_mass, protein as protein_id, ROUND(mass,?),location_start,location_end,ion,charge,subsequence, 'N' FROM temp.mass where ion = 1 order by protein, location_start, location_end",(number_decimal_places,)).fetchall()
         self.cursor.execute("DROP TABLE temp.mass")
         return b_rows, y_rows
       
@@ -138,7 +138,7 @@ class Sqllite_Database:
             data_list.append(input_tuple)
         return data_list
     
-    def db_make_set_for_protein_digest(self,protein_id,protein,max_peptide_length, digest_left, digest_right):
+    def db_make_set_for_protein_digest(self,protein_id,protein,max_peptide_length, digest_left, digest_right,number_decimal_places):
         data = []
         seq_len = len(protein)
         count_max = 1000000
@@ -152,7 +152,8 @@ class Sqllite_Database:
                         data_list = self.get_kmers_for_protein(kmer, start, end, protein_id, 'b')
                         data.extend(data_list)
                         if len(data) > count_max:
-                            self.insert(data)
+                            rounded_data = round(data, number_decimal_places)
+                            self.insert(rounded_data)
                             data.clear()
                 if kmer[-1] in digest_right or digest_right == ['-'] or (end < seq_len and protein[end] in digest_left):
                     bad_chars = ['B', 'X', 'U', 'Z', 'O', 'J']
@@ -160,7 +161,8 @@ class Sqllite_Database:
                         data_list = self.get_kmers_for_protein(kmer, start, end, protein_id, 'y')
                         data.extend(data_list)
                         if len(data) > count_max:
-                            self.insert(data)
+                            rounded_data = round(data, number_decimal_places)
+                            self.insert(rounded_data)
                             data.clear()
         return data
     
@@ -178,7 +180,7 @@ class Sqllite_Database:
                 return True, last_percent
         return True, last_percent
 
-    def insert_prepped_kmers(self, kv_proteins, max_peptide_length, digest_left, digest_right):
+    def insert_prepped_kmers(self, kv_proteins, max_peptide_length, digest_left, digest_right,number_decimal_places):
         plen = len(kv_proteins)
         last_percent = 0
         all_data = []
@@ -186,7 +188,7 @@ class Sqllite_Database:
         for protein_id, (_, protein) in enumerate(kv_proteins):
             enough_space, last_percent = self.check_for_enough_disk_space(protein_id, plen, last_percent)
             if enough_space:
-                data = self.db_make_set_for_protein_digest(protein_id,protein,max_peptide_length, digest_left, digest_right)
+                data = self.db_make_set_for_protein_digest(protein_id,protein,max_peptide_length, digest_left, digest_right,number_decimal_places)
                 all_data.extend(data)
             else:
                 sys.exit(1)
@@ -204,9 +206,9 @@ class Sqllite_Database:
             protein_id = protein_id + 1
         self.insert_proteins(all_data)
 
-    def populate_database(self, kv_proteins, max_peptide_length, digest_left, digest_right):
+    def populate_database(self, kv_proteins, max_peptide_length, digest_left, digest_right, number_decimal_places):
         self.insert_prepped_proteins(kv_proteins)
-        self.insert_prepped_kmers(kv_proteins, max_peptide_length, digest_left, digest_right)
+        self.insert_prepped_kmers(kv_proteins, max_peptide_length, digest_left, digest_right,number_decimal_places)
         self.index_ion_mass_kmers()
         self.index_ion_mass_b_kmers()
         self.index_ion_mass_y_kmers()
