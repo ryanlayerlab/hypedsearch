@@ -616,7 +616,7 @@ def create_aligned_peptides(experiment_parameters):
     peptides = get_peptides(clusters,sqllite_database)
     #rescored_peptides = get_rescored_peptides(peptides,sqllite_database)
     # aligned_spectrums = aligned_spectrums(rescored_peptides)
-    print(matched_fragments[0])
+    print(peptides[0])
     return None
 
 def create_aligned_peptides_with_target(experiment_parameters):
