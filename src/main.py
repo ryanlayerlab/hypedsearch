@@ -19,6 +19,7 @@ def populate_arguments(args) -> dict:
     spectra_folder_path = args.spectra_folder_path if not use_params else config['spectra_folder_path']
     create_sqllite_database = args.create_sqllite_database if not use_params else config['create_sqllite_database']
     database_file_path = args.database_file_path if not use_params else config['database_file_path']
+    sqllite_database_path = args.sqllite_database_path if not use_params else config['sqllite_database_path']
     max_peptide_length = args.max_peptide_length if not use_params else config['max_peptide_length']
     ppm_tolerance = args.tolerance if not use_params else config['ppm_tolerance']
     precursor_tolerance = args.precursor_tolerance if not use_params else config['precursor_tolerance']
@@ -44,6 +45,7 @@ def populate_arguments(args) -> dict:
     return {
         'spectra_file_paths': spectra_file_paths,
         'create_sqllite_database': create_sqllite_database, 'database_file_path': database_file_path,
+        'sqllite_database_path': sqllite_database_path,
         'max_peptide_length': max_peptide_length,'ppm_tolerance': ppm_tolerance,
         'precursor_tolerance': precursor_tolerance,'number_peaks': number_peaks, 
         'relative_abundance': relative_abundance, 'digest_left': digest_left, 'digest_right': digest_right, 
@@ -71,13 +73,14 @@ if __name__ == '__main__':
     parser.add_argument('--spectra-file-paths', dest='spectra_file_paths', type=str, default='./', help='Path to folder containing spectra files.')
     parser.add_argument('--create_sqllite_database', dest='create_sqllite_database', type=lambda x:bool(distutils.util.strtobool(x)))
     parser.add_argument('--database-file-path', dest='database-file-path', type=str, default='./', help='protein database path')
+    parser.add_argument('--sqllite-database-path', dest='sqllite-database-path', type=str, default='./', help='sql lite database path')
     parser.add_argument('--max-peptide-length', dest='max_peptide_length', type=int, default=20, help='Maximum peptide length to consider. Default=20')
     parser.add_argument('--ppm-tolerance', dest='ppm_tolerance', type=int, default=20, help='ppm tolerance to allow in search. Deafult=20')
     parser.add_argument('--precursor-tolerance', dest='precursor_tolerance', type=float, default=1, help='ppm tolerance to accept when matching precursor masses. Default=10')
     parser.add_argument('--number-peaks', dest='number_peaks', type=int, default=0, help='The number of peaks to take from a spectrum. The most abundant peaks will be taken. Leave blank if you want no filter or to use relative abundance filter. Defualt=0')
     parser.add_argument('--relative-abundance', dest='relative_abundance', type=float, default=0.0, help='Take only peaks from a spectrum where the abundance of the peak is >= the percentage give. Leave blank if you want no filter or to use peak filter. Default=0.0')
     parser.add_argument('--digest-left', dest='digest_left', nargs='*', default=[''], type = str, help='The Amino Acid for which the digest cuts left of. Default=None')
-    parser.add_argument('- -digest-right', dest='digest_right', nargs='*', default=[''], type = str, help='The Amino Acid for which the digest cuts right of. Default=None')
+    parser.add_argument('--digest-right', dest='digest_right', nargs='*', default=[''], type = str, help='The Amino Acid for which the digest cuts right of. Default=None')
     parser.add_argument('--number-cores', dest='number_cores', type=int, default=1, help='The number of cores allowed to use when searching. Uses at least 1 and at most the number of available cores. Default=1')
     parser.add_argument('--number-hybrids', dest='number_hybrids', type=int, default=5, help='The number of hybrid alignments to keep per spectrum. Default=5')
     parser.add_argument('--number-natives', dest='number_natives', type=int, default=5, help='The number of native alignments to keep per spectrum. Default=5')
@@ -90,3 +93,5 @@ if __name__ == '__main__':
     parser.set_defaults(config=True)
     args = parser.parse_args()
     main(args)
+
+
