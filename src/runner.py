@@ -96,7 +96,7 @@ def get_precursors(spectra_file_path,number_peaks,number_decimal_places):
             adjusted_abundance = adjusted_abundances[fragment_id]
             rounded_abundance = round(adjusted_abundance, number_decimal_places)
             rounded_mz_value = round(adjusted_mass, number_decimal_places)
-            fragment = Fragment(id=fragment_id,precursor_id=precursor_id, precursor_mass=rounded_precursor_mass, mz_value=rounded_mz_value,abundance=rounded_abundance)       
+            fragment = Fragment(id=fragment_id,precursor_id=precursor_id, precursor_mass=rounded_precursor_mass, precursor_charge = precursor_charge, mz_value=rounded_mz_value,abundance=rounded_abundance)       
             fragments.append(fragment)
         precursor = Precursor(id=precursor_id,description=precursor_description,mass=rounded_precursor_mass,charge=precursor_charge,retention_time=retention_time,abundance=precursor_abundance,fragments=fragments)
         precursors.append(precursor)
