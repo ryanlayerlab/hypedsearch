@@ -3,10 +3,11 @@ import time
 import os
 import sys
 import shutil
+from lookups.constants import AMINO_ACIDS, SINGLY_CHARGED_B_BASE, SINGLY_CHARGED_Y_BASE, DOUBLY_CHARGED_B_BASE, DOUBLY_CHARGED_Y_BASE
 
 class Sqllite_Database:
-    def __init__(self, max_len, reset=True):
-        self.connection = sqlite3.connect("hypedsearch.db")
+    def __init__(self, path, max_len, reset=True):
+        self.connection = sqlite3.connect(path)
         self.cursor = self.connection.cursor()
         self.max_len = max_len
         self.query_protein_average = 0
@@ -127,11 +128,24 @@ class Sqllite_Database:
     def get_protein(self, pid):
         row = self.cursor.execute("SELECT * FROM proteins WHERE id = ?", (pid,)).fetchone()        
         return row       
-    
+
+    def get_max_mass(self, sequence, ion, charge):
+        if ion == 'y':
+            total = SINGLY_CHARGED_Y_BASE if charge == 1 else DOUBLY_CHARGED_Y_BASE
+            total += sum([AMINO_ACIDS[aa] for aa in sequence])
+            mz = total / charge
+            return mz
+        else:
+            total = SINGLY_CHARGED_B_BASE if charge == 1 else DOUBLY_CHARGED_B_BASE
+            total += sum([AMINO_ACIDS[aa] for aa in sequence])
+        mz = total / charge
+        return mz
+
+
     def get_kmers_for_protein(self, kmer, start, end, protein_id, ion):
         data_list = []
         for charge in [1,2]:
-            mass = computational_pipeline.gen_spectra.get_max_mass(kmer, ion=ion, charge=charge)
+            mass = self.get_max_mass(kmer, ion=ion, charge=charge)
             ion_int = 0 if ion == 'b' else 1
             input_tuple = (mass, start, end, ion_int, charge, protein_id)
             data_list.append(input_tuple)
