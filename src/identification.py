@@ -18,9 +18,10 @@ def ppm_to_da(mass, ppm_tolerance):
 def get_matched_fragment(fragment, sqllite_database, ppm_tolerance, number_decimal_places):
     fragment_id = fragment.id
     precursor_mass = fragment.precursor_mass
+    precursor_charge = fragment.precursor_charge
     mz_value = fragment.mz_value
     adjusted_tolerance =  ppm_to_da(mz_value, ppm_tolerance) 
-    b_rows, y_rows = sqllite_database.query_mass_kmers(fragment_id, precursor_mass, mz_value, adjusted_tolerance, number_decimal_places)
+    b_rows, y_rows = sqllite_database.query_mass_kmers(fragment_id, precursor_mass, precursor_charge ,mz_value, adjusted_tolerance, number_decimal_places)
     b_kmers = [KMer(*row) for row in b_rows]
     y_kmers = [KMer(*row) for row in y_rows]
     matched_fragment = MatchedFragment(fragment=fragment, b_kmers=b_kmers, y_kmers=y_kmers)
@@ -65,6 +66,7 @@ def get_synthetic_b_kmer(matched_precursor, kmer, protein_sequence):
             new_kmer = KMer(
                 fragment_id = kmer.fragment_id,
                 precursor_mass = kmer.precursor_mass,
+                precursor_charge = kmer.precursor_charge,
                 protein_id=kmer.protein_id,
                 kmer_mass=new_mass,
                 location_start=kmer_start,
@@ -108,6 +110,7 @@ def get_synthetic_y_kmer(matched_precursor, kmer, protein_sequence):
             new_kmer = KMer(
                 fragment_id = kmer.fragment_id,
                 precursor_mass = kmer.precursor_mass,
+                precursor_charge = kmer.precursor_charge,
                 protein_id=kmer.protein_id,
                 kmer_mass=new_mass,
                 location_start=kmer_start,
@@ -243,12 +246,12 @@ def get_peptide(target_cluster, complimentary_clusters,sqllite_database):
     if target_cluster.cluster_type == 'b':
         y_cluster = get_best_cluster_match(target_cluster, complimentary_clusters)
         peptide_type = get_peptide_type(target_cluster,y_cluster,sqllite_database)
-        peptide = Peptide(peptide_type = peptide_type, b_cluster = target_cluster, y_cluster=y_cluster)
+        peptide = Peptide(peptide_type = peptide_type, b_clusters = [target_cluster], y_clusters=[y_cluster])
         return peptide
     else:
         b_cluster = get_best_cluster_match(target_cluster, complimentary_clusters)
         peptide_type = get_peptide_type(b_cluster,target_cluster,sqllite_database)
-        peptide = Peptide(peptide_type = peptide_type, b_cluster = b_cluster, y_cluster=target_cluster)
+        peptide = Peptide(peptide_type = peptide_type, b_clusters = [b_cluster], y_clusters=[target_cluster])
         return peptide
 
 def get_peptides(clusters,sqllite_database):
@@ -273,8 +276,34 @@ def get_rescored_peptides(peptides,sqllite_database):
         rescored_peptides.append(rescored_peptide)
     return rescored_peptides
 
-def aligned_spectrums(rescored_peptides):
-    return None
+def get_aligned_peptide(rescored_peptide):
+    if rescored_peptide is None:
+        return None
+    else:
+        peptide_type = 'hybrid'
+        b_clusters = rescored_peptide.b_clusters if rescored_peptide.b_clusters is not None else []
+        y_clusters = rescored_peptide.y_clusters if rescored_peptide.y_clusters is not None else []
+        b_scores = [len(cluster) for cluster in b_clusters]
+        y_scores = [len(cluster) for cluster in y_clusters]
+        kmer = rescored_peptide.b_clusters[0].longest_kmer
+        total_score = sum(b_scores) + sum(y_scores)
+        total_gaussian_score = total_score
+        left_proteins = ["Protein1"]
+        right_proteins = ["Protein2"]
+        sequence = "PEPTIDESEQ"
+        extensions = []
+        precursor_mass = kmer.precursor_mass  
+        precursor_charge = kmer.precursor_charge
+        total_mass_error = 0.0 
+        total_count = len(rescored_peptide.b_clusters) + len(rescored_peptide.y_clusters)    
+        return None
+
+def construct_aligned_peptides(rescored_peptides):
+    aligned_peptides = []
+    for rescored_peptide in rescored_peptides:
+        aligned_spectrum = get_aligned_peptide(rescored_peptide)
+        aligned_peptides.append(aligned_spectrum)
+    return aligned_peptides
 
 def create_aligned_peptides(experiment_parameters):
     precursors = experiment_parameters.precursors
@@ -287,10 +316,9 @@ def create_aligned_peptides(experiment_parameters):
     matched_proteins = get_matched_proteins(matched_fragments,sqllite_database)
     clusters = get_clusters(matched_proteins)
     peptides = get_peptides(clusters,sqllite_database)
-    #rescored_peptides = get_rescored_peptides(peptides,sqllite_database)
-    # aligned_spectrums = aligned_spectrums(rescored_peptides)
-    print(peptides[0])
-    return None
+    rescored_peptides = get_rescored_peptides(peptides,sqllite_database)
+    aligned_peptides = construct_aligned_peptides(rescored_peptides)
+    return aligned_peptides
 
 def create_aligned_peptides_with_target(experiment_parameters):
     return None
