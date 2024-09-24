@@ -3,7 +3,6 @@ import time
 import os
 import sys
 import shutil
-import computational_pipeline.gen_spectra
 
 class Sqllite_Database:
     def __init__(self, max_len, reset=True):
