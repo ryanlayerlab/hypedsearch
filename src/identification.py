@@ -206,9 +206,10 @@ def create_aligned_peptides(experiment_parameters):
     matched_proteins = get_matched_proteins(matched_fragments,sqllite_database)
     clusters = get_clusters(matched_proteins)
     extended_clusters = get_extended_clusters(clusters)
+    native_peptides = get_native_peptides(clusters)
+    hybrid_peptides = get_hybrid_peptides(cluster)
     print(extended_clusters[0])
     return None
-    # peptides = get_peptides(clusters,sqllite_database)
     # rescored_peptides = get_rescored_peptides(peptides,sqllite_database)
     # aligned_peptides = construct_aligned_peptides(rescored_peptides)
     # return aligned_peptides
