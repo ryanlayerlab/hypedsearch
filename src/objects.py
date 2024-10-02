@@ -10,7 +10,5 @@ Protein = namedtuple('Protein', ['id','description','sequence'])
 MatchedProtein = namedtuple('MatchedProtein',['protein','kmers'])
 Cluster = namedtuple('Cluster', ['protein', 'ion', 'longest_kmer', 'score'])
 ExtendedCluster = namedtuple('ExtendedCluster',['cluster','extended_sequence'])
-Peptide = namedtuple('Peptide', ['peptide_type', 'b_cluster','y_cluster', 'score'])
-AlignedPeptides = namedtuple('AlignedPeptides',['hybrid','left_proteins','right_proteins','sequence','b_scores','y_scores','total_score','total_gaussian_score','extensions','precursor_mass','precursor_charge','total_mass_error','total_count'])
-
-
+Peptide = namedtuple('Peptide', ['peptide_type', 'b_extended_cluster','y_extended_cluster', 'score'])
+AlignedPeptide = namedtuple('AlignedPeptide',['hybrid','left_protein','right_protein','sequence','b_score','y_score','total_score','total_gaussian_score','extensions','precursor_mass','precursor_charge','total_mass_error','total_count'])
