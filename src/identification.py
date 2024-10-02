@@ -1,8 +1,9 @@
-from objects import ExperimentParameters, Precursor, KMer, MatchedFragment, Protein, MatchedProtein, Cluster, Peptide, ExtendedCluster
+from objects import ExperimentParameters, Precursor, KMer, MatchedFragment, Protein, MatchedProtein, Cluster, Peptide, ExtendedCluster, AlignedPeptide
 from lookups.constants import AMINO_ACIDS
 from itertools import groupby
 from operator import itemgetter
 from collections import defaultdict
+from operator import attrgetter
 
 def get_filtered_fragments(precursors, ppm_tolerance):
     filtered_fragments = []
@@ -59,12 +60,22 @@ def get_clusters(matched_proteins):
     clusters = []
     for matched_protein in matched_proteins:
         protein = matched_protein.protein
-        kmers = matched_protein.kmers
-        longest_kmer = max(kmers, key=lambda k: k.location_end - k.location_start)
-        ion_of_longest = longest_kmer.ion
-        score = sum(1 for kmer in kmers if kmer.ion == ion_of_longest)
-        cluster = Cluster(protein=protein, ion=ion_of_longest, longest_kmer=longest_kmer, score=score)
-        clusters.append(cluster)    
+
+        b_kmers = [k for k in matched_protein.kmers if k.ion == 'b']
+        y_kmers = [k for k in matched_protein.kmers if k.ion == 'y']
+
+        for key, group in groupby(sorted(b_kmers, key=attrgetter('location_start')), key=attrgetter('location_start')):
+            kmers_in_group = list(group)
+            longest_kmer = max(kmers_in_group, key=lambda kmer: len(kmer.subsequence))
+            score = len(kmers_in_group)
+            clusters.append(Cluster(protein=matched_protein.protein, ion='b', longest_kmer=longest_kmer, score=score))
+
+        for key, group in groupby(sorted(y_kmers, key=attrgetter('location_end')), key=attrgetter('location_end')):
+            kmers_in_group = list(group)
+            longest_kmer = max(kmers_in_group, key=lambda kmer: len(kmer.subsequence))
+            score = len(kmers_in_group)
+            clusters.append(Cluster(protein=matched_protein.protein, ion='y', longest_kmer=longest_kmer, score=score))
+   
     return clusters
 
 def get_extended_clusters(clusters):
@@ -108,20 +119,20 @@ def get_extended_clusters(clusters):
 
     return extended_clusters
 
-def get_best_cluster_match(target_cluster, complimentary_clusters):
-    target_precursor_maas = target_cluster.longest_kmer.precursor_mass
-    target_weight = target_cluster.longest_kmer.kmer_mass
-    best_cluster = None
+def get_best_extended_cluster_match(target_extended_cluster, complimentary_extended_clusters):
+    target_precursor_mass = target_extended_cluster.cluster.longest_kmer.precursor_mass
+    target_weight = target_extended_cluster.cluster.longest_kmer.kmer_mass
+    best_extended_cluster = None
     max_peptide_weight = 0
 
-    for cluster in complimentary_clusters:
+    for complimentary_extended_cluster in complimentary_extended_clusters:
+        cluster = complimentary_extended_cluster.cluster
         compliment_weight = cluster.longest_kmer.kmer_mass
         peptide_weight = target_weight + compliment_weight
-        if peptide_weight <= target_precursor_maas and peptide_weight > max_peptide_weight:
-            best_cluster = cluster
+        if peptide_weight <= target_precursor_mass and peptide_weight > max_peptide_weight:
+            best_extended_cluster = complimentary_extended_cluster
             max_peptide_weight = peptide_weight
-
-    return best_cluster
+    return best_extended_cluster
 
 def get_peptide_type(b_cluster,y_cluster, sqllite_database):
     if b_cluster is None or y_cluster is None:
@@ -131,72 +142,73 @@ def get_peptide_type(b_cluster,y_cluster, sqllite_database):
     else:
         return 'n'
 
-def get_peptide(target_cluster, complimentary_clusters,sqllite_database):    
-    if target_cluster.cluster_type == 'b':
-        y_cluster = get_best_cluster_match(target_cluster, complimentary_clusters)
-        peptide_type = get_peptide_type(target_cluster,y_cluster,sqllite_database)
-        peptide = Peptide(peptide_type = peptide_type, b_cluster = target_cluster, y_cluster=y_cluster)
-        return peptide
-    else:
-        b_cluster = get_best_cluster_match(target_cluster, complimentary_clusters)
-        peptide_type = get_peptide_type(b_cluster,target_cluster,sqllite_database)
-        peptide = Peptide(peptide_type = peptide_type, b_cluster = b_cluster, y_cluster=target_cluster)
-        return peptide
+def get_kmer_overlap(b_seq, y_seq):
+    min_len = min(len(b_seq), len(y_seq))
+    overlap = 0
+    
+    for i in range(1, min_len + 1):
+        if b_seq[-i:] == y_seq[:i]:
+            overlap = i
+    return overlap
 
-def get_peptides(clusters,sqllite_database):
+def get_peptide_score(b_cluster, y_cluster, protein_length):
+    combined_sequence_length = len(b_cluster.longest_kmer) + len(y_cluster.longest_kmer)
+    return combined_sequence_length / protein_length
+
+def get_peptide(target_extended_cluster, complimentary_extended_clusters,sqllite_database):    
+    target_cluster = target_extended_cluster.cluster
+    protein_length = len(target_cluster.protein.sequence)
+    if target_cluster.ion == 'b':
+        y_cluster = get_best_extended_cluster_match(target_extended_cluster, complimentary_extended_clusters)
+        if y_cluster is not None:
+            peptide_type = get_peptide_type(target_cluster,y_cluster,sqllite_database)
+            score = get_peptide_score(target_cluster, y_cluster, protein_length)
+            peptide = Peptide(peptide_type = peptide_type, b_extended_cluster = target_extended_cluster, y_extended_cluster=y_cluster, score=score)
+            return peptide
+    else:
+        b_cluster = get_best_extended_cluster_match(target_extended_cluster, complimentary_extended_clusters)
+        if b_cluster is not None:
+            peptide_type = get_peptide_type(b_cluster,target_cluster,sqllite_database)
+            score = get_peptide_score(b_cluster, target_cluster, protein_length)
+            peptide = Peptide(peptide_type = peptide_type, b_extended_cluster = b_cluster, y_extended_cluster=target_extended_cluster, score=score)
+            return peptide
+
+def get_peptides(extended_clusters,sqllite_database):
     peptides = []
-    b_clusters = [cluster for cluster in clusters if cluster.cluster_type == 'b']
-    y_clusters = [cluster for cluster in clusters if cluster.cluster_type == 'y']
-    for b_cluster in b_clusters:
-        peptide = get_peptide(b_cluster, y_clusters,sqllite_database)
+    b_extended_clusters = [extended_cluster for extended_cluster in extended_clusters if extended_cluster.cluster.ion == 'b']
+    y_extended_clusters = [extended_cluster for extended_cluster in extended_clusters if extended_cluster.cluster.ion == 'y']
+    for b_extended_cluster in b_extended_clusters:
+        peptide = get_peptide(b_extended_cluster, y_extended_clusters,sqllite_database)
         peptides.append(peptide)
-    for y_cluster in y_clusters:
-        peptide = get_peptide(y_cluster,b_clusters,sqllite_database)
+    for y_extended_cluster in y_extended_clusters:
+        peptide = get_peptide(y_extended_cluster,b_extended_clusters,sqllite_database)
         peptides.append(peptide)
     return peptides        
 
-#https://github.com/ryanlayerlab/hypedsearch/blob/48f4818c9e0b21283781c369311e63eb1e65c994/src/scoring/scoring.py#L61
-def get_rescored_peptide(peptide,sqllite_database):
+def get_aligned_peptide(peptide):
+    if peptide is not None:
+        b_extended_cluster = peptide.b_extended_cluster
+        y_extended_cluster = peptide.y_extended_cluster
+        b_cluster = b_extended_cluster.cluster
+        y_cluster = y_extended_cluster.cluster
 
-    return None
+        hybrid = peptide.peptide_type
+        left_protein = b_cluster.protein.id
+        right_protein = y_cluster.protein.id
+        sequence = b_cluster.longest_kmer + b_extended_cluster.extended_sequence + y_extended_cluster.extended_sequence + y_cluster.longest_kmer
+        b_score = b_cluster.score
+        y_score = y_cluster.score
+        total_score = b_score + y_score
+        total_gaussian_score = peptide.score
+        extensions = [b_extended_cluster.extended_sequence, y_extended_cluster.extended_sequence]
+        precursor_mass = b_cluster.longest_kmer.precursor_mass
+        precursor_charge = b_cluster.longest_kmer.precursor_charge
+        total_mass_error = 0
+        total_count = 0
+        aligned_peptide =  AlignedPeptide(hybrid=hybrid,left_protein=left_protein,right_protein=right_protein,sequence=sequence,b_score=b_score,y_score=y_score,total_score=total_score,total_gaussian_score=total_gaussian_score,extensions=extensions,precursor_mass=precursor_mass,precursor_charge=precursor_charge,total_mass_error=total_mass_error,total_count=total_count)
+        return aligned_peptide
 
-def get_rescored_peptides(peptides,sqllite_database):
-    rescored_peptides = []
-    for peptide in peptides:
-        rescored_peptide = get_rescored_peptide(peptide,sqllite_database)
-        rescored_peptides.append(rescored_peptide)
-    return rescored_peptides
-
-def get_aligned_peptide(rescored_peptide):
-    if rescored_peptide is None:
-        return None
-    else:
-        peptide_type = 'hybrid'
-        b_clusters = rescored_peptide.b_clusters if rescored_peptide.b_clusters is not None else []
-        y_clusters = rescored_peptide.y_clusters if rescored_peptide.y_clusters is not None else []
-        b_scores = [len(cluster) for cluster in b_clusters]
-        y_scores = [len(cluster) for cluster in y_clusters]
-        kmer = rescored_peptide.b_clusters[0].longest_kmer
-        total_score = sum(b_scores) + sum(y_scores)
-        total_gaussian_score = total_score
-        left_proteins = ["Protein1"]
-        right_proteins = ["Protein2"]
-        sequence = "PEPTIDESEQ"
-        extensions = []
-        precursor_mass = kmer.precursor_mass  
-        precursor_charge = kmer.precursor_charge
-        total_mass_error = 0.0 
-        total_count = len(rescored_peptide.b_clusters) + len(rescored_peptide.y_clusters)    
-        return None
-
-def construct_aligned_peptides(rescored_peptides):
-    aligned_peptides = []
-    for rescored_peptide in rescored_peptides:
-        aligned_spectrum = get_aligned_peptide(rescored_peptide)
-        aligned_peptides.append(aligned_spectrum)
-    return aligned_peptides
-
-def create_aligned_peptides(experiment_parameters):
+def get_aligned_peptides(experiment_parameters):
     precursors = experiment_parameters.precursors
     ppm_tolerance = experiment_parameters.ppm_tolerance    
     filtered_fragments = get_filtered_fragments(precursors, ppm_tolerance)
@@ -206,22 +218,9 @@ def create_aligned_peptides(experiment_parameters):
     matched_proteins = get_matched_proteins(matched_fragments,sqllite_database)
     clusters = get_clusters(matched_proteins)
     extended_clusters = get_extended_clusters(clusters)
-    native_peptides = get_native_peptides(clusters)
-    hybrid_peptides = get_hybrid_peptides(cluster)
-    print(extended_clusters[0])
-    return None
-    # rescored_peptides = get_rescored_peptides(peptides,sqllite_database)
-    # aligned_peptides = construct_aligned_peptides(rescored_peptides)
-    # return aligned_peptides
-
-def create_aligned_peptides_with_target(experiment_parameters):
-    return None
-
-def get_aligned_peptides(experiment_parameters):
-    target_seq = experiment_parameters.target_seq
-    if len(target_seq) > 0:
-        aligned_peptides = create_aligned_peptides_with_target(experiment_parameters)
-        return aligned_peptides
-    else:
-        aligned_peptides = create_aligned_peptides(experiment_parameters)
-        return aligned_peptides
+    peptides = get_peptides(extended_clusters,sqllite_database)
+    aligned_peptides = []
+    for peptide in peptides:
+        aligned_peptide = get_aligned_peptide(peptide)
+        aligned_peptides.append(aligned_peptide)
+    return aligned_peptides
