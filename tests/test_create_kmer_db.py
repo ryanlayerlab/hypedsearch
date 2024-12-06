@@ -4,7 +4,7 @@ import pytest
 from click.testing import CliRunner
 
 from src.create_kmer_db import create_kmer_mass_db, main
-from src.erik_constants import TEST_DIR
+from src.erik_constants import MASS, SEQ, TEST_DIR
 from src.erik_utils import Protein
 
 
@@ -68,7 +68,7 @@ class TestCreateKmerMassDb:
         # Assert
         connection = sqlite3.connect(db_file, timeout=10)
         cursor = connection.cursor()
-        cursor.execute(f"SELECT * FROM {table_name}")
+        cursor.execute(f"SELECT {SEQ}, {MASS} FROM {table_name}")
         actual = cursor.fetchall()
         assert len(actual) == len(expected)
         for kmer in expected:

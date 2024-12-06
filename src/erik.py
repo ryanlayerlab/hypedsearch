@@ -3,7 +3,7 @@ import sqlite3
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Literal, Optional, Tuple, Union
+from typing import Dict, Generator, Literal, Optional, Tuple, Union
 
 from matplotlib import pyplot as plt
 from pydantic import BaseModel, Field, model_validator
@@ -258,10 +258,7 @@ def generate_kmers_with_masses(
     max_kmer_len: int = MAX_PEPTIDE_LEN,
     amino_acid_mass_lookup: Dict[str, float] = AMINO_ACID_MASSES,
     charge: int = 1,
-) -> Generator[Kmer]:
-    """
-    Assumes charge=1 in the the kmer theoretical mass computation
-    """
+) -> Generator[Kmer, None, None]:
     kmers = generate_kmers(peptide=peptide, max_k=max_kmer_len)
     for kmer in kmers:
         yield Kmer(

@@ -2,12 +2,12 @@ import logging
 import sqlite3
 import time
 from dataclasses import asdict
-from typing import Dict, Iterator
+from typing import Dict, Iterator, List
 
 import click
 
 from src.erik import generate_kmers_with_masses
-from src.erik_constants import LOGS_DIR, MASS, MAX_PEPTIDE_LEN, SEQ
+from src.erik_constants import CHARGE, LOGS_DIR, MASS, MAX_PEPTIDE_LEN, SEQ
 from src.erik_utils import Protein, get_proteins_from_fasta, log_params, setup_logger
 from src.lookups.constants import AMINO_ACID_MASSES
 
@@ -21,6 +21,7 @@ def create_kmer_mass_db(
     table_name: str = "kmers",
     amino_acid_mass_lookup: Dict[str, float] = AMINO_ACID_MASSES,
     max_peptide_len: float = MAX_PEPTIDE_LEN,
+    charges: List[int] = [1],
 ) -> None:
 
     # Create DB
@@ -32,7 +33,8 @@ def create_kmer_mass_db(
         f"""
         CREATE TABLE {table_name} (
             {SEQ} TEXT PRIMARY KEY,
-            {MASS} REAL
+            {MASS} REAL,
+            {CHARGE} INTEGER 
         )
         """
     )
@@ -48,16 +50,28 @@ def create_kmer_mass_db(
             max_kmer_len=max_peptide_len,
             amino_acid_mass_lookup=amino_acid_mass_lookup,
         )
+        # Incorporate charge
+        kmers = [
+            (kmer.seq, kmer.mass * charge, charge)
+            for kmer in kmers
+            for charge in charges
+        ]
         _ = cursor.executemany(
-            f"INSERT OR IGNORE INTO {table_name} VALUES(:seq, :mass)",
-            [asdict(kmer) for kmer in list(kmers)],
+            f"INSERT OR IGNORE INTO {table_name} VALUES(?, ?, ?)",
+            kmers,
         )
         _ = connection.commit()
 
     connection.close()
 
 
-@click.command(help="hello!", context_settings=dict(help_option_names=["-h", "--help"]))
+@click.command(
+    help="""
+    This script creates a database with a table with colums:\n
+    <kmer seq>, <kmer mass>, <charge>\n
+    """,
+    context_settings=dict(help_option_names=["-h", "--help"]),
+)
 @click.option("--fasta_path", "-f", type=str, required=True, help="Path to FASTA file")
 @click.option(
     "--db_file",
@@ -68,10 +82,19 @@ def create_kmer_mass_db(
 )
 @click.option(
     "--max_kmer_len",
-    help="Maximum kmer length to add to database",
+    "-k",
+    help=f"Maximum kmer length to add to database. Defaults to {MAX_PEPTIDE_LEN}",
     type=int,
     required=False,
     default=MAX_PEPTIDE_LEN,
+)
+@click.option(
+    "--charges",
+    "-c",
+    type=int,
+    multiple=True,
+    required=False,
+    help="A list of integer charges, e.g., --charges 1 2 3. Defaults to [1]",
 )
 @log_params
 def main(
@@ -80,6 +103,7 @@ def main(
     table_name: str = "kmers",
     amino_acid_mass_lookup: Dict[str, float] = AMINO_ACID_MASSES,
     max_kmer_len: float = MAX_PEPTIDE_LEN,
+    charges: List[int] = [1],
 ) -> None:
     try:
         logger.info(f"Getting proteins...")
@@ -91,6 +115,7 @@ def main(
             table_name=table_name,
             amino_acid_mass_lookup=amino_acid_mass_lookup,
             max_peptide_len=max_kmer_len,
+            charges=charges,
         )
         logger.info("Finshed creating db. Exiting")
     except:
