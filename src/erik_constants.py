@@ -15,7 +15,7 @@ HS_DIR = DATA_DIR / "hs"
 SPECTRA_DIR = DATA_DIR / "spectra"
 COMET_EXECUTABLE = GIT_REPO_DIR / f"comet/comet.macos.exe"
 COMET_PARAMS = GIT_REPO_DIR / f"comet/comet.params"
-MOUSE_PROTEOME = GIT_REPO_DIR / "comet/Uniprot_mouse.fasta"
+MOUSE_PROTEOME = GIT_REPO_DIR / "fastas/Uniprot_mouse.fasta"
 
 ## Strings
 MASS = "mass"
