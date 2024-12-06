@@ -4,13 +4,13 @@ import pytest
 from click.testing import CliRunner
 
 from src.create_kmer_db import create_kmer_mass_db, main
-from src.erik_constants import MASS, SEQ, TEST_DIR
+from src.erik_constants import CHARGE, MASS, SEQ, TEST_DIR
 from src.erik_utils import Protein
 
 
 class TestCreateKmerMassDb:
     @staticmethod
-    def test_basic_test(tmp_path):
+    def test_one_charge(tmp_path):
         # Arrange
         db_file = tmp_path / "kmers.db"
         table_name = "test"
@@ -69,6 +69,42 @@ class TestCreateKmerMassDb:
         connection = sqlite3.connect(db_file, timeout=10)
         cursor = connection.cursor()
         cursor.execute(f"SELECT {SEQ}, {MASS} FROM {table_name}")
+        actual = cursor.fetchall()
+        assert len(actual) == len(expected)
+        for kmer in expected:
+            assert kmer in actual
+
+    @staticmethod
+    def test_two_charges(tmp_path):
+        # Arrange
+        db_file = tmp_path / "kmers.db"
+        table_name = "test"
+        charges = [1, 2]
+        aa_masses = {
+            "A": 1,
+        }
+        proteins = [
+            Protein(
+                seq="A",
+                desc="",
+            )
+        ]
+        expected = [("A", 1, 1), ("A", 2, 2)]
+
+        # Act
+        create_kmer_mass_db(
+            proteins=proteins,
+            db_file=db_file,
+            table_name=table_name,
+            amino_acid_mass_lookup=aa_masses,
+            max_peptide_len=3,
+            charges=charges,
+        )
+
+        # Assert
+        connection = sqlite3.connect(db_file, timeout=10)
+        cursor = connection.cursor()
+        cursor.execute(f"SELECT {SEQ}, {MASS}, {CHARGE} FROM {table_name}")
         actual = cursor.fetchall()
         assert len(actual) == len(expected)
         for kmer in expected:

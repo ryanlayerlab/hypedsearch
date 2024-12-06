@@ -32,9 +32,11 @@ def create_kmer_mass_db(
     _ = cursor.execute(
         f"""
         CREATE TABLE {table_name} (
-            {SEQ} TEXT PRIMARY KEY,
+            id INTEGER PRIMARY KEY,
+            {SEQ} TEXT,
             {MASS} REAL,
-            {CHARGE} INTEGER 
+            {CHARGE} INTEGER,
+            UNIQUE({SEQ}, {CHARGE})
         )
         """
     )
@@ -57,7 +59,7 @@ def create_kmer_mass_db(
             for charge in charges
         ]
         _ = cursor.executemany(
-            f"INSERT OR IGNORE INTO {table_name} VALUES(?, ?, ?)",
+            f"INSERT OR IGNORE INTO {table_name} ({SEQ}, {MASS}, {CHARGE})VALUES(?, ?, ?)",
             kmers,
         )
         _ = connection.commit()
