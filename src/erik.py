@@ -302,6 +302,8 @@ def get_indices_of_largest_elements(array: List[float], top_n: int):
 def mass_difference_in_ppm(ref_mass: float, query_mass: float) -> float:
     return (abs(ref_mass - query_mass) / ref_mass) * (10**6)
 
+def relative_ppm_tolerance_in_daltons(ppm: float, ref_mass: float) -> float:
+    return (ppm * ref_mass) / (10**6)
 
 # def
 
