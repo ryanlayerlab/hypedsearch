@@ -146,3 +146,6 @@ data
 .fasta
 .mzML
 comet
+
+# Slurm log files
+slurm/logs
