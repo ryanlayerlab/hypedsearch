@@ -64,6 +64,10 @@ def create_kmer_mass_db(
         )
         _ = connection.commit()
 
+    # Create an index on the mass column
+    cursor.execute(f"CREATE INDEX IF NOT EXISTS {MASS}_idx ON {table_name}({MASS});")
+    connection.commit()
+
     connection.close()
 
 

@@ -91,15 +91,59 @@ class Sqllite_Database:
         upper_bound = mass + tolerance
         lower_bound = mass - tolerance
         self.cursor.execute(
-            "CREATE TABLE temp.mass AS SELECT ? as fragment_id, ? as precursor_mass, ? as precursor_charge, k.*, SUBSTR(p.sequence, k.location_start, k.location_end - k.location_start + 1) AS subsequence FROM kmers as k inner join proteins as p on k.protein = p.id where k.mass between ? and ? order by k.protein, k.location_start",
+            """
+            CREATE TABLE temp.mass AS
+            SELECT
+                ? AS fragment_id, 
+                ? AS precursor_mass, 
+                ? AS precursor_charge, 
+                k.*,
+                SUBSTR(p.sequence, k.location_start, k.location_end - k.location_start + 1) AS subsequence
+            FROM kmers AS k
+            INNER JOIN proteins AS p ON k.protein = p.id
+            WHERE k.mass BETWEEN ? AND ?
+            ORDER BY k.protein, k.location_start;
+            """,
             (fragment_id, precursor_mass, precursor_charge, lower_bound, upper_bound),
         )
         b_rows = self.cursor.execute(
-            "SELECT fragment_id, precursor_mass, precursor_charge, protein as protein_id, ROUND(mass,?),location_start,location_end,ion,charge,subsequence, 'N' FROM temp.mass where ion = 0 order by protein, location_start, location_end",
+            """
+            SELECT 
+                fragment_id, 
+                precursor_mass, 
+                precursor_charge, 
+                protein as protein_id, 
+                ROUND(mass, ?),
+                location_start, 
+                location_end, 
+                ion, 
+                charge, 
+                subsequence, 
+                'N' 
+            FROM temp.mass 
+            WHERE ion = 0 
+            ORDER BY protein, location_start, location_end;   
+            """,
             (number_decimal_places,),
         ).fetchall()
         y_rows = self.cursor.execute(
-            "SELECT fragment_id, precursor_mass, precursor_charge, protein as protein_id, ROUND(mass,?),location_start,location_end,ion,charge,subsequence, 'N' FROM temp.mass where ion = 1 order by protein, location_start, location_end",
+            """
+            SELECT 
+                fragment_id, 
+                precursor_mass, 
+                precursor_charge, 
+                protein as protein_id, 
+                ROUND(mass, ?),
+                location_start, 
+                location_end, 
+                ion, 
+                charge, 
+                subsequence, 
+                'N' 
+            FROM temp.mass 
+            WHERE ion = 1
+            ORDER BY protein, location_start, location_end;   
+            """,
             (number_decimal_places,),
         ).fetchall()
         self.cursor.execute("DROP TABLE temp.mass")
