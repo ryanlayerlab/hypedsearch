@@ -3,16 +3,16 @@ import sqlite3
 import pytest
 from click.testing import CliRunner
 
-from src.create_kmer_db import create_kmer_mass_db, main
+from create_kmer_db import create_kmer_mass_db, main
 from src.erik_constants import CHARGE, MASS, SEQ, TEST_DIR
-from src.erik_utils import Protein
+from src.lookups.data_classes import Protein
 
 
 class TestCreateKmerMassDb:
     @staticmethod
     def test_one_charge(tmp_path):
         # Arrange
-        db_file = tmp_path / "kmers.db"
+        db_path = tmp_path / "kmers.db"
         table_name = "test"
         # not using "B" because it's not an amino acid symbol
         aa_masses = {
@@ -59,14 +59,14 @@ class TestCreateKmerMassDb:
         # Act
         create_kmer_mass_db(
             proteins=proteins,
-            db_file=db_file,
+            db_path=db_path,
             table_name=table_name,
             amino_acid_mass_lookup=aa_masses,
             max_peptide_len=3,
         )
 
         # Assert
-        connection = sqlite3.connect(db_file, timeout=10)
+        connection = sqlite3.connect(db_path, timeout=10)
         cursor = connection.cursor()
         cursor.execute(f"SELECT {SEQ}, {MASS} FROM {table_name}")
         actual = cursor.fetchall()
@@ -94,7 +94,7 @@ class TestCreateKmerMassDb:
         # Act
         create_kmer_mass_db(
             proteins=proteins,
-            db_file=db_file,
+            db_path=db_file,
             table_name=table_name,
             amino_acid_mass_lookup=aa_masses,
             max_peptide_len=3,

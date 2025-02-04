@@ -6,18 +6,42 @@ import numpy as np
 import pytest
 from pyteomics import mzml
 
-from src.erik import (
-    Peptide,
-    Spectrum,
+from src.erik import (  # Peptide,
     generate_kmers,
-    get_b_y_ions,
+    get_b_ion_sequences,
+    get_b_y_ion_sequences,
     get_data_for_spectrum,
     get_indices_of_largest_elements,
+    get_y_ion_sequences,
+    parse_mzml,
     parse_spectrum,
+    query_database,
 )
-from src.erik_constants import SPECTRA_DIR, TEST_DIR
-from src.erik_utils import Protein, get_proteins_from_fasta
-from src.lookups.sqlite_database import Sqllite_Database
+from src.erik_constants import (
+    CHARGE,
+    END,
+    ID,
+    ION,
+    KMER_TABLE,
+    MASS,
+    PROTEIN_ID,
+    PROTEIN_TABLE,
+    SEQ,
+    SPECTRA_DIR,
+    START,
+    TEST_DIR,
+    THOMAS_SAMPLES,
+)
+from src.fasta_utils import get_proteins_from_fasta
+from src.lookups.constants import (
+    DOUBLY_CHARGED_B_BASE,
+    DOUBLY_CHARGED_Y_BASE,
+    SINGLY_CHARGED_B_BASE,
+    SINGLY_CHARGED_Y_BASE,
+)
+from src.lookups.data_classes import Kmer, Peak, Protein, Spectrum
+from src.lookups.protein_kmer_db import ProteinKmerDb
+from tests.fixtures_and_helpers import create_fasta
 
 # from src.runner import (
 #     Spectrum,
@@ -71,12 +95,16 @@ from src.lookups.sqlite_database import Sqllite_Database
 #             print(f"Took {t1-t0:.2f} seconds")
 
 
-def test_parse_spectrum():
-    spectrum = {
-        "id": "scan=1",
+def create_spectrum(
+    scan_num: int,
+    mz_array: List[float] = [1, 2, 3],
+    intensity_array: List[float] = [4, 5, 6],
+):
+    return {
+        "id": f"scan={scan_num}",
         "scanList": {"scan": [{"scan start time": 600}]},
-        "m/z array": [1, 2, 3],
-        "intensity array": [4, 5, 6],
+        "m/z array": mz_array,
+        "intensity array": intensity_array,
         "precursorList": {
             "precursor": [
                 {
@@ -93,47 +121,29 @@ def test_parse_spectrum():
             ]
         },
     }
-    expected = Spectrum(
-        mass_over_charges=(1, 2, 3),
-        abundances=(4, 5, 6),
-        precursor_mass=100,
-        precursor_charge=2,
-        precursor_abundance=200,
-        spectrum_id="scan=1",
-        retention_time=600,
-    )
-    actual = parse_spectrum(spectrum)
-    assert actual == expected
 
 
-def test_get_data_for_sepctrum():
-    sample = "BMEM_AspN_Fxn4"
-    scan_num = 2
-
-    get_data_for_spectrum(sample=sample, scan_num=2)
-
-
-class TestGetBYIons:
+class TestParseSpectrum:
     @staticmethod
-    def test_basic():
-        peptide = "ABCD"
-        expected = ["A", "AB", "ABC", "ABCD", "BCD", "CD", "D"]
-        actual = get_b_y_ions(peptide=peptide)
+    def test_parse_spectrum():
+        spectrum = create_spectrum(scan_num=1)
+        expected = Spectrum(
+            # mass_over_charges=(1, 2, 3),
+            # abundances=(4, 5, 6),
+            peaks=[
+                Peak(mz=1, abundance=4),
+                Peak(mz=2, abundance=5),
+                Peak(mz=3, abundance=6),
+            ],
+            precursor_mz=100,
+            precursor_charge=2,
+            precursor_abundance=200,
+            spectrum_id="scan=1",
+            retention_time=600,
+            scan_num=1,
+        )
+        actual = parse_spectrum(spectrum)
         assert actual == expected
-
-
-class TestPeptide:
-
-    @staticmethod
-    def test_b_y_ions():
-        peptide = "ABCD"
-        expected = ["A", "AB", "ABC", "ABCD", "BCD", "CD", "D"]
-        pep = Peptide(peptide=peptide)
-        actual = pep.b_y_ions
-        assert actual == expected
-
-    # @staticmethod
-    # def test_theoretical_b_y_ion_mass_spectrum():
 
 
 class TestGetIndicesOfLargestElements:
@@ -156,70 +166,129 @@ class TestGetIndicesOfLargestElements:
         assert (array[output] == [3, 2, 1]).all()
 
 
-def create_fasta(
-    folder: Path,
-    file_name: str = "test.fasta",
-    seqs: List[str] = ["ATGCGTA", "CGTACGT"],
-):
-    fasta_path = folder / file_name
-    lines = []
-    for seq_num, seq in enumerate(seqs):
-        lines.append(f">seq{seq_num+1}\n")
-        lines.append(f"{seq}\n")
-    with fasta_path.open("w") as f:
-        for line in lines:
-            f.write(line)
-
-
-class TestGetProteinsFromFasta:
-    @staticmethod
-    def test_basic(tmp_path):
-        fasta_path = tmp_path / "test.fasta"
-        seqs = ["ATG", "CGT"]
-        create_fasta(folder=tmp_path, seqs=seqs)
-        expected_out = [
-            Protein(seq="ATG", desc="seq1"),
-            Protein(seq="CGT", desc="seq2"),
-        ]
-
-        actual = list(get_proteins_from_fasta(fasta_path=fasta_path))
-        assert actual == expected_out
-
-
-class TestSqlliteDatabase:
-    @staticmethod
-    def test_insert_proteins(tmp_path):
-        # Arrange
-        fasta_path = tmp_path / "test.fasta"
-        seqs = ["ATG", "CGT"]
-        create_fasta(folder=tmp_path, seqs=seqs)
-        expected_out = [(0, "seq1", "ATG"), (1, "seq2", "CGT")]
-        # Act
-        db = Sqllite_Database(path=":memory:", max_len=3)
-        proteins = get_proteins_from_fasta(fasta_path=fasta_path)
-        db.insert_proteins(proteins=proteins)
-
-        # Assert
-        actual = db.cursor.execute("SELECT * FROM proteins").fetchall()
-        assert actual == expected_out
-
-
 class TestGenerateKmers:
     @staticmethod
     def test_basic():
-        peptide = "ABCDE"  # B isn't an allowed character
-        max_k = 3
+        peptide = "ACD"  # B isn't an allowed character
+        min_k, max_k = 1, 3
         expected_out = [
-            # 1-mers
-            "A",
-            "C",
-            "D",
-            "E",
-            # 2-mers
-            "CD",
-            "DE",
-            # 3-mers
-            "CDE",
+            Kmer(seq="A", inclusive_start=0, exclusive_end=1),
+            Kmer(seq="C", inclusive_start=1, exclusive_end=2),
+            Kmer(seq="D", inclusive_start=2, exclusive_end=3),
+            Kmer(seq="AC", inclusive_start=0, exclusive_end=2),
+            Kmer(seq="CD", inclusive_start=1, exclusive_end=3),
+            Kmer(seq="ACD", inclusive_start=0, exclusive_end=3),
         ]
-        actual = generate_kmers(peptide=peptide, max_k=max_k)
+        actual = generate_kmers(peptide=peptide, min_k=min_k, max_k=max_k)
         assert actual == expected_out
+
+
+class TestCalculateNeutralMass:
+    @staticmethod
+    def test_single_charged_y_ion():
+        # Arrange
+        aa_mass_lookup = {"A": 1, "B": 2, "C": 3}
+        seq, charge, ion = "ABBC", 1, "y"
+        expected = (
+            SINGLY_CHARGED_Y_BASE + sum([aa_mass_lookup[aa] for aa in seq])
+        ) / charge
+
+        # Act
+        actual = calculate_neutral_mass(
+            aa_seq=seq, charge=charge, ion=ion, amino_acid_mass_lookup=aa_mass_lookup
+        )
+
+        # Assert
+        assert actual == expected
+
+    @staticmethod
+    def test_double_charged_y_ion():
+        # Arrange
+        aa_mass_lookup = {"A": 1, "B": 2, "C": 3}
+        seq, charge, ion = "ABBC", 2, "y"
+        expected = (
+            DOUBLY_CHARGED_Y_BASE + sum([aa_mass_lookup[aa] for aa in seq])
+        ) / charge
+
+        # Act
+        actual = calculate_neutral_mass(
+            aa_seq=seq, charge=charge, ion=ion, amino_acid_mass_lookup=aa_mass_lookup
+        )
+
+        # Assert
+        assert actual == expected
+
+    @staticmethod
+    def test_single_charged_b_ion():
+        # Arrange
+        aa_mass_lookup = {"A": 1, "B": 2, "C": 3}
+        seq, charge, ion = "ABBC", 1, "b"
+        expected = (
+            SINGLY_CHARGED_B_BASE + sum([aa_mass_lookup[aa] for aa in seq])
+        ) / charge
+
+        # Act
+        actual = calculate_neutral_mass(
+            aa_seq=seq, charge=charge, ion=ion, amino_acid_mass_lookup=aa_mass_lookup
+        )
+
+        # Assert
+        assert actual == expected
+
+    @staticmethod
+    def test_double_charged_b_ion():
+        # Arrange
+        aa_mass_lookup = {"A": 1, "B": 2, "C": 3}
+        seq, charge, ion = "ABBC", 2, "b"
+        expected = (
+            DOUBLY_CHARGED_B_BASE + sum([aa_mass_lookup[aa] for aa in seq])
+        ) / charge
+
+        # Act
+        actual = calculate_neutral_mass(
+            aa_seq=seq, charge=charge, ion=ion, amino_acid_mass_lookup=aa_mass_lookup
+        )
+
+        # Assert
+        assert actual == expected
+
+
+class TestGetBIonSequences:
+    @staticmethod
+    def test_basic():
+        seq = "ABCD"
+        expected = ["A", "AB", "ABC", "ABCD"]
+        actual = get_b_ion_sequences(peptide="ABCD")
+        assert actual == expected
+
+
+class TestGetYIonSequences:
+    @staticmethod
+    def test_basic():
+        seq = "ABCD"
+        expected = ["BCD", "CD", "D"]
+        actual = get_y_ion_sequences(peptide="ABCD")
+        assert actual == expected
+
+
+class TestGetBYIonSequences:
+    @staticmethod
+    def test_basic():
+        peptide = "ABCD"
+        expected = ["A", "AB", "ABC", "ABCD", "BCD", "CD", "D"]
+        actual = get_b_y_ion_sequences(peptide=peptide)
+        assert actual == expected
+
+
+class TestParseMzml:
+    @staticmethod
+    def test_basic():
+        mzml_path = SPECTRA_DIR / f"{THOMAS_SAMPLES[0]}.mzML"
+        actual = parse_mzml(mzml_path=mzml_path)
+        pass
+
+
+class TestGetSpecificSpectrum:
+    @staticmethod
+    def test_basic():
+        pass
