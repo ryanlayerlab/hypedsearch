@@ -63,7 +63,7 @@ def create_protein_and_product_ion_database(
     charges: List[int],
 ) -> ProteinProductIonDb:
     # Set up
-    t0 = time.time()
+    fcn_start_time = time.time()
     logger.info(f"RUNNING create_protein_and_product_ion")
     # Check that files exist
     fasta_path = Path(fasta_path)
@@ -83,7 +83,7 @@ def create_protein_and_product_ion_database(
                 max_kmer_len=max_kmer_len,
                 charges_to_consider=charges,
             )
-            print(f"Took {round(time.time() - t0, 2)} seconds")
+            logger.info(f"DONE! Took {round(time.time() - fcn_start_time, 2)} seconds")
         except Exception as e:
             # Delete database if it was created
             if db_path.exists():
