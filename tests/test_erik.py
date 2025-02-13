@@ -20,10 +20,9 @@ from src.erik import (  # Peptide,
 from src.erik_constants import (
     CHARGE,
     END,
-    ID,
     ION,
-    KMER_TABLE,
     MASS,
+    PRODUCT_ION_TABLE,
     PROTEIN_ID,
     PROTEIN_TABLE,
     SEQ,
@@ -40,7 +39,7 @@ from src.lookups.constants import (
     SINGLY_CHARGED_Y_BASE,
 )
 from src.lookups.data_classes import Kmer, Peak, Protein, Spectrum
-from src.lookups.protein_kmer_db import ProteinKmerDb
+from src.lookups.protein_product_ion_db import ProteinProductIonDb
 from tests.fixtures_and_helpers import create_fasta
 
 # from src.runner import (

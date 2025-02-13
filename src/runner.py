@@ -9,7 +9,7 @@ from pyteomics import fasta, mzml
 
 import src.lookups.utils
 from src.identification import get_aligned_peptides
-from src.lookups.sqlite_database import Sqllite_Database
+from src.lookups.protein_product_ion_db import ProteinProductIonDb
 from src.lookups.utils import file_exists
 from src.objects import ExperimentParameters, FastaDatabase, Fragment, Precursor
 
@@ -38,7 +38,9 @@ def create_sqllite_database(
     number_decimal_places,
 ):
     fasta_database = create_fasta_database(database_file_path)
-    sqllite_database = Sqllite_Database(sqllite_database_path, max_peptide_length, True)
+    sqllite_database = ProteinProductIonDb(
+        sqllite_database_path, max_peptide_length, True
+    )
     kv_proteins = [(k, v) for k, v in fasta_database.proteins]
     sqllite_database.populate_database(
         kv_proteins,
@@ -52,8 +54,8 @@ def create_sqllite_database(
 
 def get_existing_sqllite_database(
     sqllite_database_path, max_peptide_length
-) -> Sqllite_Database:
-    sqllite_database = Sqllite_Database(
+) -> ProteinProductIonDb:
+    sqllite_database = ProteinProductIonDb(
         sqllite_database_path, max_peptide_length, False
     )
     return sqllite_database

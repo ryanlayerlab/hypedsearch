@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Literal, Optional, Tuple
 
 
 @dataclass
@@ -17,8 +17,8 @@ class KmerWithMass:
 
 @dataclass
 class Protein:
-    seq: str
-    id: Optional[int] = None
+    sequence: str
+    protein_id: Optional[int] = None
     desc: Optional[str] = None
 
 
@@ -26,6 +26,7 @@ class Protein:
 class Peak:
     mz: float
     abundance: float
+    id: Optional[int] = None
 
 
 @dataclass
@@ -43,7 +44,7 @@ class Spectrum:
 
 
 @dataclass(frozen=True)
-class KmerTableRow:
+class ProductIonTableRow:
     mass: float
     start: int
     end: int
@@ -52,7 +53,26 @@ class KmerTableRow:
     protein_id: int
 
 
+@dataclass(frozen=True)
+class IonWithProteinInfo(ProductIonTableRow):
+    subsequence: str
+
+
 @dataclass
 class KmerIons:
-    b_ion: KmerTableRow
-    y_ion: KmerTableRow
+    b_ion: ProductIonTableRow
+    y_ion: ProductIonTableRow
+
+
+@dataclass(frozen=True)
+class Ion:
+    seq: str
+    charge: int
+    mz: float
+    ion_type: Literal["b", "y"]
+
+
+@dataclass(frozen=True)
+class PeakIonMatch:
+    peak: Peak
+    ion: Ion

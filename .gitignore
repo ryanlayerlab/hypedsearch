@@ -143,7 +143,6 @@ intermediate_files
 Timing_data.txt
 data
 *.db
-.fasta
 .mzML
 comet
 

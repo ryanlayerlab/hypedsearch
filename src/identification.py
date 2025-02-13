@@ -3,8 +3,10 @@ from itertools import groupby
 from operator import attrgetter, itemgetter
 from typing import List
 
+from src.erik import Peak, relative_ppm_tolerance_in_daltons
 from src.lookups.constants import AMINO_ACIDS
-from src.lookups.sqlite_database import Sqllite_Database
+from src.lookups.data_classes import Peak
+from src.lookups.protein_product_ion_db import ProteinProductIonDb
 from src.objects import (
     AlignedPeptide,
     Cluster,
@@ -35,9 +37,15 @@ def ppm_to_da(mass, ppm_tolerance):
     return abs((ppm_tolerance / 1000000) * mass)
 
 
+def get_matching_ions_for_peak(
+    peak: Peak,
+):
+    pass
+
+
 def get_matched_fragment(
-    fragment: Fragment,
-    sqllite_database: Sqllite_Database,
+    fragment: Peak,
+    db: ProteinProductIonDb,
     ppm_tolerance: float,
     number_decimal_places: int,
 ):
@@ -46,7 +54,7 @@ def get_matched_fragment(
     precursor_charge = fragment.precursor_charge
     mz_value = fragment.mz_value
     adjusted_tolerance = ppm_to_da(mz_value, ppm_tolerance)
-    b_rows, y_rows = sqllite_database.query_mass_kmers(
+    b_rows, y_rows = db.query_mass_kmers(
         fragment_id,
         precursor_mass,
         precursor_charge,
@@ -64,7 +72,7 @@ def get_matched_fragment(
 
 def get_matched_fragments(
     fragments: List[Fragment],
-    sqllite_database: Sqllite_Database,
+    sqllite_database: ProteinProductIonDb,
     ppm_tolerance,
     number_decimal_places,
 ):
@@ -78,7 +86,7 @@ def get_matched_fragments(
     return matched_fragments
 
 
-def get_matched_proteins(matched_fragments, sqllite_database: Sqllite_Database):
+def get_matched_proteins(matched_fragments, sqllite_database: ProteinProductIonDb):
     all_kmers = []
     for matched_fragment in matched_fragments:
         all_kmers.extend(matched_fragment.kmers)
@@ -90,7 +98,7 @@ def get_matched_proteins(matched_fragments, sqllite_database: Sqllite_Database):
 
     matched_proteins = []
     for protein_id, kmers in grouped_kmers.items():
-        protein_row = sqllite_database.get_protein(protein_id)
+        protein_row = sqllite_database.get_protein_by_id(protein_id)
         protein = Protein(*protein_row)
         matched_protein = MatchedProtein(protein=protein, kmers=kmers)
         matched_proteins.append(matched_protein)

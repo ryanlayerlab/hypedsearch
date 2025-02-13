@@ -50,7 +50,7 @@ def create_kmer_mass_db(
 
         # Generate kmers from protein and add them to DB if they don't already exist
         kmers = generate_kmers_with_masses(
-            peptide=protein.seq,
+            peptide=protein.sequence,
             max_kmer_len=max_peptide_len,
             amino_acid_mass_lookup=amino_acid_mass_lookup,
         )

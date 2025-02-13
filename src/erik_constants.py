@@ -15,9 +15,11 @@ HS_DIR = DATA_DIR / "hs"
 SPECTRA_DIR = DATA_DIR / "spectra"
 COMET_EXECUTABLE = GIT_REPO_DIR / f"comet/comet.macos.exe"
 COMET_PARAMS = GIT_REPO_DIR / f"comet/comet.params"
-MOUSE_PROTEOME = GIT_REPO_DIR / "fastas/Uniprot_mouse.fasta"
 
-## Strings
+FASTAS_DIR = GIT_REPO_DIR / "fastas"
+MOUSE_PROTEOME = FASTAS_DIR / "Uniprot_mouse.fasta"
+
+# Strings
 MASS = "mass"
 KMERS = "kmers"
 SEQ = "sequence"
@@ -30,12 +32,26 @@ SPECTRUM_ID = "spectrum_id"
 SCAN = "scan"
 PLAIN_PEPTIDE = "plain_peptide"
 CHARGE = "charge"
+START = "start"
+I_START = "inclusive_start"
+END = "end"
+E_END = "exclusive_end"
+ION = "ion"
+PROTEIN_ID = "protein_id"
+PRODUCT_ION_TABLE = "product_ions"
+PROTEIN_TABLE = "proteins"
+SUBSEQ = "subsequence"
 
-## Numeric constants
+# Numeric constants
 MAX_PEPTIDE_LEN = 50
+MAX_KMER_LEN = 50
+B_ION_AS_INT = 0
+Y_ION_AS_INT = 1
+ION_CHARGES_TO_CONSIDER = [1, 2]
 
-## For simplicity
+# For simplicity
 samples = [f"BMEM_AspN_Fxn{val}" for val in [4, 5, 6, 7, 8, 9]]
+THOMAS_SAMPLES = [f"BMEM_AspN_Fxn{val}" for val in [4, 5, 6, 7, 8, 9]]
 
 
 # ## Asserts

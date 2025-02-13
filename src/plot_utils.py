@@ -95,7 +95,10 @@ def hide_right_top_axis(ax):
     ax.spines["top"].set_visible(False)
 
 
-def finalize(axs, fontsize=LABEL_SIZE, labelpad=7, ignoreLegend=False):
+# def set_font_size(font_size: int = LABEL_SIZE)
+
+
+def finalize(axs, fontsize=LABEL_SIZE, labelpad=7, ignore_legend=False):
     """Apply final adjustments"""
     try:
         ax = axs[0]
@@ -104,7 +107,7 @@ def finalize(axs, fontsize=LABEL_SIZE, labelpad=7, ignoreLegend=False):
             hide_right_top_axis(ax)
             ax.yaxis.label.set_size(fontsize)
             ax.xaxis.label.set_size(fontsize)
-            if ignoreLegend == False:
+            if ignore_legend == False:
                 ax.legend(frameon=False)
             ax.tick_params(axis="both", which="major", labelsize=fontsize, pad=labelpad)
     except:
@@ -112,7 +115,7 @@ def finalize(axs, fontsize=LABEL_SIZE, labelpad=7, ignoreLegend=False):
         hide_right_top_axis(axs)
         axs.yaxis.label.set_size(fontsize)
         axs.xaxis.label.set_size(fontsize)
-        if ignoreLegend == False:
+        if ignore_legend == False:
             axs.legend(frameon=False)
         axs.tick_params(axis="both", which="major", labelsize=fontsize, pad=labelpad)
 

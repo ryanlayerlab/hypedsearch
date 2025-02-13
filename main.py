@@ -6,7 +6,7 @@ from src.erik_constants import ION_CHARGES_TO_CONSIDER
 from src.fasta_utils import get_proteins_from_fasta
 
 # from src.identification import get_matched_fragment
-from src.lookups.protein_kmer_db import prepare_protein_kmer_database
+from src.lookups.protein_product_ion_db import create_protein_product_ion_db
 
 
 def hypedsearch(
@@ -19,7 +19,7 @@ def hypedsearch(
 ):
     spectra = list(parse_mzml(mzml_path=mzml_path))
     t0 = time.time()
-    db = prepare_protein_kmer_database(
+    db = create_protein_product_ion_db(
         db_path=db_path,
         fasta_path=fasta_path,
         max_kmer_len=max_kmer_len,

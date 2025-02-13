@@ -10,7 +10,7 @@ from scripts.mass_vs_num_kmers_explaining_mass import (
     sample_in_parallel,
     sample_masses_and_get_num_explanatory_kmers,
 )
-from src.erik_constants import GIT_REPO_DIR, KMER_TABLE, PLOTS_DIR
+from src.erik_constants import GIT_REPO_DIR, PLOTS_DIR, PRODUCT_ION_TABLE
 
 TEST_DB_PATH = GIT_REPO_DIR / "./dbs/test.fasta.db"
 assert TEST_DB_PATH.exists()

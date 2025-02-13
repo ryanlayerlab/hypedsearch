@@ -3,10 +3,11 @@ import time
 from collections import Counter
 from pathlib import Path
 from sqlite3 import IntegrityError
-from typing import List
+from typing import List, Optional
 from unittest.mock import patch
 
 import numpy as np
+import pandas as pd
 import pytest
 from pyteomics import mzml
 
@@ -25,10 +26,9 @@ from src.erik_constants import (
     B_ION_AS_INT,
     CHARGE,
     END,
-    ID,
     ION,
-    KMER_TABLE,
     MASS,
+    PRODUCT_ION_TABLE,
     PROTEIN_ID,
     PROTEIN_TABLE,
     SEQ,
@@ -45,14 +45,13 @@ from src.lookups.constants import (
     SINGLY_CHARGED_Y_BASE,
 )
 from src.lookups.data_classes import Kmer, Protein
-from src.lookups.protein_kmer_db import (
+from src.lookups.protein_product_ion_db import (
     KmerIons,
-    KmerTableRow,
-    ProteinKmerDb,
-    add_protein_and_its_kmers_to_db,
+    ProductIonTableRow,
+    ProteinProductIonDb,
+    add_protein_and_its_product_ions_to_db,
+    create_protein_product_ion_db,
     get_b_ion_and_y_ion_corresponding_to_kmer,
-    kmer_rows_to_structured_object,
-    prepare_protein_kmer_database,
 )
 from tests.fixtures_and_helpers import create_fasta
 
@@ -60,22 +59,32 @@ from tests.fixtures_and_helpers import create_fasta
 def create_db_with_given_kmer_masses(
     b_ion_masses: List[float],
     y_ion_masses: List[float],
+    protein_indices: Optional[List[int]] = None,
     db_path: str = ":memory:",
     max_kmer_len: int = 10,
     protein_seqs: List[str] = ["ABC"],
 ):
+    if protein_indices is not None:
+        assert len(protein_indices) == len(b_ion_masses) + len(y_ion_masses)
+    else:
+        protein_indices = [
+            random.randint(0, len(protein_seqs) - 1)
+            for _ in range(len(b_ion_masses) + len(y_ion_masses))
+        ]
     # Constants
     charge = 1
     start = 0
 
     # Create kmers for table
     kmers = []
+    idx = 0
     for _, mass in enumerate(b_ion_masses):
         # Randomly select one of the proteins
-        protein_idx = random.randint(0, len(protein_seqs) - 1)
+        protein_idx = protein_indices[idx]
+        idx += 1
         end = random.randint(1, len(protein_seqs[protein_idx]) - 1)
         kmers.append(
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=mass,
                 start=start,
                 end=end,
@@ -84,13 +93,16 @@ def create_db_with_given_kmer_masses(
                 protein_id=protein_idx,
             )
         )
+        if protein_indices is not None:
+            protein_idx += 1
 
     for _, mass in enumerate(y_ion_masses):
         # Randomly select one of the proteins
-        protein_idx = random.randint(0, len(protein_seqs) - 1)
+        protein_idx = protein_indices[idx]
+        idx += 1
         end = random.randint(1, len(protein_seqs[protein_idx]) - 1)
         kmers.append(
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=mass,
                 start=start,
                 end=end,
@@ -101,13 +113,14 @@ def create_db_with_given_kmer_masses(
         )
 
     # Create database
-    db = ProteinKmerDb(db_path=db_path, max_kmer_len=max_kmer_len)
+    db = ProteinProductIonDb(db_path=db_path, max_kmer_len=max_kmer_len)
     db.insert_proteins(
         proteins=[
-            Protein(id=p_id, seq=p_seq) for p_id, p_seq in enumerate(protein_seqs)
+            Protein(protein_id=p_id, sequence=p_seq)
+            for p_id, p_seq in enumerate(protein_seqs)
         ]
     )
-    db.insert_kmers(kmers=kmers)
+    db.insert_product_ions(kmers=kmers)
 
     return db
 
@@ -121,7 +134,7 @@ class TestCreateDbWithGivenKmerMasses:
         db = create_db_with_given_kmer_masses(
             b_ion_masses=b_ion_masses, y_ion_masses=y_ion_masses, protein_seqs=proteins
         )
-        kmer_rows = db.get_all_rows_from_table(table_name=KMER_TABLE)
+        kmer_rows = db.get_all_rows_from_table(table_name=PRODUCT_ION_TABLE)
         protein_rows = db.get_all_rows_from_table(table_name=PROTEIN_TABLE)
         assert len(kmer_rows) == len(b_ion_masses) + len(y_ion_masses)
         assert len(proteins) == len(protein_rows)
@@ -133,7 +146,7 @@ class TestProteinKmerDbInit:
         # Arrange
         db_path = tmp_path / "test.db"
         # Act
-        db = ProteinKmerDb(db_path=db_path, max_kmer_len=10)
+        db = ProteinProductIonDb(db_path=db_path, max_kmer_len=10)
         # Assert
 
         # Check that database has correct tables
@@ -144,19 +157,19 @@ class TestProteinKmerDbInit:
 
         assert len(table_names) == 2
         assert PROTEIN_TABLE in table_names
-        assert KMER_TABLE in table_names
+        assert PRODUCT_ION_TABLE in table_names
 
         # Check that tables have correct columns
         # kmer table
         expected_colms = set([MASS, START, END, ION, CHARGE, PROTEIN_ID])
         result = query_database(
-            query=f"PRAGMA table_info({KMER_TABLE})", db_path=db_path
+            query=f"PRAGMA table_info({PRODUCT_ION_TABLE})", db_path=db_path
         )
         column_names = set(colm[1] for colm in result)
         assert column_names == expected_colms
 
         # protein table
-        expected_colms = set([ID, SEQ])
+        expected_colms = set([PROTEIN_ID, SEQ])
         result = query_database(
             query=f"PRAGMA table_info({PROTEIN_TABLE})", db_path=db_path
         )
@@ -167,34 +180,42 @@ class TestProteinKmerDbInit:
 class TestInsertProteins:
     @staticmethod
     def test_multiple_proteins():
-        db = ProteinKmerDb(db_path=":memory:", max_kmer_len=3)
-        expected_out = [(0, "ATG"), (1, "CGT")]
-        proteins = [Protein(seq="ATG", id=0), Protein(seq="CGT", id=1)]
+        db = ProteinProductIonDb(db_path=":memory:", max_kmer_len=3)
+        proteins = [
+            Protein(sequence="ATG", protein_id=0),
+            Protein(sequence="CGT", protein_id=1),
+        ]
         db.insert_proteins(proteins=proteins)
         actual = db.cursor.execute(f"SELECT * FROM {PROTEIN_TABLE}").fetchall()
-        assert actual == expected_out
+        assert [Protein(**dict(protein)) for protein in actual] == proteins
 
     @staticmethod
     def test_one_protein():
         """Test adding one protein at a time"""
-        db = ProteinKmerDb(db_path=":memory:", max_kmer_len=3)
-        db.insert_proteins(proteins=[Protein(seq="ATG", id=1)])
-        expected_out = [(1, "ATG")]
+        db = ProteinProductIonDb(db_path=":memory:", max_kmer_len=3)
+        protein_1 = Protein(sequence="ATG", protein_id=1)
+        protein_2 = Protein(sequence="BC", protein_id=3)
+        db.insert_proteins(proteins=[protein_1])
         actual = db.cursor.execute(f"SELECT * FROM {PROTEIN_TABLE}").fetchall()
-        assert actual == expected_out
+        assert [Protein(**dict(protein)) for protein in actual] == [protein_1]
 
-        db.insert_proteins(proteins=[Protein(seq="BC", id=3)])
-        expected_out = [(1, "ATG"), (3, "BC")]
+        db.insert_proteins(proteins=[protein_2])
         actual = db.cursor.execute("SELECT * FROM proteins").fetchall()
-        assert actual == expected_out
+        assert [Protein(**dict(protein)) for protein in actual] == [
+            protein_1,
+            protein_2,
+        ]
 
     @staticmethod
     def test_non_unique_ids():
         """Test to make sure protein IDs added to database are unique"""
-        db = ProteinKmerDb(db_path=":memory:", max_kmer_len=3)
+        db = ProteinProductIonDb(db_path=":memory:", max_kmer_len=3)
         with pytest.raises(IntegrityError):
             db.insert_proteins(
-                proteins=[Protein(seq="A", id=1), Protein(seq="B", id=1)]
+                proteins=[
+                    Protein(sequence="A", protein_id=1),
+                    Protein(sequence="B", protein_id=1),
+                ]
             )
 
 
@@ -202,32 +223,31 @@ class TestInsertKmers:
     @staticmethod
     def test_basic():
         # Arrange
-        db = ProteinKmerDb(db_path=":memory:", max_kmer_len=3)
-        kmer1, kmer2 = (1, 0, 3, 4, 5, 6), (7, 8, 9, 1, 10, 11)
+        db = ProteinProductIonDb(db_path=":memory:", max_kmer_len=3)
         kmers = [
-            KmerTableRow(
-                mass=kmer1[0],
-                start=kmer1[1],
-                end=kmer1[2],
-                ion=kmer1[3],
-                charge=kmer1[4],
-                protein_id=kmer1[5],
+            ProductIonTableRow(
+                mass=1,
+                start=0,
+                end=3,
+                ion=4,
+                charge=5,
+                protein_id=0,
             ),
-            KmerTableRow(
-                mass=kmer2[0],
-                start=kmer2[1],
-                end=kmer2[2],
-                ion=kmer2[3],
-                charge=kmer2[4],
-                protein_id=kmer2[5],
+            ProductIonTableRow(
+                mass=7,
+                start=8,
+                end=9,
+                ion=10,
+                charge=11,
+                protein_id=1,
             ),
         ]
         # Act
-        db.insert_kmers(kmers=kmers)
+        db.insert_product_ions(kmers=kmers)
 
         # Assert
-        actual = db.cursor.execute(f"SELECT * FROM {KMER_TABLE}").fetchall()
-        assert actual == [kmer1, kmer2]
+        actual = db.cursor.execute(f"SELECT * FROM {PRODUCT_ION_TABLE}").fetchall()
+        assert [ProductIonTableRow(**dict(kmer)) for kmer in actual] == kmers
 
 
 class TestGetBIonAndYIonCorrespondingToKmer:
@@ -238,7 +258,7 @@ class TestGetBIonAndYIonCorrespondingToKmer:
         kmer = Kmer(seq=seq, inclusive_start=start, exclusive_end=end)
         b_mass, y_mass = 10, 20
         charge, protein_id = 3, 4
-        expected_b_ion = KmerTableRow(
+        expected_b_ion = ProductIonTableRow(
             mass=b_mass,
             start=start,
             end=end,
@@ -246,7 +266,7 @@ class TestGetBIonAndYIonCorrespondingToKmer:
             charge=charge,
             protein_id=protein_id,
         )
-        expected_y_ion = KmerTableRow(
+        expected_y_ion = ProductIonTableRow(
             mass=y_mass,
             start=start,
             end=end,
@@ -257,8 +277,12 @@ class TestGetBIonAndYIonCorrespondingToKmer:
 
         # Act
         with patch(
-            "src.lookups.protein_kmer_db.b_ion_neutral_mass", return_value=b_mass
-        ), patch("src.lookups.protein_kmer_db.y_ion_neutral_mass", return_value=y_mass):
+            "src.lookups.protein_product_ion_db.compute_b_ion_neutral_mass",
+            return_value=b_mass,
+        ), patch(
+            "src.lookups.protein_product_ion_db.compute_y_ion_neutral_mass",
+            return_value=y_mass,
+        ):
             actual = get_b_ion_and_y_ion_corresponding_to_kmer(
                 kmer=kmer, protein_id=protein_id, charge=charge
             )
@@ -267,35 +291,46 @@ class TestGetBIonAndYIonCorrespondingToKmer:
         assert actual == KmerIons(b_ion=expected_b_ion, y_ion=expected_y_ion)
 
 
-class TestAddProteinAndItsKmersToDb:
+class TestAddProteinAndItsProductIonsToDb:
     @staticmethod
-    def test_1():
+    def test_add_one_protein():
         # Arrange
         max_k, charges = 3, [1]
-        db = ProteinKmerDb(db_path=":memory:", max_kmer_len=max_k)
-        seq, protein_id = "ACDE", 3
-        kmers = ["A", "C", "D", "E", "AC", "CD", "DE", "ACD", "CDE"]
-        protein = Protein(seq=seq, id=protein_id)
+        db = ProteinProductIonDb(db_path=":memory:", max_kmer_len=max_k)
+        seq, protein_id = "ACD", 3
+        kmers = [
+            "A",
+            "C",
+            "D",
+            "AC",
+            "CD",
+            "ACD",
+        ]
 
         # Act
-        add_protein_and_its_kmers_to_db(
-            protein=protein, db=db, charges_to_consider=charges
+        add_protein_and_its_product_ions_to_db(
+            protein=Protein(sequence=seq, protein_id=protein_id),
+            db=db,
+            charges_to_consider=charges,
         )
 
         # Assert
         # Check that proteins are added
         actual = db.cursor.execute(f"SELECT * FROM {PROTEIN_TABLE}").fetchall()
-        expected = [(protein_id, seq)]
-        assert actual == expected
-        actual = db.cursor.execute(f"SELECT COUNT(*) FROM {KMER_TABLE}").fetchall()
+        assert len(actual) == 1
+        assert dict(actual[0]) == {PROTEIN_ID: protein_id, SEQ: seq}
+
+        # Check ions are added
+        actual = pd.read_sql(f"SELECT * FROM {PRODUCT_ION_TABLE}", db.connection)
+        # actual = db.cursor.execute(f"SELECT COUNT(*) FROM {KMER_TABLE}").fetchall()
         assert (
-            actual[0][0] == len(kmers) * 2
+            actual.shape[0] == len(kmers) * 2
         )  # multiply by 2 because we're adding b- and y-ions
 
 
 class TestPrepareProteinKmerDatabase:
     @staticmethod
-    def test_basic(tmp_path):
+    def test_smoke(tmp_path):
         # Arrange
         db_path = ":memory:"
         fasta_name = "test.fasta"
@@ -305,149 +340,155 @@ class TestPrepareProteinKmerDatabase:
             "EFG",
         ]  # avoid using disallowed amino acid characters in generate_kmers
         create_fasta(folder=tmp_path, file_name=fasta_name, seqs=seqs)
-        expected_proteins = [(seq_num, seq) for seq_num, seq in enumerate(seqs)]
+        expected_proteins = [
+            {PROTEIN_ID: seq_num, SEQ: seq} for seq_num, seq in enumerate(seqs)
+        ]
         b_mass, y_mass = 1, 2
         charges = [1, 2]
 
         # Expected kmers
         expected_kmers = [
             # A
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=0, end=1, ion=B_ION_AS_INT, charge=1, protein_id=0
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=0, end=1, ion=Y_ION_AS_INT, charge=1, protein_id=0
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=0, end=1, ion=B_ION_AS_INT, charge=2, protein_id=0
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=0, end=1, ion=Y_ION_AS_INT, charge=2, protein_id=0
             ),
             # C
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=1, end=2, ion=B_ION_AS_INT, charge=1, protein_id=0
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=1, end=2, ion=Y_ION_AS_INT, charge=1, protein_id=0
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=1, end=2, ion=B_ION_AS_INT, charge=2, protein_id=0
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=1, end=2, ion=Y_ION_AS_INT, charge=2, protein_id=0
             ),
             # D
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=2, end=3, ion=B_ION_AS_INT, charge=1, protein_id=0
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=2, end=3, ion=Y_ION_AS_INT, charge=1, protein_id=0
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=2, end=3, ion=B_ION_AS_INT, charge=2, protein_id=0
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=2, end=3, ion=Y_ION_AS_INT, charge=2, protein_id=0
             ),
             # AC
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=0, end=2, ion=B_ION_AS_INT, charge=1, protein_id=0
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=0, end=2, ion=Y_ION_AS_INT, charge=1, protein_id=0
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=0, end=2, ion=B_ION_AS_INT, charge=2, protein_id=0
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=0, end=2, ion=Y_ION_AS_INT, charge=2, protein_id=0
             ),
             # CD
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=1, end=3, ion=B_ION_AS_INT, charge=1, protein_id=0
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=1, end=3, ion=Y_ION_AS_INT, charge=1, protein_id=0
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=1, end=3, ion=B_ION_AS_INT, charge=2, protein_id=0
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=1, end=3, ion=Y_ION_AS_INT, charge=2, protein_id=0
             ),
             # E
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=0, end=1, ion=B_ION_AS_INT, charge=1, protein_id=1
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=0, end=1, ion=Y_ION_AS_INT, charge=1, protein_id=1
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=0, end=1, ion=B_ION_AS_INT, charge=2, protein_id=1
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=0, end=1, ion=Y_ION_AS_INT, charge=2, protein_id=1
             ),
             # F
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=1, end=2, ion=B_ION_AS_INT, charge=1, protein_id=1
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=1, end=2, ion=Y_ION_AS_INT, charge=1, protein_id=1
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=1, end=2, ion=B_ION_AS_INT, charge=2, protein_id=1
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=1, end=2, ion=Y_ION_AS_INT, charge=2, protein_id=1
             ),
             # G
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=2, end=3, ion=B_ION_AS_INT, charge=1, protein_id=1
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=2, end=3, ion=Y_ION_AS_INT, charge=1, protein_id=1
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=2, end=3, ion=B_ION_AS_INT, charge=2, protein_id=1
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=2, end=3, ion=Y_ION_AS_INT, charge=2, protein_id=1
             ),
             # EF
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=0, end=2, ion=B_ION_AS_INT, charge=1, protein_id=1
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=0, end=2, ion=Y_ION_AS_INT, charge=1, protein_id=1
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=0, end=2, ion=B_ION_AS_INT, charge=2, protein_id=1
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=0, end=2, ion=Y_ION_AS_INT, charge=2, protein_id=1
             ),
             # FG
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=1, end=3, ion=B_ION_AS_INT, charge=1, protein_id=1
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=1, end=3, ion=Y_ION_AS_INT, charge=1, protein_id=1
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=1, start=1, end=3, ion=B_ION_AS_INT, charge=2, protein_id=1
             ),
-            KmerTableRow(
+            ProductIonTableRow(
                 mass=2, start=1, end=3, ion=Y_ION_AS_INT, charge=2, protein_id=1
             ),
         ]
 
         # Act
         with patch(
-            "src.lookups.protein_kmer_db.b_ion_neutral_mass", return_value=b_mass
-        ), patch("src.lookups.protein_kmer_db.y_ion_neutral_mass", return_value=y_mass):
-            db = prepare_protein_kmer_database(
+            "src.lookups.protein_product_ion_db.compute_b_ion_neutral_mass",
+            return_value=b_mass,
+        ), patch(
+            "src.lookups.protein_product_ion_db.compute_y_ion_neutral_mass",
+            return_value=y_mass,
+        ):
+            db = create_protein_product_ion_db(
                 db_path=db_path,
                 fasta_path=tmp_path / fasta_name,
                 max_kmer_len=max_k,
@@ -456,36 +497,31 @@ class TestPrepareProteinKmerDatabase:
 
         # Assert
         actual = db.cursor.execute(f"SELECT * FROM {PROTEIN_TABLE}").fetchall()
-        assert actual == expected_proteins
+        assert [dict(protein) for protein in actual] == expected_proteins
 
-        kmer_rows = db.get_all_rows_from_table(table_name=KMER_TABLE)
-        kmer_rows = kmer_rows_to_structured_object(kmer_rows)
+        actual = db.cursor.execute(f"SELECT * FROM {PRODUCT_ION_TABLE}").fetchall()
+        kmer_rows = [ProductIonTableRow(**dict(kmer)) for kmer in actual]
         assert Counter(expected_kmers) == Counter(kmer_rows)
 
 
-class TestQueryMassKmers:
+class TestGetIonsWithinMassTolerance:
     @staticmethod
     def test_smoke():
         # Arrange
         b_ion_masses = [1, 1.8, 1.96]
-        y_ion_masses = [2.02, 2.04, 3]
+        y_ion_masses = [2.02, 3]
         query_mass, tol = 2, 0.05
-        fragment_id = 1
-        precursor_mass, precursor_charge = 10, 11
         proteins = ["ABC", "DEF"]
         db = create_db_with_given_kmer_masses(
             b_ion_masses=b_ion_masses, y_ion_masses=y_ion_masses, protein_seqs=proteins
         )
 
         # Act
-        b_rows, y_rows = db.query_mass_kmers(
-            fragment_id=fragment_id,
-            precursor_mass=precursor_mass,
-            precursor_charge=precursor_charge,
-            mass=query_mass,
-            tolerance=tol,
-            number_decimal_places=10,
+        matching_ions = db.get_ions_within_mass_tolerance(
+            query_mass=query_mass, tolerance=tol
         )
 
         # Assert
-        assert len(b_rows) + len(y_rows) == 3
+        assert len(matching_ions) == 2
+        assert (matching_ions[0].mass == 2.02) or (matching_ions[1].mass == 2.02)
+        assert (matching_ions[0].mass == 1.96) or (matching_ions[1].mass == 1.96)

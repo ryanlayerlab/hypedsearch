@@ -26,11 +26,11 @@ class TestCreateKmerMassDb:
         }
         proteins = [
             Protein(
-                seq="AHC",
+                sequence="AHC",
                 desc="AHC",
             ),
-            Protein(seq="DEFG", desc="DEFG"),
-            Protein(seq="AHCDEFG", desc="AHCDEFG"),
+            Protein(sequence="DEFG", desc="DEFG"),
+            Protein(sequence="AHCDEFG", desc="AHCDEFG"),
         ]
         expected = [
             # 1-mers
@@ -85,7 +85,7 @@ class TestCreateKmerMassDb:
         }
         proteins = [
             Protein(
-                seq="A",
+                sequence="A",
                 desc="",
             )
         ]
