@@ -6,12 +6,13 @@ import sys
 import time
 from copy import deepcopy
 from dataclasses import asdict, dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from src.erik_constants import (
     B_ION_AS_INT,
     CHARGE,
-    END,
+    EXCLUSIVE_END,
+    INCLUSIVE_START,
     ION,
     ION_CHARGES_TO_CONSIDER,
     MASS,
@@ -20,10 +21,10 @@ from src.erik_constants import (
     PROTEIN_ID,
     PROTEIN_TABLE,
     SEQ,
-    START,
     SUBSEQ,
     Y_ION_AS_INT,
 )
+from src.erik_utils import get_time_in_diff_units, relative_ppm_tolerance_in_daltons
 from src.fasta_utils import get_proteins_from_fasta
 from src.lookups.constants import (
     AMINO_ACID_MASSES,
@@ -65,9 +66,20 @@ def compute_y_ion_neutral_mass(
     return neutral_mass
 
 
+def load_existing_protein_product_ion_db(db_path: str):
+    db = ProteinProductIonDb(
+        db_path=db_path,
+        reset=False,
+    )
+    return db
+
+
 class ProteinProductIonDb:
     def __init__(
-        self, db_path: str, max_kmer_len: int = MAX_KMER_LEN, reset: bool = True
+        self,
+        db_path: str,
+        reset: bool = True,
+        max_kmer_len: Optional[int] = None,
     ):
         self.connection = sqlite3.connect(db_path)
         self.connection.row_factory = sqlite3.Row
@@ -91,8 +103,8 @@ class ProteinProductIonDb:
                 f"""
                 CREATE TABLE {PRODUCT_ION_TABLE} (
                     {MASS} REAL,
-                    {START} INTEGER,
-                    {END} INTEGER,
+                    {INCLUSIVE_START} INTEGER,
+                    {EXCLUSIVE_END} INTEGER,
                     {ION} INTEGER,
                     {CHARGE} INTEGER,
                     {PROTEIN_ID} INTEGER
@@ -100,11 +112,11 @@ class ProteinProductIonDb:
                 """
             )
 
-    def insert_product_ions(self, kmers: List[ProductIonTableRow]):
-        kmers = [asdict(kmer) for kmer in kmers]
+    def insert_product_ions(self, product_ions: List[ProductIonTableRow]):
+        product_ions = [asdict(kmer) for kmer in product_ions]
         self.cursor.executemany(
-            f"INSERT INTO {PRODUCT_ION_TABLE} VALUES(:{MASS}, :{START}, :{END}, :{ION}, :{CHARGE}, :{PROTEIN_ID})",
-            kmers,
+            f"INSERT INTO {PRODUCT_ION_TABLE} VALUES(:{MASS}, :{INCLUSIVE_START}, :{EXCLUSIVE_END}, :{ION}, :{CHARGE}, :{PROTEIN_ID})",
+            product_ions,
         )
         self.connection.commit()
 
@@ -118,119 +130,51 @@ class ProteinProductIonDb:
         self.connection.commit()
 
     def get_ions_within_mass_tolerance(
-        self, query_mass: float, tolerance: float
+        self,
+        query_mass: float,
+        mz_tolerance: Optional[float] = None,
+        ppm_tolerance: Optional[float] = None,
+        # precursor_charge: Optional[int] = 1000,
     ) -> List[IonWithProteinInfo]:
         # Constants
-        table_name = "temp.mass"
-        upper_bound = query_mass + tolerance
-        lower_bound = query_mass - tolerance
+        table_name = "filtered_ions"
+        if ppm_tolerance is not None:
+            mz_tolerance = relative_ppm_tolerance_in_daltons(
+                ppm=ppm_tolerance, ref_mass=query_mass
+            )
 
-        # This query:
-        # 1. selects the product ions within the mass bounds
-        # 2. gets the protein information and peptide within the protein that the product
-        # ion corresponds to;
-        # 3. combine the selected product ions and the corresponding protein info into a new table
-        self.cursor.execute(
-            f"""
-            CREATE TABLE {table_name} AS
-            SELECT
-                k.*,
-                SUBSTR(p.{SEQ}, k.{START}, k.{END} - k.{START} + 1) AS {SUBSEQ}
-            FROM {PRODUCT_ION_TABLE} AS k
-            INNER JOIN {PROTEIN_TABLE} AS p ON k.{PROTEIN_ID} = p.{PROTEIN_ID}
-            WHERE k.{MASS} BETWEEN ? AND ?
-            ORDER BY k.{PROTEIN_ID}, k.{START};
-            """,
-            (lower_bound, upper_bound),
-        )
+        upper_bound = query_mass + mz_tolerance
+        lower_bound = query_mass - mz_tolerance
 
-        # The command above creates a new table but doesn't return the rows in that table.
-        # This query returns the rows created above ordered by (protein, start, end)
-        matching_ions = self.cursor.execute(
-            f"""
+        query = f"""
+            WITH {table_name} AS (
+                SELECT
+                    k.*,
+                    SUBSTR(p.{SEQ}, k.{INCLUSIVE_START} + 1, k.{EXCLUSIVE_END} - k.{INCLUSIVE_START}) AS {SUBSEQ}
+                FROM {PRODUCT_ION_TABLE} AS k
+                INNER JOIN {PROTEIN_TABLE} AS p ON k.{PROTEIN_ID} = p.{PROTEIN_ID}
+                WHERE k.{MASS} BETWEEN {lower_bound} AND {upper_bound}
+            )
             SELECT
                 {PROTEIN_ID},
                 {MASS},
-                {START},
-                {END},
+                {INCLUSIVE_START},
+                {EXCLUSIVE_END},
                 {ION},
                 {CHARGE},
                 {SUBSEQ}
-            FROM {table_name}
-            ORDER BY {PROTEIN_ID}, {START}, {END};
-            """
-        ).fetchall()
-
-        # Remove temporary table
-        self.cursor.execute(f"DROP TABLE {table_name}")
+            FROM filtered_ions
+            ORDER BY {PROTEIN_ID}, {INCLUSIVE_START}, {EXCLUSIVE_END};
+        """
+        matching_ions = self.run_query(query=query)
         return [IonWithProteinInfo(**dict(ion)) for ion in matching_ions]
 
-    def database_info(self):
-        query = "SELECT name FROM sqlite_master WHERE type = 'table';"
-        return self.run_query(query=query)
-
-    def read_all_product_ions(self):
-        query = f"SELECT * FROM {PRODUCT_ION_TABLE}"
-        return self.run_query(query=query)
-
-    def read_all_proteins(self):
-        query = f"SELECT * FROM {PROTEIN_TABLE}"
-        return self.run_query(query=query)
-
-    def query_sequence_kmers(self, pid, start, end):
-        rows = self.cursor.execute(
-            "SELECT * FROM kmers where protein = ? and location_start = ? and location_end = ?",
-            (pid, start, end),
-        ).fetchall()
-        return rows
-
-    def query_extensions_to_length_kmers(self, target_mass, pid, start, end, dist):
-        query_start = time.time()
-        rows_cursor = self.cursor.execute(
-            "SELECT * FROM kmers where protein = ? and location_start = ? and location_end = ? and mass <= ? and ion = 0 and charge = 2",
-            (pid, start, end + dist - 1, target_mass),
-        )  # and ion = 0 and charge = 1
-        query_time = time.time() - query_start
-        fetchall_start = time.time()
-        rows = rows_cursor.fetchall()
-        fetchall_time = time.time() - fetchall_start
-        self.query_protein_average = (
-            self.query_protein_average * self.protein_count + query_time
-        ) / (self.protein_count + 1)
-        self.fetchall_protein_average = (
-            self.fetchall_protein_average * self.protein_count + fetchall_time
-        ) / (self.protein_count + 1)
-        self.protein_count += 1
-        return rows
-
-    def query_extensions_b_kmers(self, target_mass, pid, start, end, ion):
-        query_start = time.time()
-        rows_cursor = self.connection.execute(
-            "SELECT * FROM kmers where protein = ? and location_start = ? and location_end >= ? and mass < ? and ion = ? and charge = 2 order by location_end",
-            (pid, start, end, target_mass, ion),
+    def create_index_on_product_ion_mass(self):
+        start_time = time.time()
+        self.cursor.execute(f"CREATE INDEX {MASS} ON {PRODUCT_ION_TABLE}({MASS})")
+        logger.info(
+            f"Took {get_time_in_diff_units(time_sec=(time.time() - start_time))}"
         )
-        query_time = time.time() - query_start
-        self.query_protein_average = (
-            self.query_protein_average * self.protein_count + query_time
-        ) / (self.protein_count + 1)
-        self.protein_count += 1
-        return rows_cursor
-
-    def query_extensions_y_kmers(self, target_mass, pid, end, start, ion):
-        query_start = time.time()
-        rows_cursor = self.connection.execute(
-            "SELECT * FROM kmers where protein = ? and location_end = ? and location_start <= ? and mass < ? and ion = ? and charge = 2 order by location_start desc",
-            (pid, end, start, target_mass, ion),
-        )
-        query_time = time.time() - query_start
-        self.query_protein_average = (
-            self.query_protein_average * self.protein_count + query_time
-        ) / (self.protein_count + 1)
-        self.protein_count += 1
-        return rows_cursor
-
-    def query_fetchall(self):
-        return self.cursor.fetchall()
 
     def index_ion_mass_b_kmers(self):
         ctime = time.time()
@@ -239,27 +183,44 @@ class ProteinProductIonDb:
         )
         print("time to index by protein", time.time() - ctime)
 
-    def index_ion_mass_y_kmers(self):
-        ctime = time.time()
-        self.cursor.execute(
-            "CREATE INDEX y_mass_ion_idx ON kmers(protein, location_end)"
-        )
-        print("time to index by protein", time.time() - ctime)
-
-    def index_ion_mass_kmers(self):
-        ctime = time.time()
-        self.cursor.execute(
-            "CREATE INDEX mass_ion_idx ON kmers(mass, protein, location_start)"
-        )
-        print("time to index", time.time() - ctime)
-
-    def check_sizes_kmers(self):
-        size = self.cursor.execute("SELECT count(*) FROM kmers").fetchall()
-        print(size)
-
+    # Helper methods for querying and investigating the database
     def run_query(self, query):
         results = self.cursor.execute(query).fetchall()
         return results
+
+    def get_tables_in_db(self):
+        name = "name"
+        query = f"SELECT {name} FROM sqlite_master WHERE type = 'table';"
+        rows = self.run_query(query=query)
+        return [dict(row)[name] for row in rows]
+
+    def read_all_table_rows(self, table_name: str):
+        query = f"SELECT * FROM {table_name}"
+        return self.run_query(query=query)
+
+    def get_number_rows(self, table_name: str):
+        return len(self.read_all_table_rows(table_name=table_name))
+
+    def get_protein_by_id(self, protein_id):
+        query = f"SELECT * FROM {PROTEIN_TABLE} WHERE {PROTEIN_ID} = {protein_id}"
+        return self.run_query(query=query)
+
+    def get_random_sample_of_rows(self, table_name: str, sample_size: int = 100):
+        query = f"SELECT * FROM {table_name} ORDER BY RANDOM() LIMIT {sample_size};"
+        rows = self.run_query(query=query)
+        return rows
+
+    def get_unique_values_in_column(self, table_name: str, colm_name: str):
+        query = f"SELECT DISTINCT {colm_name} FROM {table_name}"
+        rows = self.run_query(query=query)
+        rows = [dict(row) for row in rows]
+        return rows
+
+    def get_charges_in_db(self):
+        charges = self.get_unique_values_in_column(
+            table_name=PRODUCT_ION_TABLE, colm_name=CHARGE
+        )
+        return [x[CHARGE] for x in charges]
 
     def count_ion_mass_kmers(self, mass, tol, ion):
         upper = mass + tol
@@ -273,84 +234,50 @@ class ProteinProductIonDb:
         print(mass, ion, rows)
         return rows
 
-    def get_all_rows_from_table(self, table_name: str):
-        rows = self.cursor.execute(f"SELECT * FROM {table_name}").fetchall()
-        return rows
-
-    def get_protein_by_id(self, protein_id):
-        row = self.cursor.execute(
-            f"SELECT * FROM {PROTEIN_TABLE} WHERE {PROTEIN_ID} = ?", (protein_id,)
-        ).fetchone()
-        return row
-
-    # def get_max_mass(self, sequence, ion, charge):
-    #     if ion == "y":
-    #         total = SINGLY_CHARGED_Y_BASE if charge == 1 else DOUBLY_CHARGED_Y_BASE
-    #         total += sum([AMINO_ACIDS[aa] for aa in sequence])
-    #         mz = total / charge
-    #         return mz
-    #     else:
-    #         total = SINGLY_CHARGED_B_BASE if charge == 1 else DOUBLY_CHARGED_B_BASE
-    #         total += sum([AMINO_ACIDS[aa] for aa in sequence])
-    #     mz = total / charge
-    #     return mz
-
-    # def get_kmers_for_protein(self, kmer, start, end, protein_id, ion):
-    #     data_list = []
-    #     for charge in [1, 2]:
-    #         mass = self.get_max_mass(kmer, ion=ion, charge=charge)
-    #         ion_int = 0 if ion == "b" else 1
-    #         input_tuple = (mass, start, end, ion_int, charge, protein_id)
-    #         data_list.append(input_tuple)
-    #     return data_list
-
-    def check_for_enough_disk_space(self, protein_id, plen, last_percent):
-        percent = int((protein_id + 1) * 100 / plen)
-        print(f"\rOn protein {protein_id + 1}/{plen} [{percent}%]", end="")
-        if percent != last_percent:
-            last_percent = percent
-            free = shutil.disk_usage("/")[2]
-            free = free / (1024**3)
-            if free < 10:
-                print("\nUsed too much space, Space available =", free, "GB")
-                return False, last_percent
-            else:
-                return True, last_percent
-        return True, last_percent
-
-    def populate_database(
-        self,
-        kv_proteins,
-        max_peptide_length,
-        digest_left,
-        digest_right,
-        number_decimal_places,
-    ):
-        self.insert_prepped_proteins(kv_proteins)
-        self.insert_prepped_kmers(
-            kv_proteins,
-            max_peptide_length,
-            digest_left,
-            digest_right,
-            number_decimal_places,
+    def print_db_info(self):
+        print(
+            f"Number product ions = {self.get_number_rows(table_name=PRODUCT_ION_TABLE)}"
         )
-        self.index_ion_mass_kmers()
-        self.index_ion_mass_b_kmers()
-        self.index_ion_mass_y_kmers()
+        print(f"Tables in DB: {self.get_tables_in_db()}")
+        print(f"Charges in DB: {self.get_charges_in_db()}")
+
+
+def filter_ions_by_charge(
+    objects_with_charge: List[Any], max_charge: int, min_charge: int = 1
+) -> List[Any]:
+    return list(
+        filter(
+            lambda x: filter(
+                lambda x: min_charge <= x.charge <= max_charge, objects_with_charge
+            )
+        )
+    )
+
+
+def format_rows_of_product_ion_table(rows):
+    return [ProductIonTableRow(**dict(row)) for row in rows]
 
 
 def create_protein_product_ion_db(
     db_path: str,
-    fasta_path: str,
+    fasta_path: Optional[str] = None,
+    protein_seqs: Optional[List[str]] = None,
     max_kmer_len: int = MAX_KMER_LEN,
     charges_to_consider: List[int] = ION_CHARGES_TO_CONSIDER,
     amino_acid_mass_lookup: Dict[str, float] = AMINO_ACID_MASSES,
-    verbose: Optional[bool] = False,
 ) -> ProteinProductIonDb:
     """ """
     fcn_start_time = time.time()
-    logger.info(f"Adding proteins from fasta {fasta_path}")
-    proteins = list(get_proteins_from_fasta(fasta_path=fasta_path))
+    # Need to either provide a FASTA from which to
+    if fasta_path is not None:
+        logger.info(f"Adding proteins from fasta {fasta_path}")
+        proteins = list(get_proteins_from_fasta(fasta_path=fasta_path))
+    else:
+        assert protein_seqs is not None
+        proteins = [
+            Protein(sequence=seq, protein_id=protein_idx)
+            for protein_idx, seq in enumerate(protein_seqs)
+        ]
     num_proteins = len(proteins)
     db = ProteinProductIonDb(db_path=db_path, max_kmer_len=max_kmer_len)
     for protein_idx, protein in enumerate(proteins):
@@ -392,30 +319,19 @@ def get_b_ion_and_y_ion_corresponding_to_kmer(
         amino_acid_mass_lookup=amino_acid_mass_lookup,
     )
 
-    template_kmer_for_table = {
-        START: kmer.inclusive_start,
-        END: kmer.exclusive_end,
-        CHARGE: charge,
-        PROTEIN_ID: protein_id,
-    }
-    kmer_as_b_ion = deepcopy(template_kmer_for_table)
-    kmer_as_b_ion[MASS] = b_mass
-    kmer_as_y_ion = deepcopy(template_kmer_for_table)
-    kmer_as_y_ion[MASS] = y_mass
-
     return KmerIons(
         b_ion=ProductIonTableRow(
             mass=b_mass,
-            start=kmer.inclusive_start,
-            end=kmer.exclusive_end,
+            inclusive_start=kmer.inclusive_start,
+            exclusive_end=kmer.exclusive_end,
             ion=B_ION_AS_INT,
             charge=charge,
             protein_id=protein_id,
         ),
         y_ion=ProductIonTableRow(
             mass=y_mass,
-            start=kmer.inclusive_start,
-            end=kmer.exclusive_end,
+            inclusive_start=kmer.inclusive_start,
+            exclusive_end=kmer.exclusive_end,
             ion=Y_ION_AS_INT,
             charge=charge,
             protein_id=protein_id,
@@ -447,4 +363,17 @@ def add_protein_and_its_product_ions_to_db(
             )
             ions_for_table.extend([kmer_ions.b_ion, kmer_ions.y_ion])
 
-    db.insert_product_ions(kmers=ions_for_table)
+    db.insert_product_ions(product_ions=ions_for_table)
+
+
+def get_average_mass_search_time(db: ProductIonTableRow, sample_size: int = 100):
+    # query = f"SELECT * FROM {PRODUCT_ION_TABLE} ORDER BY RANDOM() LIMIT {sample_size};"
+    # rows = db.run_query(query=query)
+    rows = db.get_random_sample_of_rows(
+        table_name=PRODUCT_ION_TABLE, sample_size=sample_size
+    )
+    rows = format_rows_of_product_ion_table(rows=rows)
+
+    # for row in rows:
+
+    return rows

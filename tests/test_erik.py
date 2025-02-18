@@ -19,7 +19,8 @@ from src.erik import (  # Peptide,
 )
 from src.erik_constants import (
     CHARGE,
-    END,
+    EXCLUSIVE_END,
+    INCLUSIVE_START,
     ION,
     MASS,
     PRODUCT_ION_TABLE,
@@ -27,7 +28,6 @@ from src.erik_constants import (
     PROTEIN_TABLE,
     SEQ,
     SPECTRA_DIR,
-    START,
     TEST_DIR,
     THOMAS_SAMPLES,
 )

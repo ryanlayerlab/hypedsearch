@@ -18,8 +18,9 @@ from src.comet_utils import read_comet_txt_to_df
 from src.erik_constants import (
     COMET_RUN_1_DIR,
     COMET_RUN_2_DIR,
-    END,
+    EXCLUSIVE_END,
     HS_DIR,
+    INCLUSIVE_START,
     KMERS,
     MASS,
     MAX_KMER_LEN,
@@ -32,7 +33,6 @@ from src.erik_constants import (
     SEQ,
     SPECTRA_DIR,
     SPECTRUM_ID,
-    START,
     THOMAS_SAMPLES,
 )
 from src.erik_utils import (
@@ -261,6 +261,7 @@ def get_b_y_ion_sequences(peptide: str):
 
 
 def generate_kmers(peptide: str, max_k: int, min_k: Optional[int] = 1) -> List[Kmer]:
+    """"""
     disallowed_amino_acid_symbols = ["B", "X", "U", "Z", "O", "J"]
     kmers = []
     for kmer_len in range(min_k, max_k + 1):  # Iterate over all k from 1 to max_k
@@ -325,10 +326,6 @@ def get_indices_of_largest_elements(array: List[float], top_n: int):
 
 def mass_difference_in_ppm(ref_mass: float, query_mass: float) -> float:
     return (abs(ref_mass - query_mass) / ref_mass) * (10**6)
-
-
-def relative_ppm_tolerance_in_daltons(ppm: float, ref_mass: float) -> float:
-    return (ppm * ref_mass) / (10**6)
 
 
 def load_comet_data(samples: List[str] = THOMAS_SAMPLES, run: int = 1):

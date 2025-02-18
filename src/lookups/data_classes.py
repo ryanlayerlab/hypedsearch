@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Literal, Optional, Tuple
+from typing import List, Literal, Optional, Tuple
 
 
 @dataclass
@@ -46,8 +46,8 @@ class Spectrum:
 @dataclass(frozen=True)
 class ProductIonTableRow:
     mass: float
-    start: int
-    end: int
+    inclusive_start: int
+    exclusive_end: int
     ion: int
     charge: int
     protein_id: int
@@ -76,3 +76,9 @@ class Ion:
 class PeakIonMatch:
     peak: Peak
     ion: Ion
+
+
+@dataclass(frozen=True)
+class PeakIonMatches:
+    peak: Peak
+    ions: List[IonWithProteinInfo]

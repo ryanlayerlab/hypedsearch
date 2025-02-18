@@ -33,6 +33,10 @@ from src.lookups.constants import (
 )
 
 
+def relative_ppm_tolerance_in_daltons(ppm: float, ref_mass: float) -> float:
+    return (ppm * ref_mass) / (10**6)
+
+
 def file_exists(file_name: str) -> bool:
     return os.path.isfile(file_name)
 
@@ -192,3 +196,12 @@ def timeit(func):
         return result
 
     return wrapper
+
+
+def get_time_in_diff_units(time_sec: float, decimal_places: int = 2):
+    rounding = lambda x: round(x, decimal_places)
+    return (
+        f"{rounding(time_sec)} secs = "
+        f"{rounding(time_sec / 60)} mins = "
+        f"{rounding(time_sec / (60*60))} hrs"
+    )

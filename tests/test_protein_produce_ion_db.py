@@ -1,6 +1,8 @@
 import random
+import sqlite3
 import time
 from collections import Counter
+from dataclasses import asdict
 from pathlib import Path
 from sqlite3 import IntegrityError
 from typing import List, Optional
@@ -25,7 +27,8 @@ from src.erik import (  # Peptide,
 from src.erik_constants import (
     B_ION_AS_INT,
     CHARGE,
-    END,
+    EXCLUSIVE_END,
+    INCLUSIVE_START,
     ION,
     MASS,
     PRODUCT_ION_TABLE,
@@ -33,7 +36,7 @@ from src.erik_constants import (
     PROTEIN_TABLE,
     SEQ,
     SPECTRA_DIR,
-    START,
+    SUBSEQ,
     TEST_DIR,
     Y_ION_AS_INT,
 )
@@ -44,7 +47,7 @@ from src.lookups.constants import (
     SINGLY_CHARGED_B_BASE,
     SINGLY_CHARGED_Y_BASE,
 )
-from src.lookups.data_classes import Kmer, Protein
+from src.lookups.data_classes import IonWithProteinInfo, Kmer, Protein
 from src.lookups.protein_product_ion_db import (
     KmerIons,
     ProductIonTableRow,
@@ -86,8 +89,8 @@ def create_db_with_given_kmer_masses(
         kmers.append(
             ProductIonTableRow(
                 mass=mass,
-                start=start,
-                end=end,
+                inclusive_start=start,
+                exclusive_end=end,
                 ion=B_ION_AS_INT,
                 charge=charge,
                 protein_id=protein_idx,
@@ -104,8 +107,8 @@ def create_db_with_given_kmer_masses(
         kmers.append(
             ProductIonTableRow(
                 mass=mass,
-                start=start,
-                end=end,
+                inclusive_start=start,
+                exclusive_end=end,
                 ion=Y_ION_AS_INT,
                 charge=charge,
                 protein_id=protein_idx,
@@ -120,7 +123,7 @@ def create_db_with_given_kmer_masses(
             for p_id, p_seq in enumerate(protein_seqs)
         ]
     )
-    db.insert_product_ions(kmers=kmers)
+    db.insert_product_ions(product_ions=kmers)
 
     return db
 
@@ -134,9 +137,9 @@ class TestCreateDbWithGivenKmerMasses:
         db = create_db_with_given_kmer_masses(
             b_ion_masses=b_ion_masses, y_ion_masses=y_ion_masses, protein_seqs=proteins
         )
-        kmer_rows = db.get_all_rows_from_table(table_name=PRODUCT_ION_TABLE)
-        protein_rows = db.get_all_rows_from_table(table_name=PROTEIN_TABLE)
-        assert len(kmer_rows) == len(b_ion_masses) + len(y_ion_masses)
+        product_ion_rows = db.run_query(query=f"SELECT * FROM {PRODUCT_ION_TABLE}")
+        protein_rows = db.run_query(query=f"SELECT * FROM {PROTEIN_TABLE}")
+        assert len(product_ion_rows) == len(b_ion_masses) + len(y_ion_masses)
         assert len(proteins) == len(protein_rows)
 
 
@@ -161,7 +164,9 @@ class TestProteinKmerDbInit:
 
         # Check that tables have correct columns
         # kmer table
-        expected_colms = set([MASS, START, END, ION, CHARGE, PROTEIN_ID])
+        expected_colms = set(
+            [MASS, INCLUSIVE_START, EXCLUSIVE_END, ION, CHARGE, PROTEIN_ID]
+        )
         result = query_database(
             query=f"PRAGMA table_info({PRODUCT_ION_TABLE})", db_path=db_path
         )
@@ -227,23 +232,23 @@ class TestInsertKmers:
         kmers = [
             ProductIonTableRow(
                 mass=1,
-                start=0,
-                end=3,
+                inclusive_start=0,
+                exclusive_end=3,
                 ion=4,
                 charge=5,
                 protein_id=0,
             ),
             ProductIonTableRow(
                 mass=7,
-                start=8,
-                end=9,
+                inclusive_start=8,
+                exclusive_end=9,
                 ion=10,
                 charge=11,
                 protein_id=1,
             ),
         ]
         # Act
-        db.insert_product_ions(kmers=kmers)
+        db.insert_product_ions(product_ions=kmers)
 
         # Assert
         actual = db.cursor.execute(f"SELECT * FROM {PRODUCT_ION_TABLE}").fetchall()
@@ -260,16 +265,16 @@ class TestGetBIonAndYIonCorrespondingToKmer:
         charge, protein_id = 3, 4
         expected_b_ion = ProductIonTableRow(
             mass=b_mass,
-            start=start,
-            end=end,
+            inclusive_start=start,
+            exclusive_end=end,
             ion=B_ION_AS_INT,
             charge=charge,
             protein_id=protein_id,
         )
         expected_y_ion = ProductIonTableRow(
             mass=y_mass,
-            start=start,
-            end=end,
+            inclusive_start=start,
+            exclusive_end=end,
             ion=Y_ION_AS_INT,
             charge=charge,
             protein_id=protein_id,
@@ -350,133 +355,333 @@ class TestPrepareProteinKmerDatabase:
         expected_kmers = [
             # A
             ProductIonTableRow(
-                mass=1, start=0, end=1, ion=B_ION_AS_INT, charge=1, protein_id=0
+                mass=1,
+                inclusive_start=0,
+                exclusive_end=1,
+                ion=B_ION_AS_INT,
+                charge=1,
+                protein_id=0,
             ),
             ProductIonTableRow(
-                mass=2, start=0, end=1, ion=Y_ION_AS_INT, charge=1, protein_id=0
+                mass=2,
+                inclusive_start=0,
+                exclusive_end=1,
+                ion=Y_ION_AS_INT,
+                charge=1,
+                protein_id=0,
             ),
             ProductIonTableRow(
-                mass=1, start=0, end=1, ion=B_ION_AS_INT, charge=2, protein_id=0
+                mass=1,
+                inclusive_start=0,
+                exclusive_end=1,
+                ion=B_ION_AS_INT,
+                charge=2,
+                protein_id=0,
             ),
             ProductIonTableRow(
-                mass=2, start=0, end=1, ion=Y_ION_AS_INT, charge=2, protein_id=0
+                mass=2,
+                inclusive_start=0,
+                exclusive_end=1,
+                ion=Y_ION_AS_INT,
+                charge=2,
+                protein_id=0,
             ),
             # C
             ProductIonTableRow(
-                mass=1, start=1, end=2, ion=B_ION_AS_INT, charge=1, protein_id=0
+                mass=1,
+                inclusive_start=1,
+                exclusive_end=2,
+                ion=B_ION_AS_INT,
+                charge=1,
+                protein_id=0,
             ),
             ProductIonTableRow(
-                mass=2, start=1, end=2, ion=Y_ION_AS_INT, charge=1, protein_id=0
+                mass=2,
+                inclusive_start=1,
+                exclusive_end=2,
+                ion=Y_ION_AS_INT,
+                charge=1,
+                protein_id=0,
             ),
             ProductIonTableRow(
-                mass=1, start=1, end=2, ion=B_ION_AS_INT, charge=2, protein_id=0
+                mass=1,
+                inclusive_start=1,
+                exclusive_end=2,
+                ion=B_ION_AS_INT,
+                charge=2,
+                protein_id=0,
             ),
             ProductIonTableRow(
-                mass=2, start=1, end=2, ion=Y_ION_AS_INT, charge=2, protein_id=0
+                mass=2,
+                inclusive_start=1,
+                exclusive_end=2,
+                ion=Y_ION_AS_INT,
+                charge=2,
+                protein_id=0,
             ),
             # D
             ProductIonTableRow(
-                mass=1, start=2, end=3, ion=B_ION_AS_INT, charge=1, protein_id=0
+                mass=1,
+                inclusive_start=2,
+                exclusive_end=3,
+                ion=B_ION_AS_INT,
+                charge=1,
+                protein_id=0,
             ),
             ProductIonTableRow(
-                mass=2, start=2, end=3, ion=Y_ION_AS_INT, charge=1, protein_id=0
+                mass=2,
+                inclusive_start=2,
+                exclusive_end=3,
+                ion=Y_ION_AS_INT,
+                charge=1,
+                protein_id=0,
             ),
             ProductIonTableRow(
-                mass=1, start=2, end=3, ion=B_ION_AS_INT, charge=2, protein_id=0
+                mass=1,
+                inclusive_start=2,
+                exclusive_end=3,
+                ion=B_ION_AS_INT,
+                charge=2,
+                protein_id=0,
             ),
             ProductIonTableRow(
-                mass=2, start=2, end=3, ion=Y_ION_AS_INT, charge=2, protein_id=0
+                mass=2,
+                inclusive_start=2,
+                exclusive_end=3,
+                ion=Y_ION_AS_INT,
+                charge=2,
+                protein_id=0,
             ),
             # AC
             ProductIonTableRow(
-                mass=1, start=0, end=2, ion=B_ION_AS_INT, charge=1, protein_id=0
+                mass=1,
+                inclusive_start=0,
+                exclusive_end=2,
+                ion=B_ION_AS_INT,
+                charge=1,
+                protein_id=0,
             ),
             ProductIonTableRow(
-                mass=2, start=0, end=2, ion=Y_ION_AS_INT, charge=1, protein_id=0
+                mass=2,
+                inclusive_start=0,
+                exclusive_end=2,
+                ion=Y_ION_AS_INT,
+                charge=1,
+                protein_id=0,
             ),
             ProductIonTableRow(
-                mass=1, start=0, end=2, ion=B_ION_AS_INT, charge=2, protein_id=0
+                mass=1,
+                inclusive_start=0,
+                exclusive_end=2,
+                ion=B_ION_AS_INT,
+                charge=2,
+                protein_id=0,
             ),
             ProductIonTableRow(
-                mass=2, start=0, end=2, ion=Y_ION_AS_INT, charge=2, protein_id=0
+                mass=2,
+                inclusive_start=0,
+                exclusive_end=2,
+                ion=Y_ION_AS_INT,
+                charge=2,
+                protein_id=0,
             ),
             # CD
             ProductIonTableRow(
-                mass=1, start=1, end=3, ion=B_ION_AS_INT, charge=1, protein_id=0
+                mass=1,
+                inclusive_start=1,
+                exclusive_end=3,
+                ion=B_ION_AS_INT,
+                charge=1,
+                protein_id=0,
             ),
             ProductIonTableRow(
-                mass=2, start=1, end=3, ion=Y_ION_AS_INT, charge=1, protein_id=0
+                mass=2,
+                inclusive_start=1,
+                exclusive_end=3,
+                ion=Y_ION_AS_INT,
+                charge=1,
+                protein_id=0,
             ),
             ProductIonTableRow(
-                mass=1, start=1, end=3, ion=B_ION_AS_INT, charge=2, protein_id=0
+                mass=1,
+                inclusive_start=1,
+                exclusive_end=3,
+                ion=B_ION_AS_INT,
+                charge=2,
+                protein_id=0,
             ),
             ProductIonTableRow(
-                mass=2, start=1, end=3, ion=Y_ION_AS_INT, charge=2, protein_id=0
+                mass=2,
+                inclusive_start=1,
+                exclusive_end=3,
+                ion=Y_ION_AS_INT,
+                charge=2,
+                protein_id=0,
             ),
             # E
             ProductIonTableRow(
-                mass=1, start=0, end=1, ion=B_ION_AS_INT, charge=1, protein_id=1
+                mass=1,
+                inclusive_start=0,
+                exclusive_end=1,
+                ion=B_ION_AS_INT,
+                charge=1,
+                protein_id=1,
             ),
             ProductIonTableRow(
-                mass=2, start=0, end=1, ion=Y_ION_AS_INT, charge=1, protein_id=1
+                mass=2,
+                inclusive_start=0,
+                exclusive_end=1,
+                ion=Y_ION_AS_INT,
+                charge=1,
+                protein_id=1,
             ),
             ProductIonTableRow(
-                mass=1, start=0, end=1, ion=B_ION_AS_INT, charge=2, protein_id=1
+                mass=1,
+                inclusive_start=0,
+                exclusive_end=1,
+                ion=B_ION_AS_INT,
+                charge=2,
+                protein_id=1,
             ),
             ProductIonTableRow(
-                mass=2, start=0, end=1, ion=Y_ION_AS_INT, charge=2, protein_id=1
+                mass=2,
+                inclusive_start=0,
+                exclusive_end=1,
+                ion=Y_ION_AS_INT,
+                charge=2,
+                protein_id=1,
             ),
             # F
             ProductIonTableRow(
-                mass=1, start=1, end=2, ion=B_ION_AS_INT, charge=1, protein_id=1
+                mass=1,
+                inclusive_start=1,
+                exclusive_end=2,
+                ion=B_ION_AS_INT,
+                charge=1,
+                protein_id=1,
             ),
             ProductIonTableRow(
-                mass=2, start=1, end=2, ion=Y_ION_AS_INT, charge=1, protein_id=1
+                mass=2,
+                inclusive_start=1,
+                exclusive_end=2,
+                ion=Y_ION_AS_INT,
+                charge=1,
+                protein_id=1,
             ),
             ProductIonTableRow(
-                mass=1, start=1, end=2, ion=B_ION_AS_INT, charge=2, protein_id=1
+                mass=1,
+                inclusive_start=1,
+                exclusive_end=2,
+                ion=B_ION_AS_INT,
+                charge=2,
+                protein_id=1,
             ),
             ProductIonTableRow(
-                mass=2, start=1, end=2, ion=Y_ION_AS_INT, charge=2, protein_id=1
+                mass=2,
+                inclusive_start=1,
+                exclusive_end=2,
+                ion=Y_ION_AS_INT,
+                charge=2,
+                protein_id=1,
             ),
             # G
             ProductIonTableRow(
-                mass=1, start=2, end=3, ion=B_ION_AS_INT, charge=1, protein_id=1
+                mass=1,
+                inclusive_start=2,
+                exclusive_end=3,
+                ion=B_ION_AS_INT,
+                charge=1,
+                protein_id=1,
             ),
             ProductIonTableRow(
-                mass=2, start=2, end=3, ion=Y_ION_AS_INT, charge=1, protein_id=1
+                mass=2,
+                inclusive_start=2,
+                exclusive_end=3,
+                ion=Y_ION_AS_INT,
+                charge=1,
+                protein_id=1,
             ),
             ProductIonTableRow(
-                mass=1, start=2, end=3, ion=B_ION_AS_INT, charge=2, protein_id=1
+                mass=1,
+                inclusive_start=2,
+                exclusive_end=3,
+                ion=B_ION_AS_INT,
+                charge=2,
+                protein_id=1,
             ),
             ProductIonTableRow(
-                mass=2, start=2, end=3, ion=Y_ION_AS_INT, charge=2, protein_id=1
+                mass=2,
+                inclusive_start=2,
+                exclusive_end=3,
+                ion=Y_ION_AS_INT,
+                charge=2,
+                protein_id=1,
             ),
             # EF
             ProductIonTableRow(
-                mass=1, start=0, end=2, ion=B_ION_AS_INT, charge=1, protein_id=1
+                mass=1,
+                inclusive_start=0,
+                exclusive_end=2,
+                ion=B_ION_AS_INT,
+                charge=1,
+                protein_id=1,
             ),
             ProductIonTableRow(
-                mass=2, start=0, end=2, ion=Y_ION_AS_INT, charge=1, protein_id=1
+                mass=2,
+                inclusive_start=0,
+                exclusive_end=2,
+                ion=Y_ION_AS_INT,
+                charge=1,
+                protein_id=1,
             ),
             ProductIonTableRow(
-                mass=1, start=0, end=2, ion=B_ION_AS_INT, charge=2, protein_id=1
+                mass=1,
+                inclusive_start=0,
+                exclusive_end=2,
+                ion=B_ION_AS_INT,
+                charge=2,
+                protein_id=1,
             ),
             ProductIonTableRow(
-                mass=2, start=0, end=2, ion=Y_ION_AS_INT, charge=2, protein_id=1
+                mass=2,
+                inclusive_start=0,
+                exclusive_end=2,
+                ion=Y_ION_AS_INT,
+                charge=2,
+                protein_id=1,
             ),
             # FG
             ProductIonTableRow(
-                mass=1, start=1, end=3, ion=B_ION_AS_INT, charge=1, protein_id=1
+                mass=1,
+                inclusive_start=1,
+                exclusive_end=3,
+                ion=B_ION_AS_INT,
+                charge=1,
+                protein_id=1,
             ),
             ProductIonTableRow(
-                mass=2, start=1, end=3, ion=Y_ION_AS_INT, charge=1, protein_id=1
+                mass=2,
+                inclusive_start=1,
+                exclusive_end=3,
+                ion=Y_ION_AS_INT,
+                charge=1,
+                protein_id=1,
             ),
             ProductIonTableRow(
-                mass=1, start=1, end=3, ion=B_ION_AS_INT, charge=2, protein_id=1
+                mass=1,
+                inclusive_start=1,
+                exclusive_end=3,
+                ion=B_ION_AS_INT,
+                charge=2,
+                protein_id=1,
             ),
             ProductIonTableRow(
-                mass=2, start=1, end=3, ion=Y_ION_AS_INT, charge=2, protein_id=1
+                mass=2,
+                inclusive_start=1,
+                exclusive_end=3,
+                ion=Y_ION_AS_INT,
+                charge=2,
+                protein_id=1,
             ),
         ]
 
@@ -518,10 +723,105 @@ class TestGetIonsWithinMassTolerance:
 
         # Act
         matching_ions = db.get_ions_within_mass_tolerance(
-            query_mass=query_mass, tolerance=tol
+            query_mass=query_mass, mz_tolerance=tol
         )
 
         # Assert
         assert len(matching_ions) == 2
         assert (matching_ions[0].mass == 2.02) or (matching_ions[1].mass == 2.02)
         assert (matching_ions[0].mass == 1.96) or (matching_ions[1].mass == 1.96)
+
+    @staticmethod
+    def test_blah():
+        # Define proteins and product ions to put in database
+        proteins = [
+            Protein(protein_id=0, sequence="ACDEFG"),
+            Protein(protein_id=1, sequence="HIKLMN"),
+        ]
+        product_ions = [
+            ProductIonTableRow(
+                mass=1,
+                inclusive_start=0,
+                exclusive_end=2,
+                ion=B_ION_AS_INT,
+                charge=2,
+                protein_id=0,
+            ),
+            ProductIonTableRow(
+                mass=1.96,
+                inclusive_start=0,
+                exclusive_end=1,
+                ion=B_ION_AS_INT,
+                charge=1,
+                protein_id=0,
+            ),
+            ProductIonTableRow(
+                mass=2.02,
+                inclusive_start=1,
+                exclusive_end=3,
+                ion=B_ION_AS_INT,
+                charge=2,
+                protein_id=1,
+            ),
+            ProductIonTableRow(
+                mass=3,
+                inclusive_start=2,
+                exclusive_end=5,
+                ion=B_ION_AS_INT,
+                charge=2,
+                protein_id=1,
+            ),
+        ]
+
+        expected = [
+            IonWithProteinInfo(**asdict(product_ions[1]) | {SUBSEQ: "A"}),
+            IonWithProteinInfo(**asdict(product_ions[2]) | {SUBSEQ: "IK"}),
+        ]
+
+        db = ProteinProductIonDb(db_path=":memory:", max_kmer_len=10)
+        db.insert_proteins(proteins=proteins)
+        db.insert_product_ions(product_ions=product_ions)
+
+        # Act
+        query_mass, tol = 2, 0.05
+        result = db.get_ions_within_mass_tolerance(
+            query_mass=query_mass, mz_tolerance=tol
+        )
+
+        # Assert
+        assert result == expected
+
+
+class TestSQLite3:
+    @staticmethod
+    def test_one_based_and_inclusive_of_endpoints():
+        """
+        Test to verify that the SUBSTR command is 1-based
+        """
+        # Arrange
+        seq = "ABCD"
+        start, length = 2, 3
+        expected = "BCD"
+
+        # Act
+        conn = sqlite3.connect(":memory:")
+        cursor = conn.cursor()
+        result = cursor.execute(
+            f"SELECT SUBSTR('{seq}', {start}, {length});"
+        ).fetchall()[0][0]
+        assert result == expected
+
+    @staticmethod
+    def test_convert_python_zero_based_indexing_to_sql_one_based():
+        # Arrange
+        seq = "ABCDEF"
+        inclusive_start, exclusive_end = 1, 5
+        length = exclusive_end - inclusive_start
+        expected = "BCDE"
+
+        conn = sqlite3.connect(":memory:")
+        cursor = conn.cursor()
+        result = cursor.execute(
+            f"SELECT SUBSTR('{seq}', {inclusive_start + 1}, {length});"
+        ).fetchall()[0][0]
+        assert result == expected

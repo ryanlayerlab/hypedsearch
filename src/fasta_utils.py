@@ -1,4 +1,4 @@
-from typing import Generator
+from typing import Generator, List
 
 from Bio import SeqIO
 
@@ -12,3 +12,16 @@ def get_proteins_from_fasta(fasta_path: str) -> Generator[Protein, None, None]:
             sequence=str(protein.seq),
             desc=protein.description,
         )
+
+
+def get_specific_protein_from_fasta(fasta_path: str, protein_name: str) -> Protein:
+    proteins = list(get_proteins_from_fasta(fasta_path=fasta_path))
+    matching_proteins = list(
+        filter(lambda protein: protein.desc.split(" ")[0] == protein_name, proteins)
+    )
+    assert len(matching_proteins) == 1, (
+        f"Expected there to be one row in the FASTA ({fasta_path}) "
+        f"with the given protein name ({protein_name})"
+    )
+    protein = matching_proteins[0]
+    return protein
