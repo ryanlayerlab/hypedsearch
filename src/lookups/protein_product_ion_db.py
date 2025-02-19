@@ -194,6 +194,12 @@ class ProteinProductIonDb:
         rows = self.run_query(query=query)
         return [dict(row)[name] for row in rows]
 
+    def get_indices_in_db(self):
+        name = "name"
+        query = f"SELECT {name} FROM sqlite_master WHERE type='index';"
+        rows = self.run_query(query=query)
+        return [dict(row)[name] for row in rows]
+
     def read_all_table_rows(self, table_name: str):
         query = f"SELECT * FROM {table_name}"
         return self.run_query(query=query)

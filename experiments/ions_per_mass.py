@@ -41,10 +41,13 @@ class MassSearch:
 def search_over_random_sample_of_ions(
     db: ProteinProductIonDb, sample_size: int, ppm_tolerance: float
 ) -> List[MassSearch]:
+    print("Generating random sample...")
     ions = get_random_sample_of_ions(db=db, sample_size=sample_size)
+    print("Finished generating random sample")
 
     search_results = []
-    for ion in ions:
+    for ion_idx, ion in enumerate(ions):
+        print(f"Ion {ion_idx+1} of {sample_size}")
         # Perform search
         start_time = time.time()
         matching_ions = db.get_ions_within_mass_tolerance(
@@ -95,13 +98,13 @@ def main(
 
 
 # TESTING
-print(GIT_REPO_DIR)
-print(os.getcwd())
-print(f"Python path: {sys.path}")
+# print(GIT_REPO_DIR)
+# print(os.getcwd())
+# print(f"Python path: {sys.path}")
 
-# Load database
-db_path = "dbs/test.proteinproduction.db"
-db = load_existing_protein_product_ion_db(db_path=db_path)
-db.print_db_info()
+# # Load database
+# db_path = "dbs/test.proteinproduction.db"
+# db = load_existing_protein_product_ion_db(db_path=db_path)
+# db.print_db_info()
 
-main(db_path=db_path, sample_size=10, ppm_tolerance=10, output_dir="dbs")
+# main(db_path=db_path, sample_size=10, ppm_tolerance=10, output_dir="dbs")
