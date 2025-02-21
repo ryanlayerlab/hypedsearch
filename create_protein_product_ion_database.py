@@ -6,7 +6,7 @@ from typing import List
 
 import click
 
-from src.erik_constants import MAX_PEPTIDE_LEN
+from src.constants import MAX_PEPTIDE_LEN
 from src.erik_utils import log_params, setup_logger
 from src.lookups.protein_product_ion_db import (
     ProteinProductIonDb,
@@ -77,13 +77,14 @@ def create_protein_and_product_ion_database(
         sys.exit(0)
     else:
         try:
-            create_protein_product_ion_db(
+            db = create_protein_product_ion_db(
                 fasta_path=fasta_path,
                 db_path=db_path,
                 max_kmer_len=max_kmer_len,
                 charges_to_consider=charges,
             )
             logger.info(f"DONE! Took {round(time.time() - fcn_start_time, 2)} seconds")
+            return db
         except Exception as e:
             # Delete database if it was created
             if db_path.exists():
@@ -92,4 +93,5 @@ def create_protein_and_product_ion_database(
 
 
 if __name__ == "__main__":
-    create_protein_and_product_ion_database()
+    # Add proteins and product ions to the database
+    db = create_protein_and_product_ion_database()

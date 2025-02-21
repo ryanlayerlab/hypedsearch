@@ -12,7 +12,7 @@ GIT_REPO_DIR = Path(__file__).parents[1]
 
 sys.path.append(str(GIT_REPO_DIR))
 
-from src.erik_constants import CHARGE, PRODUCT_ION_TABLE
+from src.constants import CHARGE, PRODUCT_ION_TABLE
 from src.lookups.protein_product_ion_db import (
     ProteinProductIonDb,
     format_rows_of_product_ion_table,

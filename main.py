@@ -1,8 +1,8 @@
 import time
 from typing import List
 
+from src.constants import ION_CHARGES_TO_CONSIDER
 from src.erik import parse_mzml
-from src.erik_constants import ION_CHARGES_TO_CONSIDER
 from src.fasta_utils import get_proteins_from_fasta
 
 # from src.identification import get_matched_fragment

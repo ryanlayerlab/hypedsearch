@@ -6,8 +6,8 @@ from typing import Dict, Iterator, List
 
 import click
 
+from src.constants import CHARGE, LOGS_DIR, MASS, MAX_PEPTIDE_LEN, SEQ
 from src.erik import generate_kmers_with_masses
-from src.erik_constants import CHARGE, LOGS_DIR, MASS, MAX_PEPTIDE_LEN, SEQ
 from src.erik_utils import log_params, setup_logger
 from src.fasta_utils import get_proteins_from_fasta
 from src.lookups.constants import AMINO_ACID_MASSES
