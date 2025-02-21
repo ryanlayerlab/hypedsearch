@@ -146,5 +146,7 @@ data
 .mzML
 comet
 
-# Slurm log files
+# Directories to ignore 
 slurm/logs
+old_src
+old_tests

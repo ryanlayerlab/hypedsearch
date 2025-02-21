@@ -41,6 +41,9 @@ PROTEIN_ID = "protein_id"
 PRODUCT_ION_TABLE = "product_ions"
 PROTEIN_TABLE = "proteins"
 SUBSEQ = "subsequence"
+B_ION_TYPE = "b"
+Y_ION_TYPE = "y"
+ALL_IONS = "all"
 
 # Numeric constants
 MAX_PEPTIDE_LEN = 50
@@ -57,3 +60,38 @@ THOMAS_SAMPLES = [f"BMEM_AspN_Fxn{val}" for val in [4, 5, 6, 7, 8, 9]]
 # ## Asserts
 # assert file_exists(COMET_PARAMS) == True, "Comet executable not found!"
 # assert file_exists(COMET_EXECUTABLE) == True, "Comet executable not found!"
+
+# Amino acid masses
+# Source for dictionary below is the code here https://www.rapidnovor.com/mxie-customized/massCal.js
+# which is used by this website to compute masses: https://www.rapidnovor.com/mass-calculator/
+AMINO_ACID_MASSES = {
+    "A": 71.0371138,
+    "R": 156.1011110,
+    "N": 114.0429274,
+    "D": 115.0269430,
+    "C": 103.0091845,
+    "E": 129.0425931,
+    "Q": 128.0585775,
+    "G": 57.0214637,
+    "H": 137.0589119,
+    "I": 113.0840640,
+    "L": 113.0840640,
+    "K": 128.0949630,
+    "M": 131.0404846,
+    "F": 147.0684139,
+    "P": 97.0527639,
+    "S": 87.0320284,
+    "T": 101.0476785,
+    "W": 186.0793130,
+    "Y": 163.0633285,
+    "U": 168.9641990,
+    "V": 99.0684139,
+}
+
+# Other masses
+HYDROGEN_MASS = 1.007825035
+WATER_MASS = 18.010564686  # from https://www.rapidnovor.com/mxie-customized/massCal.js
+OXYGEN_MASS = 15.99491463
+PROTON_MASS = 1.00727646688  # from Scott
+# This is the mass of water. Adding the mass of water to the sum of all the residue masses gives the mass of the peptide.
+WATER_MASS = (2 * HYDROGEN_MASS) + OXYGEN_MASS

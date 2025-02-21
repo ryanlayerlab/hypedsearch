@@ -6,7 +6,7 @@ from typing import List, Union
 import pandas as pd
 from pydantic import BaseModel, field_validator
 
-from src.erik_constants import SAMPLE
+from src.constants import SAMPLE
 from src.erik_utils import make_dir
 
 
