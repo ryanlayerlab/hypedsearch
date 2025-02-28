@@ -17,11 +17,15 @@ from src.utils import pickle_and_compress, setup_logger
 logger = setup_logger()
 
 # Constants
-testing = True
+testing = False
 peak_filtering = True
 top_n_peaks = 50
-ppm_tolerance = 10
+ppm_tolerance = 5
 ion_types = [IonTypes.B_ION_TYPE, IonTypes.Y_ION_TYPE]
+
+logger.info(
+    f"Running with testing={testing}, peak_filtering={peak_filtering}, top_n_peaks={top_n_peaks}, ppmTol={ppm_tolerance}"
+)
 
 # Load comet data
 comet_df = load_comet_data()
