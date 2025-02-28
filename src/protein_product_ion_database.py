@@ -179,7 +179,6 @@ class ProteinProductIonDb(Sqlite3Database):
         return [self.product_ion_obj(**row) for row in rows]
 
 
-@log_params
 def create_and_populate_protein_and_product_ion_database(
     charges: List[int],
     ion_types: List[IonTypes],
