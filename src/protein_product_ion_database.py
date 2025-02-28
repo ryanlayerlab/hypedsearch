@@ -150,7 +150,7 @@ class ProteinProductIonDb(Sqlite3Database):
         query_mass: float,
         mz_tolerance: Optional[float] = None,
         ppm_tolerance: Optional[float] = None,
-    ) -> DbProductIon:
+    ) -> List[DbProductIon]:
 
         if ppm_tolerance is not None:
             mz_tolerance = relative_ppm_tolerance_in_daltons(
