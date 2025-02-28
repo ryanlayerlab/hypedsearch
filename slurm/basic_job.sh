@@ -11,4 +11,4 @@
 #SBATCH --error=/scratch/Shares/layer/hypedsearch/hypedsearch/slurm/logs/slurm_%j.err   # %j inserts job number
 
 
-python scripts/db_creation_and_indexing_timing.py
+python scripts/db_creation_indexing_querying_timing.py
