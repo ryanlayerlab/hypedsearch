@@ -149,7 +149,7 @@ class Sqlite3Database:
         query = f"CREATE INDEX {index_name} ON {table_name}({colms})"
         self.execute_query(query=query)
         logger.info(
-            f"Took {get_time_in_diff_units(time_sec=(time.time() - start_time))}"
+            f"Indexing took {get_time_in_diff_units(time_sec=(time.time() - start_time))}"
         )
 
     def create_table_from_dataclass(self, table_name: str, obj: type[SqlTableRow]):

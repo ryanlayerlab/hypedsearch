@@ -149,17 +149,21 @@ def get_proteins_from_fasta(fasta_path: str) -> List[Peptide]:
     return proteins
 
 
-def get_specific_protein_from_fasta(fasta_path: str, protein_name: str) -> Peptide:
-    proteins = list(get_proteins_from_fasta(fasta_path=fasta_path))
+def get_proteins_by_name(
+    protein_names: str,
+    fasta_path: Optional[str] = None,
+    proteins: Optional[List[Peptide]] = None,
+) -> List[Peptide]:
+    if fasta_path is not None:
+        proteins = list(get_proteins_from_fasta(fasta_path=fasta_path))
     matching_proteins = list(
-        filter(lambda protein: protein.desc.split(" ")[0] == protein_name, proteins)
+        filter(lambda protein: protein.desc.split(" ")[0] in protein_names, proteins)
     )
-    assert len(matching_proteins) == 1, (
+    assert len(matching_proteins) == len(protein_names), (
         f"Expected there to be one row in the FASTA ({fasta_path}) "
-        f"with the given protein name ({protein_name})"
+        f"for each of the given proteins ({protein_names})"
     )
-    protein = matching_proteins[0]
-    return protein
+    return matching_proteins
 
 
 def get_unique_kmers(peptides: List[Peptide], k: int) -> Set[str]:
