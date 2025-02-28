@@ -1,6 +1,9 @@
 from pathlib import Path
 from typing import List
 
+B_NEUTRAL_MASS_CALCULATOR = "src.peptides_and_ions.compute_b_ion_neutral_mass"
+Y_NEUTRAL_MASS_CALCULATOR = "src.peptides_and_ions.compute_y_ion_neutral_mass"
+
 
 def create_fasta(
     folder: Path,

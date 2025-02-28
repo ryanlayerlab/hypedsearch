@@ -1,30 +1,34 @@
 from unittest.mock import patch
 
-from src.constants import B_ION_TYPE, Y_ION_TYPE
+import pytest
+
+from src.constants import B_ION_TYPE, Y_ION_TYPE, IonTypes
 from src.peptides_and_ions import (
     BIonCreator,
-    Fasta,
     Peptide,
     ProductIon,
     YIonCreator,
     generate_product_ions,
     get_proteins_from_fasta,
+    get_unique_kmers,
+    random_sample_of_unique_kmers,
 )
-from tests.fixtures_and_helpers import create_fasta
+from tests.fixtures_and_helpers import (
+    B_NEUTRAL_MASS_CALCULATOR,
+    Y_NEUTRAL_MASS_CALCULATOR,
+    create_fasta,
+)
 
-B_NEUTRAL_MASS_CALCULATOR = "src.peptides_and_ions.compute_b_ion_neutral_mass"
-Y_NEUTRAL_MASS_CALCULATOR = "src.peptides_and_ions.compute_y_ion_neutral_mass"
 
-
-class TestGetProteinsFromFasta:
+class Test_get_proteins_from_fasta:
     @staticmethod
     def test_smoke(tmp_path):
         fasta_path = tmp_path / "test.fasta"
         seqs = ["ATG", "CGT"]
         create_fasta(folder=tmp_path, seqs=seqs)
         expected_out = [
-            Peptide(seq="ATG", desc="seq1", id=0),
-            Peptide(seq="CGT", desc="seq2", id=1),
+            Peptide(seq="ATG", name="seq1", desc="seq1", id=0),
+            Peptide(seq="CGT", name="seq2", desc="seq2", id=1),
         ]
         actual = get_proteins_from_fasta(fasta_path=fasta_path)
         assert actual == expected_out
@@ -35,15 +39,14 @@ class TestGetProteinsFromFasta:
         seqs = ["ATG", "CGT"]
         create_fasta(folder=tmp_path, seqs=seqs)
         expected_out = [
-            Peptide(seq="ATG", desc="seq1", id=0),
-            Peptide(seq="CGT", desc="seq2", id=1),
+            Peptide(seq="ATG", name="seq1", desc="seq1", id=0),
+            Peptide(seq="CGT", name="seq2", desc="seq2", id=1),
         ]
-        fasta = Fasta(path=fasta_path)
-        actual = fasta.proteins()
+        actual = Peptide.from_fasta(fasta_path=fasta_path)
         assert actual == expected_out
 
 
-class TestProductIonCreators:
+class Test_ProductIonCreators_generate_product_ion_seqs:
     @staticmethod
     def test_b_ions():
         seq = "ABCD"
@@ -59,11 +62,11 @@ class TestProductIonCreators:
         assert b_seqs == expected
 
 
-class TestProductIon:
+class Test_ProductIon_initialization:
     @staticmethod
     def test_b_ion_creation():
         seq, charge = "ACD", 2
-        ion_type = B_ION_TYPE
+        ion_type = IonTypes.B_ION_TYPE
         neutral_mass = 1.5
 
         # Patch the b-ion neutral mass calculation to separate
@@ -82,7 +85,7 @@ class TestProductIon:
     @staticmethod
     def test_y_ion_creation():
         seq, charge = "ACD", 2
-        ion_type = Y_ION_TYPE
+        ion_type = IonTypes.Y_ION_TYPE
         neutral_mass = 2.0
 
         # Patch the b-ion neutral mass calculation to separate
@@ -99,12 +102,13 @@ class TestProductIon:
             assert ion.neutral_mass == neutral_mass
 
 
-class TestGenerateProductIons:
+class Test_generate_product_ions:
     @staticmethod
     def test_b_ions():
         seq = "AC"
         charges = [1, 2]
-        ion_type = B_ION_TYPE
+        ion_type = IonTypes.B_ION_TYPE
+        ion_types = [ion_type]
         # Patch neutral mass calculator to decouple tests for this function
         # from tests of neutral mass calculator
         with patch(
@@ -139,7 +143,7 @@ class TestGenerateProductIons:
             ]
 
             product_ions = generate_product_ions(
-                seq=seq, charges=charges, ion_type=ion_type
+                seq=seq, charges=charges, ion_types=ion_types
             )
 
             assert product_ions == expected
@@ -148,7 +152,8 @@ class TestGenerateProductIons:
     def test_y_ions():
         seq = "AC"
         charges = [1, 2]
-        ion_type = Y_ION_TYPE
+        ion_type = IonTypes.Y_ION_TYPE
+        ion_types = [ion_type]
         # Patch neutral mass calculator to decouple tests for this function
         # from tests of neutral mass calculator
         with patch(
@@ -183,7 +188,69 @@ class TestGenerateProductIons:
             ]
 
             product_ions = generate_product_ions(
-                seq=seq, charges=charges, ion_type=ion_type
+                seq=seq, charges=charges, ion_types=ion_types
             )
 
             assert product_ions == expected
+
+
+class TestRandomSampleOfUniqueKmers:
+    @staticmethod
+    def test_one_peptide():
+        p_seq = "ACDE"
+        peptides = [Peptide(seq=p_seq)]
+        k, sample_size = 2, 3
+        kmers = random_sample_of_unique_kmers(
+            peptides=peptides, k=k, sample_size=sample_size
+        )
+        assert len(kmers) == sample_size
+        assert all([kmer in p_seq for kmer in kmers])
+
+    @staticmethod
+    def test_two_peptide():
+        p1_seq = "ACDEDE"
+        p2_seq = "LMAC"
+        peptides = [Peptide(seq=p1_seq), Peptide(seq=p2_seq)]
+        k, sample_size = 2, 5
+        kmers = random_sample_of_unique_kmers(
+            peptides=peptides, k=k, sample_size=sample_size
+        )
+        assert len(kmers) == sample_size
+        assert all([((kmer in p1_seq) or (kmer in p2_seq)) for kmer in kmers])
+
+    @staticmethod
+    def test_raise_error():
+        p1_seq = "ACDEDE"
+        p2_seq = "LMAC"
+        peptides = [Peptide(seq=p1_seq), Peptide(seq=p2_seq)]
+        k, sample_size = 2, 20
+        with pytest.raises(RuntimeError, match="number of unique kmers"):
+            random_sample_of_unique_kmers(
+                peptides=peptides, k=k, sample_size=sample_size
+            )
+
+    @staticmethod
+    def test_via_fasta(tmp_path):
+        p1_seq = "ACDEDE"
+        p2_seq = "LMAC"
+        file_name = "test.fasta"
+        create_fasta(seqs=[p1_seq, p2_seq], folder=tmp_path, file_name=file_name)
+        k, sample_size = 2, 4
+        kmers = random_sample_of_unique_kmers(
+            fasta_path=tmp_path / file_name, k=k, sample_size=sample_size
+        )
+        assert len(kmers) == sample_size
+        assert all([((kmer in p1_seq) or (kmer in p2_seq)) for kmer in kmers])
+
+
+class Test_get_unique_kmers:
+    @staticmethod
+    def test_smoke():
+        p1_seq = "ACDEDE"
+        p2_seq = "LMAC"
+        peptides = [Peptide(seq=p1_seq), Peptide(seq=p2_seq)]
+        k = 2
+        expected_kmers = {"AC", "CD", "DE", "ED", "LM", "MA"}
+        actual_kmers = get_unique_kmers(peptides=peptides, k=k)
+
+        assert actual_kmers == expected_kmers

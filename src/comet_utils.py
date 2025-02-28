@@ -1,3 +1,4 @@
+import logging
 import os
 import subprocess
 from pathlib import Path
@@ -6,8 +7,22 @@ from typing import List, Union
 import pandas as pd
 from pydantic import BaseModel, field_validator
 
-from src.constants import SAMPLE
-from src.erik_utils import make_dir
+from src.constants import (
+    COMET_RUN_1_DIR,
+    COMET_RUN_2_DIR,
+    IONS_MATCHED,
+    PLAIN_PEPTIDE,
+    PROPOSED_PROTEIN,
+    PROTEIN,
+    PROTEIN_COUNT,
+    SAMPLE,
+    SCAN,
+    THOMAS_SAMPLES,
+)
+from src.mass_spectra import Spectrum, get_specific_spectrum_by_sample_and_scan_num
+from src.utils import make_directory
+
+logger = logging.getLogger(__name__)
 
 
 class CometExe(BaseModel):
@@ -15,7 +30,7 @@ class CometExe(BaseModel):
     params: Path
 
 
-class CometResult(BaseModel):
+class CometRow(BaseModel):
     """Class for rows of Comet output"""
 
     sample: str
@@ -23,6 +38,7 @@ class CometResult(BaseModel):
     ions_matched: int
     proteins: List[str]
     protein_count: int
+    proposed_peptide: str
 
     @field_validator("proteins", mode="before")
     def split_protein_column_by_comma(cls, protein: str) -> List[str]:
@@ -37,25 +53,31 @@ class CometResult(BaseModel):
     #     return self
 
     @classmethod
-    def from_txt(cls, file_path: str) -> List["CometResult"]:
+    def from_txt(cls, file_path: str) -> List["CometRow"]:
         file_path = Path(file_path)
         df = pd.read_csv(file_path, sep="\t", header=1)
         df["sample"] = file_path.stem
         return cls.from_dataframe(comet_output_df=df)
 
     @classmethod
-    def from_dataframe(cls, comet_output_df: pd.DataFrame) -> List["CometResult"]:
+    def from_dataframe(cls, comet_output_df: pd.DataFrame) -> List["CometRow"]:
 
         return [
             cls(
-                sample=row["sample"],
-                scan=row["scan"],
-                ions_matched=row["ions_matched"],
-                protein_count=row["protein_count"],
-                proteins=row["protein"],
+                sample=row[SAMPLE],
+                scan=row[SCAN],
+                ions_matched=row[IONS_MATCHED],
+                protein_count=row[PROTEIN_COUNT],
+                proteins=row[PROTEIN],
+                proposed_peptide=row[PLAIN_PEPTIDE],
             )
             for _, row in comet_output_df.iterrows()
         ]
+
+    def get_corresponding_spectrum(self) -> Spectrum:
+        return get_specific_spectrum_by_sample_and_scan_num(
+            sample=self.sample, scan_num=self.scan
+        )
 
 
 def read_comet_txt_to_df(txt_path: Path, sample: Union[None, str] = None):
@@ -82,9 +104,9 @@ def run_comet_and_save_params_file(
             (2) parent_output_dir/name/name.pep.xml
     """
     # Make sure the parent directory exists and make sure the
-    make_dir(parent_output_dir)
+    make_directory(parent_output_dir)
     results_output_dir = parent_output_dir / mzml_path.stem
-    make_dir(results_output_dir)
+    make_directory(results_output_dir)
 
     # Copy the comet.params file the output directory
     subprocess.run(
@@ -132,3 +154,19 @@ def run_comet(mzml_path: Path, comet: CometExe, output_dir: Path, file_name_stem
     for f in expected_output_files:
         assert f.exists(), f"{f} is expected to exist but does not"
     return result
+
+
+def load_comet_data(samples: List[str] = THOMAS_SAMPLES, run: int = 1):
+    if run == 1:
+        comet_results_dir = COMET_RUN_1_DIR
+    elif run == 2:
+        comet_results_dir = COMET_RUN_2_DIR
+    else:
+        raise ValueError(f"'run' must be 1 or 2. You set run={run}")
+    comet_dfs = []
+    for sample in samples:
+        logger.info(f"Reading data for {sample}")
+        comet_output = comet_results_dir / f"{sample}/{sample}.txt"
+        comet_dfs.append(read_comet_txt_to_df(txt_path=comet_output))
+    comet_df = pd.concat(comet_dfs, ignore_index=True)
+    return comet_df

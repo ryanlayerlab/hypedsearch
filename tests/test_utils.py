@@ -29,6 +29,19 @@ class TestGenerateKmers:
         actual = generate_aa_kmers(aa_seq=aa_seq, min_k=min_k, max_k=max_k)
         assert actual == expected_out
 
+    @staticmethod
+    def test_repeated_kmers_and_min_equals_max_k():
+        aa_seq = "ACDCD"  # B isn't an allowed character
+        min_k, max_k = 2, 2
+        expected_out = [
+            Kmer(seq="AC", position=Position(inclusive_start=0, exclusive_end=2)),
+            Kmer(seq="CD", position=Position(inclusive_start=1, exclusive_end=3)),
+            Kmer(seq="DC", position=Position(inclusive_start=2, exclusive_end=4)),
+            Kmer(seq="CD", position=Position(inclusive_start=3, exclusive_end=5)),
+        ]
+        actual = generate_aa_kmers(aa_seq=aa_seq, min_k=min_k, max_k=max_k)
+        assert actual == expected_out
+
 
 class TestGetPositionsOfSubseqInSeq:
     @staticmethod

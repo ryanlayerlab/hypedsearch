@@ -1,132 +1,165 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field, fields
+from functools import cached_property
 
 from src.sql_database import (
+    SQL_PRIMARY_KEY,
+    PrimaryKey,
     SqlColumn,
     SqlColumnTypes,
     Sqlite3Database,
+    SqlTableRow,
     add_data_classes_to_table,
-    get_create_table_query_for_dataclass,
-    get_sql_columns_from_dataclass,
+    column_string_for_create_table_query_from_dataclass,
+    get_dataclass_fields_as_sql_columns,
 )
 
 
-class TestGetCreateTableQueryForDataclass:
+def get_columns_for_create_table_query_from_dataclass():
+    pass
+
+
+class Test_SqlColumn_initialization:
     @staticmethod
-    def test_with_primary_key():
+    def test_direct_not_primary_key():
+        name, py_type = "a", int
+        sql_type = SqlColumnTypes.SQL_INT
+        actual = SqlColumn(name=name, py_type=py_type)
+        assert actual.primary_key is False
+        assert actual.py_type is py_type
+        assert actual.name == name
+        assert actual.sql_type == sql_type
+
+    @staticmethod
+    def test_direct_primary_key():
+        name, py_type = "a", PrimaryKey[str]
+        sql_type = SqlColumnTypes.SQL_TEXT
+        sql_colm = SqlColumn(name=name, py_type=py_type)
+        sql_colm
+        assert sql_colm.primary_key is True
+        assert sql_colm.py_type is py_type
+        assert sql_colm.name == name
+        assert sql_colm.sql_type == sql_type
+
+    @staticmethod
+    def test_from_dataclass_field():
         @dataclass
         class Product:
-            id: int
-            name: str
-            price: float
+            id: PrimaryKey[int]
+            val: float
 
-        name = "products"
-        actual = get_create_table_query_for_dataclass(
-            obj=Product, table_name=name, primary_key_colm="name"
-        )
-        expected = "CREATE TABLE IF NOT EXISTS products (id INTEGER, name TEXT PRIMARY KEY, price REAL)"
-        assert actual == expected
+        sql_colms = [
+            SqlColumn.from_datclass_field(field=field) for field in fields(Product)
+        ]
 
-    @staticmethod
-    def test_make_table_from_query():
-        # Arrange
-        @dataclass
-        class Name:
-            name: str
+        sql_colm = sql_colms[0]
+        assert sql_colm.primary_key is True
+        assert sql_colm.name == "id"
+        assert sql_colm.sql_type == SqlColumnTypes.SQL_INT
 
-        table_name, db_path = "names", ":memory:"
-
-        # Act
-        db = Sqlite3Database(db_path=db_path)
-        query = get_create_table_query_for_dataclass(obj=Name, table_name=table_name)
-        db.execute_query(query=query)
-        assert db.tables() == [table_name]
-
-    @staticmethod
-    def test_without_primary_key():
-        @dataclass
-        class Product:
-            id: int
-            name: str
-            price: float
-
-        name = "products"
-        actual = get_create_table_query_for_dataclass(obj=Product, table_name=name)
-        expected = (
-            "CREATE TABLE IF NOT EXISTS products (id INTEGER, name TEXT, price REAL)"
-        )
-        assert actual == expected
+        sql_colm = sql_colms[1]
+        assert sql_colm.primary_key is False
+        assert sql_colm.name == "val"
+        assert sql_colm.sql_type == SqlColumnTypes.SQL_REAL
 
 
-class TestGetSqlColumnsFromDataclass:
-    @staticmethod
-    def product_dataclass():
-        @dataclass
-        class Product:
-            id: int
-            name: str
-            price: float
-
-        return Product
-
+class Test_SqlColumn_sql_column_definition:
     @staticmethod
     def test_no_primary_key():
-        @dataclass
-        class Product:
-            id: int
-            name: str
-            price: float
-
-        expected = [
-            SqlColumn(name="id", type=SqlColumnTypes.SQL_INT),
-            SqlColumn(name="name", type=SqlColumnTypes.SQL_TEXT),
-            SqlColumn(name="price", type=SqlColumnTypes.SQL_REAL),
-        ]
-        actual = get_sql_columns_from_dataclass(obj=Product)
-        assert actual == expected
+        name, py_type = "a", int
+        sql_type = SqlColumnTypes.SQL_INT
+        expected_defn = f"{name} {sql_type.value}"
+        sql_colm = SqlColumn(name=name, py_type=py_type)
+        colm_defn = sql_colm.sql_column_definition()
+        assert colm_defn == expected_defn
 
     @staticmethod
-    def test_with_primary_key():
-        @dataclass
-        class Product:
-            id: int
-            name: str
-            price: float
-
-        expected = [
-            SqlColumn(name="id", type=SqlColumnTypes.SQL_INT),
-            SqlColumn(name="name", type=SqlColumnTypes.SQL_TEXT, primary_key=True),
-            SqlColumn(name="price", type=SqlColumnTypes.SQL_REAL),
-        ]
-        actual = get_sql_columns_from_dataclass(obj=Product, primary_key_colm="name")
-        assert actual == expected
+    def test_primary_key():
+        name, py_type = "a", PrimaryKey[float]
+        sql_type = SqlColumnTypes.SQL_REAL
+        expected_defn = f"{name} {sql_type.value} {SQL_PRIMARY_KEY}"
+        sql_colm = SqlColumn(name=name, py_type=py_type)
+        colm_defn = sql_colm.sql_column_definition()
+        assert colm_defn == expected_defn
 
 
-class TestAddDataClassesToTable:
+class Test_SqlTableRow_sql_columns:
     @staticmethod
     def test_smoke():
-        # Arrange
         @dataclass
-        class Product:
-            id: int
+        class ProteinTest(SqlTableRow):
+            id: PrimaryKey[int]
             name: str
-            price: float
 
-        table_name, db_path = "products", ":memory:"
-        dataclasses = [
-            Product(id=0, name="1", price=2),
-            Product(id=1, name="2", price=3),
+        sql_colms = ProteinTest.sql_columns()
+        # assert protein._sql_colms is not None
+        assert len(sql_colms) == 2
+
+
+class Test_SqlTableRow_sql_create_table_columns_str:
+    @staticmethod
+    def test_smoke():
+        @dataclass
+        class ProteinTest(SqlTableRow):
+            id: PrimaryKey[int]
+            name: str
+
+        colm_str = ProteinTest.sql_create_table_columns_str()
+        expected_str = "id INTEGER PRIMARY KEY, name TEXT"
+        assert colm_str == expected_str
+
+
+class Test_SqlTableRow_sql_insert_columns_str:
+    @staticmethod
+    def test_smoke():
+        @dataclass
+        class ProteinTest(SqlTableRow):
+            id: PrimaryKey[int]
+            name: str
+
+        colm_str = ProteinTest.sql_insert_columns_str()
+        expected_str = ":id, :name"
+        assert colm_str == expected_str
+
+
+class Test_Sqlite3Database_create_table_from_dataclass:
+    @staticmethod
+    def test_smoke():
+        @dataclass
+        class ProteinTest(SqlTableRow):
+            id: PrimaryKey[int]
+            seq: str
+
+        table_name, obj = "proteins", ProteinTest
+
+        db = Sqlite3Database()
+        db.create_table_from_dataclass(table_name=table_name, obj=obj)
+        assert db.tables() == [table_name]
+        table_colms = db.table_info(table_name=table_name)
+        assert table_colms[0]["name"] == "id"
+        assert table_colms[0]["type"] == "INTEGER"
+        assert table_colms[0]["pk"] == 1
+        assert table_colms[1]["name"] == "seq"
+        assert table_colms[1]["type"] == "TEXT"
+        assert table_colms[1]["pk"] == 0
+
+
+class Test_Sqlite3Database_insert_dataclasses:
+    @staticmethod
+    def test_smoke():
+        @dataclass
+        class ProteinTest(SqlTableRow):
+            id: PrimaryKey[int]
+            seq: str
+            mass: float
+
+        table_name, obj = "proteins", ProteinTest
+        proteins = [
+            ProteinTest(id=0, seq="ABC", mass=1.2),
+            ProteinTest(id=1, seq="EFG", mass=0.5),
         ]
-
-        # Act
-        # Create table and add dataclasses
-        db = Sqlite3Database(db_path=db_path)
-        query = get_create_table_query_for_dataclass(
-            obj=dataclasses[0], table_name=table_name, primary_key_colm="name"
-        )
-        db.execute_query(query=query)
-        add_data_classes_to_table(dataclasses=dataclasses, table_name=table_name, db=db)
-
-        # Assert
+        db = Sqlite3Database()
+        db.create_table_from_dataclass(table_name=table_name, obj=obj)
+        db.insert_dataclasses(table_name=table_name, data_classes=proteins)
         rows = db.all_table_rows(table_name=table_name)
-        rows = [Product(**row) for row in rows]
-        assert dataclasses == rows
+        rows = [ProteinTest(**row) for row in rows]
+        assert rows == proteins

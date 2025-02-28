@@ -1,8 +1,9 @@
-from __future__ import annotations
-
+import random
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
-from typing import Dict, List, Literal, Optional
+from typing import Callable, Dict, List, Literal, Optional, Set
 
 from Bio import SeqIO
 from pydantic import BaseModel, BeforeValidator, computed_field
@@ -15,29 +16,27 @@ from src.constants import (
     PROTON_MASS,
     WATER_MASS,
     Y_ION_TYPE,
+    IonTypes,
 )
 from src.utils import Kmer, Position, generate_aa_kmers, to_path
 
 
-class Fasta(BaseModel):
-    path: Annotated[Path, BeforeValidator(to_path)]
-
-    def proteins(self):
-        return get_proteins_from_fasta(fasta_path=self.path)
-
-
-class ProductIon(BaseModel):
+@dataclass
+class ProductIon:
     seq: str
     charge: int
-    ion_type: Literal[B_ION_TYPE, Y_ION_TYPE]
+    ion_type: IonTypes
+    neutral_mass: float = field(init=False)
 
-    @computed_field
-    @property
-    def neutral_mass(self) -> float:
-        if self.ion_type == B_ION_TYPE:
-            return compute_b_ion_neutral_mass(aa_seq=self.seq, charge=self.charge)
-        elif self.ion_type == Y_ION_TYPE:
-            return compute_y_ion_neutral_mass(aa_seq=self.seq, charge=self.charge)
+    def __post_init__(self):
+        if self.ion_type == IonTypes.B_ION_TYPE:
+            self.neutral_mass = compute_b_ion_neutral_mass(
+                aa_seq=self.seq, charge=self.charge
+            )
+        elif self.ion_type == IonTypes.Y_ION_TYPE:
+            self.neutral_mass = compute_y_ion_neutral_mass(
+                aa_seq=self.seq, charge=self.charge
+            )
         else:
             msg = (
                 "Can't compute ion neutral mass because the ion type isn't supported. "
@@ -45,25 +44,31 @@ class ProductIon(BaseModel):
             )
             raise RuntimeError(msg)
 
+        self.ion_type_as_str = self.ion_type.value
 
-class Peptide(BaseModel):
+
+@dataclass
+class Peptide:
     seq: str
     name: Optional[str] = None
     desc: Optional[str] = None
     id: Optional[int] = None
 
     @classmethod
-    def from_fasta(cls, fasta_path: str) -> List[Peptide]:
-        fasta = Fasta(path=fasta_path)
-        return fasta.proteins()
+    def from_fasta(cls, fasta_path: str) -> List["Peptide"]:
+        return get_proteins_from_fasta(fasta_path=fasta_path)
 
-    def kmers(self, max_k: int, min_k: Optional[int] = 1) -> List[Kmer]:
+    def kmers(self, max_k: int, min_k: int = 1) -> List[Kmer]:
         return generate_aa_kmers(aa_seq=self.seq, min_k=min_k, max_k=max_k)
 
     def product_ions(
-        self, ion_type: Literal[B_ION_TYPE, Y_ION_TYPE, ALL_IONS], charges: List[int]
+        self, ion_types: List[IonTypes], charges: List[int]
     ) -> List[ProductIon]:
-        return generate_product_ions(seq=self.seq, charges=charges, ion_type=ion_type)
+        return generate_product_ions(seq=self.seq, charges=charges, ion_types=ion_types)
+
+    # def product_ion_seqs(
+    #     self, ion_types: List[IonTypes]
+    # ):
 
 
 def compute_b_ion_neutral_mass(
@@ -105,11 +110,11 @@ class YIonCreator(ProductIonCreator):
         return [seq[i:] for i in range(0, len(seq))]  # Suffixes (y-ions)
 
 
-def get_product_ion_seq_generator(ion_type: str):
-    if ion_type == B_ION_TYPE:
-        return BIonCreator.generate_product_ion_seqs
-    elif ion_type == Y_ION_TYPE:
-        return YIonCreator.generate_product_ion_seqs
+def get_product_ion_creator(ion_type: IonTypes) -> ProductIonCreator:
+    if ion_type == IonTypes.B_ION_TYPE:
+        return BIonCreator
+    elif ion_type == IonTypes.Y_ION_TYPE:
+        return YIonCreator
     else:
         msg = (
             "Can't compute ion neutral mass because the ion type isn't supported.\n"
@@ -119,25 +124,28 @@ def get_product_ion_seq_generator(ion_type: str):
         raise RuntimeError(msg)
 
 
-def generate_product_ions(seq: str, charges: List[int], ion_type: str):
-    seq_generator = get_product_ion_seq_generator(ion_type=ion_type)
-
+def generate_product_ions(seq: str, charges: List[int], ion_types: List[IonTypes]):
     product_ions = []
-    for charge in charges:
-        product_ions.extend(
-            [
-                ProductIon(seq=ion_seq, charge=charge, ion_type=ion_type)
-                for ion_seq in seq_generator(seq=seq)
-            ]
-        )
+    for ion_type in ion_types:
+        seq_generator = get_product_ion_creator(
+            ion_type=ion_type
+        ).generate_product_ion_seqs
+        for charge in charges:
+            product_ions.extend(
+                [
+                    ProductIon(seq=ion_seq, charge=charge, ion_type=ion_type)
+                    for ion_seq in seq_generator(seq=seq)
+                ]
+            )
     return product_ions
 
 
 def get_proteins_from_fasta(fasta_path: str) -> List[Peptide]:
-    proteins = [
-        Peptide(seq=str(protein.seq), desc=protein.description, id=p_id)
-        for p_id, protein in enumerate(SeqIO.parse(fasta_path, "fasta"))
-    ]
+    proteins = []
+    for p_id, protein in enumerate(SeqIO.parse(fasta_path, "fasta")):
+        desc = protein.description
+        name = desc.split(" ")[0]
+        proteins.append(Peptide(seq=str(protein.seq), desc=desc, name=name, id=p_id))
     return proteins
 
 
@@ -152,3 +160,29 @@ def get_specific_protein_from_fasta(fasta_path: str, protein_name: str) -> Pepti
     )
     protein = matching_proteins[0]
     return protein
+
+
+def get_unique_kmers(peptides: List[Peptide], k: int) -> Set[str]:
+    uniq_kmers = set()
+    for peptide in peptides:
+        peptide_kmers = {kmer.seq for kmer in peptide.kmers(min_k=k, max_k=k)}
+        uniq_kmers.update(peptide_kmers)
+    return uniq_kmers
+
+
+def random_sample_of_unique_kmers(
+    k: int,
+    sample_size: int,
+    peptides: Optional[List[Peptide]] = None,
+    fasta_path: Optional[str] = None,
+) -> List[str]:
+    if fasta_path is not None:
+        peptides = Peptide.from_fasta(fasta_path=fasta_path)
+
+    uniq_kmers = get_unique_kmers(peptides=peptides, k=k)
+    if len(uniq_kmers) < sample_size:
+        raise RuntimeError(
+            f"The number of unique kmers, {len(uniq_kmers)}, must be >= than the sample size, {sample_size}"
+        )
+
+    return random.sample(sorted(uniq_kmers), k=sample_size)

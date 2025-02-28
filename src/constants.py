@@ -1,3 +1,4 @@
+from enum import Enum
 from pathlib import Path
 
 # from src.erik_utils import file_exists
@@ -9,6 +10,7 @@ TEST_DIR = GIT_REPO_DIR / "tests"
 LOGS_DIR = GIT_REPO_DIR / "logs"
 PLOTS_DIR = GIT_REPO_DIR / "plots"
 DATA_DIR = GIT_REPO_DIR / "data"
+RESULTS_DIR = DATA_DIR / "results"
 COMET_RUN_1_DIR = DATA_DIR / "comet_run_1"
 COMET_RUN_2_DIR = DATA_DIR / "comet_run_2"
 HS_DIR = DATA_DIR / "hs"
@@ -19,8 +21,10 @@ COMET_PARAMS = GIT_REPO_DIR / f"comet/comet.params"
 FASTAS_DIR = GIT_REPO_DIR / "fastas"
 MOUSE_PROTEOME = FASTAS_DIR / "Uniprot_mouse.fasta"
 
+
 # Strings
 MASS = "mass"
+NEUTRAL_MASS = "neutral_mass"
 KMERS = "kmers"
 SEQ = "sequence"
 COUNT = "count"
@@ -28,7 +32,13 @@ BOTH = "both"
 KMER_AND_MASS = "kmer+mass"
 KMER = "kmer"
 SAMPLE = "sample"
+IONS_MATCHED = "ions_matched"
 SPECTRUM_ID = "spectrum_id"
+PROTEIN_COUNT = "protein_count"
+PROTEIN = "protein"
+XCORR = "xcorr"
+EVAL = "e-value"
+PROPOSED_PROTEIN = "proposed_protein"
 SCAN = "scan"
 PLAIN_PEPTIDE = "plain_peptide"
 CHARGE = "charge"
@@ -43,11 +53,29 @@ PROTEIN_TABLE = "proteins"
 SUBSEQ = "subsequence"
 B_ION_TYPE = "b"
 Y_ION_TYPE = "y"
+
+MEMORY = ":memory:"
+
+
+class IonTypes(Enum):
+    B_ION_TYPE = "b"
+    Y_ION_TYPE = "y"
+
+
+ION_TYPE_TO_INT = {
+    "b": 0,
+    "y": 1,
+}
+
+ION_INT_TO_TYPE = {v: k for k, v in ION_TYPE_TO_INT.items()}
+
 ALL_IONS = "all"
 
 # Numeric constants
 MAX_PEPTIDE_LEN = 50
 MAX_KMER_LEN = 50
+DEFAULT_MAX_K = 25
+DEFAULT_MIN_K = 1
 B_ION_AS_INT = 0
 Y_ION_AS_INT = 1
 ION_CHARGES_TO_CONSIDER = [1, 2]
