@@ -1,3 +1,4 @@
+import platform
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,11 +46,14 @@ class ExperimentResult:
     df: pd.DataFrame
 
 
-logger = setup_logger()
-
-
 def get_experiment_results_file_path(experiment_params: ExperimentParams):
-    file_name = f"db_timing_charge={experiment_params.charges}_maxMins={experiment_params.max_num_mins}.pkl"
+    # Get operating system
+    if "macOS" in platform.platform():
+        operating_sys = "macOS"
+    # Running on Fiji
+    else:
+        operating_sys = "fiji"
+    file_name = f"db_timing_os={operating_sys}_charges={experiment_params.charges}_maxMins={experiment_params.max_num_mins}.pkl"
     file_path = RESULTS_DIR / file_name
     if experiment_params.testing:
         file_path = RESULTS_DIR / ("TESTING_" + file_name)
@@ -143,6 +147,8 @@ def db_creation_indexing_querying_timing(experiment_params: ExperimentParams):
         file_path=file_path,
     )
 
+
+logger = setup_logger()
 
 max_num_mins = 60
 num_peptides_step = 5
