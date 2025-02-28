@@ -49,10 +49,10 @@ class ExperimentResult:
 def get_experiment_results_file_path(experiment_params: ExperimentParams):
     # Get operating system
     if "macOS" in platform.platform():
-        operating_sys = "macOS"
+        operating_sys = "MAC"
     # Running on Fiji
     else:
-        operating_sys = "fiji"
+        operating_sys = "FIJI"
     file_name = f"db_timing_os={operating_sys}_charges={experiment_params.charges}_maxMins={experiment_params.max_num_mins}.pkl"
     file_path = RESULTS_DIR / file_name
     if experiment_params.testing:
