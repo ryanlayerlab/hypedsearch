@@ -53,7 +53,14 @@ def get_experiment_results_file_path(experiment_params: ExperimentParams):
     # Running on Fiji
     else:
         operating_sys = "FIJI"
-    file_name = f"db_timing_os={operating_sys}_charges={experiment_params.charges}_maxMins={experiment_params.max_num_mins}.pkl"
+    file_name = (
+        f"db_timing_os={operating_sys}_" +
+        f"charges={experiment_params.charges}_" + 
+        f"maxMins={experiment_params.max_num_mins}_" + 
+        f"peptideStep={experiment_params.num_peptides_step}_" +
+        f"numRepeats={experiment_params.num_repeats}_" + 
+        ".pkl"
+    )
     file_path = RESULTS_DIR / file_name
     if experiment_params.testing:
         file_path = RESULTS_DIR / ("TESTING_" + file_name)
@@ -151,14 +158,14 @@ def db_creation_indexing_querying_timing(experiment_params: ExperimentParams):
 logger = setup_logger()
 
 max_num_mins = 60
-num_peptides_step = 5
+num_peptides_step = 75
 num_repeats = 3
 charges, ion_types = [1, 2, 3], [IonTypes.B_ION_TYPE, IonTypes.Y_ION_TYPE]
 num_mass_queries = 5
 kmer_size = 15
 
 
-testing = True
+testing = False
 if testing:
     max_num_mins = 0.1
     num_peptides_step = 10
