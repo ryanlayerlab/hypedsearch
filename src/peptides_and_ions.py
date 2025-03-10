@@ -2,6 +2,7 @@ import logging
 import random
 from abc import ABC, abstractmethod
 from collections import defaultdict
+from time import time
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
@@ -20,7 +21,7 @@ from src.constants import (
     Y_ION_TYPE,
     IonTypes,
 )
-from src.utils import Kmer, Position, generate_aa_kmers, to_path
+from src.utils import Kmer, Position, generate_aa_kmers, get_time_in_diff_units, log_params, to_path
 
 logger = logging.getLogger(__name__)
 
@@ -207,17 +208,22 @@ def random_sample_of_unique_kmers(
 
     return random.sample(sorted(uniq_kmers), k=sample_size)
 
-
+# Don't use @log_params because 'proteins' can be a list of many, many peptides
 def get_unique_peptides(
     min_k: int,
     max_k: int,
     proteins: List[Peptide],
 ):
+    fcn_start_time = time()
     uniq_peptides = defaultdict(list)
     num_proteins = len(proteins)
     for p_idx, protein in enumerate(proteins):
         logger.info(f"Processing protein {p_idx+1} of {num_proteins}")
+        prot_start_time = time()
         uniq_kmers = set(kmer.seq for kmer in protein.kmers(min_k=min_k, max_k=max_k))
         for kmer in uniq_kmers:
             uniq_peptides[kmer].append(protein.id)
+        logger.info(f"\t took {round(time()-prot_start_time, 2)} seconds")
+    total_time = time() - fcn_start_time
+    logger.info(f"In total, function took {get_time_in_diff_units(time_sec=total_time)}")
     return uniq_peptides
