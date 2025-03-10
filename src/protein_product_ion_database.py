@@ -17,6 +17,7 @@ from src.constants import (
     Y_ION_TYPE,
     IonTypes,
 )
+from src.mass_spectra import Peak
 from src.peptides_and_ions import Peptide, ProductIon
 from src.sql_database import (
     PrimaryKey,
@@ -39,6 +40,15 @@ class DbProtein(SqlTableRow):
     def from_peptide(cls, peptide: Peptide) -> "DbProtein":
         assert peptide.id is not None
         return cls(id=peptide.id, seq=peptide.seq)
+
+
+def get_aa_seq_corresponding_to_protein_region(
+    peptide_id: int, inclusive_start: int, exclusive_end: int, peptides: List[Peptide]
+):
+    peptide = list(filter(lambda peptide: peptide.id == peptide_id, peptides))
+    assert len(peptide) == 1, "There should only be one matching peptide"
+    peptide = peptide[0].seq
+    return peptide[inclusive_start:exclusive_end]
 
 
 @dataclass
@@ -74,6 +84,7 @@ class DbProductIon(SqlTableRow):
         max_k: int = DEFAULT_MAX_K,
         min_k: int = DEFAULT_MIN_K,
     ) -> List["DbProductIon"]:
+        """ """
         kmers = peptide.kmers(min_k=min_k, max_k=max_k)
         ions = []
         for kmer in kmers:
@@ -89,13 +100,30 @@ class DbProductIon(SqlTableRow):
                     )
         return ions
 
+    def get_aa_seq(self, db):
+        aa_seq = get_aa_seq_from_db(
+            protein_id=self.protein_id,
+            inclusive_start=self.inclusive_start,
+            exclusive_end=self.exclusive_end,
+            db=db,
+        )
+        return aa_seq
+
+    def get_aa_seq_from_db_peptides(self, db_peptides: List[Peptide]):
+        return get_aa_seq_corresponding_to_protein_region(
+            peptide_id=self.protein_id,
+            inclusive_start=self.inclusive_start,
+            exclusive_end=self.exclusive_end,
+            peptides=db_peptides,
+        )
+
 
 class ProteinProductIonDb(Sqlite3Database):
     def __init__(
         self,
-        charges: List[int],
-        ion_types: List[IonTypes],
-        db_path: Optional[str] = MEMORY,
+        charges: List[int] = [1, 2, 3],
+        ion_types: List[IonTypes] = [IonTypes.B_ION_TYPE, IonTypes.Y_ION_TYPE],
+        db_path: str = MEMORY,
         protein_table_name: str = PROTEIN_TABLE,
         product_ion_table_name: str = PRODUCT_ION_TABLE,
         min_k: int = DEFAULT_MIN_K,
@@ -168,11 +196,21 @@ class ProteinProductIonDb(Sqlite3Database):
             ORDER BY {PROTEIN_ID}, {INCLUSIVE_START}, {EXCLUSIVE_END};
         """
         matching_ions = self.read_query(query=query)
-        return [DbProductIon(**dict(ion)) for ion in matching_ions]
+        return [self.product_ion_obj(**dict(ion)) for ion in matching_ions]
 
     def get_proteins(self):
         rows = self.all_table_rows(table_name=self.protein_table_name)
         return [self.protein_obj(**row) for row in rows]
+
+    def get_protein_by_id(self, protein_id):
+        query = f"""
+            SELECT * FROM {self.protein_table_name} WHERE id = {protein_id}
+        """
+        matching_proteins = self.read_query(query=query)
+        assert (
+            len(matching_proteins) == 1
+        ), f"There should only be one protein with id = {protein_id}. There are {len(matching_proteins)}"
+        return self.protein_obj(**matching_proteins[0])
 
     def get_product_ions(self):
         rows = self.all_table_rows(table_name=self.product_ion_table_name)
@@ -180,8 +218,8 @@ class ProteinProductIonDb(Sqlite3Database):
 
 
 def create_and_populate_protein_and_product_ion_database(
-    charges: List[int],
-    ion_types: List[IonTypes],
+    charges: List[int] = [1, 2, 3],
+    ion_types: List[IonTypes] = [IonTypes.B_ION_TYPE, IonTypes.Y_ION_TYPE],
     protein_obj: DbProtein = DbProtein,
     product_ion_obj: DbProductIon = DbProductIon,
     protein_table_name: str = PROTEIN_TABLE,
@@ -228,3 +266,27 @@ def protein_product_ion_database_file_name(
     ion_types = ",".join([ion_type.value for ion_type in ion_types])
     charges = ",".join([str(charge) for charge in charges])
     return f"{file_name_prefix}_ionTypes={ion_types}_charges={charges}_minK={min_k}_maxK={max_k}.db"
+
+
+@dataclass
+class IonWithSeq:
+    ion: DbProductIon
+    seq: str
+
+
+@dataclass
+class PeakWithMatchingProductIons:
+    peak: Peak
+    ions: List[IonWithSeq]
+
+
+def get_aa_seq_from_db(
+    protein_id: int, inclusive_start: int, exclusive_end: int, db: ProteinProductIonDb
+) -> str:
+    # Get protein from database
+    protein = db.get_protein_by_id(protein_id=protein_id)
+
+    # Get AA sequence from the protein
+    aa_seq = protein.seq[inclusive_start:exclusive_end]
+
+    return aa_seq

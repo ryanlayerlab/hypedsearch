@@ -11,7 +11,9 @@ from src.peptides_and_ions import (
     generate_product_ions,
     get_proteins_from_fasta,
     get_unique_kmers,
+    get_unique_peptides,
     random_sample_of_unique_kmers,
+    write_fasta,
 )
 from tests.fixtures_and_helpers import (
     B_NEUTRAL_MASS_CALCULATOR,
@@ -254,3 +256,41 @@ class Test_get_unique_kmers:
         actual_kmers = get_unique_kmers(peptides=peptides, k=k)
 
         assert actual_kmers == expected_kmers
+
+
+class Test_get_unique_peptides:
+    @staticmethod
+    def test_smoke():
+        proteins = [Peptide(seq="ACD", id=0), Peptide(seq="CDE", id=1)]
+        min_k, max_k = 1, 3
+        expected = {
+            "A": [0],
+            "AC": [0],
+            "ACD": [0],
+            "C": [0, 1],
+            "CD": [0, 1],
+            "CDE": [1],
+            "D": [0, 1],
+            "DE": [1],
+            "E": [1],
+        }
+        actual = get_unique_peptides(min_k=min_k, max_k=max_k, proteins=proteins)
+
+        assert actual == expected
+
+
+class Test_write_fasta:
+    @staticmethod
+    def test_smoke(tmp_path):
+        output_path = tmp_path / "test.fasta"
+        peptides = [
+            Peptide("ABC", name="blah1", desc="this is blah1", id=0),
+            Peptide("DEF", name="blah2", desc="this is blah2", id=1),
+        ]
+        expected_lines = [">blah1 this is blah1", "ABC", ">blah2 this is blah2", "DEF"]
+        write_fasta(peptides=peptides, output_path=output_path)
+        lines = []
+        with open(output_path, "r") as fasta:
+            lines = [line.strip() for line in fasta]
+
+        assert lines == expected_lines

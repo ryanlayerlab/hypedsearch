@@ -169,8 +169,7 @@ class Test_ProteinProductionIonDb_add_peptide_and_product_ions:
         assert protein.seq == "ACDE"
 
         product_ions = db.get_product_ions()
-        pass
-        # assert
+        assert len(product_ions) == 7
 
 
 class Test_create_and_populate_protein_and_product_ion_database:
@@ -220,3 +219,15 @@ class Test_ProteinProductIonDb_get_ions_within_mass_tolerance:
             assert len(matching_ions) == 2
             assert matching_ions[0].neutral_mass == 1.96
             assert matching_ions[1].neutral_mass == 2.02
+
+
+class Test_ProteinProductionIonDb_get_protein_by_id:
+    @staticmethod
+    def test_smoke():
+        peptide = Peptide(id=1, seq="ACDE")
+        db = ProteinProductIonDb()
+        db.create_protein_table()
+        db.create_product_ion_table()
+        db.add_peptide_and_product_ions(peptide=peptide)
+        protein = db.get_protein_by_id(protein_id=1)
+        assert protein == DbProtein(id=1, seq="ACDE")

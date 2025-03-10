@@ -53,7 +53,11 @@ PROTEIN_TABLE = "proteins"
 SUBSEQ = "subsequence"
 B_ION_TYPE = "b"
 Y_ION_TYPE = "y"
-
+FULL_NAME = "full_name"
+SHORT_NAME = "short_name"
+COMET_COUNTS = "comet_counts"
+VALIDATED = "validated"
+QUANTILE = "quantile"
 MEMORY = ":memory:"
 
 
@@ -76,6 +80,8 @@ MAX_PEPTIDE_LEN = 50
 MAX_KMER_LEN = 50
 DEFAULT_MAX_K = 25
 DEFAULT_MIN_K = 1
+DEFAULT_PPM_TOLERANCE = 10
+DEFAULT_CHARGES = [1, 2, 3]
 B_ION_AS_INT = 0
 Y_ION_AS_INT = 1
 ION_CHARGES_TO_CONSIDER = [1, 2]

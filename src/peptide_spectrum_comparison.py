@@ -2,10 +2,17 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
+import numpy as np
+
 from src.constants import IonTypes
 from src.mass_spectra import Peak, Spectrum
 from src.peptides_and_ions import Peptide, ProductIon, get_product_ion_creator
-from src.utils import mass_difference_in_ppm
+from src.protein_product_ion_database import (
+    DbProductIon,
+    ProteinProductIonDb,
+    get_aa_seq_from_db,
+)
+from src.utils import Position, mass_difference_in_ppm
 
 
 @dataclass
@@ -37,8 +44,12 @@ def get_peaks_near_mz(
 
 
 def compare_peptide_to_spectrum(
-    peptide: Peptide, spectrum: Spectrum, ppm_tolerance: int, ion_types: List[IonTypes]
+    peptide: Peptide,
+    spectrum: Spectrum,
+    ppm_tolerance: int,
+    ion_types: List[IonTypes] = [IonTypes.B_ION_TYPE, IonTypes.Y_ION_TYPE],
 ):
+    """ """
     # The product ions will have charge <= precursor's charge
     charges_to_consider = list(range(1, spectrum.precursor_charge + 1))
 
@@ -107,3 +118,48 @@ def compare_peptide_to_spectrum(
         num_peaks_matching_product_ion=num_peaks_matching_product_ion,
         num_product_ions_with_match=num_product_ions_with_match,
     )
+
+
+@dataclass
+class Cluster:
+    # protein_id: int
+    ions: List[DbProductIon]
+    ion_type: IonTypes
+    # region: Position = field(init=False)
+
+    def __post_init__(self):
+        if self.ion_type == IonTypes.B_ION_TYPE:
+            # Start positions should be the same
+            end_pos = self.ions[0].inclusive_start
+            assert all([ion.inclusive_start == end_pos for ion in self.ions])
+        else:
+            # End positions should be the same
+            end_pos = self.ions[0].exclusive_end
+            assert all([ion.exclusive_end == end_pos for ion in self.ions])
+
+    @property
+    def protein_id(self):
+        uniq_protein_ids = np.unique([ion.protein_id for ion in self.ions])
+        assert (
+            len(uniq_protein_ids) == 1
+        ), f"There should only be one protein ID in a cluster. Found {len(uniq_protein_ids)}"
+        return uniq_protein_ids[0]
+
+    @property
+    def region(self) -> Position:
+        min_start = min([ion.inclusive_start for ion in self.ions])
+        max_end = max([ion.exclusive_end for ion in self.ions])
+        return Position(inclusive_start=min_start, exclusive_end=max_end)
+
+    @property
+    def num_supporting_ions(self):
+        return len(self.ions)
+
+    def get_aa_seq(self, db: ProteinProductIonDb):
+        region = self.region
+        return get_aa_seq_from_db(
+            protein_id=self.protein_id,
+            inclusive_start=region.inclusive_start,
+            exclusive_end=region.exclusive_end,
+            db=db,
+        )

@@ -1,5 +1,7 @@
+import logging
 import random
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
@@ -19,6 +21,8 @@ from src.constants import (
     IonTypes,
 )
 from src.utils import Kmer, Position, generate_aa_kmers, to_path
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -66,9 +70,21 @@ class Peptide:
     ) -> List[ProductIon]:
         return generate_product_ions(seq=self.seq, charges=charges, ion_types=ion_types)
 
-    # def product_ion_seqs(
-    #     self, ion_types: List[IonTypes]
-    # ):
+
+def write_fasta(peptides: List[Peptide], output_path: str) -> None:
+    with open(output_path, "w") as f:
+        for peptide in peptides:
+            header_parts = []
+            if peptide.name:
+                header_parts.append(peptide.name)
+            # if peptide.id is not None:
+            #     header_parts.append(f"id:{peptide.id}")
+            if peptide.desc:
+                header_parts.append(peptide.desc)
+
+            header = " ".join(header_parts) or "unnamed_peptide"
+            f.write(f">{header}\n")
+            f.write(f"{peptide.seq}\n")
 
 
 def compute_b_ion_neutral_mass(
@@ -190,3 +206,18 @@ def random_sample_of_unique_kmers(
         )
 
     return random.sample(sorted(uniq_kmers), k=sample_size)
+
+
+def get_unique_peptides(
+    min_k: int,
+    max_k: int,
+    proteins: List[Peptide],
+):
+    uniq_peptides = defaultdict(list)
+    num_proteins = len(proteins)
+    for p_idx, protein in enumerate(proteins):
+        logger.info(f"Processing protein {p_idx+1} of {num_proteins}")
+        uniq_kmers = set(kmer.seq for kmer in protein.kmers(min_k=min_k, max_k=max_k))
+        for kmer in uniq_kmers:
+            uniq_peptides[kmer].append(protein.id)
+    return uniq_peptides

@@ -13,6 +13,14 @@ from typing import Any, Callable, List, Literal, Optional, Union
 from src.constants import COMET_RUN_1_DIR, COMET_RUN_2_DIR, THOMAS_SAMPLES
 
 
+def remove_gene_name(protein_name: str) -> str:
+    """
+    Make column for shortened name <database>|<accession number> instead of
+    <database>|<accession number>|<gene name>
+    """
+    return "|".join(protein_name.split("|")[:2])
+
+
 def make_directory(dir_path: str, overwrite: bool = False) -> None:
     """
     Ensures that a directory exists at the given path.
