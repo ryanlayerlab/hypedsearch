@@ -261,7 +261,7 @@ def get_uniq_kmer_to_protein_map(
 ) -> Dict[str, List[int]]:
     """ """
     fcn_start_time = time()
-    uniq_peptides = defaultdict(list)
+    uniq_kmer_to_protein_map = defaultdict(list)
     num_proteins = len(proteins)
     for p_idx, protein in enumerate(proteins):
         if p_idx % 10 == 0:
@@ -269,10 +269,10 @@ def get_uniq_kmer_to_protein_map(
         prot_start_time = time()
         uniq_kmers = set(kmer.seq for kmer in protein.kmers(min_k=min_k, max_k=max_k))
         for kmer in uniq_kmers:
-            uniq_peptides[kmer].append(protein.id)
+            uniq_kmer_to_protein_map[kmer].append(protein.id)
         # logger.info(f"\t took {round(time()-prot_start_time, 2)} seconds")
     total_time = time() - fcn_start_time
     logger.info(
         f"Creating the unique kmers-to-protein map took {get_time_in_diff_units(time_sec=total_time)}"
     )
-    return uniq_peptides
+    return uniq_kmer_to_protein_map

@@ -10,7 +10,7 @@ from src.peptide_spectrum_comparison import (
 )
 from src.protein_product_ion_database import (
     B_ION_TYPE,
-    DbProductIon,
+    DbKmer,
     DbProtein,
     ProteinProductIonDb,
 )
@@ -25,7 +25,7 @@ class Test_get_ions_matching_peak:
         ion_types = [IonTypes.B_ION_TYPE]
         proteins = [DbProtein(id=1, seq="ABC")]
         product_ions = [
-            DbProductIon(
+            DbKmer(
                 protein_id=1,
                 inclusive_start=1,
                 exclusive_end=2,
@@ -33,7 +33,7 @@ class Test_get_ions_matching_peak:
                 neutral_mass=1.2,
                 ion_type=0,
             ),
-            DbProductIon(
+            DbKmer(
                 protein_id=1,
                 inclusive_start=1,
                 exclusive_end=3,
@@ -41,7 +41,7 @@ class Test_get_ions_matching_peak:
                 neutral_mass=0.9,
                 ion_type=0,
             ),
-            DbProductIon(
+            DbKmer(
                 protein_id=1,
                 inclusive_start=2,
                 exclusive_end=3,
@@ -50,7 +50,7 @@ class Test_get_ions_matching_peak:
                 ion_type=0,
             ),
             # 2-mers
-            DbProductIon(
+            DbKmer(
                 protein_id=1,
                 inclusive_start=0,
                 exclusive_end=2,
@@ -86,7 +86,7 @@ class Test_Cluster_initialization:
     def test_b_cluster():
         cluster = Cluster(
             ions=[
-                DbProductIon(
+                DbKmer(
                     protein_id=0,
                     inclusive_start=1,
                     exclusive_end=3,
@@ -94,7 +94,7 @@ class Test_Cluster_initialization:
                     neutral_mass=5.2,
                     ion_type=0,
                 ),
-                DbProductIon(
+                DbKmer(
                     protein_id=0,
                     inclusive_start=1,
                     exclusive_end=5,
@@ -113,7 +113,7 @@ class Test_Cluster_initialization:
     def test_y_cluster():
         cluster = Cluster(
             ions=[
-                DbProductIon(
+                DbKmer(
                     protein_id=1,
                     inclusive_start=1,
                     exclusive_end=5,
@@ -121,7 +121,7 @@ class Test_Cluster_initialization:
                     neutral_mass=5.2,
                     ion_type=1,
                 ),
-                DbProductIon(
+                DbKmer(
                     protein_id=1,
                     inclusive_start=3,
                     exclusive_end=5,
@@ -143,7 +143,7 @@ class Test_Cluster_initialization:
         ):
             Cluster(
                 ions=[
-                    DbProductIon(
+                    DbKmer(
                         protein_id=0,
                         inclusive_start=1,
                         exclusive_end=3,
@@ -151,7 +151,7 @@ class Test_Cluster_initialization:
                         neutral_mass=5.2,
                         ion_type=0,
                     ),
-                    DbProductIon(
+                    DbKmer(
                         protein_id=0,
                         inclusive_start=1,
                         exclusive_end=5,
@@ -169,7 +169,7 @@ class Test_Cluster_initialization:
         ):
             Cluster(
                 ions=[
-                    DbProductIon(
+                    DbKmer(
                         protein_id=0,
                         inclusive_start=1,
                         exclusive_end=3,
@@ -177,7 +177,7 @@ class Test_Cluster_initialization:
                         neutral_mass=5.2,
                         ion_type=0,
                     ),
-                    DbProductIon(
+                    DbKmer(
                         protein_id=0,
                         inclusive_start=2,
                         exclusive_end=5,
@@ -195,7 +195,7 @@ class Test_Cluster_initialization:
         ):
             Cluster(
                 ions=[
-                    DbProductIon(
+                    DbKmer(
                         protein_id=0,
                         inclusive_start=1,
                         exclusive_end=3,
@@ -203,7 +203,7 @@ class Test_Cluster_initialization:
                         neutral_mass=5.2,
                         ion_type=1,
                     ),
-                    DbProductIon(
+                    DbKmer(
                         protein_id=0,
                         inclusive_start=2,
                         exclusive_end=5,
@@ -221,7 +221,7 @@ class Test_Cluster_initialization:
         ):
             Cluster(
                 ions=[
-                    DbProductIon(
+                    DbKmer(
                         protein_id=0,
                         inclusive_start=1,
                         exclusive_end=3,
@@ -229,7 +229,7 @@ class Test_Cluster_initialization:
                         neutral_mass=5.2,
                         ion_type=0,
                     ),
-                    DbProductIon(
+                    DbKmer(
                         protein_id=1,
                         inclusive_start=1,
                         exclusive_end=5,
@@ -247,7 +247,7 @@ class Test_get_b_clusters:
         # Arrange
         ions = [
             # b-cluster 1
-            DbProductIon(
+            DbKmer(
                 protein_id=0,
                 inclusive_start=1,
                 exclusive_end=3,
@@ -255,7 +255,7 @@ class Test_get_b_clusters:
                 neutral_mass=5.2,
                 ion_type=0,
             ),
-            DbProductIon(
+            DbKmer(
                 protein_id=0,
                 inclusive_start=1,
                 exclusive_end=5,
@@ -264,7 +264,7 @@ class Test_get_b_clusters:
                 ion_type=0,
             ),
             # b-cluster 2
-            DbProductIon(
+            DbKmer(
                 protein_id=1,
                 inclusive_start=2,
                 exclusive_end=4,
@@ -273,7 +273,7 @@ class Test_get_b_clusters:
                 ion_type=0,
             ),
             # y-ions
-            DbProductIon(
+            DbKmer(
                 protein_id=1,
                 inclusive_start=2,
                 exclusive_end=4,
@@ -281,7 +281,7 @@ class Test_get_b_clusters:
                 neutral_mass=5.2,
                 ion_type=1,
             ),
-            DbProductIon(
+            DbKmer(
                 protein_id=3,
                 inclusive_start=2,
                 exclusive_end=4,
@@ -314,7 +314,7 @@ class Test_get_y_clusters:
         # Arrange
         ions = [
             # y-cluster 1
-            DbProductIon(
+            DbKmer(
                 protein_id=0,
                 inclusive_start=1,
                 exclusive_end=5,
@@ -322,7 +322,7 @@ class Test_get_y_clusters:
                 neutral_mass=5.2,
                 ion_type=1,
             ),
-            DbProductIon(
+            DbKmer(
                 protein_id=0,
                 inclusive_start=3,
                 exclusive_end=5,
@@ -331,7 +331,7 @@ class Test_get_y_clusters:
                 ion_type=1,
             ),
             # y-cluster 2
-            DbProductIon(
+            DbKmer(
                 protein_id=1,
                 inclusive_start=2,
                 exclusive_end=4,
@@ -340,7 +340,7 @@ class Test_get_y_clusters:
                 ion_type=1,
             ),
             # b-ions
-            DbProductIon(
+            DbKmer(
                 protein_id=1,
                 inclusive_start=2,
                 exclusive_end=4,
@@ -348,7 +348,7 @@ class Test_get_y_clusters:
                 neutral_mass=5.2,
                 ion_type=0,
             ),
-            DbProductIon(
+            DbKmer(
                 protein_id=3,
                 inclusive_start=2,
                 exclusive_end=4,

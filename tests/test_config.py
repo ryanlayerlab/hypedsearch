@@ -4,7 +4,7 @@ from dataclasses import dataclass, fields
 import click
 from click.testing import CliRunner
 
-from config import AppConfig, Required, generate_cli, process_dataclass_field_type
+from src.config import AppConfig, Required, generate_cli, process_dataclass_field_type
 
 
 class Test_generate_cli:

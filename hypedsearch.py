@@ -7,8 +7,8 @@ from typing import Dict, List, Optional, Required
 
 import pandas as pd
 
-from config import AppConfig, Required, generate_cli
 from src.comet_utils import CometPSM, get_comet_protein_counts, run_comet
+from src.config import AppConfig, Required, generate_cli
 from src.constants import (
     COMET_EXECUTABLE,
     COMET_PARAMS,
@@ -45,31 +45,16 @@ logger = logging.getLogger(__name__)
 @dataclass
 class HypedsearchConfig(AppConfig):
     mzml_dir: str
-    # db_path: Required[str]
-    # spectrum_file: Required[str]
-    # scan_num: int = -1
-    # fasta_path: str = MOUSE_PROTEOME
-    # num_peaks: int = DEFAULT_NUM_PEAKS
-    # comet_exe_path: str = COMET_EXECUTABLE
-    # comet_params_path: str = COMET_PARAMS
-    # min_k: int = DEFAULT_MIN_K
-    # max_k: int = DEFAULT_MAX_K
-    # mzml_paths: List[str]
-
-
-@dataclass
-class HypedsearchConfig(AppConfig):
-    mzml_dir: Path
-    mzml_path: Path
-    output_dir: Path
-    db_path: Path
+    mzml_path: str
+    output_dir: str
+    db_path: str
     # spectrum_file: Required[str]
     scan_num: int = -1
-    fasta_path: Path = MOUSE_PROTEOME
+    fasta_path: str = MOUSE_PROTEOME
     top_n_proteins: int = 100
     num_peaks: int = DEFAULT_NUM_PEAKS
-    comet_exe_path: Path = COMET_EXECUTABLE
-    comet_params_path: Path = COMET_PARAMS
+    comet_exe_path: str = COMET_EXECUTABLE
+    comet_params_path: str = COMET_PARAMS
     # min_k: int = DEFAULT_MIN_K
     # max_k: int = DEFAULT_MAX_K
     # mzml_paths: List[str]
@@ -115,10 +100,10 @@ class HypedsearchConfig(AppConfig):
 def hypedsearch(config: HypedsearchConfig):
     logger.info(f"Configuration: {config}")
 
-    # Run Comet on all the MZML files in the specified directory
+    # Run Comet on all the MZML files in the specified directory and its subdirectories
     logger.info("Starting Comet run 1...")
     start_time = time()
-    mzml_paths = config.mzml_dir.glob("*.mzML")
+    mzml_paths = list(config.mzml_dir.rglob("*.mzML"))
     comet_run_1_txts = []
     for mzml in mzml_paths:
         logger.info(f"Running Comet on MZML file: {mzml}")
@@ -159,7 +144,7 @@ def hypedsearch(config: HypedsearchConfig):
     db = create_db(
         db_path=config.db_path,
         db_proteins=db_proteins,
-        uniq_kmers=uniq_kmer_to_protein_map.keys(),
+        uniq_kmer_to_protein_map=uniq_kmer_to_protein_map,
         overwrite=False,
     )
 

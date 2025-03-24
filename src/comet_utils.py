@@ -1,6 +1,7 @@
 import logging
 import os
 import subprocess
+import xml.etree.ElementTree as ET
 from collections import Counter
 from pathlib import Path
 from time import time
@@ -37,16 +38,22 @@ from src.utils import (
 logger = logging.getLogger(__name__)
 
 
-def read_comet_txt_to_df(txt_path: Path, sample: Union[None, str] = None):
+def read_comet_txt_to_df(txt_path: Path):
     """
     Reads Comet's output TXT file to a pandas dataframe.
-    Adds a 'sample' column that's not in the TXT file so that each row has reference
-    to the TXT file it came from
+    Adds a 'sample' column that's not in the TXT file but is in the XML file that Comet
+    also spits out.
     """
+    # Get sample name from the Comet XML file because
+    xml_path = Path(str(txt_path).replace(".txt", ".pep.xml"))
+    tree = ET.parse(xml_path)
+    root = tree.getroot()
+    namespace = {"pep": "http://regis-web.systemsbiology.net/pepXML"}
+    msms_run_summary = root.find("pep:msms_run_summary", namespace)
+    sample = msms_run_summary.get("base_name").split("/")[-1]
+
+    # Read the TXT file to a dataframe and add the sample column
     df = pd.read_csv(txt_path, sep="\t", header=1)
-    # Add a "sample" column
-    if sample is None:
-        sample = txt_path.stem
     df[SAMPLE] = sample
     return df
 

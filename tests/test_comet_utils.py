@@ -1,9 +1,23 @@
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
 
-from src.comet_utils import run_comet, update_database_path_in_comet_params_file
-from src.constants import COMET_EXECUTABLE, COMET_PARAMS, MOUSE_PROTEOME
+from src.comet_utils import (
+    read_comet_txt_to_df,
+    run_comet,
+    update_database_path_in_comet_params_file,
+)
+from src.constants import COMET_EXECUTABLE, COMET_PARAMS, GIT_REPO_DIR, MOUSE_PROTEOME
+
+
+class Test_read_comet_txt_to_df:
+    @staticmethod
+    def test_smoke():
+        # Load XML file
+        txt_file = GIT_REPO_DIR / "tests/data/test_comet_result.txt"
+        df = read_comet_txt_to_df(txt_path=txt_file)
+        assert all(df["sample"] == "BMEM_AspN_Fxn5")
 
 
 class Test_update_database_path_in_comet_params_file:

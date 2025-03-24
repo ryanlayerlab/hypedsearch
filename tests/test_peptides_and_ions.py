@@ -258,7 +258,7 @@ class Test_get_unique_kmers:
         assert actual_kmers == expected_kmers
 
 
-class Test_get_unique_peptides:
+class Test_get_uniq_kmer_to_protein_map:
     @staticmethod
     def test_smoke():
         proteins = [Peptide(seq="ACD", id=0), Peptide(seq="CDE", id=1)]
