@@ -3,6 +3,7 @@ import sqlite3
 import time
 from dataclasses import Field, asdict, dataclass, field, fields, is_dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Any, Dict, Generic, List, Optional, TypeVar, get_args, get_origin
 
 from pydantic import BaseModel
@@ -85,6 +86,9 @@ class SqlTableRow:
     def sql_columns(cls) -> List[SqlColumn]:
         sql_colms = []
         for f in fields(cls):
+            # Skip hidden fields
+            if f.name[0] == "_":
+                continue
             sql_colm = SqlColumn.from_datclass_field(field=f)
             sql_colms.append(sql_colm)
         return sql_colms
@@ -105,8 +109,21 @@ class SqlTableRow:
 
 
 class Sqlite3Database:
-    def __init__(self, db_path: Optional[str] = MEMORY):
+    def __init__(self, db_path: Optional[str] = MEMORY, overwrite: bool = False):
         self.db_path = db_path
+        if self.db_path != MEMORY:
+            self.db_path = Path(db_path).absolute()
+            if self.db_path.exists():
+                logger.info(f"The database already exists at {self.db_path}.")
+                if overwrite:
+                    logger.info(
+                        "'overwrite' is True so deleting the existing databse and starting anew."
+                    )
+                    self.db_path.unlink()
+                else:
+                    logger.info(
+                        "'overwrite' is False so connecting to the existing one."
+                    )
         self.connection = sqlite3.connect(self.db_path)
         self.connection.row_factory = sqlite3.Row
         self.cursor = self.connection.cursor()

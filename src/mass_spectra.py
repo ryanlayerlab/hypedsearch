@@ -12,7 +12,7 @@ from src.constants import SPECTRA_DIR, THOMAS_SAMPLES
 @dataclass
 class Peak:
     mz: float
-    abundance: float
+    intensity: float
     id: Optional[int] = None
 
 
@@ -35,7 +35,7 @@ class Spectrum:
             spectrum["intensity array"]
         )
         peaks = [
-            Peak(mz=masses[idx], abundance=abundances[idx], id=idx)
+            Peak(mz=masses[idx], intensity=abundances[idx], id=idx)
             for idx in range(len(masses))
         ]
         spectrum_id = spectrum.get("id", "")
@@ -89,7 +89,7 @@ def get_indices_of_largest_elements(array: List[float], top_n: int):
 
 
 def top_n_peak_filtering(peaks: List[Peak], n: int) -> List[Peak]:
-    abundances = [peak.abundance for peak in peaks]
+    abundances = [peak.intensity for peak in peaks]
     indices = get_indices_of_largest_elements(array=abundances, top_n=n)
     peaks = np.array(peaks)
     return list(peaks[indices])
