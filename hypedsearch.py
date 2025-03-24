@@ -201,7 +201,7 @@ def hypedsearch(config: HypedsearchConfig):
         parent_output_dir=config.output_dir,
         comet_exe_path=config.comet_exe_path,
         mzml_path=config.mzml_path,
-        output_file_stem="run_2",
+        output_file_stem=f"scan={config.scan_num}_run_2",
     )
 
     # Get Comet run 1 vs 2 results
