@@ -1,10 +1,9 @@
-# Hypedsearch
+# Hypedsearch <!-- omit in toc -->
 
-- [Hypedsearch](#hypedsearch)
-  - [Installation](#installation)
-    - [Using Conda (recommended)](#using-conda-recommended)
-    - [Without using Conda (using `pip` and `venv`)](#without-using-conda-using-pip-and-venv)
-  - [Usage](#usage)
+- [Installation](#installation)
+  - [Using Conda (recommended)](#using-conda-recommended)
+  - [Without using Conda (using `pip` and `venv`)](#without-using-conda-using-pip-and-venv)
+- [Usage](#usage)
 
 
 ## Installation
