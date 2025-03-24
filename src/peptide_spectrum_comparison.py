@@ -31,7 +31,7 @@ from src.peptides_and_ions import (
     write_fasta,
 )
 from src.protein_product_ion_database import (
-    DbProductIon,
+    DbKmer,
     IonWithSeq,
     PeakWithMatchingProductIons,
     PositionedIon,
@@ -393,7 +393,7 @@ def peak_to_product_ion_mapping(
 #     )
 
 
-def ions_as_df(ions: List[DbProductIon]):
+def ions_as_df(ions: List[DbKmer]):
     data = [
         [
             ion.protein_id,
@@ -514,13 +514,13 @@ def get_y_clusters(ions: List[PositionedIon]) -> List[Cluster]:
     return y_clusters
 
 
-def get_start_and_end_positions_from_ions(ions: List[DbProductIon]) -> Position:
+def get_start_and_end_positions_from_ions(ions: List[DbKmer]) -> Position:
     start = min([ion.inclusive_start for ion in ions])
     end = max([ion.exclusive_end for ion in ions])
     return Position(inclusive_start=start, exclusive_end=end)
 
 
-def create_df_from_ions(ions: List[DbProductIon]) -> pd.DataFrame:
+def create_df_from_ions(ions: List[DbKmer]) -> pd.DataFrame:
     rows = []
     for ion in ions:
         rows.append(
