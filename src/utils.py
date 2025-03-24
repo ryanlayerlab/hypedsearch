@@ -1,4 +1,5 @@
 import gzip
+import hashlib
 import logging
 import os
 import pickle
@@ -11,6 +12,8 @@ from pathlib import Path
 from typing import Any, Callable, List, Literal, Optional, Union
 
 from src.constants import COMET_RUN_1_DIR, COMET_RUN_2_DIR, THOMAS_SAMPLES
+
+logger = logging.getLogger(__name__)
 
 
 def remove_gene_name(protein_name: str) -> str:
@@ -30,10 +33,13 @@ def make_directory(dir_path: str, overwrite: bool = False) -> None:
         overwrite (bool): If True, deletes the existing directory and creates a new one.
     """
     if os.path.exists(dir_path):
+        logger.info(f"{dir_path} already exists")
         if overwrite:
+            logger.info(f"Overwriting {dir_path}")
             shutil.rmtree(dir_path)  # Remove the existing directory and its contents
             os.makedirs(dir_path)  # Create a new empty directory
     else:
+        logger.info(f"{dir_path} does not exist. Creating it...")
         os.makedirs(dir_path)  # Create the directory if it does not exist
 
 
@@ -187,3 +193,14 @@ def pickle_and_compress(obj: Any, file_path: str):
 def decompress_and_unpickle(file_path: str):
     with gzip.open(file_path, "rb") as file:
         return pickle.load(file)
+
+
+def file_hash(filepath: Path, algorithm="sha256") -> str:
+    """Compute the hash of a file using the specified algorithm."""
+    hash_func = hashlib.new(algorithm)
+    with filepath.open("rb") as f:
+        for chunk in iter(
+            lambda: f.read(4096), b""
+        ):  # Read in chunks to handle large files efficiently
+            hash_func.update(chunk)
+    return hash_func.hexdigest()

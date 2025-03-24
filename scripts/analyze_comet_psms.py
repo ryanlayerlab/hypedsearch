@@ -11,7 +11,7 @@ from typing import Union
 import pandas as pd
 from tqdm import tqdm
 
-from src.comet_utils import CometRow, load_comet_data
+from src.comet_utils import CometPSM, load_comet_data
 from src.constants import PLAIN_PEPTIDE, RESULTS_DIR, SAMPLE, SCAN, IonTypes
 from src.mass_spectra import get_specific_spectrum_by_sample_and_scan_num
 from src.peptide_spectrum_comparison import (
@@ -38,7 +38,7 @@ ion_types = [IonTypes.B_ION_TYPE, IonTypes.Y_ION_TYPE]
 
 @dataclass
 class PSM:
-    comet_row: Union[CometRow, pd.Series]
+    comet_row: Union[CometPSM, pd.Series]
     psm: PeptideSpectrumComparison
 
 

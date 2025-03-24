@@ -2,26 +2,35 @@ import logging
 import random
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from time import time
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
+from time import time
 from typing import Callable, Dict, List, Literal, Optional, Set
 
 from Bio import SeqIO
-from pydantic import BaseModel, BeforeValidator, computed_field
+from pydantic import BaseModel, BeforeValidator, computed_field, field_validator
 from typing_extensions import Annotated
 
 from src.constants import (
     ALL_IONS,
     AMINO_ACID_MASSES,
     B_ION_TYPE,
+    DEFAULT_MAX_K,
+    DEFAULT_MIN_K,
     PROTON_MASS,
     WATER_MASS,
     Y_ION_TYPE,
     IonTypes,
 )
-from src.utils import Kmer, Position, generate_aa_kmers, get_time_in_diff_units, log_params, to_path
+from src.utils import (
+    Kmer,
+    Position,
+    generate_aa_kmers,
+    get_time_in_diff_units,
+    log_params,
+    to_path,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +92,7 @@ def write_fasta(peptides: List[Peptide], output_path: str) -> None:
             if peptide.desc:
                 header_parts.append(peptide.desc)
 
-            header = " ".join(header_parts) or "unnamed_peptide"
+            header = " ".join(header_parts)
             f.write(f">{header}\n")
             f.write(f"{peptide.seq}\n")
 
@@ -106,6 +115,16 @@ def compute_y_ion_neutral_mass(
     aa_mass_sum = sum([amino_acid_mass_lookup[aa] for aa in aa_seq])
     neutral_mass = (aa_mass_sum + WATER_MASS + (charge * PROTON_MASS)) / charge
     return neutral_mass
+
+
+def compute_peptide_mz(
+    aa_seq: str,
+    charge: int,
+    amino_acid_mass_lookup: Dict[str, float] = AMINO_ACID_MASSES,
+) -> float:
+    return compute_y_ion_neutral_mass(
+        aa_seq=aa_seq, charge=charge, amino_acid_mass_lookup=amino_acid_mass_lookup
+    )
 
 
 class ProductIonCreator(ABC):
@@ -158,6 +177,9 @@ def generate_product_ions(seq: str, charges: List[int], ion_types: List[IonTypes
 
 
 def get_proteins_from_fasta(fasta_path: str) -> List[Peptide]:
+    """
+    Get the proteins from a FASTA file.
+    """
     proteins = []
     for p_id, protein in enumerate(SeqIO.parse(fasta_path, "fasta")):
         desc = protein.description
@@ -166,11 +188,33 @@ def get_proteins_from_fasta(fasta_path: str) -> List[Peptide]:
     return proteins
 
 
+class Fasta(BaseModel):
+    fasta_path: Path
+
+    @field_validator("fasta_path", mode="before")
+    def str_to_path(cls, fasta_path: str) -> Path:
+        return Path(fasta_path).absolute()
+
+    @property
+    def proteins(self) -> List[Peptide]:
+        proteins = get_proteins_from_fasta(fasta_path=self.fasta_path)
+        return proteins
+
+    def proteins_by_name(self, protein_names: List[str]) -> List[Peptide]:
+        proteins = get_proteins_by_name(
+            protein_names=protein_names, fasta_path=self.fasta_path
+        )
+        return proteins
+
+
 def get_proteins_by_name(
-    protein_names: str,
+    protein_names: List[str],
     fasta_path: Optional[str] = None,
     proteins: Optional[List[Peptide]] = None,
 ) -> List[Peptide]:
+    """
+    Get the given proteins from the given FASTA file.
+    """
     if fasta_path is not None:
         proteins = list(get_proteins_from_fasta(fasta_path=fasta_path))
     matching_proteins = list(
@@ -208,22 +252,27 @@ def random_sample_of_unique_kmers(
 
     return random.sample(sorted(uniq_kmers), k=sample_size)
 
+
 # Don't use @log_params because 'proteins' can be a list of many, many peptides
-def get_unique_peptides(
-    min_k: int,
-    max_k: int,
+def get_uniq_kmer_to_protein_map(
     proteins: List[Peptide],
-):
+    min_k: int = DEFAULT_MIN_K,
+    max_k: int = DEFAULT_MAX_K,
+) -> Dict[str, List[int]]:
+    """ """
     fcn_start_time = time()
     uniq_peptides = defaultdict(list)
     num_proteins = len(proteins)
     for p_idx, protein in enumerate(proteins):
-        logger.info(f"Processing protein {p_idx+1} of {num_proteins}")
+        if p_idx % 10 == 0:
+            logger.info(f"Processing protein {p_idx+1} of {num_proteins}")
         prot_start_time = time()
         uniq_kmers = set(kmer.seq for kmer in protein.kmers(min_k=min_k, max_k=max_k))
         for kmer in uniq_kmers:
             uniq_peptides[kmer].append(protein.id)
-        logger.info(f"\t took {round(time()-prot_start_time, 2)} seconds")
+        # logger.info(f"\t took {round(time()-prot_start_time, 2)} seconds")
     total_time = time() - fcn_start_time
-    logger.info(f"In total, function took {get_time_in_diff_units(time_sec=total_time)}")
+    logger.info(
+        f"Creating the unique kmers-to-protein map took {get_time_in_diff_units(time_sec=total_time)}"
+    )
     return uniq_peptides

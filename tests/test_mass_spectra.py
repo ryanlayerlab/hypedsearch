@@ -11,9 +11,9 @@ class TestSpectrum:
         spectrum = create_spectrum(scan_num=1)
         expected = Spectrum(
             peaks=[
-                Peak(mz=1, abundance=4, id=0),
-                Peak(mz=2, abundance=5, id=1),
-                Peak(mz=3, abundance=6, id=2),
+                Peak(mz=1, intensity=4, id=0),
+                Peak(mz=2, intensity=5, id=1),
+                Peak(mz=3, intensity=6, id=2),
             ],
             precursor_mz=100,
             precursor_charge=2,

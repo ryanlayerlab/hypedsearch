@@ -10,8 +10,8 @@ from src.peptides_and_ions import (
     YIonCreator,
     generate_product_ions,
     get_proteins_from_fasta,
+    get_uniq_kmer_to_protein_map,
     get_unique_kmers,
-    get_unique_peptides,
     random_sample_of_unique_kmers,
     write_fasta,
 )
@@ -274,7 +274,9 @@ class Test_get_unique_peptides:
             "DE": [1],
             "E": [1],
         }
-        actual = get_unique_peptides(min_k=min_k, max_k=max_k, proteins=proteins)
+        actual = get_uniq_kmer_to_protein_map(
+            min_k=min_k, max_k=max_k, proteins=proteins
+        )
 
         assert actual == expected
 

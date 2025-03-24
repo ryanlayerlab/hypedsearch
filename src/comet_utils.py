@@ -3,6 +3,7 @@ import os
 import subprocess
 from collections import Counter
 from pathlib import Path
+from time import time
 from typing import List, Optional, Union
 
 import pandas as pd
@@ -11,6 +12,8 @@ from pydantic import BaseModel, field_validator
 from src.constants import (
     COMET_RUN_1_DIR,
     COMET_RUN_2_DIR,
+    DELTA_CN,
+    EVAL,
     IONS_MATCHED,
     MOUSE_PROTEOME,
     PLAIN_PEPTIDE,
@@ -19,8 +22,11 @@ from src.constants import (
     SAMPLE,
     SCAN,
     THOMAS_SAMPLES,
+    XCORR,
 )
 from src.mass_spectra import Spectrum, get_specific_spectrum_by_sample_and_scan_num
+from src.peptide_spectrum_comparison import PeptideSpectrumComparison
+from src.peptides_and_ions import Peptide
 from src.utils import (
     flatten_list_of_lists,
     log_params,
@@ -31,35 +37,66 @@ from src.utils import (
 logger = logging.getLogger(__name__)
 
 
-class CometExe(BaseModel):
-    exe: Path
-    params: Path
+def read_comet_txt_to_df(txt_path: Path, sample: Union[None, str] = None):
+    """
+    Reads Comet's output TXT file to a pandas dataframe.
+    Adds a 'sample' column that's not in the TXT file so that each row has reference
+    to the TXT file it came from
+    """
+    df = pd.read_csv(txt_path, sep="\t", header=1)
+    # Add a "sample" column
+    if sample is None:
+        sample = txt_path.stem
+    df[SAMPLE] = sample
+    return df
 
 
-class CometRow(BaseModel):
+class CometPSM(BaseModel):
     """Class for rows of Comet output"""
 
     sample: str
     scan: int
+    proposed_peptide: str
     ions_matched: int
     proteins: List[str]
     protein_count: int
-    proposed_peptide: str
+    xcorr: float
+    eval: float
+    delta_cn: float
+    # prev_aa: str
+    # next_aa: str
 
     @field_validator("proteins", mode="before")
     def split_protein_column_by_comma(cls, protein: str) -> List[str]:
+        """
+        The 'protein' column in Comet's TXT output has string-valued values that look like:
+            "<protein 1 name>,<protein 2 name>,<...>"
+        I.e., comma-separated protein names.
+        This function breaks the string of comma-separated values into a list:
+            ["<protein 1 name>", "<protein 2 name>", ...]
+        """
         return protein.split(",")
 
     @classmethod
-    def from_txt(cls, file_path: str) -> List["CometRow"]:
+    def from_txt(
+        cls, file_path: str, as_df: bool = False
+    ) -> Union[List["CometPSM"], pd.DataFrame]:
+        """
+        Reads Comet results .txt file to a list of dataclasses or a dataframe
+        """
         file_path = Path(file_path)
-        df = pd.read_csv(file_path, sep="\t", header=1)
-        df["sample"] = file_path.stem
-        return cls.from_dataframe(comet_output_df=df)
+        df = read_comet_txt_to_df(txt_path=file_path)
+        if as_df:
+            return df
+        else:
+            return cls.from_dataframe(comet_output_df=df)
 
     @classmethod
-    def from_dataframe(cls, comet_output_df: pd.DataFrame) -> List["CometRow"]:
-
+    def from_dataframe(cls, comet_output_df: pd.DataFrame) -> List["CometPSM"]:
+        """
+        Given a dataframe from the read_comet_txt_to_df method, convert the dataframe
+        into a list of class instances--one for each row in the dataframe.
+        """
         return [
             cls(
                 sample=row[SAMPLE],
@@ -68,18 +105,38 @@ class CometRow(BaseModel):
                 protein_count=row[PROTEIN_COUNT],
                 proteins=row[PROTEIN],
                 proposed_peptide=row[PLAIN_PEPTIDE],
+                xcorr=row[XCORR],
+                eval=row[EVAL],
+                delta_cn=row[DELTA_CN],
             )
             for _, row in comet_output_df.iterrows()
         ]
 
     def get_corresponding_spectrum(self) -> Spectrum:
+        """
+        Gets the spectrum corresponding to the Comet-returned PSM
+        """
         return get_specific_spectrum_by_sample_and_scan_num(
             sample=self.sample, scan_num=self.scan
         )
 
+    def compare(self, spectrum: Optional[Spectrum] = None):
+        if spectrum is None:
+            logger.info(
+                "Spectrum not provided. "
+                "So getting the spectrum which might be a problem since no peak filtering will happen."
+            )
+            spectrum = self.get_corresponding_spectrum()
+        psm = PeptideSpectrumComparison(
+            spectrum=spectrum, peptide=Peptide(seq=self.proposed_peptide)
+        )
+        psm.compare()
+        return psm
+
 
 def get_comet_protein_counts(
-    comet_rows: Optional[List[CometRow]] = None, shorten_names: bool = True
+    comet_rows: Optional[List[CometPSM]] = None,
+    shorten_names: bool = True,
 ) -> Counter:
     if comet_rows is None:
         comet_rows = load_comet_data(as_df=False)
@@ -92,111 +149,10 @@ def get_comet_protein_counts(
     return Counter(all_prots)
 
 
-def read_comet_txt_to_df(txt_path: Path, sample: Union[None, str] = None):
-    df = pd.read_csv(txt_path, sep="\t", header=1)
-    # Add a "sample" column
-    if sample is None:
-        sample = txt_path.stem
-    df[SAMPLE] = sample
-    return df
-
-
-def run_comet_and_save_params_file(
-    mzml_path: Path,
-    comet: CometExe,
-    parent_output_dir: Path,
-    fasta_path: Path = MOUSE_PROTEOME,
-):
-    """
-    Given an MZML path/name.mzML and an output dir (parent_output_dir), this function:
-        1. creates a folder parent_output_dir/name if it doesn't already exist
-        2. copies comet.params to the parent_output_dir/name directory; the reason to do
-            this is to keep Comet results with the comet.params file that generated them
-        3. runs Comet and saves the result files in parent_output_dir/name/name.<ext>.
-            Typically there will be two Comet outputs:
-            (1) parent_output_dir/name/name.txt
-            (2) parent_output_dir/name/name.pep.xml
-    """
-    # Make sure the parent directory exists and make sure the
-    make_directory(parent_output_dir)
-    results_output_dir = parent_output_dir / mzml_path.stem
-    make_directory(results_output_dir)
-
-    # Copy the comet.params file the output directory
-    subprocess.run(
-        f"cp {comet.params} {fasta_path} {results_output_dir}",
-        shell=True,
-        capture_output=True,
-        text=True,
-    )
-
-    exit_code = run_comet(
-        mzml_path=mzml_path.absolute(),
-        comet=comet,
-        output_dir=results_output_dir,
-        file_name_stem=mzml_path.stem,
-    )
-
-    if exit_code == 0:
-        copied_fasta = results_output_dir / fasta_path.name
-        logger.info(f"Deleting {copied_fasta}")
-        copied_fasta.unlink()
-
-
-def run_comet(mzml_path: Path, comet: CometExe, output_dir: Path, file_name_stem: str):
-    """
-    Runs Comet on given MZML file and saves the results in the output_dir folder with
-    file_name_stem as the result file names' stems. Typically there will be two Comet outputs:
-        (1) output_dir/file_name_stem.txt
-        (2) output_dir/file_name_stem.pep.xml
-    """
-    assert output_dir.exists(), f"Output dir {output_dir} doesn't exist!"
-    curr_dir = os.getcwd()
-
-    # When running Comet, we need the CWD to contain the comet.params file
-    os.chdir(output_dir.absolute())
-    output_path = output_dir / file_name_stem
-
-    # Run Comet
-    command = f"{comet.exe} {mzml_path.absolute()} -N{output_path.absolute()}"
-    logger.info(
-        f"Running Comet with command:\n{command}\nfrom directory:\n{os.getcwd()}"
-    )
-    result = subprocess.run(
-        command,
-        shell=True,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        # Comet failed so clean up and exit
-        msg = (
-            "Comet failed!\n"
-            f"Exit code = {result.returncode}\n"
-            f"Error output = \n{result.stderr}"
-        )
-        logger.info(msg)
-        os.chdir(curr_dir)
-        return result.returncode
-
-    # Check that expected output files exist -- TODO: this should be moved to a test
-    expected_output_files = (
-        Path(str(output_path) + ".txt"),
-        Path(str(output_path) + ".pep.xml"),
-    )
-    for f in expected_output_files:
-        assert f.exists(), f"{f} is expected to exist but does not"
-
-    logger.info(
-        f"Looks like Comet ran successfully. The expected files ({expected_output_files}) exist"
-    )
-    os.chdir(curr_dir)
-    return result.returncode
-
-
 def load_comet_data(
     samples: List[str] = THOMAS_SAMPLES, run: int = 1, as_df: bool = True
 ):
+    """ """
     if run == 1:
         comet_results_dir = COMET_RUN_1_DIR
     elif run == 2:
@@ -213,4 +169,156 @@ def load_comet_data(
     if as_df is True:
         return comet_df
     else:
-        return CometRow.from_dataframe(comet_output_df=comet_df)
+        return CometPSM.from_dataframe(comet_output_df=comet_df)
+
+
+def update_database_path_in_comet_params_file(
+    fasta_path: str, comet_params_path: str, output_path: str
+) -> None:
+    """
+    Given the path to a comet.params file, update the "database_name=..." line
+    to point to the given FASTA path instead of what it was set to. Save the resulting,
+    updated comet.params file to the given output path.
+    """
+    with open(comet_params_path, "r") as infile:
+        lines = infile.readlines()
+
+    # Find and replace the line that starts with "database_name ="
+    for line_idx, line in enumerate(lines):
+        if line.strip().startswith("database_name ="):
+            lines[line_idx] = f"database_name = {fasta_path}\n"
+            break  # Stop after finding the first occurrence
+
+    # Write the modified content to the output path
+    with open(output_path, "w") as outfile:
+        outfile.writelines(lines)
+
+
+@log_params
+def run_comet(
+    template_comet_params_path: Union[str, Path],
+    fasta_path: Union[str, Path],
+    mzml_path: Union[str, Path],
+    parent_output_dir: Union[str, Path],
+    comet_exe_path: Union[str, Path],
+    keep_params: bool = True,
+    overwrite: bool = True,
+    output_file_stem: Optional[str] = None,
+) -> Path:
+    """
+    This function runs Comet on the given MZML using the given FASTA as Comet's databse
+    of proteins from which to consider peptides. Comet will be run using the template
+    comet.param file provided but will update the "database_name=..." line to the
+    given FASTA path to allow users to programmaticallyl update the protein database used by Comet.
+
+    The function does the following:
+        1. Checks that /path/to/parent exists
+        2. Creates the /path/to/parent/sample directory--which we'll call the "sample directory"
+            where the value of "sample" is taken from the MZML file's stem: <sample>.mzML
+        3. Change/cd into the sample directory
+        3. Copy the template comet.params to the sample directory and update the "database_name=..."
+            line to point to the given FASTA file
+        4. Run Comet
+        5. Check that the Comet-created .txt and .pep.xml files were created
+        6. Change/cd back to the original directory
+
+    Args:
+        - template_comet_params_path: path to the comet.params file you'd like to
+            use as a template
+        - fasta_path: path to the FASTA that Comet should use as its database
+        - mzml_path: path to MZML file on which to run Comet
+        - parent_output_dir: parent directory where Comet results will be saved
+        - comet_exe_path: path to Comet executable
+        - keep_params: whether or not to delete the comet.params file in
+            . Defaults to True.
+
+    Returns:
+        - path to the Comet-created .txt file
+    """
+    start_time = time()
+    # Constants & make sure paths are Path objects
+    orig_dir = Path(os.getcwd()).absolute()
+    try:
+        comet_params_str = "comet.params"
+        sample = mzml_path.stem
+        mzml_path = Path(mzml_path).absolute()
+        parent_output_dir = Path(parent_output_dir).absolute()
+        comet_exe_path = Path(comet_exe_path).absolute()
+        sample_output_dir = (parent_output_dir / sample).absolute()
+        comet_params_path = (sample_output_dir / comet_params_str).absolute()
+
+        # Check whether expected output files already exist
+        if output_file_stem is None:
+            output_file_stem = f"{sample}"
+        output_file_without_extension = (
+            sample_output_dir / f"{output_file_stem}"
+        ).absolute()
+        comet_txt_output_path = Path(
+            str(output_file_without_extension) + ".txt"
+        ).absolute()
+        comet_pep_xml_output_path = Path(
+            str(output_file_without_extension) + ".pep.xml"
+        ).absolute()
+        if comet_txt_output_path.exists() and not overwrite:
+            logger.info(
+                f"Output file {comet_txt_output_path} already exists and overwrite is set to {overwrite}. "
+                f"Returning early."
+            )
+            return comet_txt_output_path
+
+        # Make sure parent_output_dir and sample_output_dir exist
+        make_directory(parent_output_dir)
+        make_directory(sample_output_dir)
+
+        # Change to to sample_output_dir
+        os.chdir(sample_output_dir)
+
+        # Copy template comet.params file to the sample_output_dir
+        cmd = f"cp {template_comet_params_path} {comet_params_path}"
+        cmd_result = subprocess.run(
+            cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
+
+        # Update "database_name..." line in comet.params to point to given FASTA file
+        update_database_path_in_comet_params_file(
+            fasta_path=fasta_path,
+            comet_params_path=comet_params_path.absolute(),
+            output_path=comet_params_path,
+        )
+
+        # Run Comet
+        cmd = f"{comet_exe_path} {mzml_path} -N{output_file_without_extension}"
+        logger.info(
+            f"Running Comet with command:\n{cmd}\nfrom directory:\n{os.getcwd()}"
+        )
+        cmd_result = subprocess.run(
+            cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+        )
+
+        # Check that expected output files exist -- TODO: this should be moved to a test
+        expected_output_files = [comet_txt_output_path, comet_pep_xml_output_path]
+        for f in expected_output_files:
+            assert f.exists(), f"{f} is expected to exist but does not"
+
+        logger.info(
+            f"Looks like Comet ran successfully. The expected files ({expected_output_files}) exist"
+        )
+
+        # Delete comet.params if desired
+        if not keep_params:
+            comet_params_path.unlink()
+
+        # Change back to original directory
+        os.chdir(orig_dir)
+
+        logger.info(f"Running Comet took {round(time() - start_time, 2)} seconds")
+        return comet_txt_output_path
+
+    except:
+        os.chdir(orig_dir)

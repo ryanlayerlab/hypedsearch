@@ -98,7 +98,7 @@ def hide_right_top_axis(ax):
 # def set_font_size(font_size: int = LABEL_SIZE)
 
 
-def finalize(axs, fontsize=LABEL_SIZE, labelpad=7, ignore_legend=False):
+def finalize(axs, fontsize=LABEL_SIZE, labelpad=7, ignore_legend=False, add_grid=True):
     """Apply final adjustments"""
     try:
         ax = axs[0]
@@ -110,6 +110,8 @@ def finalize(axs, fontsize=LABEL_SIZE, labelpad=7, ignore_legend=False):
             if ignore_legend == False:
                 ax.legend(frameon=False)
             ax.tick_params(axis="both", which="major", labelsize=fontsize, pad=labelpad)
+            if add_grid:
+                ax.grid(True, linestyle="--", alpha=0.7)
     except:
         axs.tick_params(direction="out")
         hide_right_top_axis(axs)
