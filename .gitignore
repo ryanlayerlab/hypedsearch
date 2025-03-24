@@ -141,10 +141,10 @@ intermediate_files
 .fake
 .ionide
 Timing_data.txt
-data
-*.db
-.mzML
-comet
+# data
+# *.db
+# .mzML
+# comet
 
 # Directories to ignore 
 slurm/logs
@@ -152,3 +152,11 @@ old_src
 old_tests
 dbs
 no-git
+tmp 
+data/comet_run_1
+data/comet_run_2
+data/hs
+data/Hypedsearch_outputs
+data/OLD_comet_run_1
+data/specmill_psms
+old_stuff
