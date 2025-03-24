@@ -151,3 +151,4 @@ slurm/logs
 old_src
 old_tests
 dbs
+no-git
