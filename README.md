@@ -36,20 +36,18 @@ pip install -r requirements.txt  # Install dependencies
 
 ### Comet
 
-Hypedsearch depends [Comet](https://comet-ms.sourceforge.net/). 
+Hypedsearch depends on [Comet](https://comet-ms.sourceforge.net/). 
 So make sure you have a Comet executable locally and can run Comet. 
-If you're running Hypedsearch on a Mac, the executable `comet/comet.macos.exe` may work for you.
+If you're running Hypedsearch on a Mac, the executable `comet/comet.macos.exe` in this repo may work for you.
 
 ## Usage
 
 Make sure `hypedsearch` or the environment in which you installed the Hypedsearch dependencies is activated. 
-Once the environment is activated, the following command should work:
+Once the environment is activated, the following command should work and show the help page:
 
 ```bash 
 python hypedsearch.py -h
 ```
-
-which should show full usage information. 
 
 Here's an example usage of Hypedsearch that should work after cloning the repo, following the installation requirements above, and, if needed, updating the paths to the Comet executable and `comet.params` file:
 
@@ -73,16 +71,16 @@ Here's what this command will do:
 find all `*.mzML` files in the `mzml_dir` directory and its subdirectories. 
 As an example, say three files are found `Fxn1.mzML`, `Fxn2.mzML`, `Fxn3.mzML`.
 
-2. ***Create file-specific subdirectories***: 
+1. ***Create file-specific subdirectories***: 
 for each `<name>.mzML` found in step 1, create a subfolder called `<name>` under `output_dir`.
 In our example, three subfolders under `output_dir` will be created called `Fxn1`, `Fxn2`, and `Fxn3`.
 
-3. ***Comet run #1***: 
+1. ***Comet run #1***: 
 runs Comet on each `.mzML` file found in step 1 using the provided Comet executable `comet_exe_path` and Comet params file `comet_params_path` and using the provided FASTA file at `fasta_path` for the database of proteins that Comet searches.
 The Comet result files will be named `run_1.txt` and `run_1.pep.xml` and will be saved in their `mzML` file's subfolder. 
 E.g., `Fxn1.mzML`'s Comet results will be saved as `output_dir/Fxn1/run_1.txt` and `output_dir/Fxn1/run_1.pep.xml`.
 
-4. ***Protein-Comet counts***:
+1. ***Protein-Comet counts***:
 next Hypedseach combines all the the Comet-found peptide-spectrum matches (PSMs) from all the `mzML` files and counts the number of times each protein appears in the "protein" column which will product data that looks like this:
 
   | protein | Comet count  |
@@ -106,16 +104,16 @@ Users can filter the peaks considered to the top N=`num_peaks` most intense peak
 7. ***Find peak-matching product ions and form hybrids***: 
 by searching the database created in step 5, find the product ions that may explain each peak in the spectrum. From the returned product ions, construct the possible hybrids that may correspond to the spectrum. [TODO: add more details on how this works elsewhere]
 
-8. ***Create new FASTA file for Comet run #2***:
+1. ***Create new FASTA file with the hybrids and most abundant proteins***:
 create a FASTA file containing the proteins in the database from step 5 (i.e., the top N=`top_n_proteins` most abundant proteins) and the hybrids from step 7.
 If `mzml_path=/path/to/BMEM_AspN_Fxn4.mzML` and `scan_num=7`, then the new FASTA file will be saved as `output_dir/BMEM_AspN_Fxn4/scan_num=7_hybrids.fasta`.
 
-9. ***Comet run #2***:
+1. ***Comet run #2***:
 run Comet again on the `.mzML` located at `mzml_path` using the new FASTA file from step 8.
 The Comet run #2 result files will be named `scan_num=<scan_num>_run_2.txt` and `scan_num=<scan_num>_run_2.pep.xml` and will be saved in their `mzML` file's subfolder.
 If `mzml_path=/path/to/BMEM_AspN_Fxn4.mzML` and `scan_num=7`, this step will produce these two files: `output_dir/BMEM_AspN_Fxn4/scan_num=7_run_2.txt` `output_dir/BMEM_AspN_Fxn4/scan_num=7_run_2.pep.xml`.
 
-10. ***Gather the scan-specific results***:
+1.  ***Gather the spectrum-specific results***:
 get the PSMs that correspond to the user-specified spectrum from the first Comet run and the second run, combine them into a new file called `scan=<scan_num>_hs_results.csv` which will be saved in the `mzML` file's subfolder.
 The `.csv` file will have a `run` column.
 The PSMs from Comet run #1 will have `run=1` and the PSMs from Comet run #2 will have `run=2`. 
