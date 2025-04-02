@@ -10,15 +10,15 @@
 #SBATCH --time=23:00:00               # Time limit hrs:min:sec
 # Standard output and error log
 # %j inserts job ID, %x inserts job name
-#SBATCH --output=/scratch/Shares/layer/hypedsearch/hypedsearch/slurm/logs/%x_%j.out   # Standard output and error log
-#SBATCH --error=/scratch/Shares/layer/hypedsearch/hypedsearch/slurm/logs/%x_%j.err   # %j inserts job number
+#SBATCH --output=/scratch/Shares/layer/hypedsearch/hypedsearch/slurm/logs/%x_%j.out 
+#SBATCH --error=/scratch/Shares/layer/hypedsearch/hypedsearch/slurm/logs/%x_%j.err 
 
 python hypedsearch.py \
 --mzml_dir data/spectra \
 --mzml_path $1 \
 --output_dir results/april-1-run \
---db_path test.db \
+--db_path results/april-1-run/test.db \
 --top_n_proteins 50 \
 --num_peaks 100 \
---comet_exe_path comet/comet.macos.exe \
+--comet_exe_path comet/comet.linux.exe \
 --comet_params_path comet/comet.params
