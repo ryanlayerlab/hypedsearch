@@ -206,42 +206,12 @@ def run_comet(
     template_comet_params_path: Union[str, Path],
     fasta_path: Union[str, Path],
     mzml_path: Union[str, Path],
-    parent_output_dir: Union[str, Path],
+    output_dir: Union[str, Path],
     comet_exe_path: Union[str, Path],
     keep_params: bool = True,
     overwrite: bool = True,
     output_file_stem: Optional[str] = None,
 ) -> Path:
-    """
-    This function runs Comet on the given MZML using the given FASTA as Comet's databse
-    of proteins from which to consider peptides. Comet will be run using the template
-    comet.param file provided but will update the "database_name=..." line to the
-    given FASTA path to allow users to programmaticallyl update the protein database used by Comet.
-
-    The function does the following:
-        1. Checks that /path/to/parent exists
-        2. Creates the /path/to/parent/sample directory--which we'll call the "sample directory"
-            where the value of "sample" is taken from the MZML file's stem: <sample>.mzML
-        3. Change/cd into the sample directory
-        3. Copy the template comet.params to the sample directory and update the "database_name=..."
-            line to point to the given FASTA file
-        4. Run Comet
-        5. Check that the Comet-created .txt and .pep.xml files were created
-        6. Change/cd back to the original directory
-
-    Args:
-        - template_comet_params_path: path to the comet.params file you'd like to
-            use as a template
-        - fasta_path: path to the FASTA that Comet should use as its database
-        - mzml_path: path to MZML file on which to run Comet
-        - parent_output_dir: parent directory where Comet results will be saved
-        - comet_exe_path: path to Comet executable
-        - keep_params: whether or not to delete the comet.params file in
-            . Defaults to True.
-
-    Returns:
-        - path to the Comet-created .txt file
-    """
     start_time = time()
     # Constants & make sure paths are Path objects
     orig_dir = Path(os.getcwd()).absolute()
@@ -249,17 +219,14 @@ def run_comet(
         comet_params_str = "comet.params"
         sample = mzml_path.stem
         mzml_path = Path(mzml_path).absolute()
-        parent_output_dir = Path(parent_output_dir).absolute()
+        output_dir = Path(output_dir).absolute()
         comet_exe_path = Path(comet_exe_path).absolute()
-        sample_output_dir = (parent_output_dir / sample).absolute()
-        comet_params_path = (sample_output_dir / comet_params_str).absolute()
+        comet_params_path = (output_dir / comet_params_str).absolute()
 
         # Check whether expected output files already exist
         if output_file_stem is None:
             output_file_stem = f"{sample}"
-        output_file_without_extension = (
-            sample_output_dir / f"{output_file_stem}"
-        ).absolute()
+        output_file_without_extension = (output_dir / f"{output_file_stem}").absolute()
         comet_txt_output_path = Path(
             str(output_file_without_extension) + ".txt"
         ).absolute()
@@ -274,11 +241,10 @@ def run_comet(
             return comet_txt_output_path
 
         # Make sure parent_output_dir and sample_output_dir exist
-        make_directory(parent_output_dir)
-        make_directory(sample_output_dir)
+        make_directory(output_dir)
 
         # Change to to sample_output_dir
-        os.chdir(sample_output_dir)
+        os.chdir(output_dir)
 
         # Copy template comet.params file to the sample_output_dir
         cmd = f"cp {template_comet_params_path} {comet_params_path}"

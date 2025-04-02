@@ -52,7 +52,7 @@ class Test_run_comet:
             fasta_path=MOUSE_PROTEOME,
             mzml_path=Path("data/spectra/BMEM_AspN_Fxn4.mzML"),
             comet_exe_path=COMET_EXECUTABLE,
-            parent_output_dir=tmp_path,
+            output_dir=tmp_path,
         )
         comet_params_path = tmp_path / "BMEM_AspN_Fxn4/comet.params"
         comet_results_path = tmp_path / "BMEM_AspN_Fxn4/BMEM_AspN_Fxn4.txt"
