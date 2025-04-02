@@ -295,3 +295,6 @@ def run_comet(
 
     except:
         os.chdir(orig_dir)
+        raise RuntimeError(
+            f"Running Comet failed. The command:\n{cmd}\nfailed with error:\n{cmd_result.stderr}"
+        )
