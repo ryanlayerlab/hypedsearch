@@ -15,6 +15,7 @@ from src.constants import (
     DEFAULT_MAX_K,
     DEFAULT_MIN_K,
     DEFAULT_NUM_PEAKS,
+    DEFAULT_PPM_TOLERANCE,
     LOGS_DIR,
     MOUSE_PROTEOME,
     SCAN,
@@ -27,16 +28,18 @@ from src.peptide_spectrum_comparison import (
     get_possible_hybrids,
 )
 from src.peptides_and_ions import (
+    Peptide,
     get_proteins_by_name,
     get_proteins_from_fasta,
     get_uniq_kmer_to_protein_map,
 )
 from src.protein_product_ion_database import (
+    ProteinProductIonDb,
     create_db,
     get_product_ions_matching_spectrum,
     process_peak_matching_ions,
 )
-from src.utils import setup_logger
+from src.utils import make_directory, setup_logger
 
 setup_logger(log_file=LOGS_DIR / f"{__name__}.log")
 logger = logging.getLogger(__name__)
@@ -55,6 +58,10 @@ class HypedsearchConfig(AppConfig):
     num_peaks: int = DEFAULT_NUM_PEAKS
     comet_exe_path: str = COMET_EXECUTABLE
     comet_params_path: str = COMET_PARAMS
+    cleanup: bool = True
+    peak_to_ion_ppm_tol: float = DEFAULT_PPM_TOLERANCE
+    precursor_ppm_tol: float = DEFAULT_PPM_TOLERANCE
+
     # min_k: int = DEFAULT_MIN_K
     # max_k: int = DEFAULT_MAX_K
     # mzml_paths: List[str]
@@ -79,6 +86,15 @@ class HypedsearchConfig(AppConfig):
             "If 0, no peak filtering."
         )
         help_strings["scan_num"] = "Scan number to analyze. If -1, analyze all scans."
+        help_strings["cleanup"] = (
+            "If True, remove intermediate files leaving only the Hypedsearch .csv result file"
+        )
+        help_strings["peak_to_ion_ppm_tol"] = (
+            "PPM tolerance when matching spectrum peaks to product ions"
+        )
+        help_strings["precursor_ppm_tol"] = (
+            "Proposed peptides must be within this PPM tolerance of the spectrum precursor m/z"
+        )
         return help_strings
 
     @staticmethod
@@ -99,6 +115,7 @@ class HypedsearchConfig(AppConfig):
 
 def hypedsearch(config: HypedsearchConfig):
     logger.info(f"Configuration: {config}")
+    hs_start_time = time()
 
     # Run Comet on all the MZML files in the specified directory and its subdirectories
     logger.info("Starting Comet run 1...")
@@ -107,15 +124,18 @@ def hypedsearch(config: HypedsearchConfig):
     comet_run_1_txts = []
     for mzml in mzml_paths:
         logger.info(f"Running Comet on MZML file: {mzml}")
+        # Create the output directory for this mzML file
+        mzml_output_dir = config.output_dir / mzml.stem
         comet_run_1_txts.append(
             run_comet(
                 template_comet_params_path=config.comet_params_path,
                 fasta_path=config.fasta_path,
-                parent_output_dir=config.output_dir,
+                output_dir=mzml_output_dir,
                 comet_exe_path=config.comet_exe_path,
                 mzml_path=mzml,
                 overwrite=False,
                 output_file_stem="run_1",
+                keep_params=False,
             )
         )
     logger.info(f"Comet run 1 completed in {time() - start_time:.2f} seconds.")
@@ -150,13 +170,56 @@ def hypedsearch(config: HypedsearchConfig):
 
     # Get spectrum and filter peaks
     spectra = Spectrum.from_mzml(mzml_path=config.mzml_path)
-    spectrum = list(
-        filter(lambda spectrum: spectrum.scan_num == config.scan_num, spectra)
-    )
-    assert (
-        len(spectrum) == 1
-    ), f"Scan number must be unique. There were {len(spectrum)} spectra with scan number {config.scan_num}."
-    spectrum = spectrum[0]
+
+    if config.scan_num == -1:
+        for spectrum in spectra:
+            logger.info(f"Processing spectrum {spectrum.scan_num}...")
+            run_hypedsearch_on_one_spectrum(
+                config=config,
+                db=db,
+                spectrum=spectrum,
+                protein_id_to_name_map=protein_id_to_name_map,
+                uniq_kmer_to_protein_map=uniq_kmer_to_protein_map,
+                db_proteins=db_proteins,
+            )
+    else:
+        logger.info(f"Processing spectrum {config.scan_num}...")
+        spectrum = list(
+            filter(lambda spectrum: spectrum.scan_num == config.scan_num, spectra)
+        )
+        assert (
+            len(spectrum) == 1
+        ), f"Scan number must be unique. There were {len(spectrum)} spectra with scan number {config.scan_num}."
+        spectrum = spectrum[0]
+
+        run_hypedsearch_on_one_spectrum(
+            config=config,
+            db=db,
+            spectrum=spectrum,
+            protein_id_to_name_map=protein_id_to_name_map,
+            uniq_kmer_to_protein_map=uniq_kmer_to_protein_map,
+            db_proteins=db_proteins,
+        )
+    logger.info(f"Hypedsearch completed in {time() - hs_start_time:.2f} seconds.")
+
+    # Cleanup
+    if config.cleanup:
+        logger.info("Cleaning up intermediate files...")
+        # Remove the Comet run 1 output files
+        (config.output_dir / f"{config.mzml_path.stem}/run_1.txt").unlink()
+        (config.output_dir / f"{config.mzml_path.stem}/run_1.pep.xml").unlink()
+        config.db_path.unlink()
+
+
+def run_hypedsearch_on_one_spectrum(
+    config: HypedsearchConfig,
+    db: ProteinProductIonDb,
+    spectrum: Spectrum,
+    protein_id_to_name_map: Dict[str, str],
+    uniq_kmer_to_protein_map: Dict[str, List[str]],
+    db_proteins: List[Peptide],
+):
+    # Perform peak filtering
     if config.num_peaks > 0:
         spectrum.filter_to_top_n_peaks(n=config.num_peaks)
 
@@ -164,6 +227,7 @@ def hypedsearch(config: HypedsearchConfig):
     peaks_with_matches = get_product_ions_matching_spectrum(
         spectrum=spectrum,
         db=db,
+        peak_product_ion_ppm_tolerance=config.peak_to_ion_ppm_tol,
     )
     positioned_ions = process_peak_matching_ions(
         peaks_with_matches=peaks_with_matches,
@@ -179,14 +243,15 @@ def hypedsearch(config: HypedsearchConfig):
 
     # Get possible hybrids
     possible_hybrids = get_possible_hybrids(
-        extended_clusters=extended_clusters, spectrum=spectrum
+        extended_clusters=extended_clusters,
+        spectrum=spectrum,
+        precursor_mz_ppm_tolerance=config.precursor_ppm_tol,
     )
 
+    scan_dir = config.output_dir / f"{config.mzml_path.stem}/scan={spectrum.scan_num}"
+    make_directory(scan_dir)
     # Create new FASTA with hybrids
-    sample = config.mzml_path.stem
-    new_fasta_path = (
-        config.output_dir / f"{sample}/scan={config.scan_num}_hybrids.fasta"
-    )
+    new_fasta_path = scan_dir / "hybrids.fasta"
     create_new_fasta_including_hybrids(
         db_proteins=db_proteins,
         hybrids=possible_hybrids,
@@ -198,31 +263,30 @@ def hypedsearch(config: HypedsearchConfig):
     comet_run_2_txt = run_comet(
         template_comet_params_path=config.comet_params_path,
         fasta_path=new_fasta_path,
-        parent_output_dir=config.output_dir,
+        output_dir=scan_dir,
         comet_exe_path=config.comet_exe_path,
         mzml_path=config.mzml_path,
-        output_file_stem=f"scan={config.scan_num}_run_2",
+        output_file_stem=f"run_2",
+        keep_params=False,
     )
 
     # Get Comet run 1 vs 2 results
     run_1_path = config.output_dir / f"{config.mzml_path.stem}/run_1.txt"
     comet_run_1 = CometPSM.from_txt(file_path=run_1_path, as_df=True)
-    comet_run_1 = comet_run_1[comet_run_1[SCAN] == config.scan_num]
+    comet_run_1 = comet_run_1[comet_run_1[SCAN] == spectrum.scan_num]
     comet_run_1.reset_index(inplace=True, drop=True)
     comet_run_1["run"] = 1
 
     comet_run_2 = CometPSM.from_txt(file_path=comet_run_2_txt, as_df=True)
-    comet_run_2 = comet_run_1[comet_run_2[SCAN] == config.scan_num]
+    comet_run_2 = comet_run_2[comet_run_2[SCAN] == spectrum.scan_num]
     comet_run_2.reset_index(inplace=True, drop=True)
     comet_run_2["run"] = 2
 
     df = pd.concat([comet_run_1, comet_run_2], ignore_index=True)
     df.to_csv(
-        config.output_dir
-        / f"{config.mzml_path.stem}/scan={config.scan_num}_hs_results.csv",
+        scan_dir / "hs_results.csv",
         index=False,
     )
-    logger.info("Hypedsearch completed!")
 
 
 if __name__ == "__main__":
