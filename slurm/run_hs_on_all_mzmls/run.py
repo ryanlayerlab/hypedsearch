@@ -1,3 +1,9 @@
+import sys
+from pathlib import Path
+
+repo_dir = Path(__file__).parents[2]
+sys.path.append(str(repo_dir))
+
 import subprocess
 
 from src.constants import SPECTRA_DIR
