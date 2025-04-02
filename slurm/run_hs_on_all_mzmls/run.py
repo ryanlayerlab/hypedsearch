@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 
 repo_dir = Path(__file__).parents[2]
+assert repo_dir.name == "hypedsearch"
 sys.path.append(str(repo_dir))
 
 import subprocess
@@ -9,7 +10,7 @@ import subprocess
 from src.constants import SPECTRA_DIR
 
 mzml_paths = list(SPECTRA_DIR.glob("*.mzML"))
-mzml_paths = mzml_paths[:2]
+# mzml_paths = mzml_paths[:2]
 for mzml in mzml_paths:
     cmd = [
         "sbatch",
