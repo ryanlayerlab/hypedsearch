@@ -20,5 +20,3 @@ python hypedsearch.py \
 --num_peaks 100 \
 --comet_exe_path comet/comet.macos.exe \
 --comet_params_path comet/comet.params
-
- -n $1 -r 10
