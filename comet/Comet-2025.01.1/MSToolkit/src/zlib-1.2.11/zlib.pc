@@ -1,0 +1,13 @@
+prefix=/Users/erjo3868/repos/hypedsearch/hypedsearch/comet/Comet-2025.01.1/MSToolkit/obj
+exec_prefix=${prefix}
+libdir=/Users/erjo3868/repos/hypedsearch/hypedsearch/comet/Comet-2025.01.1/MSToolkit/obj
+sharedlibdir=${libdir}
+includedir=/Users/erjo3868/repos/hypedsearch/hypedsearch/comet/Comet-2025.01.1/MSToolkit/include
+
+Name: zlib
+Description: zlib compression library
+Version: 1.2.11
+
+Requires:
+Libs: -L${libdir} -L${sharedlibdir} -lz
+Cflags: -I${includedir}
