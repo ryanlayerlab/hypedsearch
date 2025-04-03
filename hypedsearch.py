@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Required
 
 import pandas as pd
 
-from src.comet_utils import CometPSM, get_comet_protein_counts, run_comet
+from src.comet_utils import CometPSM, get_comet_protein_counts, run_comet_on_one_mzml
 from src.config import AppConfig, Required, generate_cli
 from src.constants import (
     COMET_EXECUTABLE,
@@ -127,7 +127,7 @@ def hypedsearch(config: HypedsearchConfig):
         # Create the output directory for this mzML file
         mzml_output_dir = config.output_dir / mzml.stem
         comet_run_1_txts.append(
-            run_comet(
+            run_comet_on_one_mzml(
                 template_comet_params_path=config.comet_params_path,
                 fasta_path=config.fasta_path,
                 output_dir=mzml_output_dir,
@@ -236,21 +236,32 @@ def run_hypedsearch_on_one_spectrum(
     )
 
     # Get clusters
+    logger.info("Getting clusters...")
+    t0 = time()
     clusters = get_clusters_from_ions(ions=positioned_ions)
+    logger.info(f"Getting clusters took {time() - t0:.2f} seconds")
+    logger.info("Extending clusters...")
+    t0 = time()
     extended_clusters = get_extended_clusters(
         spectrum_clusters=clusters, spectrum=spectrum, db=db
     )
+    logger.info(f"Extending clusters took {time() - t0:.2f} seconds")
 
     # Get possible hybrids
+    logger.info("Creating possible hybrids...")
+    t0 = time()
     possible_hybrids = get_possible_hybrids(
         extended_clusters=extended_clusters,
         spectrum=spectrum,
         precursor_mz_ppm_tolerance=config.precursor_ppm_tol,
     )
+    logger.info(f"Getting possible hybrids took {time() - t0:.2f} seconds")
 
     scan_dir = config.output_dir / f"{config.mzml_path.stem}/scan={spectrum.scan_num}"
     make_directory(scan_dir)
     # Create new FASTA with hybrids
+    logger.info("Creating new FASTA with hybrids...")
+    t0 = time()
     new_fasta_path = scan_dir / "hybrids.fasta"
     create_new_fasta_including_hybrids(
         db_proteins=db_proteins,
@@ -258,9 +269,11 @@ def run_hypedsearch_on_one_spectrum(
         protein_id_to_name_map=protein_id_to_name_map,
         fasta_path=new_fasta_path,
     )
+    logger.info(f"Creating new FASTA took {time() - t0:.2f} seconds")
 
     # Run Comet
-    comet_run_2_txt = run_comet(
+    logger.info("Running Comet using new FASTA...")
+    comet_run_2_txt = run_comet_on_one_mzml(
         template_comet_params_path=config.comet_params_path,
         fasta_path=new_fasta_path,
         output_dir=scan_dir,
@@ -271,6 +284,8 @@ def run_hypedsearch_on_one_spectrum(
     )
 
     # Get Comet run 1 vs 2 results
+    logger.info("Getting Comet run 1 and 2 results...")
+    t0 = time()
     run_1_path = config.output_dir / f"{config.mzml_path.stem}/run_1.txt"
     comet_run_1 = CometPSM.from_txt(file_path=run_1_path, as_df=True)
     comet_run_1 = comet_run_1[comet_run_1[SCAN] == spectrum.scan_num]
@@ -287,6 +302,7 @@ def run_hypedsearch_on_one_spectrum(
         scan_dir / "hs_results.csv",
         index=False,
     )
+    logger.info(f"Getting Comet results took {time() - t0:.2f} seconds")
 
 
 if __name__ == "__main__":

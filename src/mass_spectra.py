@@ -106,13 +106,20 @@ def load_mzml_data(samples: List[str] = THOMAS_SAMPLES):
 
 
 def get_specific_spectrum_by_sample_and_scan_num(
-    sample: str, scan_num: int
+    sample: Union[str, int], scan_num: int
 ) -> Spectrum:
     """
     Args:
         - scan_num is the spectrum's 1-based index
     """
-    mzml_path = SPECTRA_DIR / f"{sample}.mzML"
+    if isinstance(sample, str):
+        mzml_path = SPECTRA_DIR / f"{sample}.mzML"
+    elif isinstance(sample, int):
+        mzml_path = SPECTRA_DIR / f"BMEM_AspN_Fxn{sample}.mzML"
+    else:
+        raise RuntimeError(
+            f"Provided 'sample' should be type str or int. You provided {type(sample)}"
+        )
     matched_spectrum = None
     spectra = Spectrum.from_mzml(mzml_path=mzml_path)
     matched_spectrum = None

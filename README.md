@@ -5,6 +5,7 @@
   - [Without using Conda (using `pip` and `venv`)](#without-using-conda-using-pip-and-venv)
   - [Comet](#comet)
 - [Usage](#usage)
+- [(Potentially) Helpful commands](#potentially-helpful-commands)
 
 
 ## Installation
@@ -62,7 +63,8 @@ python hypedsearch.py \
 --num_peaks 100 \
 --comet_exe_path comet/comet.macos.exe \
 --comet_params_path comet/comet.params \
---fasta_path fastas/Uniprot_mouse.fasta
+--fasta_path fastas/Uniprot_mouse.fasta \
+--cleanup False
 ```
 
 Here's what this command will do:
@@ -85,8 +87,8 @@ next Hypedseach combines all the the Comet-found peptide-spectrum matches (PSMs)
 
   | protein | Comet count  |
   | - | - |
-  | sp|Q7TQP3|GP119_MOUSE | 10 | 
-  |  sp|P01326|INS2_MOUSE | 25 | 
+  | sp\|Q7TQP3\|GP119_MOUSE | 10 | 
+  | sp\|P01326\|INS2_MOUSE | 25 | 
   | ... | ... | 
 
   We will use these Comet protein counts as a proxy for protein abundance. 
@@ -118,3 +120,12 @@ get the PSMs that correspond to the user-specified spectrum from the first Comet
 The `.csv` file will have a `run` column.
 The PSMs from Comet run #1 will have `run=1` and the PSMs from Comet run #2 will have `run=2`. 
 If `mzml_path=/path/to/BMEM_AspN_Fxn4.mzML` and `scan_num=7`, this step generate the file: `output_dir/BMEM_AspN_Fxn4/scan_num=7_hs_results.csv`.
+
+## (Potentially) Helpful commands
+
+Here are some commands that may be helpful for you. 
+
+| Action | Command | 
+| - | - |
+| Run Comet on all `.mzML` files in a directory | `python -m src.comet_utils -m data/spectra -o results/comet_run_for_protein_abundances -np 5` |
+

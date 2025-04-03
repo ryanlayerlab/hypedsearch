@@ -721,8 +721,6 @@ def get_possible_hybrids(
     spectrum: Spectrum,
     precursor_mz_ppm_tolerance: int = DEFAULT_PPM_TOLERANCE,
 ) -> List[HybridPeptide]:
-    logger.info("Creating possible hybrids...")
-    start_time = time()
     mz_tolerance = relative_ppm_tolerance_in_daltons(
         ppm=precursor_mz_ppm_tolerance, ref_mass=spectrum.precursor_mz
     )

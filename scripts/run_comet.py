@@ -4,7 +4,7 @@ from pathlib import Path
 repo_dir = Path(__file__).parents[1]
 sys.path.append(str(repo_dir))
 
-from src.comet_utils import CometExe, run_comet_and_save_params_file
+from src.comet_utils import run_comet_on_one_mzml
 from src.constants import (
     COMET_EXECUTABLE,
     COMET_PARAMS,
@@ -14,14 +14,12 @@ from src.constants import (
 )
 from src.utils import setup_logger
 
-setup_logger()
-
-comet = CometExe(exe=COMET_EXECUTABLE, params=COMET_PARAMS)
-parent_output_dir = COMET_RUN_1_DIR
+logger = setup_logger()
 
 
-mzml_paths = [SPECTRA_DIR / f"{sample}.mzML" for sample in THOMAS_SAMPLES]
+mzmls = list(SPECTRA_DIR.glob("*.mzML"))
 
+logger.info("About to run Comet on ")
 for mzml_path in mzml_paths:
     run_comet_and_save_params_file(
         mzml_path=mzml_path, comet=comet, parent_output_dir=parent_output_dir

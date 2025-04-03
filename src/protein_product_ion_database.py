@@ -69,10 +69,6 @@ class DbKmer(SqlTableRow):
             seq=seq, aa_mass=aa_mass, protein_ids=",".join(map(str, protein_ids))
         )
 
-    @property
-    def aa_seq(self):
-        return self._charge
-
     def set_charge(self, charge: int):
         self._charge = charge
 
