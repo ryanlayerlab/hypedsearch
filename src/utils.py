@@ -11,6 +11,8 @@ from itertools import chain
 from pathlib import Path
 from typing import Any, Callable, List, Literal, Optional, Union
 
+import click
+
 from src.constants import COMET_RUN_1_DIR, COMET_RUN_2_DIR, THOMAS_SAMPLES
 
 logger = logging.getLogger(__name__)
@@ -204,3 +206,13 @@ def file_hash(filepath: Path, algorithm="sha256") -> str:
         ):  # Read in chunks to handle large files efficiently
             hash_func.update(chunk)
     return hash_func.hexdigest()
+
+
+class PathType(click.ParamType):
+    name = "path"
+
+    def convert(self, value, param, ctx):
+        try:
+            return Path(value).resolve()  # Convert to absolute Path object
+        except Exception as e:
+            self.fail(f"{value} is not a valid path: {e}", param, ctx)
