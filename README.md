@@ -127,21 +127,35 @@ Here are some commands that may be helpful for you.
 
 - Run Comet on all `.mzML` files in a directory:
   ```
-  python -m src.comet_utils -m data/spectra -o results/comet_run_for_protein_abundances -np 5
+  python -m src.comet_utils -h
+  python -m src.comet_utils \
+    -m data/spectra \
+    -o results/comet_run_for_protein_abundances \
+    -np 5
   ```
 - Get the top N most abundant proteins:
   ```
-  python -m src.protein_abundance get-common-proteins -d results/comet_run_for_protein_abundances -n 1 -t 10 -o results/comet_run_for_protein_abundances/top_10_proteins.txt
+  python -m src.protein_abundance get-common-proteins \
+    -d results/comet_run_for_protein_abundances \
+    -n 1 -t 10 \
+    -o results/comet_run_for_protein_abundances/top_10_proteins.txt
   ```
 
 - Create database of proteins and product ions
   ```
   python -m src.create_db
-  python -m src.create_db -d results/new_fasta/top_10_prots.db -p results/new_fasta/top_10_proteins.txt -f fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta
+  python -m src.create_db \
+    -d results/new_fasta/top_10_prots.db \
+    -p results/new_fasta/top_10_proteins.txt \
+    -f fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta
   ```
 
 - Run hypedsearch
   ```
   python -m src.run_hypedsearch -h 
-  python -m src.run_hypedsearch -d results/new_fasta/top_10_prots.db -o results/new_fasta/hs_results -n 0 -p 10 -P 20 -m data/spectra/BMEM_AspN_Fxn4.mzML
+  python -m src.run_hypedsearch \
+    -m data/spectra/BMEM_AspN_Fxn4.mzML \
+    -d results/new_fasta/top_10_prots.db \
+    -o results/new_fasta/hs_results \
+    -n 0 -p 10 -P 20
   ```
