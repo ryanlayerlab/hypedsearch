@@ -91,6 +91,10 @@ class DbKmer(SqlTableRow):
     def ion(self):
         return self._ion_type
 
+    @property
+    def protein_ids_as_ints(self):
+        return [int(p_id) for p_id in self.protein_ids.split(",")]
+
     def ionize(self, charge: int, ion_type: IonTypes):
         self.set_ion_type(ion_type=ion_type)
         self.set_charge(charge=charge)
@@ -107,17 +111,6 @@ class PositionedIon:
     protein_id: int
     inclusive_start: int
     exclusive_end: int
-
-
-# @dataclass
-# class DbProtein(SqlTableRow):
-#     id: PrimaryKey[int]
-#     seq: str
-
-#     @classmethod
-#     def from_peptide(cls, peptide: Peptide) -> "DbProtein":
-#         assert peptide.id is not None
-#         return cls(id=peptide.id, seq=peptide.seq)
 
 
 @dataclass
@@ -139,78 +132,6 @@ def get_aa_seq_corresponding_to_protein_region(
     assert len(peptide) == 1, "There should only be one matching peptide"
     peptide = peptide[0].seq
     return peptide[inclusive_start:exclusive_end]
-
-
-# @dataclass
-# class DbProductIon(SqlTableRow):
-#     protein_id: int
-#     inclusive_start: int
-#     exclusive_end: int
-#     charge: int
-#     neutral_mass: float
-#     ion_type: int
-
-#     @classmethod
-#     def kmer_to_ion(
-#         cls, kmer: Kmer, charge: int, ion_type: IonTypes, protein_id: int
-#     ) -> "DbProductIon":
-#         product_ion = ProductIon(seq=kmer.seq, charge=charge, ion_type=ion_type)
-#         return cls(
-#             protein_id=protein_id,
-#             # position=kmer.position,
-#             inclusive_start=kmer.position.inclusive_start,
-#             exclusive_end=kmer.position.exclusive_end,
-#             charge=product_ion.charge,
-#             neutral_mass=product_ion.neutral_mass,
-#             ion_type=ION_TYPE_TO_INT[product_ion.ion_type.value],
-#         )
-
-#     @classmethod
-#     def from_peptide(
-#         cls,
-#         peptide: Peptide,
-#         charges: List[int],
-#         ion_types: List[IonTypes],
-#         max_k: int = DEFAULT_MAX_K,
-#         min_k: int = DEFAULT_MIN_K,
-#     ) -> List["DbProductIon"]:
-#         """ """
-#         kmers = peptide.kmers(min_k=min_k, max_k=max_k)
-#         ions = []
-#         for kmer in kmers:
-#             for charge in charges:
-#                 for ion_type in ion_types:
-#                     ions.append(
-#                         cls.kmer_to_ion(
-#                             kmer=kmer,
-#                             charge=charge,
-#                             ion_type=ion_type,
-#                             protein_id=peptide.id,
-#                         )
-#                     )
-#         return ions
-
-#     def set_aa_seq(self, db):
-#         aa_seq = get_aa_seq_from_db(
-#             protein_id=self.protein_id,
-#             inclusive_start=self.inclusive_start,
-#             exclusive_end=self.exclusive_end,
-#             db=db,
-#         )
-#         self._aa_seq = aa_seq
-#         return aa_seq
-
-#     @property
-#     def aa_seq(self):
-#         return self._aa_seq
-
-#     def get_aa_seq_from_db_peptides(self, db_peptides: List[Peptide]):
-#         return get_aa_seq_corresponding_to_protein_region(
-#             peptide_id=self.protein_id,
-#             inclusive_start=self.inclusive_start,
-#             exclusive_end=self.exclusive_end,
-#             peptides=db_peptides,
-#         )
 
 
 def b_bounds(ppm_tolerance, query_mass, charge):
@@ -243,78 +164,13 @@ class ProteinProductIonDb(Sqlite3Database):
         product_ion_table_name: str = PRODUCT_ION_TABLE,
         protein_obj: type[DbProtein] = DbProtein,
         product_ion_obj: type[DbKmer] = DbKmer,
-        overwrite: bool = False,
-        # charges: List[int] = [1, 2, 3],
-        # ion_types: List[IonTypes] = [IonTypes.B_ION_TYPE, IonTypes.Y_ION_TYPE],
-        # min_k: int = DEFAULT_MIN_K,
-        # max_k: int = DEFAULT_MAX_K,
+        overwrite: bool = True,
     ):
         super().__init__(db_path=db_path, overwrite=overwrite)
         self.protein_table_name = protein_table_name
         self.product_ion_table_name = product_ion_table_name
         self.protein_obj = protein_obj
         self.product_ion_obj = product_ion_obj
-        # self.min_k = min_k
-        # self.max_k = max_k
-        # self.charges = charges
-        # self.ion_types = ion_types
-
-    # def create_protein_table(self):
-    #     self.create_table_from_dataclass(
-    #         table_name=self.protein_table_name, obj=self.protein_obj
-    #     )
-
-    # def create_product_ion_table(self):
-    #     self.create_table_from_dataclass(
-    #         table_name=self.product_ion_table_name, obj=self.product_ion_obj
-    # )
-
-    # def add_peptide_and_product_ions(
-    #     self,
-    #     peptide: Peptide,
-    # ) -> None:
-    #     # Add peptide to DB
-    #     db_protein = self.protein_obj.from_peptide(peptide=peptide)
-    #     self.insert_dataclasses(
-    #         table_name=self.protein_table_name, data_classes=[db_protein]
-    #     )
-
-    #     # Add product ions to DB
-    #     db_ions = self.product_ion_obj.from_peptide(
-    #         peptide=peptide,
-    #         charges=self.charges,
-    #         ion_types=self.ion_types,
-    #         min_k=self.min_k,
-    #         max_k=self.max_k,
-    #     )
-    #     self.insert_dataclasses(
-    #         table_name=self.product_ion_table_name, data_classes=db_ions
-    #     )
-
-    # def get_ions_within_mass_tolerance(
-    #     self,
-    #     query_mass: float,
-    #     mz_tolerance: Optional[float] = None,
-    #     ppm_tolerance: Optional[float] = None,
-    # ) -> List[DbProductIon]:
-
-    #     if ppm_tolerance is not None:
-    #         mz_tolerance = relative_ppm_tolerance_in_daltons(
-    #             ppm=ppm_tolerance, ref_mass=query_mass
-    #         )
-
-    #     upper_bound = query_mass + mz_tolerance
-    #     lower_bound = query_mass - mz_tolerance
-
-    #     query = f"""
-    #         SELECT
-    #             *
-    #         FROM {self.product_ion_table_name} as product_ion
-    #         WHERE product_ion.{NEUTRAL_MASS} BETWEEN {lower_bound} AND {upper_bound}
-    #         ORDER BY {PROTEIN_ID}, {INCLUSIVE_START}, {EXCLUSIVE_END};
-    #     """
-    #     matching_ions = self.read_query(query=query)
-    #     return [self.product_ion_obj(**dict(ion)) for ion in matching_ions]
 
     def get_proteins(self):
         rows = self.all_table_rows(table_name=self.protein_table_name)
@@ -349,7 +205,6 @@ class ProteinProductIonDb(Sqlite3Database):
         results = []
         for charge in range(1, precursor_charge + 1):
             for ion_type in ion_types:
-                # logger.info(f"Getting charge={charge}, {ion_type} ions...")
                 bounds_fcn = bounds_fcns[ion_type]
                 lower_bound, upper_bound = bounds_fcn(
                     ppm_tolerance=ppm_tolerance,
@@ -366,7 +221,7 @@ class ProteinProductIonDb(Sqlite3Database):
                 matching_ions = [
                     self.product_ion_obj(**dict(ion)) for ion in matching_ions
                 ]
-                # logger.info(f"Matching ions PRE-filtering: {matching_ions}")
+
                 matching_ions = list(
                     filter(
                         lambda ion: compute_peptide_mz(
@@ -383,57 +238,6 @@ class ProteinProductIonDb(Sqlite3Database):
                 # logger.info(f"Matching ions POST-filtering: {matching_ions}")
                 results.extend(matching_ions)
         return results
-
-
-# def create_and_populate_protein_and_product_ion_database(
-#     charges: List[int] = [1, 2, 3],
-#     ion_types: List[IonTypes] = [IonTypes.B_ION_TYPE, IonTypes.Y_ION_TYPE],
-#     protein_obj: DbProtein = DbProtein,
-#     product_ion_obj: DbProductIon = DbProductIon,
-#     protein_table_name: str = PROTEIN_TABLE,
-#     product_ion_table_name: str = PRODUCT_ION_TABLE,
-#     db_path: str = MEMORY,
-#     min_k: int = DEFAULT_MIN_K,
-#     max_k: int = DEFAULT_MAX_K,
-#     peptides: Optional[List[Peptide]] = None,
-#     fasta_path: Optional[str] = None,
-# ) -> ProteinProductIonDb:
-#     logger.info("Creating protein-product ion database...")
-#     if fasta_path is not None:
-#         peptides = Peptide.from_fasta(fasta_path=fasta_path)
-
-#     db = ProteinProductIonDb(
-#         charges=charges,
-#         ion_types=ion_types,
-#         db_path=db_path,
-#         protein_table_name=protein_table_name,
-#         product_ion_table_name=product_ion_table_name,
-#         min_k=min_k,
-#         max_k=max_k,
-#         protein_obj=protein_obj,
-#         product_ion_obj=product_ion_obj,
-#     )
-
-#     db.create_protein_table()
-#     db.create_product_ion_table()
-#     num_peptides = len(peptides)
-#     for p_idx, peptide in enumerate(peptides):
-#         logger.info(f"Adding protein {p_idx + 1} / {num_peptides}...")
-#         db.add_peptide_and_product_ions(peptide=peptide)
-
-#     return db
-
-
-# def protein_product_ion_database_file_name(
-#     charges: List[int],
-#     ion_types: List[IonTypes],
-#     file_name_prefix: str,
-#     min_k: int,
-#     max_k: int,
-# ):
-#     ion_types = ",".join([ion_type.value for ion_type in ion_types])
-#     charges = ",".join([str(charge) for charge in charges])
-#     return f"{file_name_prefix}_ionTypes={ion_types}_charges={charges}_minK={min_k}_maxK={max_k}.db"
 
 
 @dataclass
@@ -545,12 +349,10 @@ def create_db(
     return db
 
 
-def process_peak_matching_ions(
+def get_positions_in_proteins_of_peak_matching_ions(
     peaks_with_matches: List[PeakWithMatchingProductIons],
-    kmer_to_protein_map: Dict[str, int],
     db: ProteinProductIonDb,
-):
-
+) -> List[PositionedIon]:
     # Filter out the peaks with no product ion matches
     peaks_with_matches = list(
         filter(
@@ -559,15 +361,15 @@ def process_peak_matching_ions(
         )
     )
 
-    # Just look at the ions, ignoring the peaks
+    # Ignore the peaks now and just look at the peak-matching ions
     ions = flatten_list_of_lists(
         [peak_and_matches.ions for peak_and_matches in peaks_with_matches]
     )
 
-    # Get the position of each matched product ion
+    # For each ion, get the positions in the proteins it appears in
     positioned_ions = []
     for ion in ions:
-        for p_id in kmer_to_protein_map[ion.seq]:
+        for p_id in ion.protein_ids_as_ints:
             prot = db.get_protein_by_id(protein_id=p_id)
             new_ions = [
                 PositionedIon(

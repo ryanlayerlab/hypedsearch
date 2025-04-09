@@ -181,8 +181,13 @@ def lighten_color(color, amount=0.5):
     return colorsys.hls_to_rgb(c[0], 1 - amount * (1 - c[1]), c[2])
 
 
-def fig_setup(nrows=1, ncols=1, w=6, h=4):
-    fig, axs = plt.subplots(nrows=nrows, ncols=ncols, figsize=(ncols * w, nrows * h))
+def fig_setup(nrows=1, ncols=1, w=6, h=4, constrained_layout: bool = True):
+    fig, axs = plt.subplots(
+        nrows=nrows,
+        ncols=ncols,
+        figsize=(ncols * w, nrows * h),
+        constrained_layout=constrained_layout,
+    )
     if nrows * ncols == 1:
         return fig, [axs]
     else:

@@ -33,7 +33,6 @@ from src.constants import (
     XCORR,
 )
 from src.mass_spectra import Spectrum, get_specific_spectrum_by_sample_and_scan_num
-from src.peptide_spectrum_comparison import PeptideSpectrumComparison
 from src.peptides_and_ions import Peptide
 from src.utils import (
     PathType,
@@ -50,19 +49,31 @@ LINUX_OS = "linux"
 logger = logging.getLogger(__name__)
 
 
-def read_comet_txt_to_df(txt_path: Path):
+def get_comet_txts_in_dir(dir: Path) -> List[Path]:
+    txt_files = list(dir.glob("*.txt"))
+    pepxml_stems = {f.name[:-8] for f in dir.glob("*.pep.xml")}
+
+    matching_txt_files = [
+        txt_file for txt_file in txt_files if txt_file.stem in pepxml_stems
+    ]
+
+    return matching_txt_files
+
+
+def read_comet_txt_to_df(txt_path: Path, sample: Optional[str] = None):
     """
     Reads Comet's output TXT file to a pandas dataframe.
     Adds a 'sample' column that's not in the TXT file but is in the XML file that Comet
     also spits out.
     """
-    # Get sample name from the Comet XML file because
-    xml_path = Path(str(txt_path).replace(".txt", ".pep.xml"))
-    tree = ET.parse(xml_path)
-    root = tree.getroot()
-    namespace = {"pep": "http://regis-web.systemsbiology.net/pepXML"}
-    msms_run_summary = root.find("pep:msms_run_summary", namespace)
-    sample = msms_run_summary.get("base_name").split("/")[-1]
+    if sample is None:
+        # Get sample name from the Comet XML file because
+        xml_path = Path(str(txt_path).replace(".txt", ".pep.xml"))
+        tree = ET.parse(xml_path)
+        root = tree.getroot()
+        namespace = {"pep": "http://regis-web.systemsbiology.net/pepXML"}
+        msms_run_summary = root.find("pep:msms_run_summary", namespace)
+        sample = msms_run_summary.get("base_name").split("/")[-1]
 
     # Read the TXT file to a dataframe and add the sample column
     df = pd.read_csv(txt_path, sep="\t", header=1)
@@ -140,19 +151,6 @@ class CometPSM(BaseModel):
         return get_specific_spectrum_by_sample_and_scan_num(
             sample=self.sample, scan_num=self.scan
         )
-
-    def compare_to_spectrum(self, spectrum: Optional[Spectrum] = None):
-        if spectrum is None:
-            logger.info(
-                "Spectrum not provided. "
-                "So getting the spectrum which might be a problem since no peak filtering will happen."
-            )
-            spectrum = self.get_corresponding_spectrum()
-        psm = PeptideSpectrumComparison(
-            spectrum=spectrum, peptide=Peptide(seq=self.proposed_peptide)
-        )
-        psm.compare()
-        return psm
 
 
 def get_comet_protein_counts(
@@ -250,7 +248,7 @@ def get_default_comet_executable_path():
 
 
 @click.command(
-    name="Run Comet",
+    name="run-comet",
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
 )
 @click.option(
@@ -369,109 +367,92 @@ def cli(
 
 
 def run_comet_on_one_mzml(
-    fasta: Path,
     output_dir: Path,
+    mzml: Path,
     # keep_params: bool = True,
-    mzml: Path = MOUSE_PROTEOME,
+    fasta: Path = MOUSE_PROTEOME,
     stem: Optional[str] = None,
     comet_exe: Path = get_default_comet_executable_path(),
     comet_params: Path = COMET_PARAMS,
     check: bool = False,
     scan: Optional[int] = None,
     num_psms: Optional[int] = None,
-    cleanup: bool = True,
 ) -> Path:
     start_time = time()
     # Constants & make sure paths are Path objects
     orig_dir = Path(os.getcwd()).absolute()
-    try:
-        comet_params_str = "comet.params"
-        new_comet_params_path = (output_dir / comet_params_str).absolute()
+    comet_params_str = "comet.params"
+    new_comet_params_path = (output_dir / comet_params_str).absolute()
 
-        # Check whether expected output files already exist
-        if stem is None:
-            stem = f"{mzml.stem}"
-        output_file_without_extension = (output_dir / f"{stem}").absolute()
-        scan_range = ""
-        if scan is not None:
-            scan_range = f".{scan}-{scan}"
-        comet_txt_output_path = Path(
-            str(output_file_without_extension) + f"{scan_range}.txt"
-        ).absolute()
-        comet_pep_xml_output_path = Path(
-            str(output_file_without_extension) + f"{scan_range}.pep.xml"
-        ).absolute()
-        if comet_txt_output_path.exists() and check:
-            logger.info(
-                f"Output file {comet_txt_output_path} already exists so Comet will NOT be run."
-            )
-            return comet_txt_output_path
-
-        # Make sure parent_output_dir and sample_output_dir exist
-        make_directory(output_dir)
-
-        # Change to to sample_output_dir
-        os.chdir(output_dir)
-
-        # Copy template comet.params file to the sample_output_dir
-        cmd = f"cp {comet_params} {new_comet_params_path}"
-        cmd_result = subprocess.run(
-            cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-        )
-
-        # Update comet.params with user-provided values
-        params = CometParams(path=new_comet_params_path)
-        params.update_database_name(fasta_path=fasta)
-        if scan is not None:
-            params.update_scan_range(min_scan=scan, max_scan=scan)
-        if num_psms is not None:
-            params.update_num_output_lines(num_output_lines=num_psms)
-        params.write(output_path=new_comet_params_path)
-
-        # Run Comet
-        cmd = f"{comet_exe} {mzml} -N{output_file_without_extension}"
+    # Check whether expected output files already exist
+    if stem is None:
+        stem = f"{mzml.stem}"
+    output_file_without_extension = (output_dir / f"{stem}").absolute()
+    scan_range = ""
+    if scan is not None:
+        scan_range = f".{scan}-{scan}"
+    comet_txt_output_path = Path(
+        str(output_file_without_extension) + f"{scan_range}.txt"
+    ).absolute()
+    comet_pep_xml_output_path = Path(
+        str(output_file_without_extension) + f"{scan_range}.pep.xml"
+    ).absolute()
+    if comet_txt_output_path.exists() and check:
         logger.info(
-            f"Running Comet with command:\n{cmd}\nfrom directory:\n{os.getcwd()}"
+            f"Output file {comet_txt_output_path} already exists so Comet will NOT be run."
         )
-        cmd_result = subprocess.run(
-            cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-        )
-
-        # Check that expected output files exist -- TODO: this should be moved to a test
-        expected_output_files = [comet_txt_output_path, comet_pep_xml_output_path]
-        for f in expected_output_files:
-            assert f.exists(), f"{f} is expected to exist but does not"
-
-        logger.info(
-            f"Looks like Comet ran successfully. The expected files ({expected_output_files}) exist"
-        )
-
-        # Clean up files by
-        # 1. deleting the comet.params file that's copied to the output
-        # 2. deleting the .pep.xml Comet result file because we only use the .txt file
-        if cleanup:
-            new_comet_params_path.unlink()
-            # Actually keeping the pep.xml file because that's where I get the sample name b/c
-            # it's not necessarily in the txt
-            # comet_pep_xml_output_path.unlink() #
-
-        # Change back to original directory
-        os.chdir(orig_dir)
-
-        logger.info(f"Running Comet took {round(time() - start_time, 2)} seconds")
         return comet_txt_output_path
 
-    except:
-        os.chdir(orig_dir)
+    # Make sure parent_output_dir and sample_output_dir exist
+    make_directory(output_dir)
+
+    # Change to to sample_output_dir
+    os.chdir(output_dir)
+
+    # Copy template comet.params file to the sample_output_dir
+    cmd = f"cp {comet_params} {new_comet_params_path}"
+    cmd_result = subprocess.run(
+        cmd,
+        shell=True,
+        capture_output=True,
+        text=True,
+    )
+
+    # Update comet.params with user-provided values
+    params = CometParams(path=new_comet_params_path)
+    params.update_database_name(fasta_path=fasta)
+    if scan is not None:
+        params.update_scan_range(min_scan=scan, max_scan=scan)
+    if num_psms is not None:
+        params.update_num_output_lines(num_output_lines=num_psms)
+    params.write(output_path=new_comet_params_path)
+
+    # Run Comet
+    cmd = f"{comet_exe} {mzml} -N{output_file_without_extension}"
+    logger.info(f"Running Comet with command:\n{cmd}\nfrom directory:\n{os.getcwd()}")
+    cmd_result = subprocess.run(
+        cmd,
+        shell=True,
+        capture_output=True,
+        text=True,
+    )
+
+    # Change back to original directory
+    os.chdir(orig_dir)
+
+    # Check for errors
+    if cmd_result.returncode != 0:
         raise RuntimeError(
-            f"Running Comet failed. The command:\n{cmd}\nfailed with error:\n{cmd_result.stderr}"
+            f"Comet failed with stdout:\n{cmd_result.stdout}\n"
+            f"And stderr:\n{cmd_result.stderr}"
         )
+
+    # Check that expected output files exist -- TODO: this should be moved to a test
+    expected_output_files = [comet_txt_output_path, comet_pep_xml_output_path]
+    for f in expected_output_files:
+        assert f.exists(), f"{f} is expected to exist but does not"
+    logger.info(f"Running Comet took {round(time() - start_time, 2)} seconds")
+    return comet_txt_output_path
 
 
 if __name__ == "__main__":

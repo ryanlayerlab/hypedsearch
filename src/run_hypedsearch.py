@@ -18,6 +18,7 @@ from src.peptide_spectrum_comparison import (  # get_possible_hybrids,
     create_hybrids_fasta,
     extend_clusters,
     get_clusters_from_ions,
+    get_hybrids,
 )
 from src.protein_product_ion_database import (
     PositionedIon,
@@ -36,102 +37,63 @@ from src.utils import (
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class HSIntermediates:
-    positioned_ions: List[PositionedIon]
-    b_ext_clusters: List[ExtendedCluster]
-    y_ext_clusters: List[ExtendedCluster]
-    hybrids: List[HybridPeptide]
+# @dataclass
+# class HSIntermediates:
+#     positioned_ions: List[PositionedIon]
+#     b_ext_clusters: List[ExtendedCluster]
+#     y_ext_clusters: List[ExtendedCluster]
+#     hybrids: List[HybridPeptide]
 
 
-def get_extended_clusters(
-    spectrum: Spectrum,
-    db_path: Path,
-    peak_to_ion_ppm_tol: float = DEFAULT_PPM_TOLERANCE,
-) -> SpectrumExtendedClusters:
-    # Connect to the database
-    db = ProteinProductIonDb(db_path=db_path, overwrite=False)
+# def get_potential_hybrids(
+#     spectrum: Spectrum,
+#     db_path: Path,
+#     peak_to_ion_ppm_tol: float = DEFAULT_PPM_TOLERANCE,
+#     precursor_ppm_tol: float = DEFAULT_PPM_TOLERANCE,
+# ):
+#     # Connect to the database
+#     db = ProteinProductIonDb(db_path=db_path, overwrite=False)
 
-    # Find ions that match spectrum peaks
-    peaks_with_matches = get_product_ions_matching_spectrum(
-        spectrum=spectrum,
-        db=db,
-        peak_product_ion_ppm_tolerance=peak_to_ion_ppm_tol,
-    )
-    positioned_ions = get_positions_in_proteins_of_peak_matching_ions(
-        peaks_with_matches=peaks_with_matches,
-        db=db,
-    )
+#     # Find ions that match spectrum peaks
+#     peaks_with_matches = get_product_ions_matching_spectrum(
+#         spectrum=spectrum,
+#         db=db,
+#         peak_product_ion_ppm_tolerance=peak_to_ion_ppm_tol,
+#     )
+#     positioned_ions = get_positions_in_proteins_of_peak_matching_ions(
+#         peaks_with_matches=peaks_with_matches,
+#         db=db,
+#     )
 
-    # Get clusters
-    logger.info("Getting clusters...")
-    t0 = time()
-    clusters = get_clusters_from_ions(ions=positioned_ions)
-    logger.info(f"Getting clusters took {get_time_in_diff_units(time() - t0)}")
+#     # Get clusters
+#     logger.info("Getting clusters...")
+#     t0 = time()
+#     clusters = get_clusters_from_ions(ions=positioned_ions)
+#     logger.info(f"Getting clusters took {time() - t0:.2f} seconds")
+#     logger.info("Extending clusters...")
+#     t0 = time()
+#     extended_clusters = extend_clusters(
+#         spectrum_clusters=clusters, spectrum=spectrum, db=db
+#     )
+#     logger.info(f"Extending clusters took {time() - t0:.2f} seconds")
 
-    # Extend clusters
-    logger.info("Extending clusters...")
-    t0 = time()
-    extended_clusters = extend_clusters(
-        spectrum_clusters=clusters,
-        db=db,
-        precursor_charge=spectrum.precursor_charge,
-        precursor_mz=spectrum.precursor_mz,
-    )
-    logger.info(f"Extending clusters took {get_time_in_diff_units(time() - t0)}")
-
-    return extended_clusters
-
-
-def get_potential_hybrids(
-    spectrum: Spectrum,
-    db_path: Path,
-    peak_to_ion_ppm_tol: float = DEFAULT_PPM_TOLERANCE,
-    precursor_ppm_tol: float = DEFAULT_PPM_TOLERANCE,
-):
-    # Connect to the database
-    db = ProteinProductIonDb(db_path=db_path, overwrite=False)
-
-    # Find ions that match spectrum peaks
-    peaks_with_matches = get_product_ions_matching_spectrum(
-        spectrum=spectrum,
-        db=db,
-        peak_product_ion_ppm_tolerance=peak_to_ion_ppm_tol,
-    )
-    positioned_ions = get_positions_in_proteins_of_peak_matching_ions(
-        peaks_with_matches=peaks_with_matches,
-        db=db,
-    )
-
-    # Get clusters
-    logger.info("Getting clusters...")
-    t0 = time()
-    clusters = get_clusters_from_ions(ions=positioned_ions)
-    logger.info(f"Getting clusters took {time() - t0:.2f} seconds")
-    logger.info("Extending clusters...")
-    t0 = time()
-    extended_clusters = extend_clusters(
-        spectrum_clusters=clusters, spectrum=spectrum, db=db
-    )
-    logger.info(f"Extending clusters took {time() - t0:.2f} seconds")
-
-    # Get possible hybrids
-    logger.info("Creating possible hybrids...")
-    t0 = time()
-    possible_hybrids = get_possible_hybrids(
-        extended_clusters=extended_clusters,
-        spectrum=spectrum,
-        precursor_mz_ppm_tolerance=precursor_ppm_tol,
-    )
-    logger.info(
-        f"Getting possible hybrids took {get_time_in_diff_units(time() - t0)}. There are {len(possible_hybrids)} possible hybrids."
-    )
-    return HSIntermediates(
-        positioned_ions=positioned_ions,
-        hybrids=possible_hybrids,
-        b_ext_clusters=extended_clusters.b,
-        y_ext_clusters=extended_clusters.y,
-    )
+#     # Get possible hybrids
+#     logger.info("Creating possible hybrids...")
+#     t0 = time()
+#     possible_hybrids = get_possible_hybrids(
+#         extended_clusters=extended_clusters,
+#         spectrum=spectrum,
+#         precursor_mz_ppm_tolerance=precursor_ppm_tol,
+#     )
+#     logger.info(
+#         f"Getting possible hybrids took {get_time_in_diff_units(time() - t0)}. There are {len(possible_hybrids)} possible hybrids."
+#     )
+#     return HSIntermediates(
+#         positioned_ions=positioned_ions,
+#         hybrids=possible_hybrids,
+#         b_ext_clusters=extended_clusters.b,
+#         y_ext_clusters=extended_clusters.y,
+#     )
 
 
 def run_hs_on_one_spectrum(
@@ -159,49 +121,20 @@ def run_hs_on_one_spectrum(
     logger.info(
         f"Running HS on spectrum {spectrum.scan_num} from MZML {spectrum.mzml.name}..."
     )
-    # Connect to the database
-    db = ProteinProductIonDb(db_path=db_path, overwrite=False)
 
     # Perform peak filtering
     if num_peaks > 0:
         spectrum.filter_to_top_n_peaks(n=num_peaks)
 
-    # Find ions that match spectrum peaks
-    peaks_with_matches = get_product_ions_matching_spectrum(
+    # Get hybrids
+    results = get_hybrids(
+        db_path=db_path,
         spectrum=spectrum,
-        db=db,
-        peak_product_ion_ppm_tolerance=peak_to_ion_ppm_tol,
-    )
-    positioned_ions = get_positions_in_proteins_of_peak_matching_ions(
-        peaks_with_matches=peaks_with_matches,
-        db=db,
+        peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
+        precursor_mz_ppm_tol=precursor_ppm_tol,
     )
 
-    # Get clusters
-    logger.info("Getting clusters...")
-    t0 = time()
-    clusters = get_clusters_from_ions(ions=positioned_ions)
-    logger.info(f"Getting clusters took {time() - t0:.2f} seconds")
-    logger.info("Extending clusters...")
-    t0 = time()
-    extended_clusters = extend_clusters(
-        spectrum_clusters=clusters, spectrum=spectrum, db=db
-    )
-    logger.info(f"Extending clusters took {time() - t0:.2f} seconds")
-
-    # Get possible hybrids
-    logger.info("Creating possible hybrids...")
-    t0 = time()
-    possible_hybrids = get_possible_hybrids(
-        extended_clusters=extended_clusters,
-        spectrum=spectrum,
-        precursor_mz_ppm_tolerance=precursor_ppm_tol,
-    )
-    logger.info(
-        f"Getting possible hybrids took {get_time_in_diff_units(time() - t0)}. There are {len(possible_hybrids)} possible hybrids."
-    )
-
-    if len(possible_hybrids) == 0:
+    if len(results.hybrids) == 0:
         logger.info("No possible hybrids found. Exiting...\n\n")
         return
 
@@ -213,7 +146,8 @@ def run_hs_on_one_spectrum(
         new_fasta_path = (
             tmp_path / f"{spectrum.mzml.stem}_{spectrum.scan_num}_hybrids.fasta"
         )
-        create_hybrids_fasta(hybrids=possible_hybrids, fasta_path=new_fasta_path, db=db)
+        db = ProteinProductIonDb(db_path=db_path, overwrite=False)
+        create_hybrids_fasta(hybrids=results.hybrids, fasta_path=new_fasta_path, db=db)
 
         # Run Comet
         logger.info("Running Comet using new FASTA...")

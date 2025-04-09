@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-from src.comet_utils import CometPSM, load_comet_data
+from src.comet_utils import CometPSM, get_comet_txts_in_dir, load_comet_data
 from src.plot_utils import fig_setup, finalize, set_title_axes_labels
 from src.utils import PathType, flatten_list_of_lists
 
@@ -38,7 +38,7 @@ def get_protein_comet_counts(
     top_n_psms: Optional[int] = None,
 ) -> Counter:
     # Get all Comet PSMs
-    comet_txts = list(comet_results_dir.glob("*.txt"))
+    comet_txts = get_comet_txts_in_dir(dir=comet_results_dir)
     psms = flatten_list_of_lists([CometPSM.from_txt(txt) for txt in comet_txts])
 
     # Filter PSMs to just those in the top N
@@ -138,10 +138,17 @@ def get_most_common_proteins(protein_counts: Counter, top_n: int) -> List[str]:
     type=int,
     help="Get the top_n most common proteins",
 )
+@click.option(
+    "--output",
+    "-o",
+    type=PathType(),
+    help="Output file to save the most common proteins",
+)
 def get_most_common_proteins_cli(
     comet_results_dir: Path,
     top_n_proteins: int,
     top_n_psms: Optional[int] = None,
+    output: Optional[Path] = None,
 ):
     prot_counts = get_protein_comet_counts(
         comet_results_dir=comet_results_dir, top_n_psms=top_n_psms
@@ -151,6 +158,12 @@ def get_most_common_proteins_cli(
     )
     for prot in most_common_proteins:
         print(prot)
+
+    if output is not None:
+        with open(output, "w") as f:
+            for prot in most_common_proteins:
+                f.write(f"{prot}\n")
+        logger.info(f"Most common proteins saved to {output}")
 
 
 @click.group()
