@@ -3,10 +3,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
+from matplotlib.pyplot import Axes
 from pydantic import BaseModel
 from pyteomics import mzml
 
 from src.constants import SPECTRA_DIR, THOMAS_SAMPLES
+from src.plot_utils import set_title_axes_labels
 
 
 @dataclass
@@ -24,13 +26,13 @@ class Spectrum:
     precursor_abundance: float
     spectrum_id: str
     retention_time: float
-    mzml: Optional[str] = None
+    mzml: Optional[Path] = None
     scan_num: Optional[int] = None
     # For keeping track of whether the peaks have been processed:
     peaks_preprocessed: bool = False
 
     @classmethod
-    def from_dict(cls, spectrum: Dict, mzml: Optional[str] = None) -> "Spectrum":
+    def from_dict(cls, spectrum: Dict, mzml: Optional[Path] = None) -> "Spectrum":
         masses, abundances = tuple(spectrum["m/z array"]), tuple(
             spectrum["intensity array"]
         )
@@ -64,8 +66,7 @@ class Spectrum:
         mzml_path = Path(mzml_path)
         spectra = mzml.read(str(mzml_path))
         return [
-            cls.from_dict(spectrum=spectrum, mzml=mzml_path.stem)
-            for spectrum in spectra
+            cls.from_dict(spectrum=spectrum, mzml=mzml_path) for spectrum in spectra
         ]
 
     def filter_to_top_n_peaks(self, n: int) -> None:
@@ -75,6 +76,54 @@ class Spectrum:
 
         # Update boolean that tracks whether peaks where preprocessed
         self.peaks_preprocessed = True
+
+    def plot_spectrum(
+        self,
+        ax: Axes,
+        annotate: bool = True,
+        log_intensity: bool = False,
+        alpha: float = 1,
+    ):
+        title = f"MZML={self.mzml.stem}; scan={self.scan_num}"
+        plot_peaks(
+            ax=ax,
+            peaks=self.peaks,
+            annotate=annotate,
+            alpha=alpha,
+            log_intensity=log_intensity,
+            title=title,
+        )
+
+
+def plot_peaks(
+    ax: Axes,
+    peaks: List[Peak],
+    annotate: bool = True,
+    log_intensity: bool = False,
+    alpha: float = 1,
+    color: str = "grey",
+    label: str = "peaks",
+    title: Optional[str] = None,
+):
+    mzs = [peak.mz for peak in peaks]
+    intensities = [peak.intensity for peak in peaks]
+    if log_intensity:
+        intensities = [np.log(intensity) for intensity in intensities]
+
+    ax.vlines(
+        mzs, [0], intensities, color=color, linewidth=0.5, alpha=alpha, label=label
+    )
+    if annotate:
+        if log_intensity:
+            ylabel = "log(intensity)"
+        else:
+            ylabel = "intensity"
+        set_title_axes_labels(
+            ax=ax,
+            xlabel="m/z",
+            ylabel=ylabel,
+            title=title,
+        )
 
 
 def get_indices_of_largest_elements(array: List[float], top_n: int):
@@ -103,6 +152,16 @@ def load_mzml_data(samples: List[str] = THOMAS_SAMPLES):
         spectra = Spectrum.from_mzml(mzml_path=mzml_path)
         mzml_data.extend(list(spectra))
     return mzml_data
+
+
+def get_spectrum_from_mzml(scan_num: int, mzml_path: Path):
+    spectra = Spectrum.from_mzml(mzml_path=mzml_path)
+
+    spectrum = list(filter(lambda spectrum: spectrum.scan_num == scan_num, spectra))
+    assert (
+        len(spectrum) == 1
+    ), f"Scan number must be unique. There were {len(spectrum)} spectra with scan number {scan_num}."
+    return spectrum[0]
 
 
 def get_specific_spectrum_by_sample_and_scan_num(

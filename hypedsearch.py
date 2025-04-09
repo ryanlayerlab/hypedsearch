@@ -22,9 +22,9 @@ from src.constants import (
 )
 from src.mass_spectra import Spectrum, get_specific_spectrum_by_sample_and_scan_num
 from src.peptide_spectrum_comparison import (
-    create_new_fasta_including_hybrids,
+    create_hybrids_fasta,
+    extend_clusters,
     get_clusters_from_ions,
-    get_extended_clusters,
     get_possible_hybrids,
 )
 from src.peptides_and_ions import (
@@ -36,8 +36,8 @@ from src.peptides_and_ions import (
 from src.protein_product_ion_database import (
     ProteinProductIonDb,
     create_db,
+    get_positions_in_proteins_of_peak_matching_ions,
     get_product_ions_matching_spectrum,
-    process_peak_matching_ions,
 )
 from src.utils import make_directory, setup_logger
 
@@ -229,7 +229,7 @@ def run_hypedsearch_on_one_spectrum(
         db=db,
         peak_product_ion_ppm_tolerance=config.peak_to_ion_ppm_tol,
     )
-    positioned_ions = process_peak_matching_ions(
+    positioned_ions = get_positions_in_proteins_of_peak_matching_ions(
         peaks_with_matches=peaks_with_matches,
         kmer_to_protein_map=uniq_kmer_to_protein_map,
         db=db,
@@ -242,7 +242,7 @@ def run_hypedsearch_on_one_spectrum(
     logger.info(f"Getting clusters took {time() - t0:.2f} seconds")
     logger.info("Extending clusters...")
     t0 = time()
-    extended_clusters = get_extended_clusters(
+    extended_clusters = extend_clusters(
         spectrum_clusters=clusters, spectrum=spectrum, db=db
     )
     logger.info(f"Extending clusters took {time() - t0:.2f} seconds")
@@ -263,7 +263,7 @@ def run_hypedsearch_on_one_spectrum(
     logger.info("Creating new FASTA with hybrids...")
     t0 = time()
     new_fasta_path = scan_dir / "hybrids.fasta"
-    create_new_fasta_including_hybrids(
+    create_hybrids_fasta(
         db_proteins=db_proteins,
         hybrids=possible_hybrids,
         protein_id_to_name_map=protein_id_to_name_map,

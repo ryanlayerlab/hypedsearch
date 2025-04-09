@@ -41,7 +41,7 @@ Hypedsearch depends on [Comet](https://comet-ms.sourceforge.net/).
 So make sure you have a Comet executable locally and can run Comet. 
 If you're running Hypedsearch on a Mac, the executable `comet/comet.macos.exe` in this repo may work for you.
 
-## Usage
+<!-- ## Usage
 
 Make sure `hypedsearch` or the environment in which you installed the Hypedsearch dependencies is activated. 
 Once the environment is activated, the following command should work and show the help page:
@@ -65,9 +65,9 @@ python hypedsearch.py \
 --comet_params_path comet/comet.params \
 --fasta_path fastas/Uniprot_mouse.fasta \
 --cleanup False
-```
+``` -->
 
-Here's what this command will do:
+# Hypedsearch algorithm
 
 1. ***Find mass spectra files***: 
 find all `*.mzML` files in the `mzml_dir` directory and its subdirectories. 
@@ -125,7 +125,23 @@ If `mzml_path=/path/to/BMEM_AspN_Fxn4.mzML` and `scan_num=7`, this step generate
 
 Here are some commands that may be helpful for you. 
 
-| Action | Command | 
-| - | - |
-| Run Comet on all `.mzML` files in a directory | `python -m src.comet_utils -m data/spectra -o results/comet_run_for_protein_abundances -np 5` |
+- Run Comet on all `.mzML` files in a directory:
+  ```
+  python -m src.comet_utils -m data/spectra -o results/comet_run_for_protein_abundances -np 5
+  ```
+- Get the top N most abundant proteins:
+  ```
+  python -m src.protein_abundance get-common-proteins -d results/comet_run_for_protein_abundances -n 1 -t 10 -o results/comet_run_for_protein_abundances/top_10_proteins.txt
+  ```
 
+- Create database of proteins and product ions
+  ```
+  python -m src.create_db
+  python -m src.create_db -d results/new_fasta/top_10_prots.db -p results/new_fasta/top_10_proteins.txt -f fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta
+  ```
+
+- Run hypedsearch
+  ```
+  python -m src.run_hypedsearch -h 
+  python -m src.run_hypedsearch -d results/new_fasta/top_10_prots.db -o results/new_fasta/hs_results -n 0 -p 10 -P 20 -m data/spectra/BMEM_AspN_Fxn4.mzML
+  ```

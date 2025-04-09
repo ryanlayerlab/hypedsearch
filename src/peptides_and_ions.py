@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from time import time
-from typing import Callable, Dict, List, Literal, Optional, Set
+from typing import Callable, Dict, List, Literal, Optional, Set, Union
 
 from Bio import SeqIO
 from pydantic import BaseModel, BeforeValidator, computed_field, field_validator
@@ -227,9 +227,11 @@ def get_proteins_by_name(
     return matching_proteins
 
 
-def get_unique_kmers(peptides: List[Peptide], k: int) -> Set[str]:
+def get_unique_kmers(peptides: Union[List[Peptide], List[str]], k: int) -> Set[str]:
     uniq_kmers = set()
     for peptide in peptides:
+        if isinstance(peptide, str):
+            peptide = Peptide(seq=peptide)
         peptide_kmers = {kmer.seq for kmer in peptide.kmers(min_k=k, max_k=k)}
         uniq_kmers.update(peptide_kmers)
     return uniq_kmers
@@ -275,4 +277,5 @@ def get_uniq_kmer_to_protein_map(
     logger.info(
         f"Creating the unique kmers-to-protein map took {get_time_in_diff_units(time_sec=total_time)}"
     )
+    logger.info(f"Number of unique kmers {len(uniq_kmer_to_protein_map)}")
     return uniq_kmer_to_protein_map

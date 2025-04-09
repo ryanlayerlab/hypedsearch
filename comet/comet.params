@@ -96,7 +96,7 @@ output_txtfile = 1                     # 0=no, 1=yes  write tab-delimited txt fi
 output_pepxmlfile = 1                  # 0=no, 1=yes  write pepXML file
 output_mzidentmlfile = 0               # 0=no, 1=yes  write mzIdentML file
 output_percolatorfile = 0              # 0=no, 1=yes  write Percolator pin file
-num_output_lines = 20                   # num peptide results to show
+num_output_lines = 5                   # num peptide results to show
 
 #
 # mzXML/mzML/raw file parameters
