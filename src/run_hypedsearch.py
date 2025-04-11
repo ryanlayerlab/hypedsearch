@@ -103,14 +103,16 @@ def run_hs_on_one_spectrum(
     num_peaks: int = DEFAULT_NUM_PEAKS,
     peak_to_ion_ppm_tol: float = DEFAULT_PPM_TOLERANCE,
     precursor_ppm_tol: float = DEFAULT_PPM_TOLERANCE,
-    cleanup: bool = True,
+    fasta_path: Optional[Path] = None,
+    keep_fasta: bool = False,
+    overwrite: bool = False,
 ):
     # Check if run already exists. If it does, skip it.
     output_file = (
         output_dir
         / f"hs_{spectrum.mzml.stem}.{spectrum.scan_num}-{spectrum.scan_num}.txt"
     )
-    if output_file.exists():
+    if output_file.exists() and not overwrite:
         logger.info(
             f"Output file {output_file} already exists. Skipping spectrum {spectrum.scan_num} from MZML {spectrum.mzml.name}.\n\n"
         )
@@ -143,15 +145,26 @@ def run_hs_on_one_spectrum(
 
         # Create new FASTA with hybrids
         logger.info("Creating new FASTA with hybrids...")
-        new_fasta_path = (
-            tmp_path / f"{spectrum.mzml.stem}_{spectrum.scan_num}_hybrids.fasta"
-        )
+        if keep_fasta:
+            new_fasta_path = (
+                output_dir / f"{spectrum.mzml.stem}_{spectrum.scan_num}_hybrids.fasta"
+            )
+        else:
+            new_fasta_path = (
+                tmp_path / f"{spectrum.mzml.stem}_{spectrum.scan_num}_hybrids.fasta"
+            )
         db = ProteinProductIonDb(db_path=db_path, overwrite=False)
-        create_hybrids_fasta(hybrids=results.hybrids, fasta_path=new_fasta_path, db=db)
+        create_hybrids_fasta(
+            hybrids=results.hybrids,
+            fasta_path=new_fasta_path,
+            db=db,
+            other_prots=fasta_path,
+        )
 
         # Run Comet
         logger.info("Running Comet using new FASTA...")
         output_stem = f"hs_{spectrum.mzml.stem}"
+        comet_txt = None
         try:
             comet_txt = run_comet_on_one_mzml(
                 fasta=new_fasta_path,
@@ -167,6 +180,7 @@ def run_hs_on_one_spectrum(
     logger.info(
         f"Running HS on spectrum {spectrum.scan_num} from MZML {spectrum.mzml.name} took {get_time_in_diff_units(time() - fcn_start_time)}\n\n"
     )
+    # return (results, comet_txt)
 
 
 def run_hs_on_mzml(
@@ -176,8 +190,10 @@ def run_hs_on_mzml(
     num_peaks: int = DEFAULT_NUM_PEAKS,
     peak_to_ion_ppm_tol: float = DEFAULT_PPM_TOLERANCE,
     precursor_ppm_tol: float = DEFAULT_PPM_TOLERANCE,
-    cleanup: bool = True,
     scan: Optional[int] = None,
+    keep_fasta: bool = False,
+    fasta_path: Optional[Path] = None,
+    overwrite: bool = False,
 ):
     # Create the output directory if it doesn't exist
     make_directory(output_dir)
@@ -192,7 +208,9 @@ def run_hs_on_mzml(
             num_peaks=num_peaks,
             peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
             precursor_ppm_tol=precursor_ppm_tol,
-            cleanup=cleanup,
+            keep_fasta=keep_fasta,
+            fasta_path=fasta_path,
+            overwrite=overwrite,
         )
 
     # Otherwise, run HS on all scans
@@ -209,7 +227,9 @@ def run_hs_on_mzml(
                 num_peaks=num_peaks,
                 peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
                 precursor_ppm_tol=precursor_ppm_tol,
-                cleanup=cleanup,
+                keep_fasta=keep_fasta,
+                fasta_path=fasta_path,
+                overwrite=overwrite,
             )
 
 
@@ -239,6 +259,13 @@ def run_hs_on_mzml(
     help="Path to the output directory.",
 )
 @click.option(
+    "--scan",
+    "-s",
+    type=int,
+    default=None,
+    help="Scan number to run HS on. If not provided, HS will be run on all scans.",
+)
+@click.option(
     "--num_peaks",
     "-n",
     type=int,
@@ -263,30 +290,39 @@ def run_hs_on_mzml(
     help="PPM tolerance for precursor m/z matching.",
 )
 @click.option(
-    "--cleanup",
-    "-c",
+    "--keep_fasta",
+    "-kf",
     type=bool,
-    default=True,
+    default=False,
     show_default=True,
-    help="Whether to clean up the temporary files.",
+    help="Whether or not to keep the FASTA file with the hybrids",
 )
 @click.option(
-    "--scan",
-    "-s",
-    type=int,
-    default=None,
-    help="Scan number to run HS on. If not provided, HS will be run on all scans.",
+    "--fasta_path",
+    "-fp",
+    type=PathType(),
+    help="If provided, the proteins in the given FASTA file will be included with the potential hybrid sequences in the FASTA file that Comet searches",
+)
+@click.option(
+    "--overwrite",
+    "-ow",
+    type=bool,
+    default=False,
+    show_default=True,
+    help="If True, checks if Hypedsearch output already exists and, if it does, does not run Hypedsearch",
 )
 @log_params
 def run_hs_on_mzml_cli(
     db_path: Path,
     mzml: Path,
     output_dir: Path,
-    num_peaks: int = DEFAULT_NUM_PEAKS,
-    peak_to_ion_ppm_tol: float = DEFAULT_PPM_TOLERANCE,
-    precursor_ppm_tol: float = DEFAULT_PPM_TOLERANCE,
-    cleanup: bool = True,
-    scan: Optional[int] = None,
+    num_peaks: int,
+    peak_to_ion_ppm_tol: float,
+    precursor_ppm_tol: float,
+    keep_fasta: bool,
+    scan: Optional[int],
+    fasta_path: Optional[Path],
+    overwrite: bool,
 ):
     t0 = time()
     logger.info("Starting to run Hypedsearch")
@@ -297,8 +333,10 @@ def run_hs_on_mzml_cli(
         num_peaks=num_peaks,
         peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
         precursor_ppm_tol=precursor_ppm_tol,
-        cleanup=cleanup,
+        keep_fasta=keep_fasta,
         scan=scan,
+        fasta_path=fasta_path,
+        overwrite=overwrite,
     )
     logger.info(
         f"Running Hypedsearch in total took {get_time_in_diff_units(time() - t0)}"

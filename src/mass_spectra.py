@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from pyteomics import mzml
 
 from src.constants import SPECTRA_DIR, THOMAS_SAMPLES
-from src.plot_utils import set_title_axes_labels
+from src.plot_utils import fig_setup, set_title_axes_labels
 
 
 @dataclass
@@ -79,11 +79,14 @@ class Spectrum:
 
     def plot_spectrum(
         self,
-        ax: Axes,
+        ax: Optional[Axes] = None,
         annotate: bool = True,
         log_intensity: bool = False,
         alpha: float = 1,
     ):
+        if ax is None:
+            _, axs = fig_setup()
+            ax = axs[0]
         title = f"MZML={self.mzml.stem}; scan={self.scan_num}"
         plot_peaks(
             ax=ax,
@@ -93,6 +96,7 @@ class Spectrum:
             log_intensity=log_intensity,
             title=title,
         )
+        return ax
 
 
 def plot_peaks(
