@@ -110,13 +110,16 @@ class CometPSM(BaseModel):
 
     @classmethod
     def from_txt(
-        cls, file_path: str, as_df: bool = False
+        cls,
+        file_path: str,
+        as_df: bool = False,
+        sample: Optional[str] = None,
     ) -> Union[List["CometPSM"], pd.DataFrame]:
         """
         Reads Comet results .txt file to a list of dataclasses or a dataframe
         """
         file_path = Path(file_path)
-        df = read_comet_txt_to_df(txt_path=file_path)
+        df = read_comet_txt_to_df(txt_path=file_path, sample=sample)
         if as_df:
             return df
         else:

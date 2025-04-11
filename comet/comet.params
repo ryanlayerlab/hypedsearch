@@ -122,7 +122,7 @@ activation_method = ALL                # activation method; used if activation m
 # After fragmentation, these are min and max of masses I want in the results for the precursor
 # Mass range of detector at MS1 level. Thomas has seen >=6 AA peptides (average mass of AA is 114 Da)
 # Big molecules will typically have more charge because there are more places where a proton can bind
-digest_mass_range = 300.0 1700.0       # MH+ peptide mass range to analyze
+digest_mass_range = 300.0 5000.0       # MH+ peptide mass range to analyze
 peptide_length_range = 5 50            # minimum and maximum peptide length to analyze (default min 1 to allowed max 51)
 max_duplicate_proteins = -1            # maximum number of additional duplicate protein names to report for each peptide ID; -1 reports all duplicates
 max_fragment_charge = 3                # set maximum fragment charge state to analyze (allowed max 5)
