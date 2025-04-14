@@ -6,14 +6,17 @@ import pytest
 from src.comet_utils import CometParams, read_comet_txt_to_df, run_comet_on_one_mzml
 from src.constants import COMET_EXECUTABLE, COMET_PARAMS, GIT_REPO_DIR, MOUSE_PROTEOME
 
+UNIT_TESTS_DIR = GIT_REPO_DIR / "tests/unit"
+
 
 class Test_read_comet_txt_to_df:
     @staticmethod
-    def test_smoke():
+    def test_missing_pep_xml_file():
         # Load XML file
-        txt_file = GIT_REPO_DIR / "tests/data/test_comet_result.txt"
-        df = read_comet_txt_to_df(txt_path=txt_file)
-        assert all(df["sample"] == "BMEM_AspN_Fxn5")
+        txt_file = UNIT_TESTS_DIR / "data/test_comet_result.txt"
+        sample = "blah"
+        df = read_comet_txt_to_df(txt_path=txt_file, sample=sample)
+        assert all(df["sample"] == sample)
 
 
 class Test_CometParams:
