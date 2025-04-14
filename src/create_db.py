@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_proteins_for_db(
-    proteins: Optional[Union[List[Peptide], Path]], fasta_path: Path
+    proteins: Optional[Union[List[Peptide], Path, List[str]]], fasta_path: Path
 ) -> List[Peptide]:
     # Case 1: proteins is Path to a file containing protein names
     if isinstance(proteins, Path):
@@ -35,10 +35,16 @@ def get_proteins_for_db(
         db_proteins = get_proteins_by_name(
             protein_names=protein_names, fasta_path=fasta_path
         )
-    # Case 2: proteins is a list of Peptide objects
+    # Case 2: proteins is a list
     elif isinstance(proteins, list):
-        db_proteins = proteins
-
+        # Case 2a: proteins are Peptides
+        if isinstance(proteins[0], Peptide):
+            db_proteins = proteins
+        # Case 2b: proteins are names of proteins
+        elif isinstance(proteins[0], str):
+            db_proteins = get_proteins_by_name(
+                protein_names=proteins, fasta_path=fasta_path
+            )
     # Case 3: proteins is None so get all proteins from the FASTA file
     elif proteins is None:
         # Assuming fasta_path is defined globally or passed in some way

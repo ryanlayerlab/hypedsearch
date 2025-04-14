@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from src.comet_utils import CometPSM
 from src.mass_spectra import (
     get_specific_spectrum_by_sample_and_scan_num,
     get_spectrum_from_mzml,
@@ -11,16 +12,22 @@ from src.run_hypedsearch import run_hs_on_one_spectrum
 
 class Test_run_hs_on_one_spectrum:
     @staticmethod
-    def test_smoke():
+    def test_smoke(tmp_path):
         # Arrange
-        db_path = Path("results/comet_run_for_protein_abundances/top_10_prots.db")
-        mzml_path = Path("data/spectra/BMEM_AspN_Fxn4.mzML")
+        db_path = Path(
+            "results/comet_run_for_protein_abundances/top_10_prots.db"
+        ).absolute()
+        mzml_path = Path("data/spectra/BMEM_AspN_Fxn4.mzML").absolute()
         scan = 7
         spectrum = get_spectrum_from_mzml(mzml_path=mzml_path, scan_num=scan)
 
         # Act
-        run_hs_on_one_spectrum(db_path=db_path, spectrum=spectrum)
+        result = run_hs_on_one_spectrum(
+            db_path=db_path, spectrum=spectrum, output_dir=tmp_path
+        )
         # Assert
+        psms = CometPSM.from_txt(file_path=result[1], sample=mzml_path.stem)
+        assert len(psms) > 0
 
     @staticmethod
     def test_smoke_fxn4_scan7():

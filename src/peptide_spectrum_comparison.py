@@ -674,22 +674,24 @@ class HybridPeptide:
     def fasta_name(self):
         return f"hybrid_{self.b_seq}-{self.y_seq}"
 
-    def set_fasta_description(self, db: ProteinProductIonDb):
-        b_prot_names = [
-            db.get_protein_by_id(prot_id).name for prot_id in self.b_prot_ids
-        ]
-        y_prot_names = [
-            db.get_protein_by_id(prot_id).name for prot_id in self.y_prot_ids
-        ]
+    def set_fasta_description(
+        self,
+        prot_id_to_name_map: Dict[int, str],
+    ):
+        b_prot_names = [prot_id_to_name_map[prot_id] for prot_id in self.b_prot_ids]
+        y_prot_names = [prot_id_to_name_map[prot_id] for prot_id in self.y_prot_ids]
         self.fasta_description = (
             f"b-prots:{','.join(b_prot_names)} y-prots:{','.join(y_prot_names)}"
         )
+
+    def mz(self, charge: int):
+        return compute_peptide_mz(aa_seq=self.b_seq + self.y_seq, charge=charge)
 
 
 def create_hybrids_fasta(
     hybrids: List[HybridPeptide],
     fasta_path: Path,
-    db: ProteinProductIonDb,
+    prot_id_to_name_map: Dict[int, str],
     other_prots: Optional[Union[List[Peptide], Path]] = None,
 ) -> List[Peptide]:
     prots = []
@@ -699,7 +701,7 @@ def create_hybrids_fasta(
         elif isinstance(other_prots, Path):
             prots = Peptide.from_fasta(fasta_path=other_prots)
     for idx, hybrid in enumerate(hybrids):
-        hybrid.set_fasta_description(db=db)
+        hybrid.set_fasta_description(prot_id_to_name_map=prot_id_to_name_map)
         new_peptide = Peptide(
             seq=hybrid.seq, name=hybrid.fasta_name, desc=hybrid.fasta_description
         )
