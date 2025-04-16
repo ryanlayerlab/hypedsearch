@@ -17,6 +17,7 @@ from src.constants import (
     PROTON_MASS,
     WATER_MASS,
 )
+from time import time
 from src.mass_spectra import Spectrum
 from src.peptide_spectrum_comparison import (
     HybridPeptide,
@@ -222,6 +223,7 @@ def run_on_mzml(
     num_psms: int = 20,
     scan: Optional[int] = None,
 ):
+    fcn_start_time = time()
     proteins = get_proteins_by_name(protein_names=protein_names, fasta_path=fasta_path)
     spectra = Spectrum.from_mzml(mzml_path=mzml)
 
@@ -231,6 +233,7 @@ def run_on_mzml(
     num_spectra = len(spectra)
     for idx, spectrum in enumerate(spectra):
         logger.info(f"Running on spectrum {idx+1} of {num_spectra}")
+        t0 = time()
         spectrum.filter_to_top_n_peaks(n=num_peaks)
         get_all_hybrids_and_run_comet(
             spectrum=spectrum,
@@ -241,7 +244,9 @@ def run_on_mzml(
             max_k=max_k,
             num_psms=num_psms,
         )
+        logger.info(f"Done with spectrum {idx + 1} in {get_time_in_diff_units(time()-fcn_start_time)}.")
 
+    logger.info(f"Running on MZML took {get_time_in_diff_units(time()-fcn_start_time)}. Done!")
 
 if __name__ == "__main__":
     setup_logger()

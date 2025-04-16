@@ -5,11 +5,15 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=5gb               
-#SBATCH --time=00:05:00               
+#SBATCH --time=00:05:00
+#SBATCH --output=/dev/null
+#SBATCH --error=/dev/null            
 
 source slurm/slurm_fcns.sh
+out_dir="slurm/logs/$SLURM_JOB_NAME"
+mkdir -p $out_dir
 
-redirect_output slurm/logs
+redirect_output $out_dir
 
 if is_slurm_array_job; then
     python -m src.form_all_hybrids \

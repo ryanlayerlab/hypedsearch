@@ -171,3 +171,10 @@ Here are some commands that may be helpful for you.
     -s 9 \
     -o tmp
   ```
+
+  Running on a Slurm-managed supercomputer:
+  ```
+  sbatch --array=9,10,15 slurm/form_all_hybrids.sbatch
+  ```
+
+- Running on Slurm-managed supercomputer:
