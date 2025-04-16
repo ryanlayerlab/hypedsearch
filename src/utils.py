@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from itertools import chain
 from pathlib import Path
 from typing import Any, Callable, List, Literal, Optional, Union
-
+import sys
 import click
 
 from src.constants import COMET_RUN_1_DIR, COMET_RUN_2_DIR, THOMAS_SAMPLES
@@ -112,7 +112,7 @@ def setup_logger(
     file_handler.setLevel(log_level)
 
     # Create a console handler
-    console_handler = logging.StreamHandler()
+    console_handler = logging.StreamHandler(stream=sys.stdout)
     console_handler.setLevel(log_level)
 
     # Define a common formatter
