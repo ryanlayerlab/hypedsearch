@@ -662,9 +662,11 @@ def extend_clusters(
 @dataclass
 class HybridPeptide:
     b_seq: str
-    b_prot_ids: Set[int]
     y_seq: str
-    y_prot_ids: Set[int]
+    b_prot_ids: Set[int] = field(default_factory=set)
+    b_prot_names: Set[str] = field(default_factory=set)
+    y_prot_ids: Set[int] = field(default_factory=set)
+    y_prot_names: Set[str] = field(default_factory=set)
 
     @property
     def seq(self):
@@ -674,15 +676,20 @@ class HybridPeptide:
     def fasta_name(self):
         return f"hybrid_{self.b_seq}-{self.y_seq}"
 
+    def set_protein_names(self, prot_id_to_name_map: Dict[int, str]):
+        self.b_prot_names = set(
+            prot_id_to_name_map[prot_id] for prot_id in self.b_prot_ids
+        )
+        self.y_prot_names = set(
+            prot_id_to_name_map[prot_id] for prot_id in self.y_prot_ids
+        )
+
     def set_fasta_description(
         self,
         prot_id_to_name_map: Dict[int, str],
     ):
-        b_prot_names = [prot_id_to_name_map[prot_id] for prot_id in self.b_prot_ids]
-        y_prot_names = [prot_id_to_name_map[prot_id] for prot_id in self.y_prot_ids]
-        self.fasta_description = (
-            f"b-prots:{','.join(b_prot_names)} y-prots:{','.join(y_prot_names)}"
-        )
+        self.set_protein_names(prot_id_to_name_map=prot_id_to_name_map)
+        self.fasta_description = f"b-prots:{','.join(self.b_prot_names)} y-prots:{','.join(self.y_prot_names)}"
 
     def mz(self, charge: int):
         return compute_peptide_mz(aa_seq=self.b_seq + self.y_seq, charge=charge)

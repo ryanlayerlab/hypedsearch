@@ -2,13 +2,14 @@ from unittest.mock import patch
 
 import pytest
 
-from src.constants import B_ION_TYPE, Y_ION_TYPE, IonTypes
+from src.constants import B_ION_TYPE, GIT_REPO_DIR, MOUSE_PROTEOME, Y_ION_TYPE, IonTypes
 from src.peptides_and_ions import (
     BIonCreator,
     Peptide,
     ProductIon,
     YIonCreator,
     generate_product_ions,
+    get_proteins_by_name,
     get_proteins_from_fasta,
     get_uniq_kmer_to_protein_map,
     get_unique_kmers,
@@ -296,3 +297,14 @@ class Test_write_fasta:
             lines = [line.strip() for line in fasta]
 
         assert lines == expected_lines
+
+
+class Test_get_proteins_by_name:
+    @staticmethod
+    def test_protein_names_as_path():
+        fasta_path = GIT_REPO_DIR / "fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
+        protein_names = GIT_REPO_DIR / "tests/unit/data/top_10_proteins.txt"
+        prots = get_proteins_by_name(protein_names=protein_names, fasta_path=fasta_path)
+        assert len(prots) == 10
+
+    # @staticmethod

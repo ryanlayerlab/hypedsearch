@@ -8,9 +8,11 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
+from src.click_utils import PathType
 from src.comet_utils import CometPSM, get_comet_txts_in_dir, load_comet_data
+from src.constants import GIT_REPO_DIR
 from src.plot_utils import fig_setup, finalize, set_title_axes_labels
-from src.utils import PathType, flatten_list_of_lists
+from src.utils import flatten_list_of_lists
 
 logger = logging.getLogger(__name__)
 

@@ -70,12 +70,13 @@ class Spectrum:
         ]
 
     def filter_to_top_n_peaks(self, n: int) -> None:
-        # Update peaks
-        new_peaks = top_n_peak_filtering(peaks=self.peaks, n=n)
-        self.peaks = new_peaks
+        if n > 0:
+            # Update peaks
+            new_peaks = top_n_peak_filtering(peaks=self.peaks, n=n)
+            self.peaks = new_peaks
 
-        # Update boolean that tracks whether peaks where preprocessed
-        self.peaks_preprocessed = True
+            # Update boolean that tracks whether peaks where preprocessed
+            self.peaks_preprocessed = True
 
     def plot_spectrum(
         self,

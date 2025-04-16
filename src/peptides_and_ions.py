@@ -208,15 +208,24 @@ class Fasta(BaseModel):
 
 
 def get_proteins_by_name(
-    protein_names: List[str],
+    protein_names: Union[List[str], Path],
     fasta_path: Optional[str] = None,
     proteins: Optional[List[Peptide]] = None,
 ) -> List[Peptide]:
     """
-    Get the given proteins from the given FASTA file.
+    Get proteins by name.
+        - If fasta_path is provided, then the proteins returned are those in the fasta
+        files with the given names (protein_names). protein_names can be specfied
+        - protein_names can be provided as a list of names or as a Path to a file containing
+        protein names
     """
+    #
     if fasta_path is not None:
         proteins = list(get_proteins_from_fasta(fasta_path=fasta_path))
+
+    if isinstance(protein_names, Path):
+        protein_names = protein_names.read_text().splitlines()
+
     matching_proteins = list(
         filter(lambda protein: protein.desc.split(" ")[0] in protein_names, proteins)
     )

@@ -13,6 +13,7 @@ import click
 import pandas as pd
 from pydantic import BaseModel, field_validator
 
+from src.click_utils import PathType
 from src.config import AppConfig
 from src.constants import (
     COMET_DIR,
@@ -35,7 +36,6 @@ from src.constants import (
 from src.mass_spectra import Spectrum, get_specific_spectrum_by_sample_and_scan_num
 from src.peptides_and_ions import Peptide
 from src.utils import (
-    PathType,
     flatten_list_of_lists,
     log_params,
     make_directory,
@@ -87,7 +87,7 @@ class CometPSM(BaseModel):
     sample: str
     num: int
     scan: int
-    proposed_peptide: str
+    aa_seq: str
     ions_matched: int
     proteins: List[str]
     protein_count: int
@@ -139,7 +139,7 @@ class CometPSM(BaseModel):
                 ions_matched=row[IONS_MATCHED],
                 protein_count=row[PROTEIN_COUNT],
                 proteins=row[PROTEIN],
-                proposed_peptide=row[PLAIN_PEPTIDE],
+                aa_seq=row[PLAIN_PEPTIDE],
                 xcorr=row[XCORR],
                 eval=row[EVAL],
                 delta_cn=row[DELTA_CN],
