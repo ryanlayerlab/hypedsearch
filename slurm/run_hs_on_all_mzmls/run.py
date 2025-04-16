@@ -21,7 +21,7 @@ scans = list(df["scan"].unique())
 print(f"Number of total scans = {len(scans)}")
 
 mzml = (SPECTRA_DIR / "BMEM_AspN_Fxn5.mzML").absolute()
-for scan in scans[0:1000]:
+for scan in scans[0:100]:
     # for scan in scans[1000:2000]:
     # for scan in scans[2000:3000]:
     # for scan in scans[3000:]:

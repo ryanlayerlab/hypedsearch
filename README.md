@@ -159,3 +159,15 @@ Here are some commands that may be helpful for you.
     -o results/new_fasta/hs_results \
     -n 0 -p 10 -P 20
   ```
+
+- Form all possible hybrids and then run Comet
+  ```
+  python -m src.form_all_hybrids -h
+  python -m src.form_all_hybrids \
+    -pn results/new_fasta/top_10_proteins.txt \
+    -f fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta \
+    -m data/spectra/BMEM_AspN_Fxn5.mzML \
+    -pt 20 \
+    -s 9 \
+    -o tmp
+  ```
