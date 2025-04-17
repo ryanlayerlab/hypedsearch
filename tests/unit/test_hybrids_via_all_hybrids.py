@@ -2,12 +2,12 @@ import pytest
 
 from src.comet_utils import CometPSM
 from src.constants import GIT_REPO_DIR
-from src.form_all_hybrids import run_on_mzml
+from src.hybrids_via_all_hybrids import run_hypedsearch_on_spectrum
 
 GIT_REPO_DIR
 
 
-class Test_run_on_mzml:
+class Test_run_hypedsearch_on_spectrum:
     @staticmethod
     def test_smoke(tmp_path):
         # Arrange
@@ -23,7 +23,7 @@ class Test_run_on_mzml:
         sample = mzml.stem
 
         # Act
-        run_on_mzml(
+        run_hypedsearch_on_spectrum(
             protein_names=protein_names,
             fasta_path=fasta_path,
             scan=scan,
