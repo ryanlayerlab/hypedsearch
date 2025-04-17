@@ -134,7 +134,7 @@ def run_hypedsearch_on_spectrum(
     other_prots_for_fasta: Optional[Union[List[Peptide], Path]] = None,
     num_psms: int = DEFAULT_NUM_COMET_PSMS,
 ) -> HSOutput:
-
+    assert output_dir.exists(), f"Output directory is expected to exist but doesn't:\n{output_dir}"  
     logger.info(f"Running HS on scan={scan} of MZML:\n{mzml}")
     start_time = time()
 

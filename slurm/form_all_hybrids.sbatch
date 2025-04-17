@@ -22,6 +22,7 @@ echo -e "fasta=${FASTA}\nproteins=${PROTEINS}\nmzml=${MZML}\nout dir=${HS_OUTPUT
 out_dir="slurm/logs/$SLURM_JOB_NAME"
 mkdir -p $out_dir
 redirect_output $out_dir
+echo "Redirected SLURM output to $out_dir"
 
 # Copy needed files to local machine
 TMP_DIR="/tmp"
@@ -32,15 +33,16 @@ MZML_TMP="$TMP_DIR/$(basename "$MZML")"
 cp "$FASTA" "$FASTA_TMP"
 cp "$PROTEINS" "$PROTEINS_TMP"
 cp "$MZML" "$MZML_TMP"
+echo "Done copying files to local machine!"
 
 # Run python script
 if is_slurm_array_job; then
     print_job_array_stuff
-    python -m src.hybrids_via_all_hybrids.py \
-        -protein_names $PROTEINS_TMP \
-        -fasta_path $FASTA_TMP \
-        -mzml $MZML_TMP \
-        -precursor_mz_ppm_tol 20 \
+    python -m src.hybrids_via_all_hybrids \
+        --protein_names $PROTEINS_TMP \
+        --fasta_path $FASTA_TMP \
+        --mzml $MZML_TMP \
+        --precursor_mz_ppm_tol 20 \
         --scan $SLURM_ARRAY_TASK_ID \
         --output_dir $HS_OUTPUTDIR
 else
