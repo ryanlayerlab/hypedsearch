@@ -5,12 +5,13 @@ import os
 import pickle
 import re
 import shutil
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from itertools import chain
 from pathlib import Path
 from typing import Any, Callable, List, Literal, Optional, Union
-import sys
+
 import click
 
 from src.constants import COMET_RUN_1_DIR, COMET_RUN_2_DIR, THOMAS_SAMPLES
@@ -206,3 +207,7 @@ def file_hash(filepath: Path, algorithm="sha256") -> str:
         ):  # Read in chunks to handle large files efficiently
             hash_func.update(chunk)
     return hash_func.hexdigest()
+
+
+def hypedsearch_output_stem(mzml_stem: str):
+    return f"hs_{mzml_stem}"

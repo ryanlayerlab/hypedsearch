@@ -12,6 +12,7 @@ PLOTS_DIR = GIT_REPO_DIR / "plots"
 DATA_DIR = GIT_REPO_DIR / "data"
 COMET_DIR = GIT_REPO_DIR / "comet"
 RESULTS_DIR = GIT_REPO_DIR / "results"
+SLURM_DIR = GIT_REPO_DIR / "slurm"
 COMET_RUN_1_DIR = DATA_DIR / "comet_run_1"
 COMET_RUN_2_DIR = DATA_DIR / "comet_run_2"
 HS_DIR = DATA_DIR / "hs"
@@ -62,11 +63,17 @@ COMET_COUNTS = "comet_counts"
 VALIDATED = "validated"
 QUANTILE = "quantile"
 MEMORY = ":memory:"
+DEFAULT_NUM_COMET_PSMS = 20
 
 
 class IonTypes(Enum):
     B_ION_TYPE = "b"
     Y_ION_TYPE = "y"
+
+
+class HybridFormingMethods(Enum):
+    all = "all"
+    cluster = "cluster"
 
 
 ION_TYPE_TO_INT = {
