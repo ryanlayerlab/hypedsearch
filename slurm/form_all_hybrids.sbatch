@@ -4,7 +4,7 @@
 #SBATCH --mail-type=NONE
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
-#SBATCH --mem=5gb               
+#SBATCH --mem=2gb               
 #SBATCH --time=00:05:00
 #SBATCH --output=/dev/null
 #SBATCH --error=/dev/null            
