@@ -1,52 +1,17 @@
 import logging
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass
 from pathlib import Path
 from time import time
-from typing import Any, Dict, List, Literal, Optional
+from typing import Dict, List
 
-from src.constants import (
-    AMINO_ACID_MASSES,
-    B_ION_TYPE,
-    DEFAULT_MAX_K,
-    DEFAULT_MIN_K,
-    DEFAULT_PPM_TOLERANCE,
-    EXCLUSIVE_END,
-    INCLUSIVE_START,
-    ION_INT_TO_TYPE,
-    ION_TYPE_TO_INT,
-    MEMORY,
-    NEUTRAL_MASS,
-    PRODUCT_ION_TABLE,
-    PROTEIN_ID,
-    PROTEIN_TABLE,
-    PROTON_MASS,
-    WATER_MASS,
-    Y_ION_TYPE,
-    IonTypes,
-)
+from src.constants import (AMINO_ACID_MASSES, DEFAULT_PPM_TOLERANCE, MEMORY,
+                           PRODUCT_ION_TABLE, PROTEIN_TABLE, PROTON_MASS,
+                           WATER_MASS, IonTypes)
 from src.mass_spectra import Peak, Spectrum
-from src.peptides_and_ions import (
-    Peptide,
-    ProductIon,
-    compute_peptide_mz,
-    get_uniq_kmer_to_protein_map,
-)
-from src.sql_database import (
-    PrimaryKey,
-    SqlColumn,
-    Sqlite3Database,
-    SqlTableRow,
-    add_data_classes_to_table,
-)
-from src.utils import (
-    Kmer,
-    Position,
-    flatten_list_of_lists,
-    get_positions_of_subseq_in_seq,
-    get_time_in_diff_units,
-    log_params,
-    relative_ppm_tolerance_in_daltons,
-)
+from src.peptides_and_ions import (Peptide, compute_peptide_mz)
+from src.sql_database import (PrimaryKey, Sqlite3Database, SqlTableRow)
+from src.utils import (flatten_list_of_lists, get_positions_of_subseq_in_seq, get_time_in_diff_units,
+                       relative_ppm_tolerance_in_daltons)
 
 logger = logging.getLogger(__name__)
 

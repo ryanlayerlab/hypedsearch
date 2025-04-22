@@ -5,6 +5,7 @@ import pytest
 from src.constants import B_ION_TYPE, GIT_REPO_DIR, MOUSE_PROTEOME, Y_ION_TYPE, IonTypes
 from src.peptides_and_ions import (
     BIonCreator,
+    KmerToProteinIdMap,
     Peptide,
     ProductIon,
     YIonCreator,
@@ -308,3 +309,52 @@ class Test_get_proteins_by_name:
         assert len(prots) == 10
 
     # @staticmethod
+
+
+class Test_KmerToProteinIdMap:
+    class Test_from_peptides:
+        @staticmethod
+        def test_smoke():
+            # Arrange
+            peptides = [
+                Peptide(seq="ACD", id=0),
+                Peptide(seq="CDEF", id=1),
+            ]
+            # Act
+            result = KmerToProteinIdMap.from_peptides(
+                min_k=1, max_k=3, peptides=peptides
+            )
+            kmer_protein_map = result.kmer_to_protein_id_map
+
+            # Assert
+            for seq in [
+                "A",
+                "C",
+                "D",
+                "E",
+                "F",
+                "AC",
+                "CD",
+                "DE",
+                "EF",
+                "ACD",
+                "CDE",
+                "DEF",
+            ]:
+                assert seq in kmer_protein_map
+            assert kmer_protein_map["C"] == [0, 1]
+
+    class Test_save:
+        @staticmethod
+        def test_smoke(tmp_path):
+
+            # Arrange
+            seq_to_prot_map = {"A": [0, 1], "AC": [0], "CDE": [1]}
+            k_to_p_map = KmerToProteinIdMap(kmer_to_protein_id_map=seq_to_prot_map)
+            path = tmp_path / "test.pkl"
+            # Act
+            k_to_p_map.save(path=path)
+
+            # Assert
+            assert path.exists()
+            assert seq_to_prot_map == KmerToProteinIdMap.load(path=path)

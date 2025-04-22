@@ -1,26 +1,15 @@
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-import numpy as np
 import pandas as pd
 
-from src.comet_utils import CometPSM, get_comet_protein_counts, load_comet_data
-from src.constants import (
-    COMET_COUNTS,
-    COMET_RUN_1_DIR,
-    FULL_NAME,
-    MOUSE_PROTEOME,
-    PROTEIN,
-    QUANTILE,
-    RESULTS_DIR,
-    SHORT_NAME,
-    SPECTRA_DIR,
-    VALIDATED,
-)
+from src.comet_utils import get_comet_protein_counts
+from src.constants import (COMET_COUNTS, COMET_RUN_1_DIR, FULL_NAME,
+                           MOUSE_PROTEOME, SHORT_NAME, SPECTRA_DIR, VALIDATED)
 from src.peptides_and_ions import Peptide
-from src.utils import flatten_list_of_lists, pickle_and_compress, remove_gene_name
+from src.utils import remove_gene_name
 
 
 @dataclass

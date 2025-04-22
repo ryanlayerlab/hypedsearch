@@ -2,19 +2,15 @@ import logging
 import os
 import platform
 import subprocess
-import xml.etree.ElementTree as ET
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
-from time import time
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import List, Optional, Union
 
 import click
 import pandas as pd
-from pydantic import BaseModel, field_validator
 
 from src.click_utils import PathType
-from src.config import AppConfig
 from src.constants import (
     COMET_DIR,
     COMET_PARAMS,
@@ -22,6 +18,7 @@ from src.constants import (
     COMET_RUN_2_DIR,
     DELTA_CN,
     EVAL,
+    HS_OUTPUT_PREFIX,
     IONS_MATCHED,
     MOUSE_PROTEOME,
     NUM,
@@ -34,10 +31,9 @@ from src.constants import (
     XCORR,
 )
 from src.mass_spectra import Spectrum, get_specific_spectrum_by_sample_and_scan_num
-from src.peptides_and_ions import Peptide
 from src.utils import (
     flatten_list_of_lists,
-    log_params,
+    log_time,
     make_directory,
     remove_gene_name,
     setup_logger,
@@ -60,34 +56,47 @@ def get_comet_txts_in_dir(dir: Path) -> List[Path]:
     return matching_txt_files
 
 
-def read_comet_txt_to_df(txt_path: Path, sample: Optional[str] = None):
+def read_comet_txt_to_df(
+    txt_path: Path,
+    #  , sample: Optional[str] = None
+):
     """
     Reads Comet's output TXT file to a pandas dataframe.
     Adds a 'sample' column that's not in the TXT file but is in the XML file that Comet
     also spits out.
     """
-    if sample is None:
-        # Get sample name from the Comet XML file because
-        xml_path = Path(str(txt_path).replace(".txt", ".pep.xml"))
-        tree = ET.parse(xml_path)
-        root = tree.getroot()
-        namespace = {"pep": "http://regis-web.systemsbiology.net/pepXML"}
-        msms_run_summary = root.find("pep:msms_run_summary", namespace)
-        sample = msms_run_summary.get("base_name").split("/")[-1]
+    # if sample is None:
+    #     # Get sample name from the Comet XML file because
+    #     xml_path = Path(str(txt_path).replace(".txt", ".pep.xml"))
+    #     tree = ET.parse(xml_path)
+    #     root = tree.getroot()
+    #     namespace = {"pep": "http://regis-web.systemsbiology.net/pepXML"}
+    #     msms_run_summary = root.find("pep:msms_run_summary", namespace)
+    #     sample = msms_run_summary.get("base_name").split("/")[-1]
 
     # Read the TXT file to a dataframe and add the sample column
-    df = pd.read_csv(txt_path, sep="\t", header=1)
-    df[SAMPLE] = sample
+    def determine_if_comet_header(filepath):
+        with open(filepath, "r") as f:
+            first_line = f.readline().strip()
+            if ("comet" in first_line) or ("Comet" in first_line):
+                return 1, "\t"
+            else:
+                return 0, ","
+
+    num_lines_to_skip, sep = determine_if_comet_header(filepath=txt_path)
+    df = pd.read_csv(txt_path, sep="\t", header=num_lines_to_skip)
+    # df[SAMPLE] = sample
     return df
 
 
-class CometPSM(BaseModel):
+@dataclass
+class CometPSM:
     """Class for rows of Comet output"""
 
     sample: str
     num: int
     scan: int
-    aa_seq: str
+    seq: str
     ions_matched: int
     proteins: List[str]
     protein_count: int
@@ -97,55 +106,56 @@ class CometPSM(BaseModel):
     # prev_aa: str
     # next_aa: str
 
-    @field_validator("proteins", mode="before")
-    def split_protein_column_by_comma(cls, protein: str) -> List[str]:
-        """
-        The 'protein' column in Comet's TXT output has string-valued values that look like:
-            "<protein 1 name>,<protein 2 name>,<...>"
-        I.e., comma-separated protein names.
-        This function breaks the string of comma-separated values into a list:
-            ["<protein 1 name>", "<protein 2 name>", ...]
-        """
-        return protein.split(",")
+    def __post_init__(self):
+        self.proteins = self.proteins.split(",")
 
     @classmethod
     def from_txt(
         cls,
         file_path: str,
         as_df: bool = False,
-        sample: Optional[str] = None,
+        sample: str = "",
     ) -> Union[List["CometPSM"], pd.DataFrame]:
         """
         Reads Comet results .txt file to a list of dataclasses or a dataframe
         """
         file_path = Path(file_path)
-        df = read_comet_txt_to_df(txt_path=file_path, sample=sample)
+        df = read_comet_txt_to_df(txt_path=file_path)
         if as_df:
+            df[SAMPLE] = sample
             return df
         else:
-            return cls.from_dataframe(comet_output_df=df)
+            return cls.from_dataframe(comet_output_df=df, sample=sample)
 
     @classmethod
-    def from_dataframe(cls, comet_output_df: pd.DataFrame) -> List["CometPSM"]:
+    def from_dataframe(
+        cls, comet_output_df: pd.DataFrame, sample: str
+    ) -> List["CometPSM"]:
         """
         Given a dataframe from the read_comet_txt_to_df method, convert the dataframe
         into a list of class instances--one for each row in the dataframe.
         """
         return [
             cls(
-                sample=row[SAMPLE],
+                sample=sample,
                 scan=row[SCAN],
                 num=row[NUM],
                 ions_matched=row[IONS_MATCHED],
                 protein_count=row[PROTEIN_COUNT],
                 proteins=row[PROTEIN],
-                aa_seq=row[PLAIN_PEPTIDE],
+                seq=row[PLAIN_PEPTIDE],
                 xcorr=row[XCORR],
                 eval=row[EVAL],
                 delta_cn=row[DELTA_CN],
             )
             for _, row in comet_output_df.iterrows()
         ]
+
+    @classmethod
+    def from_dir(
+        cls, folder: Path, as_df: bool = False
+    ) -> Union[List["CometPSM"], pd.DataFrame]:
+        return read_comet_txts_in_dir(folder=folder, as_df=as_df)
 
     def get_corresponding_spectrum(self) -> Spectrum:
         """
@@ -169,6 +179,49 @@ def get_comet_protein_counts(
         all_prots = [remove_gene_name(protein_name=prot) for prot in all_prots]
 
     return Counter(all_prots)
+
+
+def read_comet_txts_in_dir(
+    folder: Path, as_df: bool = True
+) -> Union[List[CometPSM], pd.DataFrame]:
+    txts = list(folder.glob("*.txt"))
+    data = []
+    for txt in txts:
+        # Parse sample
+        file_stem = txt.stem
+        if file_stem[: len(HS_OUTPUT_PREFIX)] == HS_OUTPUT_PREFIX:
+            sample = file_stem[len(HS_OUTPUT_PREFIX) :]
+        else:
+            sample = file_stem
+        data.append(CometPSM.from_txt(file_path=txt, as_df=as_df, sample=sample))
+
+    if as_df:
+        return pd.concat(data, ignore_index=True)
+    else:
+        return flatten_list_of_lists(data)
+
+
+def load_comet_data(
+    samples: List[str] = THOMAS_SAMPLES, run: int = 1, as_df: bool = True
+):
+    """ """
+    if run == 1:
+        comet_results_dir = COMET_RUN_1_DIR
+    elif run == 2:
+        comet_results_dir = COMET_RUN_2_DIR
+    else:
+        raise ValueError(f"'run' must be 1 or 2. You set run={run}")
+    comet_dfs = []
+    for sample in samples:
+        logger.info(f"Reading data for {sample}")
+        comet_output = comet_results_dir / f"{sample}/{sample}.txt"
+        comet_dfs.append(read_comet_txt_to_df(txt_path=comet_output))
+    comet_df = pd.concat(comet_dfs, ignore_index=True)
+
+    if as_df is True:
+        return comet_df
+    else:
+        return CometPSM.from_dataframe(comet_output_df=comet_df)
 
 
 def load_comet_data(
@@ -369,6 +422,7 @@ def cli(
         )
 
 
+@log_time
 def run_comet_on_one_mzml(
     output_dir: Path,
     mzml: Path,
@@ -381,7 +435,7 @@ def run_comet_on_one_mzml(
     scan: Optional[int] = None,
     num_psms: Optional[int] = None,
 ) -> Path:
-    start_time = time()
+    # start_time = time()
     # Constants & make sure paths are Path objects
     orig_dir = Path(os.getcwd()).absolute()
     comet_params_str = "comet.params"
@@ -454,7 +508,7 @@ def run_comet_on_one_mzml(
     expected_output_files = [comet_txt_output_path, comet_pep_xml_output_path]
     for f in expected_output_files:
         assert f.exists(), f"{f} is expected to exist but does not"
-    logger.info(f"Running Comet took {round(time() - start_time, 2)} seconds")
+    # logger.info(f"Running Comet took {round(time() - start_time, 2)} seconds")
     return comet_txt_output_path
 
 

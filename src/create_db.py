@@ -5,21 +5,12 @@ from typing import List, Optional, Union
 
 import click
 
-from src.constants import (
-    DEFAULT_MAX_K,
-    DEFAULT_MIN_K,
-    MEMORY,
-    MOUSE_PROTEOME,
-    PRODUCT_ION_TABLE,
-    PROTEIN_TABLE,
-)
-from src.peptides_and_ions import (
-    Peptide,
-    get_proteins_by_name,
-    get_uniq_kmer_to_protein_map,
-)
-from src.protein_product_ion_database import DbKmer, DbProtein, ProteinProductIonDb
-from src.sql_database import Sqlite3Database
+from src.constants import (DEFAULT_MAX_K, DEFAULT_MIN_K, MEMORY,
+                           MOUSE_PROTEOME)
+from src.peptides_and_ions import (Peptide, get_proteins_by_name,
+                                   get_uniq_kmer_to_protein_map)
+from src.protein_product_ion_database import (DbKmer, DbProtein,
+                                              ProteinProductIonDb)
 from src.utils import PathType, get_time_in_diff_units, setup_logger
 
 logger = logging.getLogger(__name__)

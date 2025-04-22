@@ -4,13 +4,12 @@ from pathlib import Path
 from typing import List, Optional
 
 import click
-import numpy as np
 import pandas as pd
+import seaborn as sns
 from matplotlib import pyplot as plt
 
 from src.click_utils import PathType
-from src.comet_utils import CometPSM, get_comet_txts_in_dir, load_comet_data
-from src.constants import GIT_REPO_DIR
+from src.comet_utils import CometPSM, get_comet_txts_in_dir
 from src.plot_utils import fig_setup, finalize, set_title_axes_labels
 from src.utils import flatten_list_of_lists
 
@@ -54,14 +53,16 @@ def get_protein_comet_counts(
     return comet_protein_counts
 
 
-@click.command(
-    name="plot-counts",
-    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-)
-@common_arguments
+# @click.command(
+#     name="plot-counts",
+#     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+# )
+# @common_arguments
 def plot_protein_counts(
     comet_results_dir: Path,
     top_n_psms: Optional[int] = None,
+    ms: int = 10,
+    top_n_prots: int = 10,
 ):
 
     prot_counts = get_protein_comet_counts(
@@ -71,7 +72,9 @@ def plot_protein_counts(
     df = pd.DataFrame(prot_counts.items(), columns=["prot", "count"])
     df.sort_values("count", inplace=True, ignore_index=True, ascending=False)
 
-    fig, axs = fig_setup(2, 1)
+    fig, axs = fig_setup(1, 2)
+
+    # 1st plot
     ax = axs[0]
     _ = ax.plot(
         df["count"],
@@ -86,6 +89,7 @@ def plot_protein_counts(
     )
     # finalize(axs)
 
+    # 2nd plot
     # fig, axs = fig_setup(1, 1)
     ax = axs[1]
     _ = ax.plot(
@@ -93,32 +97,36 @@ def plot_protein_counts(
         "bo",
         ms=1,
     )
-
     # Label the left-most N points
-    num_pts_to_label = 8
-    fs = 7
-    for i in range(num_pts_to_label):
-        _ = ax.text(
-            i,
-            df["count"].iloc[i],
-            df["prot"].iloc[i],
-            fontsize=fs,
-            verticalalignment="bottom",
-            horizontalalignment="left",
+    # fs = 7
+    colors = sns.color_palette("hsv", top_n_prots)
+    for idx in range(top_n_prots):
+
+        # _ = ax.text(
+        _ = ax.scatter(
+            idx,
+            df["count"].iloc[idx],
+            label=df["prot"].iloc[idx],
+            color=colors[idx],
+            s=ms,
+            # fontsize=fs,
+            # verticalalignment="bottom",
+            # horizontalalignment="left",
         )
 
     set_title_axes_labels(
         ax=ax,
         xlabel="protein index",
-        ylabel="count",
+        # ylabel="count",
         # title="Number of times protein appears in Comet run 1 data"
     )
-    ax.set_xlim(left=-1, right=100)
+    _ = ax.set_xlim(left=-1, right=100)
     finalize(axs)
     params = f"topNpsms={top_n_psms}.cometDir={comet_results_dir.stem}"
-    fig.suptitle(params)
+    _ = fig.suptitle(params)
     plt.tight_layout()
     fig.savefig(f"plots/protein_counts.{params}.png", dpi=200)
+    return axs
 
 
 def get_most_common_proteins(protein_counts: Counter, top_n: int) -> List[str]:

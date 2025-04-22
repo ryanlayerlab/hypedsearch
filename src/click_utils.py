@@ -30,6 +30,7 @@ class ClickOptions:
             "--fasta_path",
             "-f",
             type=PathType(),
+            required=True,
             help="Path to the FASTA file.",
         )
 
@@ -109,11 +110,11 @@ class ClickOptions:
             "--scan",
             "-s",
             type=int,
-            default=None,
+            default=0,
             show_default=True,
             help=(
                 "If this is set, then the workflow will only run on the spectrum with this scan number "
-                "rather than all the spectra in the MZML"
+                "rather than all the spectra in the MZML which is what will happen if scan=0"
             ),
         )
 

@@ -64,6 +64,10 @@ VALIDATED = "validated"
 QUANTILE = "quantile"
 MEMORY = ":memory:"
 DEFAULT_NUM_COMET_PSMS = 20
+HS_OUTPUT_PREFIX = "hs_"
+NOT_HYBRID = 0
+HYBRID = 1
+MAYBE_HYBRID = 2
 
 
 class IonTypes(Enum):

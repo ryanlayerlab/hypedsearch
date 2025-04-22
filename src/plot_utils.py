@@ -1,7 +1,11 @@
+from pathlib import Path
+from typing import Optional, Union
+
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 from matplotlib import rcParams
-from matplotlib.lines import Line2D
+from matplotlib.axes import Axes
 
 # Constants
 SINGLE_FIG_SIZE = (6, 4)
@@ -224,3 +228,119 @@ def set_title_axes_labels(ax, title=None, xlabel=None, ylabel=None):
 
 def plot_pdf(ax, pdf, label=None, style="o"):
     ax.plot(pdf[:, 0], pdf[:, 1], style, label=label)
+
+
+# function that, given an Axes object, plots the y=x line with a adjustable but default line style, color, and size
+def plot_y_equals_x_line(ax, linestyle="--", color=ALMOST_BLACK, linewidth=0.5):
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    min_val = min(xlim[0], ylim[0])
+    max_val = max(xlim[1], ylim[1])
+    ax.plot([min_val, max_val], [min_val, max_val], linestyle, color=color)
+
+
+def plot_line(ax, m=1, b=0, label=None, ls="--", lc="black", lw=1):
+    """
+    Plot the y=m*x + b line
+    """
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    min_val = min(xlim[0], ylim[0])
+    max_val = max(xlim[1], ylim[1])
+    x = np.linspace(min_val, max_val, 100)
+    y = m * x + b
+    ax.plot(x, y, ls=ls, color=lc, lw=lw, label=label)
+    pass
+
+
+# Write me a function that returns a line of best fit for a given set of x and y values.
+# Return the slope, intercept
+def best_fit_line(x, y):
+    """
+    Returns the slope and intercept of the line of best fit for the given x and y values.
+    """
+    # Calculate the slope and intercept using numpy's polyfit function
+    slope, intercept = np.polyfit(x, y, 1)
+    return slope, intercept
+
+
+# Write me a function that (1) has a basic docstring that just describes what the function does
+# in a few sentences, (2) computes the
+def plot_best_fit_line(ax, x, y, label=None):
+    """
+    Plot the line of best fit for the given x and y values.
+    """
+    slope, intercept = best_fit_line(x, y)
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    min_val = min(xlim[0], ylim[0])
+    max_val = max(xlim[1], ylim[1])
+    x = np.linspace(min_val, max_val, 100)
+    y = slope * x + intercept
+    ax.plot(x, y, label=label)
+
+
+def hist_plot(
+    ax,
+    data,
+    nbins: int = 10,
+    kde: bool = True,
+    box_counts: bool = True,
+    bw_adjust: float = 2,
+    # label=None, color=None, alpha=0.5
+):
+    """
+    Plot a histogram of the given data.
+    """
+    sns.histplot(
+        data,
+        bins=nbins,
+        ax=ax,
+        kde=kde,
+        kde_kws=dict(bw_adjust=bw_adjust),
+    )
+    # if kde:
+    #     sns.kdeplot(
+    #         data,
+    #         ax=ax,
+    #         bw_adjust=2,
+    #         label="KDE",
+    #     )
+
+    # Add count numbers to top of histogram boxes
+    if box_counts:
+        for patch in ax.patches:
+            height = patch.get_height()
+            if height > 0:  # only label non-empty bins
+                _ = ax.text(
+                    patch.get_x() + patch.get_width() / 2,
+                    height,
+                    f"{int(height)}",
+                    ha="center",
+                    va="bottom",
+                )
+
+
+def save_fig(
+    path: Union[Path, str],
+    dpi: int = 200,
+    title: Optional[str] = None,
+    fig: Optional[plt.Figure] = None,
+    # bbox_inches: str = "tight",
+    # transparent: bool = True,
+    # fig_format: str = "pdf",
+):
+    """
+    Save the figure to a file.
+    """
+    finalize(fig.axes)
+    if title is not None:
+        fig.suptitle(title, fontsize=16, fontweight="bold")
+    plt.tight_layout()
+    plt.savefig(
+        path,
+        dpi=dpi,
+        # bbox_inches=bbox_inches,
+        # transparent=transparent,
+        # format=fig_format,
+    )

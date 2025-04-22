@@ -20,7 +20,7 @@ class TestSpectrum:
             precursor_abundance=200,
             spectrum_id="scan=1",
             retention_time=600,
-            scan_num=1,
+            scan=1,
         )
         actual = Spectrum.from_dict(spectrum=spectrum)
         assert actual == expected

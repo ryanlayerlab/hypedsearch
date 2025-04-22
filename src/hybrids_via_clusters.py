@@ -4,16 +4,17 @@ from dataclasses import dataclass, field
 from itertools import groupby
 from pathlib import Path
 from time import time
-from typing import DefaultDict, Dict, List, Optional, Set, Union
+from typing import DefaultDict, List, Optional, Set
 from venv import logger
 
 from src.constants import DEFAULT_PPM_TOLERANCE, PROTON_MASS, WATER_MASS
+from src.hypedsearch_utils import HybridPeptide, SeqWithMass
 from src.mass_spectra import Spectrum
 from src.peptide_spectrum_comparison import (
     get_start_and_end_positions_from_ions,
     ions_as_df,
 )
-from src.peptides_and_ions import Peptide, compute_peptide_mz, write_fasta
+from src.peptides_and_ions import Peptide, compute_peptide_mz
 from src.protein_product_ion_database import (
     PositionedIon,
     ProteinProductIonDb,
@@ -21,7 +22,7 @@ from src.protein_product_ion_database import (
     get_positions_in_proteins_of_peak_matching_ions,
     get_product_ions_matching_spectrum,
 )
-from src.sql_database import Sqlite3Database, SqlTableRow
+from src.sql_database import Sqlite3Database
 from src.utils import get_time_in_diff_units, relative_ppm_tolerance_in_daltons
 
 logger = logging.getLogger(__name__)
@@ -100,7 +101,7 @@ class Cluster:
 class ExtendedCluster:
     cluster: Cluster
     # num_extended_aa: int
-    # seqs: List[SeqWithMz]
+    # seqs: List[SeqWithMass]
     extended_seq: Optional[str]
 
     @property
@@ -130,92 +131,6 @@ class SpectrumExtendedClusters:
 class SpectrumClusters:
     b: List[Cluster]
     y: List[Cluster]
-
-
-@dataclass
-class SeqWithMz:
-    seq: str
-    mz: float
-
-
-@dataclass
-class SeqWithMass(SqlTableRow):
-    seq: str
-    mz: float
-
-    @classmethod
-    def from_seq(cls, seq: str, charge: int):
-        mz = compute_peptide_mz(aa_seq=seq, charge=charge)
-        return cls(seq=seq, mz=mz)
-
-
-@dataclass
-class HybridPeptide:
-    b_seq: str
-    y_seq: str
-    b_prot_ids: Set[int] = field(default_factory=set)
-    b_prot_names: Set[str] = field(default_factory=set)
-    y_prot_ids: Set[int] = field(default_factory=set)
-    y_prot_names: Set[str] = field(default_factory=set)
-
-    @property
-    def seq(self):
-        return self.b_seq + self.y_seq
-
-    @property
-    def fasta_name(self):
-        return f"hybrid_{self.b_seq}-{self.y_seq}"
-
-    def set_protein_names(self, prot_id_to_name_map: Dict[int, str]):
-        self.b_prot_names = set(
-            prot_id_to_name_map[prot_id] for prot_id in self.b_prot_ids
-        )
-        self.y_prot_names = set(
-            prot_id_to_name_map[prot_id] for prot_id in self.y_prot_ids
-        )
-
-    def set_fasta_info(
-        self,
-        prot_id_to_name_map: Dict[int, str],
-    ):
-        self.set_protein_names(prot_id_to_name_map=prot_id_to_name_map)
-        self.fasta_description = f"b-prots:{','.join(self.b_prot_names)} y-prots:{','.join(self.y_prot_names)}"
-
-    def mz(self, charge: int):
-        return compute_peptide_mz(aa_seq=self.b_seq + self.y_seq, charge=charge)
-
-
-# MISCELLANEOUS METHODS THAT DO NOT RELATE TO CLUSTERING
-def create_hybrids_fasta(
-    hybrids: List[HybridPeptide],
-    fasta_path: Path,
-    other_prots: Optional[Union[List[Peptide], Path]] = None,
-) -> List[Peptide]:
-    """
-    Writes a list of hybrids (hybrids) write to a FASTA file (fasta_path).
-    You can optionally include other proteins in the FASTA file with the hybrids.
-    You can include other proteins via other_prots in three different ways: if other_prots
-     is a
-        1) list - you passed a list of Peptide objects
-        2) None - there are no other proteins/peptides you want in the FASTA file; just the hybrids
-        3) Path - you passed a FASTA file; all proteins in the FASTA file will be included
-         with the hybrids
-    """
-    prots = []
-    if other_prots is not None:
-        if isinstance(other_prots, list):
-            prots = other_prots
-        elif isinstance(other_prots, Path):
-            prots = Peptide.from_fasta(fasta_path=other_prots)
-    for idx, hybrid in enumerate(hybrids):
-        new_peptide = Peptide(
-            seq=hybrid.seq, name=hybrid.fasta_name, desc=hybrid.fasta_description
-        )
-
-        prots.append(new_peptide)
-
-    write_fasta(peptides=prots, output_path=fasta_path)
-    return prots
 
 
 # METHODS RELATED TO CLUSTERING
@@ -271,7 +186,7 @@ def extend_cluster(
     seqs = []
     while extended_cluster_mz < precursor_mz:
         seqs.append(
-            SeqWithMz(
+            SeqWithMass(
                 seq=aa_seq,
                 mz=extended_cluster_mz,
             )

@@ -1,8 +1,6 @@
 import logging
 import shutil
-import sys
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
 from time import time
 from typing import List, Optional, Union
@@ -16,13 +14,20 @@ from src.constants import (
     DEFAULT_MAX_K,
     DEFAULT_MIN_K,
     DEFAULT_NUM_COMET_PSMS,
-    DEFAULT_NUM_PEAKS,
     DEFAULT_PPM_TOLERANCE,
     PROTON_MASS,
     WATER_MASS,
     HybridFormingMethods,
 )
-from src.hybrids_via_clusters import HybridPeptide, SeqWithMass, create_hybrids_fasta
+from src.hybrids_via_clusters import HybridPeptide, SeqWithMass
+from src.hypedsearch_utils import (
+    HSOutput,
+    HybridPeptide,
+    create_hybrids_fasta,
+    determe_hybrid_forming_method,
+    hypedsearch_output_stem,
+    remove_native_hybrids,
+)
 from src.mass_spectra import Spectrum
 from src.peptides_and_ions import (
     Peptide,
@@ -30,17 +35,11 @@ from src.peptides_and_ions import (
     get_proteins_by_name,
     get_uniq_kmer_to_protein_map,
 )
-from src.protein_abundance import get_most_common_proteins, get_protein_comet_counts
-from src.protein_product_ion_database import (
-    ProteinProductIonDb,
-    get_positions_in_proteins_of_peak_matching_ions,
-    get_product_ions_matching_spectrum,
-)
 from src.sql_database import Sqlite3Database
 from src.utils import (
     get_time_in_diff_units,
-    hypedsearch_output_stem,
     log_params,
+    log_time,
     relative_ppm_tolerance_in_daltons,
     setup_logger,
 )
@@ -48,13 +47,7 @@ from src.utils import (
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class HSOutput:
-    hybrids: List[HybridPeptide]
-    comet_txt: Optional[Path]
-    run_time: Optional[float] = None
-
-
+@log_time
 def form_all_hybrids(
     precursor_charge: int,
     precursor_mz: float,
@@ -64,7 +57,6 @@ def form_all_hybrids(
     max_k: int = DEFAULT_MAX_K,
 ) -> List[HybridPeptide]:
     logger.info("Forming all hybrids...")
-    start_time = time()
     uniq_kmer_to_protein_map = get_uniq_kmer_to_protein_map(
         proteins=proteins, min_k=min_k, max_k=max_k
     )
@@ -86,6 +78,8 @@ def form_all_hybrids(
     adjusted_precursor_mz = precursor_mz + (WATER_MASS / precursor_charge) + PROTON_MASS
     potench_hybrids = []
     for b_seq in uniq_kmer_to_protein_map:
+        if b_seq == "EVEDPQVEQLE":
+            pass
         b_seq_mz = compute_peptide_mz(aa_seq=b_seq, charge=precursor_charge)
         lower_bdd = adjusted_precursor_mz - mz_tolerance - b_seq_mz
         upper_bdd = adjusted_precursor_mz + mz_tolerance - b_seq_mz
@@ -105,47 +99,38 @@ def form_all_hybrids(
                     y_prot_ids=uniq_kmer_to_protein_map[y_seq],
                 )
             )
-
-    logger.info(
-        f"Forming all hybrids took {get_time_in_diff_units(time() - start_time)}"
-    )
     return potench_hybrids
 
 
-def determe_hybrid_forming_method(
-    protein_names: Optional[Path],
-) -> HybridFormingMethods:
-    if protein_names is not None:
-        return HybridFormingMethods.all
-    else:
-        raise RuntimeError("Unrecognized hybrid forming method!")
-
-
-def run_hypedsearch_on_spectrum(
-    mzml: Path,
+@log_time
+def run_hypedsearch_on_one_spectrum(
     fasta_path: Path,
     precursor_mz_ppm_tol: float,
-    scan: int,
     output_dir: Path,
+    spectrum: Spectrum,
     num_peaks: int = 0,
     min_k: int = DEFAULT_MIN_K,
     max_k: int = DEFAULT_MAX_K,
     protein_names: Optional[Path] = None,
     other_prots_for_fasta: Optional[Union[List[Peptide], Path]] = None,
     num_psms: int = DEFAULT_NUM_COMET_PSMS,
+    keep_fasta: bool = False,
+    overwrite: bool = False,
 ) -> HSOutput:
-    assert output_dir.exists(), f"Output directory is expected to exist but doesn't:\n{output_dir}"  
-    logger.info(f"Running HS on scan={scan} of MZML:\n{mzml}")
     start_time = time()
+    # Check if HS result already exists
+    comet_output = (
+        output_dir
+        / f"{hypedsearch_output_stem(mzml_stem=spectrum.mzml.stem)}.{spectrum.scan}-{spectrum.scan}.txt"
+    )
+    if comet_output.exists() and not overwrite:
+        logger.info(
+            f"Comet output for scan={spectrum.scan} already exists and overwrite=False so NOT running HS on it."
+        )
+        return HSOutput(hybrids=[], comet_txt=None, run_time=time() - start_time)
 
-    # Load spectra
-    spectra = Spectrum.from_mzml(mzml_path=mzml)
-    spectra = list(filter(lambda spectrum: spectrum.scan_num == scan, spectra))
-    assert (
-        len(spectra) == 1
-    ), f"There are {len(spectra)} spectra corresponding to scan {scan} in {mzml}"
-    spectrum = spectra[0]
-
+    logger.info(f"Running HS on scan={spectrum.scan} from MZML:\n{spectrum.mzml}")
+    start_time = time()
     # Preprocess spectrum
     if num_peaks > 0:
         spectrum.filter_to_top_n_peaks(n=num_peaks)
@@ -169,11 +154,15 @@ def run_hypedsearch_on_spectrum(
         prot_id_to_name_map = {prot.id: prot.name for prot in proteins}
 
     if len(potench_hybrids) == 0:
-        logger.info("No hybrids were formed! Exiting...")
-        sys.exit(0)
+        logger.info("No hybrids were formed! Returning...")
+        return HSOutput(hybrids=[], comet_txt=None, run_time=time() - start_time)
+
+    # Remove hybrids that are native
+    potench_hybrids = remove_native_hybrids(
+        proteins=proteins, hybrids=potench_hybrids, min_k=min_k, max_k=max_k
+    )
 
     # Prepare the hybrids to be written to a FASTA file by setting their description and name
-    logger.info
     for hybrid in potench_hybrids:
         hybrid.set_fasta_info(prot_id_to_name_map=prot_id_to_name_map)
 
@@ -183,9 +172,12 @@ def run_hypedsearch_on_spectrum(
         temp_dir = Path(temp_dir).absolute()
 
         # Create new FASTA with hybrids and other proteins the user wants included
-        new_fasta_path = (
-            temp_dir / f"{spectrum.mzml.stem}_{spectrum.scan_num}_hybrids.fasta"
-        )
+        fasta_name = f"{spectrum.mzml.stem}_{spectrum.scan}_hybrids.fasta"
+        if keep_fasta:
+            new_fasta_path = output_dir / fasta_name
+        else:
+            new_fasta_path = temp_dir / fasta_name
+
         create_hybrids_fasta(
             hybrids=potench_hybrids,
             fasta_path=new_fasta_path,
@@ -200,7 +192,7 @@ def run_hypedsearch_on_spectrum(
                 fasta=new_fasta_path,
                 mzml=spectrum.mzml,
                 output_dir=temp_dir,
-                scan=spectrum.scan_num,
+                scan=spectrum.scan,
                 stem=output_stem,
                 num_psms=num_psms,
             )
@@ -208,16 +200,71 @@ def run_hypedsearch_on_spectrum(
             comet_txt = output_dir / comet_txt.name
         except RuntimeError as err:
             logger.info(f"Comet failed! Here's the error message:\n{err}")
-
     elapsed_time = time() - start_time
-    logger.info(f"Running HS took {get_time_in_diff_units(elapsed_time)}")
+    # logger.info(
+    #     f"Running HS on scan={spectrum.scan_num} took {get_time_in_diff_units(elapsed_time)}"
+    # )
     return HSOutput(hybrids=potench_hybrids, comet_txt=comet_txt, run_time=elapsed_time)
 
 
-options = ClickOptions()
+def run_hypedsearch_on_spectra(
+    mzml: Path,
+    fasta_path: Path,
+    precursor_mz_ppm_tol: float,
+    output_dir: Path,
+    scan: int = 0,
+    num_peaks: int = 0,
+    min_k: int = DEFAULT_MIN_K,
+    max_k: int = DEFAULT_MAX_K,
+    protein_names: Optional[Path] = None,
+    other_prots_for_fasta: Optional[Union[List[Peptide], Path]] = None,
+    num_psms: int = DEFAULT_NUM_COMET_PSMS,
+    overwrite: bool = False,
+) -> List[HSOutput]:
+    assert (
+        output_dir.exists()
+    ), f"Output directory is expected to exist but doesn't:\n{output_dir}"
+    start_time = time()
+
+    # Load spectra
+    spectra = Spectrum.from_mzml(mzml_path=mzml)
+
+    # Filter to only the scan we want
+    if scan != 0:
+        spectra = list(filter(lambda spectrum: spectrum.scan == scan, spectra))
+        assert (
+            len(spectra) == 1
+        ), f"There are {len(spectra)} spectra corresponding to scan {scan} in {mzml}"
+
+    hs_results = []
+    for spectrum_idx, spectrum in enumerate(spectra):
+        # Run HS on spectrum
+        res = run_hypedsearch_on_one_spectrum(
+            fasta_path=fasta_path,
+            precursor_mz_ppm_tol=precursor_mz_ppm_tol,
+            output_dir=output_dir,
+            spectrum=spectrum,
+            num_peaks=num_peaks,
+            min_k=min_k,
+            max_k=max_k,
+            protein_names=protein_names,
+            other_prots_for_fasta=other_prots_for_fasta,
+            num_psms=num_psms,
+            overwrite=overwrite,
+        )
+        hs_results.append(res)
+
+    elapsed_time = time() - start_time
+    logger.info(
+        f"Running HS on all scans included in run took {get_time_in_diff_units(elapsed_time)}"
+    )
+    return hs_results
+    # return HSOutput(hybrids=potench_hybrids, comet_txt=comet_txt, run_time=elapsed_time)
 
 
 def run_hypedsearch_on_scan_cli_options():
+    options = ClickOptions()
+
     def decorator(func):
         for opt in reversed(
             [
@@ -244,6 +291,12 @@ def run_hypedsearch_on_scan_cli_options():
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
 )
 @run_hypedsearch_on_scan_cli_options()
+@click.option(
+    "--overwrite",
+    is_flag=True,
+    default=False,
+    help="Overwrite existing Comet output files.",
+)
 @log_params
 def cli(
     protein_names: Path,
@@ -255,9 +308,10 @@ def cli(
     min_k: int,
     max_k: int,
     num_psms: int,
-    scan: Optional[int] = None,
+    overwrite: bool,
+    scan: Optional[int],
 ):
-    run_hypedsearch_on_spectrum(
+    run_hypedsearch_on_spectra(
         protein_names=protein_names,
         fasta_path=fasta_path,
         mzml=mzml,
@@ -268,6 +322,7 @@ def cli(
         max_k=max_k,
         num_psms=num_psms,
         scan=scan,
+        overwrite=overwrite,
     )
 
 

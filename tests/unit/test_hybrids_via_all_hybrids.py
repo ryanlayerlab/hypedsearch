@@ -2,7 +2,7 @@ import pytest
 
 from src.comet_utils import CometPSM
 from src.constants import GIT_REPO_DIR
-from src.hybrids_via_all_hybrids import run_hypedsearch_on_spectrum
+from src.hybrids_via_all_hybrids import run_hypedsearch_on_spectra
 
 GIT_REPO_DIR
 
@@ -23,7 +23,7 @@ class Test_run_hypedsearch_on_spectrum:
         sample = mzml.stem
 
         # Act
-        run_hypedsearch_on_spectrum(
+        run_hypedsearch_on_spectra(
             protein_names=protein_names,
             fasta_path=fasta_path,
             scan=scan,
