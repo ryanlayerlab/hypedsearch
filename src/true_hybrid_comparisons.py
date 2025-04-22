@@ -8,8 +8,8 @@ import pandas as pd
 
 from src.comet_utils import CometPSM
 from src.constants import GIT_REPO_DIR
+from src.hypedsearch_utils import HybridPeptide
 from src.mass_spectra import Spectrum, get_specific_spectrum_by_sample_and_scan_num
-from src.peptide_spectrum_comparison import HybridPeptide
 from src.utils import flatten_list_of_lists
 
 
@@ -32,6 +32,14 @@ class TrueHybrid(HybridPeptide):
         "Scg": ["sp|Q03517|SCG1_MOUSE"],
         "IAPP": ["sp|P12968|IAPP_MOUSE", "sp|P12968B|IAPP_MOUSE"],
     }
+
+    def __repr__(self):
+        # Only include fields that are not None or unset
+        set_fields = {
+            key: value for key, value in vars(self).items() if value is not None
+        }
+        # Creating a string representation with just the set attributes
+        return f"TrueHybrid({', '.join(f'{k}={v}' for k, v in set_fields.items())})"
 
     def get_spectrum(self) -> Spectrum:
         self.spectrum = get_specific_spectrum_by_sample_and_scan_num(
@@ -68,9 +76,7 @@ class TrueHybrid(HybridPeptide):
         )
 
     def set_hybrid_in_psms(self) -> bool:
-        psms_containing_seq = list(
-            filter(lambda psm: self.seq in psm.aa_seq, self.psms)
-        )
+        psms_containing_seq = list(filter(lambda psm: self.seq in psm.seq, self.psms))
         if len(psms_containing_seq) > 0:
             self.hybrid_in_psms = True
         else:
@@ -93,7 +99,7 @@ class AllHybridsRun:
 
 
 def get_seq_containing_psms(seq: str, psms: List[CometPSM]) -> List[CometPSM]:
-    psms_containing_seq = list(filter(lambda psm: seq in psm.aa_seq, psms))
+    psms_containing_seq = list(filter(lambda psm: seq in psm.seq, psms))
     return psms_containing_seq
 
 

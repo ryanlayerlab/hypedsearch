@@ -1,10 +1,10 @@
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 from matplotlib.pyplot import Axes
-from pydantic import BaseModel
 from pyteomics import mzml
 
 from src.constants import SPECTRA_DIR, THOMAS_SAMPLES
@@ -20,19 +20,47 @@ class Peak:
 
 @dataclass
 class Spectrum:
-    peaks: Tuple[Peak, ...]
     precursor_mz: float
     precursor_charge: int
     precursor_abundance: float
     spectrum_id: str
     retention_time: float
+    peaks: List[Peak] = field(default_factory=list, repr=False)
     mzml: Optional[Path] = None
-    scan_num: Optional[int] = None
+    scan: Optional[int] = None
     # For keeping track of whether the peaks have been processed:
     peaks_preprocessed: bool = False
 
+    @property
+    def sample(self):
+        if self.mzml is not None:
+            return self.mzml.stem
+        else:
+            return None
+
+    @property
+    def total_intensity(self):
+        return sum([peak.intensity for peak in self.peaks])
+
     @classmethod
     def from_dict(cls, spectrum: Dict, mzml: Optional[Path] = None) -> "Spectrum":
+        # Extract scan number from 'id' key
+        spectrum_id = spectrum.get("id", "")
+        scan_num = int(re.search(r"scan=(\d+)", spectrum_id).group(1))
+
+        # Extract other required fields
+        precursor_mz = spectrum["precursorList"]["precursor"][0]["selectedIonList"][
+            "selectedIon"
+        ][0]["selected ion m/z"]
+        precursor_charge = spectrum["precursorList"]["precursor"][0]["selectedIonList"][
+            "selectedIon"
+        ][0]["charge state"]
+        precursor_abundance = spectrum["precursorList"]["precursor"][0][
+            "selectedIonList"
+        ]["selectedIon"][0]["peak intensity"]
+        retention_time = spectrum["scanList"]["scan"][0]["scan start time"]
+
+        # Get peaks
         masses, abundances = tuple(spectrum["m/z array"]), tuple(
             spectrum["intensity array"]
         )
@@ -40,24 +68,16 @@ class Spectrum:
             Peak(mz=masses[idx], intensity=abundances[idx], id=idx)
             for idx in range(len(masses))
         ]
-        spectrum_id = spectrum.get("id", "")
-        scan_num = int(spectrum_id.split("=")[1])
         return cls(
             # mass_over_charges=masses,
             # abundances=abundances,
-            scan_num=scan_num,
+            scan=scan_num,
             peaks=peaks,
-            precursor_mz=spectrum["precursorList"]["precursor"][0]["selectedIonList"][
-                "selectedIon"
-            ][0]["selected ion m/z"],
-            precursor_charge=spectrum["precursorList"]["precursor"][0][
-                "selectedIonList"
-            ]["selectedIon"][0]["charge state"],
-            precursor_abundance=spectrum["precursorList"]["precursor"][0][
-                "selectedIonList"
-            ]["selectedIon"][0]["peak intensity"],
+            precursor_mz=precursor_mz,
+            precursor_charge=precursor_charge,
+            precursor_abundance=precursor_abundance,
             spectrum_id=spectrum_id,
-            retention_time=spectrum["scanList"]["scan"][0]["scan start time"],
+            retention_time=retention_time,
             mzml=mzml,
         )
 
@@ -88,7 +108,7 @@ class Spectrum:
         if ax is None:
             _, axs = fig_setup()
             ax = axs[0]
-        title = f"MZML={self.mzml.stem}; scan={self.scan_num}"
+        title = f"MZML={self.mzml.stem}; scan={self.scan}"
         plot_peaks(
             ax=ax,
             peaks=self.peaks,
@@ -98,6 +118,18 @@ class Spectrum:
             title=title,
         )
         return ax
+
+
+# def plot_peak(
+#     ax: Axes,
+#     x: float,
+#     y: float,
+#     label: str = "peaks",
+#     color: Any = "grey",
+#     alpha: float = 1,
+#     linewidth: float = 0.5,
+# ):
+#     _ = ax.vlines(x, [0], y, color=color, linewidth=linewidth, alpha=alpha, label=label)
 
 
 def plot_peaks(
@@ -162,7 +194,7 @@ def load_mzml_data(samples: List[str] = THOMAS_SAMPLES):
 def get_spectrum_from_mzml(scan_num: int, mzml_path: Path):
     spectra = Spectrum.from_mzml(mzml_path=mzml_path)
 
-    spectrum = list(filter(lambda spectrum: spectrum.scan_num == scan_num, spectra))
+    spectrum = list(filter(lambda spectrum: spectrum.scan == scan_num, spectra))
     assert (
         len(spectrum) == 1
     ), f"Scan number must be unique. There were {len(spectrum)} spectra with scan number {scan_num}."
@@ -188,7 +220,7 @@ def get_specific_spectrum_by_sample_and_scan_num(
     spectra = Spectrum.from_mzml(mzml_path=mzml_path)
     matched_spectrum = None
     for spectrum in spectra:
-        if spectrum.scan_num == scan_num:
+        if spectrum.scan == scan_num:
             matched_spectrum = spectrum
             break
     return matched_spectrum

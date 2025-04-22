@@ -4,17 +4,19 @@ import logging
 import os
 import pickle
 import re
+import shlex
 import shutil
+import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from functools import wraps
 from itertools import chain
 from pathlib import Path
+from time import time
 from typing import Any, Callable, List, Literal, Optional, Union
 
-import click
-
-from src.constants import COMET_RUN_1_DIR, COMET_RUN_2_DIR, THOMAS_SAMPLES
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +195,7 @@ def pickle_and_compress(obj: Any, file_path: str):
         pickle.dump(obj, file, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def decompress_and_unpickle(file_path: str):
+def decompress_and_depickle(file_path: str):
     with gzip.open(file_path, "rb") as file:
         return pickle.load(file)
 
@@ -209,5 +211,66 @@ def file_hash(filepath: Path, algorithm="sha256") -> str:
     return hash_func.hexdigest()
 
 
-def hypedsearch_output_stem(mzml_stem: str):
-    return f"hs_{mzml_stem}"
+def log_time(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time()
+        result = func(*args, **kwargs)
+        duration = time() - start
+        logging.info(f"{func.__name__} took {get_time_in_diff_units(duration)}")
+        return result
+
+    return wrapper
+
+
+@dataclass
+class CmdResult:
+    stdout: Optional[str] = None
+    stderr: Optional[str] = None
+    code: Optional[int] = None
+
+
+def run_command_line_cmd(cmd: str):
+    run_args = shlex.split(cmd)
+    result = subprocess.run(run_args, capture_output=True, text=True)
+    return CmdResult(code=result.returncode, stdout=result.stdout, stderr=result.stderr)
+
+
+# function that takes in a list of any one kind dataclass and spits out a dataframe with one row per dataclass list element.
+# Optionally take a list of the dataclass's fields/attributes to include in the dataframe.
+def dataclass_list_to_dataframe(
+    dataclass_list: List[Any], fields: Optional[List[str]] = None
+) -> pd.DataFrame:
+    """
+    Function that takes in a list of any one kind dataclass and spits out a dataframe
+    with one row per dataclass list element. Optionally take a list of the dataclass's
+    fields/attributes to include in the dataframe.
+    """
+    if fields is None:
+        fields = [
+            field.name for field in dataclass_list[0].__dataclass_fields__.values()
+        ]
+    data = {field: [] for field in fields}
+    for item in dataclass_list:
+        for field in fields:
+            data[field].append(getattr(item, field))
+    return pd.DataFrame(data)
+
+
+def lowercase_and_underscore(in_str: str):
+    """
+    Change a string to all lower case and replace spaces with underscores.
+    """
+    return in_str.lower().replace(" ", "_")
+
+
+def is_pickleable(obj: Any) -> bool:
+    """
+    Check if an object is pickleable.
+    """
+    try:
+        pickle.dumps(obj)
+        return True
+    except Exception as e:
+        print(f"Not pickleable: {e}")
+        return False

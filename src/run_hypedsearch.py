@@ -1,15 +1,14 @@
 import logging
 import shutil
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
 from time import time
-from typing import List, Optional
+from typing import Optional
 
 import click
 
 from src.comet_utils import run_comet_on_one_mzml
-from src.constants import DEFAULT_NUM_PEAKS, DEFAULT_PPM_TOLERANCE, MOUSE_PROTEOME
+from src.constants import DEFAULT_NUM_PEAKS, DEFAULT_PPM_TOLERANCE
 from src.mass_spectra import Spectrum, get_spectrum_from_mzml
 from src.peptide_spectrum_comparison import (  # get_possible_hybrids,
     ExtendedCluster,
@@ -20,12 +19,7 @@ from src.peptide_spectrum_comparison import (  # get_possible_hybrids,
     get_clusters_from_ions,
     get_hybrids,
 )
-from src.protein_product_ion_database import (
-    PositionedIon,
-    ProteinProductIonDb,
-    get_positions_in_proteins_of_peak_matching_ions,
-    get_product_ions_matching_spectrum,
-)
+from src.protein_product_ion_database import ProteinProductIonDb
 from src.utils import (
     PathType,
     get_time_in_diff_units,
@@ -50,19 +44,18 @@ def run_hs_on_one_spectrum(
 ):
     # Check if run already exists. If it does, skip it.
     output_file = (
-        output_dir
-        / f"hs_{spectrum.mzml.stem}.{spectrum.scan_num}-{spectrum.scan_num}.txt"
+        output_dir / f"hs_{spectrum.mzml.stem}.{spectrum.scan}-{spectrum.scan}.txt"
     )
     if output_file.exists() and not overwrite:
         logger.info(
-            f"Output file {output_file} already exists. Skipping spectrum {spectrum.scan_num} from MZML {spectrum.mzml.name}.\n\n"
+            f"Output file {output_file} already exists. Skipping spectrum {spectrum.scan} from MZML {spectrum.mzml.name}.\n\n"
         )
         return
 
     # Run HS on the spectrum
     fcn_start_time = time()
     logger.info(
-        f"Running HS on spectrum {spectrum.scan_num} from MZML {spectrum.mzml.name}..."
+        f"Running HS on spectrum {spectrum.scan} from MZML {spectrum.mzml.name}..."
     )
 
     # Perform peak filtering
@@ -88,11 +81,11 @@ def run_hs_on_one_spectrum(
         logger.info("Creating new FASTA with hybrids...")
         if keep_fasta:
             new_fasta_path = (
-                output_dir / f"{spectrum.mzml.stem}_{spectrum.scan_num}_hybrids.fasta"
+                output_dir / f"{spectrum.mzml.stem}_{spectrum.scan}_hybrids.fasta"
             )
         else:
             new_fasta_path = (
-                tmp_path / f"{spectrum.mzml.stem}_{spectrum.scan_num}_hybrids.fasta"
+                tmp_path / f"{spectrum.mzml.stem}_{spectrum.scan}_hybrids.fasta"
             )
 
         # Create protein ID-to-name map
@@ -116,7 +109,7 @@ def run_hs_on_one_spectrum(
                 fasta=new_fasta_path,
                 mzml=spectrum.mzml,
                 output_dir=tmp_path,
-                scan=spectrum.scan_num,
+                scan=spectrum.scan,
                 stem=output_stem,
             )
             shutil.copy2(comet_txt, output_dir)
@@ -125,7 +118,7 @@ def run_hs_on_one_spectrum(
             logger.info(f"Comet failed! Here's the error message:\n{err}")
 
     logger.info(
-        f"Running HS on spectrum {spectrum.scan_num} from MZML {spectrum.mzml.name} took {get_time_in_diff_units(time() - fcn_start_time)}\n\n"
+        f"Running HS on spectrum {spectrum.scan} from MZML {spectrum.mzml.name} took {get_time_in_diff_units(time() - fcn_start_time)}\n\n"
     )
     return (results, comet_txt)
 

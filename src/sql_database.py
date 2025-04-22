@@ -1,15 +1,14 @@
 import logging
 import sqlite3
 import time
-from dataclasses import Field, asdict, dataclass, field, fields, is_dataclass
+from dataclasses import Field, asdict, dataclass, field, fields
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Generic, List, Optional, TypeVar, get_args, get_origin
+from typing import (Any, Dict, Generic, List, Optional, TypeVar, get_args)
 
-from pydantic import BaseModel
 
 from src.constants import MEMORY
-from src.utils import get_time_in_diff_units
+from src.utils import log_time
 
 logger = logging.getLogger(__name__)
 
@@ -160,21 +159,23 @@ class Sqlite3Database:
         query = f"SELECT COUNT(*) FROM {table_name}"
         return self.read_query(query=query)
 
+    @log_time
     def add_index(self, table_name: str, index_name: str, colms_to_index: List[str]):
         start_time = time.time()
         colms = ", ".join(colms_to_index)
         query = f"CREATE INDEX {index_name} ON {table_name}({colms})"
         self.execute_query(query=query)
-        logger.info(
-            f"Indexing took {get_time_in_diff_units(time_sec=(time.time() - start_time))}"
-        )
+        # logger.info(
+        #     f"Indexing took {get_time_in_diff_units(time_sec=(time.time() - start_time))}"
+        # )
 
     def create_table_from_dataclass(self, table_name: str, obj: type[SqlTableRow]):
         colm_str = obj.sql_create_table_columns_str()
         query = f"CREATE TABLE IF NOT EXISTS {table_name} ({colm_str})"
         self.execute_query(query=query)
-        logger.info(f"Created table {table_name}")
+        # logger.info(f"Created table {table_name}")
 
+    @log_time
     def insert_dataclasses(
         self, table_name: str, data_classes: List[SqlTableRow]
     ) -> None:
