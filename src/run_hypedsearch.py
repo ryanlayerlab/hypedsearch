@@ -1,288 +1,220 @@
-import logging
-import shutil
-import tempfile
+import argparse
+from dataclasses import dataclass
 from pathlib import Path
-from time import time
-from typing import Optional
+from typing import Literal
 
-import click
-
-from src.comet_utils import run_comet_on_one_mzml
-from src.constants import DEFAULT_NUM_PEAKS, DEFAULT_PPM_TOLERANCE
-from src.mass_spectra import Spectrum, get_spectrum_from_mzml
-from src.peptide_spectrum_comparison import (  # get_possible_hybrids,
-    ExtendedCluster,
-    HybridPeptide,
-    SpectrumExtendedClusters,
-    create_hybrids_fasta,
-    extend_clusters,
-    get_clusters_from_ions,
-    get_hybrids,
+from src.comet_utils import CometPSM
+from src.constants import (
+    DEFAULT_CRUX_PARAMS,
+    DEFAULT_CRUX_PATH,
+    DEFAULT_NUM_PSMS,
+    DEFAULT_PEAK_TO_ION_PPM_TOL,
+    DEFAULT_PRECURSOR_MZ_PPM_TOL,
 )
-from src.protein_product_ion_database import ProteinProductIonDb
-from src.utils import (
-    PathType,
-    get_time_in_diff_units,
-    log_params,
-    make_directory,
-    setup_logger,
-)
-
-logger = logging.getLogger(__name__)
+from src.form_hybrids import form_hybrids_for_spectrum
+from src.hypedsearch_utils import create_hybrids_fasta
+from src.mass_spectra import Mzml, Spectrum
+from src.run_comet import run_comet_via_crux
+from src.utils import setup_logger, to_json
 
 
-def run_hs_on_one_spectrum(
-    db_path: Path,
+@dataclass
+class HSOutput:
+    hybrids_json: Path
+    hybrids_native_fasta: Path
+    hybrids_fasta: Path
+    native_target: Path
+    native_decoy: Path
+    hybrids_native_target: Path
+    hybrids_native_decoy: Path
+    hybrids_target: Path
+
+    @classmethod
+    def from_out_dir(cls, out_dir: Path) -> "HSOutput":
+        return cls(
+            hybrids_json=out_dir / "hybrids.json",
+            hybrids_native_fasta=out_dir / "hybrids_native.fasta",
+            hybrids_fasta=out_dir / "hybrids.fasta",
+            native_target=out_dir / "native_target.txt",
+            native_decoy=out_dir / "native_decoy.txt",
+            hybrids_native_target=out_dir / "hybrids_native_target.txt",
+            hybrids_native_decoy=out_dir / "hybrids_native_decoy.txt",
+            hybrids_target=out_dir / "hybrids_target.txt",
+        )
+
+
+def process_spectrum(
     spectrum: Spectrum,
-    output_dir: Path,
-    num_peaks: int = DEFAULT_NUM_PEAKS,
-    peak_to_ion_ppm_tol: float = DEFAULT_PPM_TOLERANCE,
-    precursor_ppm_tol: float = DEFAULT_PPM_TOLERANCE,
-    fasta_path: Optional[Path] = None,
-    keep_fasta: bool = False,
-    overwrite: bool = False,
+    db_path: Path,
+    fasta: Path,
+    out_dir: Path,
+    crux_path: Path = DEFAULT_CRUX_PATH,
+    crux_params: Path = DEFAULT_CRUX_PARAMS,
+    num_psms: int = DEFAULT_NUM_PSMS,
+    precursor_mz_ppm_tol: float = DEFAULT_PRECURSOR_MZ_PPM_TOL,
+    peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
 ):
-    # Check if run already exists. If it does, skip it.
-    output_file = (
-        output_dir / f"hs_{spectrum.mzml.stem}.{spectrum.scan}-{spectrum.scan}.txt"
-    )
-    if output_file.exists() and not overwrite:
-        logger.info(
-            f"Output file {output_file} already exists. Skipping spectrum {spectrum.scan} from MZML {spectrum.mzml.name}.\n\n"
+    # Constants
+    hs_output = HSOutput.from_out_dir(out_dir)
+
+    # Run Comet
+    try:
+        comet_output = run_comet_via_crux(
+            mzml=spectrum.mzml,
+            fasta=fasta,
+            out_dir=out_dir,
+            crux_path=crux_path,
+            crux_params=crux_params,
+            decoy_search=2,
+            min_scan=spectrum.scan,
+            max_scan=spectrum.scan,
+            num_psms=num_psms,
         )
+        # Rename output files
+        comet_output.target_output.rename(hs_output.native_target)
+        comet_output.decoy_output.rename(hs_output.native_decoy)
+
+    # If the native search returns no PSMs, create empty files
+    except AssertionError:
         return
+    #     hs_output.native_target.touch()
+    #     hs_output.native_decoy.touch()
 
-    # Run HS on the spectrum
-    fcn_start_time = time()
-    logger.info(
-        f"Running HS on spectrum {spectrum.scan} from MZML {spectrum.mzml.name}..."
-    )
-
-    # Perform peak filtering
-    if num_peaks > 0:
-        spectrum.filter_to_top_n_peaks(n=num_peaks)
-
-    # Get hybrids
-    results = get_hybrids(
-        db_path=db_path,
+    # Form hybrids
+    seq_to_hybrids = form_hybrids_for_spectrum(
         spectrum=spectrum,
-        peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
-        precursor_mz_ppm_tol=precursor_ppm_tol,
-    )
-
-    if len(results.hybrids) == 0:
-        logger.info("No possible hybrids found. Exiting...\n\n")
-        return
-
-    with tempfile.TemporaryDirectory() as temp_dir:
-        tmp_path = Path(temp_dir).absolute()
-
-        # Create new FASTA with hybrids
-        logger.info("Creating new FASTA with hybrids...")
-        if keep_fasta:
-            new_fasta_path = (
-                output_dir / f"{spectrum.mzml.stem}_{spectrum.scan}_hybrids.fasta"
-            )
-        else:
-            new_fasta_path = (
-                tmp_path / f"{spectrum.mzml.stem}_{spectrum.scan}_hybrids.fasta"
-            )
-
-        # Create protein ID-to-name map
-        db = ProteinProductIonDb(db_path=db_path, overwrite=False)
-        prot_id_to_name_map = {prot.id: prot.name for prot in db.get_proteins()}
-
-        # Create hybrids FASTA
-        create_hybrids_fasta(
-            hybrids=results.hybrids,
-            fasta_path=new_fasta_path,
-            prot_id_to_name_map=prot_id_to_name_map,
-            other_prots=fasta_path,
-        )
-
-        # Run Comet
-        logger.info("Running Comet using new FASTA...")
-        output_stem = f"hs_{spectrum.mzml.stem}"
-        comet_txt = None
-        try:
-            comet_txt = run_comet_on_one_mzml(
-                fasta=new_fasta_path,
-                mzml=spectrum.mzml,
-                output_dir=tmp_path,
-                scan=spectrum.scan,
-                stem=output_stem,
-            )
-            shutil.copy2(comet_txt, output_dir)
-            comet_txt = output_dir / comet_txt.name
-        except RuntimeError as err:
-            logger.info(f"Comet failed! Here's the error message:\n{err}")
-
-    logger.info(
-        f"Running HS on spectrum {spectrum.scan} from MZML {spectrum.mzml.name} took {get_time_in_diff_units(time() - fcn_start_time)}\n\n"
-    )
-    return (results, comet_txt)
-
-
-def run_hs_on_mzml(
-    db_path: Path,
-    mzml: Path,
-    output_dir: Path,
-    num_peaks: int = DEFAULT_NUM_PEAKS,
-    peak_to_ion_ppm_tol: float = DEFAULT_PPM_TOLERANCE,
-    precursor_ppm_tol: float = DEFAULT_PPM_TOLERANCE,
-    scan: Optional[int] = None,
-    keep_fasta: bool = False,
-    fasta_path: Optional[Path] = None,
-    overwrite: bool = False,
-):
-    # Create the output directory if it doesn't exist
-    make_directory(output_dir)
-
-    # If scan number is passed, then run HS on that scan only
-    if scan is not None:
-        spectrum = get_spectrum_from_mzml(mzml_path=mzml, scan_num=scan)
-        run_hs_on_one_spectrum(
-            db_path=db_path,
-            spectrum=spectrum,
-            output_dir=output_dir,
-            num_peaks=num_peaks,
-            peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
-            precursor_ppm_tol=precursor_ppm_tol,
-            keep_fasta=keep_fasta,
-            fasta_path=fasta_path,
-            overwrite=overwrite,
-        )
-
-    # Otherwise, run HS on all scans
-    else:
-        # Get all the spectra from the mzml file
-        spectra = Spectrum.from_mzml(mzml_path=mzml)
-
-        # Run HS on each spectrum
-        for spectrum in spectra:
-            run_hs_on_one_spectrum(
-                db_path=db_path,
-                spectrum=spectrum,
-                output_dir=output_dir,
-                num_peaks=num_peaks,
-                peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
-                precursor_ppm_tol=precursor_ppm_tol,
-                keep_fasta=keep_fasta,
-                fasta_path=fasta_path,
-                overwrite=overwrite,
-            )
-
-
-@click.command(
-    name="run-hs",
-    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-)
-@click.option(
-    "--db_path",
-    "-d",
-    type=PathType(),
-    required=True,
-    help="Path to the already-created protein and product ion database.",
-)
-@click.option(
-    "--mzml",
-    "-m",
-    type=PathType(),
-    required=True,
-    help="Path to the mzML file.",
-)
-@click.option(
-    "--output_dir",
-    "-o",
-    type=PathType(),
-    required=True,
-    help="Path to the output directory.",
-)
-@click.option(
-    "--scan",
-    "-s",
-    type=int,
-    default=None,
-    help="Scan number to run HS on. If not provided, HS will be run on all scans.",
-)
-@click.option(
-    "--num_peaks",
-    "-n",
-    type=int,
-    default=DEFAULT_NUM_PEAKS,
-    show_default=True,
-    help="Number of peaks to keep in the spectrum.",
-)
-@click.option(
-    "--peak_to_ion_ppm_tol",
-    "-p",
-    type=float,
-    default=DEFAULT_PPM_TOLERANCE,
-    show_default=True,
-    help="PPM tolerance for peak to ion matching.",
-)
-@click.option(
-    "--precursor_ppm_tol",
-    "-P",
-    type=float,
-    default=DEFAULT_PPM_TOLERANCE,
-    show_default=True,
-    help="PPM tolerance for precursor m/z matching.",
-)
-@click.option(
-    "--keep_fasta",
-    "-kf",
-    type=bool,
-    default=False,
-    show_default=True,
-    help="Whether or not to keep the FASTA file with the hybrids",
-)
-@click.option(
-    "--fasta_path",
-    "-fp",
-    type=PathType(),
-    help="If provided, the proteins in the given FASTA file will be included with the potential hybrid sequences in the FASTA file that Comet searches",
-)
-@click.option(
-    "--overwrite",
-    "-ow",
-    type=bool,
-    default=False,
-    show_default=True,
-    help="If True, checks if Hypedsearch output already exists and, if it does, does not run Hypedsearch",
-)
-@log_params
-def run_hs_on_mzml_cli(
-    db_path: Path,
-    mzml: Path,
-    output_dir: Path,
-    num_peaks: int,
-    peak_to_ion_ppm_tol: float,
-    precursor_ppm_tol: float,
-    keep_fasta: bool,
-    scan: Optional[int],
-    fasta_path: Optional[Path],
-    overwrite: bool,
-):
-    t0 = time()
-    logger.info("Starting to run Hypedsearch")
-    run_hs_on_mzml(
         db_path=db_path,
-        mzml=mzml,
-        output_dir=output_dir,
-        num_peaks=num_peaks,
+        precursor_mz_ppm_tol=precursor_mz_ppm_tol,
         peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
-        precursor_ppm_tol=precursor_ppm_tol,
-        keep_fasta=keep_fasta,
-        scan=scan,
-        fasta_path=fasta_path,
-        overwrite=overwrite,
+        fasta=fasta,
     )
-    logger.info(
-        f"Running Hypedsearch in total took {get_time_in_diff_units(time() - t0)}"
+    serialized_hy_peps = {
+        key: [hy_pep.to_dict() for hy_pep in hy_peps]
+        for key, hy_peps in seq_to_hybrids.items()
+    }
+    to_json(data=serialized_hy_peps, out_path=hs_output.hybrids_json)
+
+    # Create FASTA containing hybrids. Add the hybrids to the proteome (as opposed to
+    # running Comet just on the hybrids) so that the decoy search makes sense
+    _ = create_hybrids_fasta(
+        hybrid_seqs=list(seq_to_hybrids.keys()),
+        new_fasta_path=hs_output.hybrids_native_fasta,
+        old_fasta=fasta,
     )
+
+    # Run Comet on hybrids+native FASTA
+    comet_output = run_comet_via_crux(
+        mzml=spectrum.mzml,
+        fasta=hs_output.hybrids_native_fasta,
+        out_dir=out_dir,
+        crux_path=crux_path,
+        crux_params=crux_params,
+        decoy_search=2,
+        min_scan=spectrum.scan,
+        max_scan=spectrum.scan,
+        num_psms=num_psms,
+    )
+    # Rename output files
+    comet_output.target_output.rename(hs_output.hybrids_native_target)
+    comet_output.decoy_output.rename(hs_output.hybrids_native_decoy)
+
+    # Create FASTA containing just hybrids to look at xcorr of hybrids
+    _ = create_hybrids_fasta(
+        hybrid_seqs=list(seq_to_hybrids.keys()),
+        new_fasta_path=hs_output.hybrids_fasta,
+    )
+    comet_output = run_comet_via_crux(
+        mzml=spectrum.mzml,
+        fasta=hs_output.hybrids_fasta,
+        out_dir=out_dir,
+        crux_path=crux_path,
+        crux_params=crux_params,
+        decoy_search=0,
+        min_scan=spectrum.scan,
+        max_scan=spectrum.scan,
+        num_psms=num_psms,
+    )
+    # Rename output files
+    comet_output.target_output.rename(hs_output.hybrids_target)
+
+    # Delete new FASTA to save space
+    hs_output.hybrids_native_fasta.unlink()
+    hs_output.hybrids_fasta.unlink()
+
+
+def process_mzml(
+    mzml: Path,
+    db_path: Path,
+    fasta: Path,
+    out_dir: Path,
+    num_psms: int,
+    testing: bool = False,
+):
+    # Make directory for MZML
+    mzml_dir = out_dir / mzml.stem
+    mzml_dir.mkdir(parents=True, exist_ok=True)
+    for spectrum_idx, spectrum in enumerate(Mzml(path=mzml).ms2_spectra):
+        scan_dir = mzml_dir / f"scan_{spectrum.scan}"
+        scan_dir.mkdir(parents=True, exist_ok=True)
+        process_spectrum(
+            spectrum=spectrum,
+            db_path=db_path,
+            fasta=fasta,
+            out_dir=scan_dir,
+            num_psms=num_psms,
+        )
+        if testing and (spectrum_idx == 1):
+            break
+    # Output for snakemake
+    (mzml_dir / "done.txt").touch()
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Process the spectra in an MZML file",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--mzml", "-m", type=Path, required=True, help="Path to the MZML file."
+    )
+    parser.add_argument(
+        "--db_path",
+        "-d",
+        type=Path,
+        required=True,
+        help="Path to the product-ion database file.",
+    )
+    parser.add_argument(
+        "--fasta", "-f", type=Path, required=True, help="Path to the FASTA file."
+    )
+    parser.add_argument(
+        "--out_dir", "-o", type=Path, required=True, help="Where files will be saved."
+    )
+    parser.add_argument(
+        "--num_psms",
+        "-n",
+        type=int,
+        required=True,
+        help="Number of Comet PSMs to return.",
+    )
+    parser.add_argument(
+        "--testing",
+        "-t",
+        action="store_true",
+        help="For testing, only process two spectra",
+    )
+
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
     setup_logger()
-    run_hs_on_mzml_cli()
+    args = parse_args()
+    process_mzml(
+        mzml=args.mzml,
+        db_path=args.db_path,
+        fasta=args.fasta,
+        out_dir=args.out_dir,
+        num_psms=args.num_psms,
+        testing=args.testing,
+    )

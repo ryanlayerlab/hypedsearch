@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Running a Simple Search Using Tide and Percolator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" type="text/css" href="../styles.css">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-V7XKGGFPYX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-V7XKGGFPYX');
+</script>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+<script type="text/javascript">
+	// Main Menu
+	$( document ).ready(function() {
+			var pull 		= $('.btn');
+				menu 		= $('nav ul');
+				menuHeight	= menu.height();
+
+			$(pull).on('click', function(e) {
+				e.preventDefault();
+				menu.slideToggle();
+			});
+
+			$(window).resize(function(){
+	    		var w = $(window).width();
+	    		if(w > 320 && menu.is(':hidden')) {
+	    			menu.removeAttr('style');
+	    		} 
+			});
+	});
+</script>
+</head>
+<body>
+	<div class="page-wrap">
+	 	<nav>
+			<div class="btn">
+		    </div>
+		    <img src="../images/crux-logo.png" id="logo"></a>
+			<ul id="navitems">
+			    <li><a href="../index.html">Home</a></li>
+			    <li><a href="../download.html">Download</a></li>
+			    <li><a href="../fileformats.html">File Formats</a></li>
+		        <li><a href="http://groups.google.com/group/crux-users">Contact</a></li> <!--Link to google support board-->
+		    </ul>
+		</nav>
+		<div id="content">
+		<!-- START CONTENT -->
+		<h2>Running a Simple Search Using Tide and Percolator</h2>
+
+		<p>
+		Now that you have your environment <a href="gettingstarted.html">set
+		up</a> and the two input files in your working directory, you can
+		conduct the search. The search process compares each spectrum
+		in <span class=file>demo.ms2</span> to peptides (subsequences of the
+		proteins) in fasta files provided in a
+		dirctory, <span class=file>yeast-index/</span>.  Peptides whose
+		precursor mass is close to that of the observed spectrum are scored
+		against that spectrum, and the top scores are reported in the output.
+		To conduct the search, we first create a peptide index
+		using <code>tide-index</code> and then execute the search
+		using <code>tide-search</code>.</p>
+
+		<ol>
+		<li>
+		<div class=code>
+		<code>$ crux tide-index small-yeast.fasta yeast-index </code>
+		</div>
+
+		<p>
+		While generating the peptide index, you will see output like this:</p>
+
+		<pre>
+INFO: Writing results to output directory 'crux-output'.
+INFO: CPU: guanine.gs.washington.edu
+INFO: Crux version: 4.0-ad795d65-2021-08-23
+INFO: Tue Sep 14 20:43:36 PDT 2021
+INFO: Beginning tide-index.
+INFO: Running tide-index...
+INFO: Writing results to output directory 'yeast-index'.
+INFO: Reading small-yeast.fasta and computing unmodified peptides...
+INFO: Generated 1735 targets, including duplicates.
+INFO: Generated 1735 decoys.
+INFO: Writing decoy fasta...
+INFO: Generating 1 decoy per target
+INFO: Reading proteins
+INFO: Skipped 0 duplicate targets and 0 duplicate decoys.
+INFO: Wrote 1735 targets and 1735 decoys.
+INFO: Precomputing theoretical spectra...
+INFO: Elapsed time: 0.102 s
+INFO: Finished crux tide-index.
+INFO: Return Code:0
+		</pre>
+
+		<p>
+		This command produces the peptide index in <code>yeast-index</code>
+		and also produces a directory <code>crux-output</code> containing 
+		the following files:
+		<ol>
+
+		<li>
+		tide-index.decoy.fasta &ndash; a set of decoy proteins, derived from
+		the proteins in the input set,</li>
+
+		<li>
+		tide-search.params.txt &ndash; a record of all the parameters used in
+		the search, and</li>
+
+		<li>tide-search.log.txt &ndash; a log file containing a copy of all
+		  the messages printed to the screen during the search.</li>
+		</ol>
+
+		<p>
+		Now you can run this command:</p></li>
+
+		<div class=code>
+		<li><code>$ crux tide-search demo.ms2 yeast-index</code>
+		</div>
+
+		<p>While the search is running, you will see output like this:</p>
+
+		<pre>
+INFO: Writing results to output directory 'crux-output'.
+INFO: CPU: guanine.gs.washington.edu
+INFO: Crux version: 4.1-6d021498-2021-10-19
+INFO: Wed Oct 27 18:37:40 PDT 2021
+INFO: Beginning tide-search.
+INFO: Running tide-search...
+INFO: Number of Threads: 1
+INFO: Reading index yeast-index/
+INFO: Read 56 target proteins
+INFO: Converting demo.ms2 to spectrumrecords format
+INFO: Elapsed time starting conversion: 0.0616 s
+INFO: Converting ms_level 2 ...
+INFO: Reading spectrum file crux-output/demo.ms2.spectrumrecords.tmp.
+INFO: Read 7535 spectra.
+INFO: Starting search.
+INFO: 1000 spectrum-charge combinations searched, 13% complete
+INFO: 2000 spectrum-charge combinations searched, 27% complete
+...
+INFO: 6000 spectrum-charge combinations searched, 80% complete
+INFO: 7000 spectrum-charge combinations searched, 93% complete
+INFO: [Thread 0]: Deleted 0 precursor, 0 isotope and 0 out-of-range peaks.
+INFO: [Thread 0]: Retained 100% of peaks.
+INFO: Time per spectrum-charge combination: 0.003292 s.
+INFO: Average number of candidates per spectrum-charge combination: 1.065428
+INFO: Elapsed time: 24.8 s
+INFO: Finished crux tide-search.
+INFO: Return Code:0
+		</pre>
+
+		<p>
+		The <span class=file>crux-output</span> directory now contains four new files
+		containing the search results:
+
+		<ol>
+
+		<li>
+		tide-search.target.txt &ndash; search results
+		in <a href="../file-formats/txt-format.html">tab-delimited format</a>.</li>
+
+		<li>
+		tide-search.decoy.txt &ndash; search results from a decoy database
+		in <a href="../file-formats/txt-format.html">tab-delimited format</a>.</li>
+
+		<li>
+		tide-search.params.txt &ndash; a record of all the parameters used in
+		the search.</li>
+
+		<li>tide-search.log.txt &ndash; a log file containing a copy of all
+		  the messages printed to the screen during the search.</li>
+		</ol>
+
+		</p>
+		</li>
+
+		<p>
+		  Note that the peptide-spectrum matches (PSMs) in the
+		  tide-search.target.txt are sorted by the precursor m/z value
+		  associated with the spectrum. If you want to see which PSMs got the
+		  highest XCorr scores, you can sort the file using tools such as Python and Excel.</p>
+
+		<p>The first lines of the resulting sorted output file should look like this:</p>
+
+		<table class="searchtable">
+		<td><b>file</b></td><td><b>scan</b></td><td><b>charge</b></td><td><b>spectrum precursor m/z</b></td><td><b>spectrum neutral mass</b></td><td><b>peptide mass</b></td><td><b>delta_cn</b></td><td><b>delta_lcn</b></td><td><b>xcorr score</b></td><td><b>xcorr rank</b></td><td><b>distinct matches/spectrum</b></td><td><b>sequence</b></td><td><b>modifications</b></td><td><b>cleavage type</b></td><td><b>protein id</b></td><td><b>flanking aa</b></td><td><b>target/decoy</b></td></tr>
+
+		<tr>
+		<td>demo.ms2</td><td>60135</td><td>3</td><td>1057.8792</td><td>3170.6156</td><td>3170.6106</td><td>0</td><td>0</td><td>6.69412756</td><td>1</td><td>1</td><td>IALSRPNVEVVALNDPFITNDYAAYMFK</td><td></td><td>trypsin-full-digest</td><td>YGR192C(19)</td><td>RY</td><td>target</td></tr>
+
+		<tr>
+		<td>demo.ms2</td><td>60355</td><td>4</td><td>838.1677</td><td>3348.6418</td><td>3348.6411</td><td>0</td><td>0</td><td>6.36378858</td><td>1</td><td>1</td><td>HEIASEVASFLNGNIIEHDVPEHFFGELAK</td><td></td><td>trypsin-full-digest</td><td>YLR249W(27)</td><td>RG</td><td>target</td></tr>
+
+		<tr>
+		<td>demo.ms</td><td>257701</td><td>3</td><td>1190.5835</td><td>3568.7287</t><td>3568.7202</td><td>0</td><td>0</td><td>6.23474788</td><td>1</td><td>1</td><td>GVLGYTEDAVVSSDFLGDSHSSIFDASAGIQLSPK</td><td></td><td>trypsin-full-digest</td><td>YGR192C(270)</td><td>KF</td><td>target</td></tr>
+
+		<tr>
+		<td>demo.ms2</td><td>46517</td><td>3</td><td>739.3639</td><td>2215.0698</td><td>2215.0659</td><td>0</td><td>0</td><td>6.11194706</td><td>1</td><td>1</td><td>HELSSLADVYINDAFGTAHR</td><td></td><td>trypsin-full-digest</td><td>YCR012W(150)</td><td>RA</td><td>target</td></tr>
+
+		<tr>
+		<td>demo.ms2</td><td>75478</td><td>3</td><td>975.1579</td><td>2922.4519</td><td>2922.4465</td><td>0</td><td>0</td><td>5.96129632</td><td>1</td><td>1</td><td>NMITGTSQADCAILIIAGGVGEFEAGISK</td><td>11_S_57.02</td><td>trypsin-full-digest</td><td>YBR118W(101)</td><td>KD</td><td>target</td></tr>
+		</table>
+
+		<p>
+		The final step is to post-process the search results using Percolator.
+		Each spectrum has been compared to many peptides and we would like to
+		return only the best match for each spectrum.  We also expect that
+		some fraction of the spectra will not be identifiable as peptides (due
+		to chemical noise, multiple peptides co-eluting, poor fragmentation,
+		etc.).  The analysis step filters out those spectra and ranks the
+		matches by quality.
+		</p></li>
+
+		<li>
+		<div class=code><code>
+		$ crux percolator --test-fdr 0.1 crux-output/tide-search.target.txt</code>
+		</div>
+
+		<p>While the analysis is running, you will see output like this
+		</p>
+
+		<pre>
+INFO: CPU: guanine.gs.washington.edu
+INFO: Crux version: 4.1-6d021498-2021-10-19
+INFO: Wed Oct 27 18:56:07 PDT 2021
+INFO: Beginning percolator.
+INFO: Converting input to pin format.
+INFO: Parsing crux-output/tide-search.target.txt
+INFO: Assigning index 0 to demo.ms2.
+INFO: Parsing crux-output/tide-search.decoy.txt
+INFO: There are 4014 target matches and 4014 decoys
+INFO: Maximum observed charge is 5.
+INFO: File conversion complete.
+INFO: Percolator version 3.05.nightly-137-e806a0c5, Build Date Aug 17 2021 11:04:02
+INFO: Copyright (c) 2006-9 University of Washington. All rights reserved.
+INFO: Written by Lukas Käll (lukall@u.washington.edu) in the
+INFO: Department of Genome Sciences at the University of Washington.
+INFO: Issued command:
+INFO: percolator --results-peptides crux-output/percolator.target.peptides.txt --decoy-results-peptides crux-output/percolator.decoy.peptides.txt --results-psms crux-output/percolator.target.psms.txt --decoy-results-psms crux-output/percolator.decoy.psms.txt --verbose 2 --protein-decoy-pattern decoy_ --seed 1 --subset-max-train 0 --trainFDR 0.01 --testFDR 0.1 --maxiter 10 --search-input auto --no-schema-validation --protein-enzyme trypsin --post-processing-tdc crux-output/make-pin.pin
+INFO: Started Wed Oct 27 18:56:08 2021
+INFO:  on guanine.gs.washington.edu
+INFO: Hyperparameters: selectionFdr=0.01, Cpos=0, Cneg=0, maxNiter=10
+INFO: Reading tab-delimited input from datafile crux-output/make-pin.pin
+INFO: Features:
+INFO: deltLCn deltCn XCorr PepLen Charge1 Charge2 Charge3 Charge4 Charge5 enzN enzC enzInt lnNumDSP dM absdM
+INFO: Found 8028 PSMs
+INFO: Separate target and decoy search inputs detected, using target-decoy competition on Percolator scores.
+INFO: Train/test set contains 4014 positives and 4014 negatives, size ratio=1 and pi0=1
+INFO: Selecting Cpos by cross-validation.
+INFO: Selecting Cneg by cross-validation.
+INFO: Split 1:  Selected feature 3 as initial direction. Could separate 264 training set positives with q<0.01 in that direction.
+INFO: Split 2:  Selected feature 3 as initial direction. Could separate 286 training set positives with q<0.01 in that direction.
+INFO: Split 3:  Selected feature 3 as initial direction. Could separate 313 training set positives with q<0.01 in that direction.
+INFO: Found 489 test set positives with q<0.1 in initial direction
+INFO: Reading in data and feature calculation took 0.2100 cpu seconds or 0 seconds wall clock time.
+INFO: ---Training with Cpos selected by cross validation, Cneg selected by cross validation, initial_fdr=0.01, fdr=0.01
+INFO: Iteration 1:      Estimated 497 PSMs with q<0.1
+INFO: Iteration 2:      Estimated 498 PSMs with q<0.1
+INFO: Iteration 3:      Estimated 497 PSMs with q<0.1
+INFO: Iteration 4:      Estimated 495 PSMs with q<0.1
+INFO: Iteration 5:      Estimated 499 PSMs with q<0.1
+INFO: Iteration 6:      Estimated 500 PSMs with q<0.1
+INFO: Iteration 7:      Estimated 499 PSMs with q<0.1
+INFO: Iteration 8:      Estimated 500 PSMs with q<0.1
+INFO: Iteration 9:      Estimated 499 PSMs with q<0.1
+INFO: Iteration 10:     Estimated 500 PSMs with q<0.1
+INFO: Learned normalized SVM weights for the 3 cross-validation splits:
+INFO:  Split1    Split2  Split3 FeatureName
+INFO: -0.2393    0.1490 -0.9274 deltLCn
+INFO:  0.1964    0.0398  0.9062 deltCn
+INFO:  1.7107    2.0151  3.3339 XCorr
+INFO:  0.1113   -0.5086 -0.7459 PepLen
+INFO:  0.0000    0.0000  0.0000 Charge1
+INFO: -0.0370   -0.1876 -0.5067 Charge2
+INFO:  0.0155    0.1021  0.3208 Charge3
+INFO:  0.0561    0.2259  0.5142 Charge4
+INFO:  0.0188    0.0916  0.1388 Charge5
+INFO:  0.0000    0.0000  0.0000 enzN
+INFO:  0.0000    0.0000  0.0000 enzC
+INFO: -0.0209   -0.0580 -0.0997 enzInt
+INFO:  0.2998   -0.3144  0.6631 lnNumDSP
+INFO: -0.0458    0.1445 -0.3350 dM
+INFO:  0.1462    0.7423  0.8114 absdM
+INFO: -2.1264   -3.3482 -5.0740 m0
+INFO: Found 499 test set PSMs with q<0.1.
+INFO: Selected best-scoring PSM per scan+expMass (target-decoy competition): 1787 target PSMs and 1168 decoy PSMs.
+INFO: Multiple instantiations of Normalizer
+INFO: Multiple instantiations of Normalizer
+INFO: Multiple instantiations of Normalizer
+INFO: Tossing out "redundant" PSMs keeping only the best scoring PSM for each unique peptide.
+INFO: Calculating q values.
+INFO: Final list yields 362 target peptides with q<0.1.
+INFO: Calculating posterior error probabilities (PEPs).
+INFO: Processing took 5.5800 cpu seconds or 4 seconds wall clock time.
+INFO: Multiple instantiations of Normalizer
+INFO: Multiple instantiations of Normalizer
+INFO: Elapsed time: 4.9 s
+INFO: Finished crux percolator.
+INFO: Return Code:0
+		</pre>
+
+		<p>
+		The <span class=file>crux-output</span> directory will now contain
+		eight new files:</p>
+		<ol>
+
+		<li>
+		percolator.target.psms.txt &ndash; a list of peptide-spectrum matches
+		(PSMs), ranked by quality,</li>
+
+		<li>
+		percolator.target.peptides.txt &ndash; a list of peptides, ranked by
+		quality,</li>
+
+		<li>
+		percolator.decoy.psms.txt &ndash; a ranked list of decoy PSMs, </li>
+
+		<li>
+		percolator.decoy.peptides.txt &ndash; a ranked list of decoy peptides,</li>
+
+		<li>
+		percolator.pout.xml &ndash; a single XML output file containing all of
+		the Percolator results,</li>
+
+		<li>
+		make-pin.pin.xml: an intermediate XML format file that is used by
+		Percolator.</li>
+
+		<li>
+		percolator.params.txt &ndash; parameter file, and</li>
+
+		<li>
+		percolator.log.txt &ndash; log file.</li>
+
+		</ol>
+		</p>
+
+		<p>
+		  As before, you might want to sort the Percolator output files, this
+		  time by the "percolator score" column.</p>
+
+		<p>
+		The beginning of the resulting percolator.target.psms.sort.txt file will look like
+		this:</p>
+
+		<table class="searchtable">
+		<td><b>file_idx</b></td><td><b>scan</b></td><td><b>charge</b></td><td><b>spectrum precursor m/z</b></td><td><b>spectrum neutral mass</b></td><td><b>peptide mass</b></td><td><b>percolator score</b></td><td><b>percolator q-value</b></td><td><b>percolator PEP</b></td><td><b>distinct matches/spectrum</b></td><td><b>sequence</b></td><td><b>protein id</b></td><td><b>flanking aa</b></td></tr>
+		<tr>
+		<td>0</td><td>57701</td><td>3</td><td>1190.5835</td><td>3568.7287</td><td>3568.7209</td><td>3.22302477</td><td>0.002617801</td><td>5.1679258e-07</td><td>1</td><td>GVLGYTEDAVVSSDFLGDSHSSIFDASAGIQLSPK</td><td>YGR192C</td><td>KF</td></tr>
+
+		<tr>
+		<td>0</td><td>28906</td><td>3</td><td>731.0363</td><td>2190.0869</td><td>2190.0817</td><td>3.05633388</td><td>0.002617801</td><td>9.7863355e-07</td><td>2</td><td>HLVHEVTSPQAFEGLENAGR</td><td>YGL009C</td><td>RK</td></tr>
+
+		<tr>
+		<td>0</td><td>60831</td><td>4</td><td>838.1685</td><td>3348.6450</td><td>3348.6414</td><td>3.01509804</td><td>0.002617801</td><td>1.1460915e-06</td><td>1</td><td>HEIASEVASFLNGNIIEHDVPEHFFGELAK</td><td>YLR249W</td><td>RG</td></tr>
+
+		<tr>
+		<td>0</td><td>22958</td><td>3</td><td>520.9552</td><td>1559.8437</td><td>1559.8420</td><td>2.99335675</td><td>0.002617801</td><td>1.2456261e-06</td><td>1</td><td>SHINVVVIGHVDSGK</td><td>YBR118W</td><td>KS</td></tr>
+
+		<tr>
+		<td>0</td><td>28872</td><td>4</td><td>548.5290</td><td>2190.0869</td><td>2190.0817</td><td>2.98298458</td><td>0.002617801</td><td>1.2961123e-06</td><td>2</td><td>HLVHEVTSPQAFEGLENAGR</td><td>YGL009C</td><td>RK</td></tr>
+		</table>
+
+		<p>
+		In this output, the PSMs are ranked by "percolator score," with higher
+		scores indicating a higher quality match. The associated statistical
+		confidence estimate is reported as a "percolator q-value," interpreted
+		as the minimal false discovery rate threshold at which this match is
+		deemed significant.  In the list above, all of the matches have
+		q-values of <0.002, meaning that they are highly significant.
+		The meanings of the remaining columns are
+		described <a href="../file-formats/txt-format.html">here</a>.  Note that when you run
+		Percolator on your own computer, the results may be somewhat
+		different than the ones reported here.  This is because Percolator
+		involves randomly subdividing the data in a cross-validation scheme
+		(described in detail
+		<a href="http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-13-S16-S3">here</a>.)</p>
+		</li>
+		</ol>
+	<!-- END CONTENT -->
+		</div>
+	</div>
+
+<footer class="site-footer">
+	<div id="centerfooter">
+		<div class="footerimportantlinks">
+			<img src="../images/linkicon.png" style="width:16px; height:16px"><h3>Important links</h3>
+			<ul>
+				<li><a href="../faq.html">Crux FAQ</a></li>
+				<li><a href="../glossary.html">Glossary of terminology</a></li>
+				<li><a href="http://scholar.google.com/citations?hl=en&user=Rw9S1HIAAAAJ">Google Scholar profile</a></li>
+				<li><a href="https://github.com/crux-toolkit/crux-toolkit">GitHub</a></li>
+				<li><a href="../release-notes.html">Release Notes</a></li>
+				<li><a href="https://mailman1.u.washington.edu/mailman/listinfo/crux-users" title="Receive announcements of new versions">Join the mailing list</a></li>
+				<li><a href="http://www.apache.org/licenses/LICENSE-2.0">Apache license</a></li>
+				<li><a href="http://groups.google.com/group/crux-users">Support Board</a></li>
+			</ul>
+		</div>
+		<div class="footerimportantlinks tutoriallinks">
+			<img src="../images/tutorialicon.png" style="height:16px"><h3>Tutorials</h3>
+			<ul>
+				<li><a href="install.html">Installation</a></li>
+				<li><a href="gettingstarted.html">Getting started with Crux</a></li>
+				<li><a href="search.html">Running a simple search using Tide and Percolator</a></li>
+				<li><a href="customizedsearch.html">Customization and search options</a></li>
+				<li><a href="spectralcounts.html">Using spectral-counts</a></li>
+			</ul>
+		</div>
+		<div id="footertext">
+			<p>
+				The original version of Crux was written by Chris Park and Aaron Klammer
+				under the supervision
+				of <a href="http://www.gs.washington.edu/faculty/maccoss.htm">Prof. Michael
+				MacCoss</a>
+				and <a href="http://noble.gs.washington.edu/~noble">Prof. William
+				Stafford Noble</a> in the Department of Genome Sciences at the
+				University of Washington, Seattle.  Website by <a href="http://www.yuvalboss.com/">Yuval Boss</a>. 
+				<br />The complete list of contributors
+				can be found <a href="../contributors.html">here</a>.
+				<br />
+				<br />
+				Maintenance and development of Crux is funded by the <a href="https://www.nih.gov/">National Institutes of Health</a> award P41 GM103533. 
+			</p>
+		</div>
+	</div>
+</footer>
+	
+</body>
+
+</html>

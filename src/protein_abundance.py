@@ -1,7 +1,8 @@
 import logging
-from collections import Counter
+from collections import Counter, defaultdict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import click
 import pandas as pd
@@ -9,9 +10,16 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 
 from src.click_utils import PathType
-from src.comet_utils import CometPSM, get_comet_txts_in_dir
-from src.plot_utils import fig_setup, finalize, set_title_axes_labels
-from src.utils import flatten_list_of_lists
+from src.comet_utils import CometPSM, read_comet_txts_in_dir
+from src.constants import DEFAULT_MAX_KMER_LEN
+from src.plot_utils import fig_setup, finalize, save_fig, set_title_axes_labels
+from src.utils import (
+    flatten_list_of_lists,
+    generate_aa_kmers,
+    pickle_and_compress,
+    setup_logger,
+    to_json,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,41 +42,60 @@ def common_arguments(func):
     return func
 
 
-def get_protein_comet_counts(
+def load_comet_psms(
     comet_results_dir: Path,
+    q_value_threshold: Optional[float] = None,
     top_n_psms: Optional[int] = None,
-) -> Counter:
-    # Get all Comet PSMs
-    comet_txts = get_comet_txts_in_dir(dir=comet_results_dir)
-    psms = flatten_list_of_lists([CometPSM.from_txt(txt) for txt in comet_txts])
+):
+    if q_value_threshold is not None:
+        # Load PSMs from the assign-confidence.target.txt file
+        assign_confidence_file = comet_results_dir / "assign-confidence.target.txt"
+        psms = CometPSM.from_txt(txt_path=assign_confidence_file)
+        # Filter PSMs by q_value threshold
+        psms = filter(lambda psm: psm.q_value <= q_value_threshold, psms)
+        return psms
+    elif top_n_psms is not None:
+        # Load PSMs from all *comet.target.txt files
+        comet_target_files = comet_results_dir.glob("*.comet.target.txt")
+        psms = []
+        for comet_target_file in comet_target_files:
+            psms.extend(CometPSM.from_txt(txt_path=comet_target_file))
+        return psms
+    else:
+        raise RuntimeError("Either q_value_threshold or top_n_psms must be provided.")
 
-    # Filter PSMs to just those in the top N
-    if top_n_psms is not None:
-        psms = filter(lambda psm: psm.num <= top_n_psms, psms)
 
-    # Get all the proteins in the resulting PSMs and then count the number of occurences for each protein
+def get_protein_counts_from_comet_results(
+    psms: List[CometPSM],
+) -> Counter[str, int]:
+    """ """
     all_comet_proteins = flatten_list_of_lists([psm.proteins for psm in psms])
     comet_protein_counts = Counter(all_comet_proteins)
-
     return comet_protein_counts
 
 
-# @click.command(
-#     name="plot-counts",
-#     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-# )
-# @common_arguments
+def get_prefix_counts_by_length(
+    seqs: List[str],
+) -> Dict[int, Dict[str, int]]:
+    """
+    Get the number of times each unique k-mer in the given sequences appears across all sequences
+    and organize the counts by k-mer length.
+    """
+    all_prefixes = flatten_list_of_lists(
+        [[seq[:i] for i in range(1, len(seq) + 1)] for seq in seqs]
+    )
+    prefix_counts = Counter(all_prefixes)
+    prefix_counts_by_length = defaultdict(dict)
+    for prefix, count in prefix_counts.items():
+        prefix_counts_by_length[len(prefix)][prefix] = count
+    return prefix_counts_by_length
+
+
 def plot_protein_counts(
-    comet_results_dir: Path,
-    top_n_psms: Optional[int] = None,
+    prot_counts: Dict[str, int],
     ms: int = 10,
     top_n_prots: int = 10,
 ):
-
-    prot_counts = get_protein_comet_counts(
-        comet_results_dir=comet_results_dir, top_n_psms=top_n_psms
-    )
-
     df = pd.DataFrame(prot_counts.items(), columns=["prot", "count"])
     df.sort_values("count", inplace=True, ignore_index=True, ascending=False)
 
@@ -85,20 +112,17 @@ def plot_protein_counts(
         ax=ax,
         xlabel="protein index",
         ylabel="count",
-        # title="Number of times protein appears in Comet run 1 data"
     )
-    # finalize(axs)
 
-    # 2nd plot
-    # fig, axs = fig_setup(1, 1)
+    # 2nd plot - same as first but only showing the most 100 abundant proteins
     ax = axs[1]
     _ = ax.plot(
         df["count"],
         "bo",
         ms=1,
     )
+
     # Label the left-most N points
-    # fs = 7
     colors = sns.color_palette("hsv", top_n_prots)
     for idx in range(top_n_prots):
 
@@ -109,24 +133,48 @@ def plot_protein_counts(
             label=df["prot"].iloc[idx],
             color=colors[idx],
             s=ms,
-            # fontsize=fs,
-            # verticalalignment="bottom",
-            # horizontalalignment="left",
         )
 
     set_title_axes_labels(
         ax=ax,
         xlabel="protein index",
-        # ylabel="count",
-        # title="Number of times protein appears in Comet run 1 data"
     )
     _ = ax.set_xlim(left=-1, right=100)
     finalize(axs)
-    params = f"topNpsms={top_n_psms}.cometDir={comet_results_dir.stem}"
-    _ = fig.suptitle(params)
-    plt.tight_layout()
-    fig.savefig(f"plots/protein_counts.{params}.png", dpi=200)
-    return axs
+    return fig, axs
+
+
+def get_and_plot_most_common_proteins(
+    comet_results_dir: Path,
+    top_n_proteins: int = 10,
+    q_value_threshold: Optional[float] = None,
+    top_n_psms: Optional[int] = None,
+    out_path: Optional[Path] = None,
+):
+    psms = load_comet_psms(
+        comet_results_dir=comet_results_dir,
+        q_value_threshold=q_value_threshold,
+        top_n_psms=top_n_psms,
+    )
+    prot_counts = get_protein_counts_from_comet_results(psms=psms)
+    most_common_proteins = get_most_common_proteins(
+        protein_counts=prot_counts, top_n=top_n_proteins
+    )
+
+    # Save top proteins
+    with open(out_path, "w") as f:
+        for prot in most_common_proteins:
+            print(prot)
+            f.write(f"{prot}\n")
+
+    # Plot protein abundances
+    fig, _ = plot_protein_counts(
+        prot_counts=prot_counts,
+    )
+    save_fig(
+        path=out_path.parent / "protein_abundances.png",
+        fig=fig,
+    )
 
 
 def get_most_common_proteins(protein_counts: Counter, top_n: int) -> List[str]:
@@ -137,10 +185,40 @@ def get_most_common_proteins(protein_counts: Counter, top_n: int) -> List[str]:
 
 
 @click.command(
-    name="get-common-proteins",
-    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+    name="protein-abundances",
+    context_settings={
+        "help_option_names": ["-h", "--help"],
+    },
+    help=(
+        "Get the most common proteins from Comet results.\n\n"
+        "\t - If q_value_threshold is provided, then it's assumed there's an assign-confidence.target.txt "
+        "file in the comet_results_dir and the PSMs will be loaded from that file and "
+        "filtered to those with q_value <= q_value_threshold.\n\n"
+        "\t - If top_n_psms is provided, then all PSMs will be loaded from all *.comet.target.txt "
+        "files in comet_results_dir and filtered to just the top_n_psms per spectrum.\n\n"
+        "The top_n_proteins will be saved in a TXT as a new-line separated list in the given out_path.\n\n"
+        "A plot of the protein counts will be saved in the same directory as the TXT."
+    ),
 )
-@common_arguments
+@click.option(
+    "--comet_results_dir",
+    "-d",
+    type=PathType(),
+    required=True,
+    help="Path to the directory containing Comet .txt result files",
+)
+@click.option(
+    "--q_value_threshold",
+    "-q",
+    type=float,
+    help=("If provided, only consider PSMs with q_value <= q_value_threshold. "),
+)
+@click.option(
+    "--top_n_psms",
+    "-n",
+    type=int,
+    help="If provided, only consider the top N PSMs per spectrum",
+)
 @click.option(
     "--top_n_proteins",
     "-t",
@@ -149,39 +227,97 @@ def get_most_common_proteins(protein_counts: Counter, top_n: int) -> List[str]:
     help="Get the top_n most common proteins",
 )
 @click.option(
-    "--output",
+    "--out_path",
     "-o",
     type=PathType(),
-    help="Output file to save the most common proteins",
+    required=True,
+    help=("The top_n_proteins will be saved here as a new-line separated list."),
 )
-def get_most_common_proteins_cli(
+def cli_get_and_plot_most_common_proteins(
     comet_results_dir: Path,
     top_n_proteins: int,
+    out_path: Path,
+    q_value_threshold: Optional[float] = None,
     top_n_psms: Optional[int] = None,
-    output: Optional[Path] = None,
 ):
-    prot_counts = get_protein_comet_counts(
-        comet_results_dir=comet_results_dir, top_n_psms=top_n_psms
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    get_and_plot_most_common_proteins(
+        comet_results_dir=comet_results_dir,
+        top_n_proteins=top_n_proteins,
+        q_value_threshold=q_value_threshold,
+        top_n_psms=top_n_psms,
+        out_path=out_path,
     )
-    most_common_proteins = get_most_common_proteins(
-        protein_counts=prot_counts, top_n=top_n_proteins
+
+
+@click.command(
+    name="prefix-abundances",
+    context_settings={
+        "help_option_names": ["-h", "--help"],
+    },
+    help=(
+        "Get the abundances/counts of all the prefixes of the PSM sequences.\n\n"
+        "\t - If q_value_threshold is provided, then it's assumed there's an assign-confidence.target.txt "
+        "file in the comet_results_dir and the PSMs will be loaded from that file and "
+        "filtered to those with q_value <= q_value_threshold.\n\n"
+        "\t - If top_n_psms is provided, then all PSMs will be loaded from all *.comet.target.txt "
+        "files in comet_results_dir and filtered to just the top_n_psms per spectrum.\n\n"
+        "The prefix counts will be saved in a JSON file in the given out_path.\n\n"
+    ),
+)
+@click.option(
+    "--comet_results_dir",
+    "-d",
+    type=PathType(),
+    required=True,
+    help="Path to the directory containing Comet .txt result files",
+)
+@click.option(
+    "--q_value_threshold",
+    "-q",
+    type=float,
+    help=("If provided, only consider PSMs with q_value <= q_value_threshold. "),
+)
+@click.option(
+    "--top_n_psms",
+    "-n",
+    type=int,
+    help="If provided, only consider the top N PSMs per spectrum",
+)
+@click.option(
+    "--out_path",
+    "-o",
+    type=PathType(),
+    required=True,
+    help=("The prefix counts will be saved here as a JSON."),
+)
+def cli_get_prefix_counts_by_length(
+    comet_results_dir: Path,
+    out_path: Path,
+    q_value_threshold: Optional[float] = None,
+    top_n_psms: Optional[int] = None,
+):
+    psms = load_comet_psms(
+        comet_results_dir=comet_results_dir,
+        q_value_threshold=q_value_threshold,
+        top_n_psms=top_n_psms,
     )
-    for prot in most_common_proteins:
-        print(prot)
-
-    if output is not None:
-        with open(output, "w") as f:
-            for prot in most_common_proteins:
-                f.write(f"{prot}\n")
-        logger.info(f"Most common proteins saved to {output}")
+    prefix_counts_by_length = get_prefix_counts_by_length(
+        seqs=[psm.seq for psm in psms]
+    )
+    to_json(data=prefix_counts_by_length, out_path=out_path)
 
 
-@click.group()
+@click.group(
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200}
+)
 def cli():
     pass
 
 
 if __name__ == "__main__":
-    cli.add_command(get_most_common_proteins_cli)
-    cli.add_command(plot_protein_counts)
+    setup_logger()
+    cli.add_command(cli_get_and_plot_most_common_proteins)
+    cli.add_command(cli_get_prefix_counts_by_length)
     cli()
+    # cli_get_and_plot_most_common_proteins()

@@ -1,8 +1,10 @@
 import gzip
 import hashlib
+import json
 import logging
 import os
 import pickle
+import platform
 import re
 import shlex
 import shutil
@@ -14,11 +16,37 @@ from functools import wraps
 from itertools import chain
 from pathlib import Path
 from time import time
-from typing import Any, Callable, List, Literal, Optional, Union
+from typing import Annotated, Any, Callable, Dict, List, Literal, Optional, Union
 
 import pandas as pd
+from pydantic import BeforeValidator
+from scipy.stats import percentileofscore
+
+from src.constants import COMET_DIR
+
+MAC_OS = "macos"
+LINUX_OS = "linux"
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CmdResult:
+    stdout: Optional[str] = None
+    stderr: Optional[str] = None
+    code: Optional[int] = None
+
+
+@dataclass
+class Position:
+    inclusive_start: int
+    exclusive_end: int
+
+
+@dataclass
+class Kmer:
+    seq: str
+    position: Position
 
 
 def remove_gene_name(protein_name: str) -> str:
@@ -48,22 +76,12 @@ def make_directory(dir_path: str, overwrite: bool = False) -> None:
         os.makedirs(dir_path)  # Create the directory if it does not exist
 
 
-def to_path(path: Union[str, Path]):
-    return Path(path)
+def to_path(path: Union[str, Path], check_exists: bool = False) -> Path:
+    path = Path(path).absolute()
+    if check_exists:
+        assert path.exists(), f"The given path {path} does NOT exist!"
 
-
-@dataclass
-class Position:
-    inclusive_start: int
-    exclusive_end: int
-
-
-@dataclass
-class Kmer:
-    seq: str
-    position: Position
-
-    # def as_product_ion(self, charge: int, ion_type: IonTypes, )
+    return path
 
 
 def generate_aa_kmers(aa_seq: str, max_k: int, min_k: Optional[int] = 1) -> List[Kmer]:
@@ -211,23 +229,22 @@ def file_hash(filepath: Path, algorithm="sha256") -> str:
     return hash_func.hexdigest()
 
 
-def log_time(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        start = time()
-        result = func(*args, **kwargs)
-        duration = time() - start
-        logging.info(f"{func.__name__} took {get_time_in_diff_units(duration)}")
-        return result
+def log_time(level=logging.INFO):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            start = time()
+            result = func(*args, **kwargs)
+            duration = time() - start
+            # logging.debug(f"{func.__name__} took {get_time_in_diff_units(duration)}")
+            logging.log(
+                level, f"{func.__name__} took {get_time_in_diff_units(duration)}"
+            )
+            return result
 
-    return wrapper
+        return wrapper
 
-
-@dataclass
-class CmdResult:
-    stdout: Optional[str] = None
-    stderr: Optional[str] = None
-    code: Optional[int] = None
+    return decorator
 
 
 def run_command_line_cmd(cmd: str):
@@ -238,7 +255,7 @@ def run_command_line_cmd(cmd: str):
 
 # function that takes in a list of any one kind dataclass and spits out a dataframe with one row per dataclass list element.
 # Optionally take a list of the dataclass's fields/attributes to include in the dataframe.
-def dataclass_list_to_dataframe(
+def dataclass_list_to_df(
     dataclass_list: List[Any], fields: Optional[List[str]] = None
 ) -> pd.DataFrame:
     """
@@ -274,3 +291,77 @@ def is_pickleable(obj: Any) -> bool:
     except Exception as e:
         print(f"Not pickleable: {e}")
         return False
+
+
+def get_max_elements(objs: List[Any], attr: str):
+    if not objs:
+        return []
+    max_val = max(getattr(obj, attr) for obj in objs)
+    return list(filter(lambda obj: getattr(obj, attr) == max_val, objs))
+
+
+def get_fcn_of_objects(objs: List[Any], attr: str, fcn: Callable):
+    return fcn([getattr(obj, attr) for obj in objs])
+
+
+def get_arg_fcn_of_objects(objs: List[Any], attr: str, fcn: Callable):
+    val = get_fcn_of_objects(objs=objs, attr=attr, fcn=fcn)
+    return list(filter(lambda obj: getattr(obj, attr) == val, objs))
+
+
+def get_os():
+    os = platform.platform()
+    if "macOS" in os:
+        return MAC_OS
+    elif "Linux" in os:
+        return LINUX_OS
+    else:
+        raise RuntimeError(f"Unrecognized operating system: {os}")
+
+
+def get_percentile(value, values):
+    """
+    E.g., if this function returns 99, it means that 99% of the values in the list
+    are less than or equal to value.
+    """
+    return percentileofscore(values, value, kind="rank")
+
+
+def get_rank(values, query_val) -> int:
+    sorted_unique = sorted(set(values), reverse=True)
+    rank_map = {val: rank + 1 for rank, val in enumerate(sorted_unique)}
+    return int(rank_map.get(query_val, 0))
+
+
+def check_path_exists(path: Union[Path, str]):
+    if isinstance(path, str):
+        path = Path(path)
+    path = path.absolute()
+    if not path.exists():
+        raise ValueError(f"Path {path} does not exist")
+    return path
+
+
+ExistingPath = Annotated[Path, BeforeValidator(check_path_exists)]
+
+
+def get_default_comet_executable_path():
+    try:
+        os = get_os()
+        comet_path = COMET_DIR / f"comet.{os}.exe"
+        assert comet_path.exists()
+        return comet_path
+    except:
+        raise RuntimeError(
+            "Please provide the Comet executable path. Could NOT find it in the default locations"
+        )
+
+
+def to_json(data: Any, out_path: Union[str, Path]):
+    with open(out_path, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+def load_json(in_path: Union[str, Path]) -> Dict:
+    with open(in_path, "r") as f:
+        return json.load(f)

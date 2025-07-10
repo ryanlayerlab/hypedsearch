@@ -2,6 +2,7 @@
 #SBATCH --partition=short
 #SBATCH --job-name=form-all-hybrids   
 #SBATCH --mail-type=NONE
+#SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=2gb               

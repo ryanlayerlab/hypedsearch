@@ -4,20 +4,38 @@ import random
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 from time import time
 from typing import Dict, List, Optional, Set, Union
 
 import click
 from Bio import SeqIO
-from pydantic import (BaseModel, field_validator)
+from pydantic import BaseModel, field_validator
 
 from src.click_utils import PathType
-from src.constants import (AMINO_ACID_MASSES, B_ION_TYPE, DEFAULT_MAX_K,
-                           DEFAULT_MIN_K, PROTON_MASS, WATER_MASS,
-                           Y_ION_TYPE, IonTypes)
-from src.utils import (Kmer, generate_aa_kmers, get_time_in_diff_units,
-                       setup_logger)
+from src.constants import (
+    AMINO_ACID_MASSES,
+    B_ION_TYPE,
+    DEFAULT_MAX_KMER_LEN,
+    DEFAULT_MIN_KMER_LEN,
+    PROTON_MASS,
+    WATER_MASS,
+    Y_ION_TYPE,
+    IonTypes,
+)
+from src.utils import (
+    ExistingPath,
+    Kmer,
+    generate_aa_kmers,
+    get_time_in_diff_units,
+    log_params,
+    log_time,
+    make_directory,
+    pickle_and_compress,
+    run_in_parallel,
+    setup_logger,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +81,9 @@ class Peptide:
         return generate_aa_kmers(aa_seq=self.seq, min_k=min_k, max_k=max_k)
 
     def product_ions(
-        self, ion_types: List[IonTypes], charges: List[int]
+        self,
+        charges: List[int],
+        ion_types: List[IonTypes] = [IonTypes.B_ION_TYPE, IonTypes.Y_ION_TYPE],
     ) -> List[ProductIon]:
         return generate_product_ions(seq=self.seq, charges=charges, ion_types=ion_types)
 
@@ -179,15 +199,25 @@ def get_proteins_from_fasta(fasta_path: str) -> List[Peptide]:
 @dataclass
 class KmerToProteinIdMap:
     kmer_to_protein_id_map: Dict[str, List[int]]
-    min_k: int = DEFAULT_MIN_K
-    max_k: int = DEFAULT_MAX_K
+    min_k: int = DEFAULT_MIN_KMER_LEN
+    max_k: int = DEFAULT_MAX_KMER_LEN
+
+    @classmethod
+    def from_fasta(
+        cls,
+        fasta_path: str,
+        min_k: int = DEFAULT_MIN_KMER_LEN,
+        max_k: int = DEFAULT_MAX_KMER_LEN,
+    ):
+        proteins = Peptide.from_fasta(fasta_path=fasta_path)
+        return cls.from_peptides(peptides=proteins, min_k=min_k, max_k=max_k)
 
     @classmethod
     def from_peptides(
         cls,
         peptides: List[Peptide],
-        min_k: int = DEFAULT_MIN_K,
-        max_k: int = DEFAULT_MAX_K,
+        min_k: int = DEFAULT_MIN_KMER_LEN,
+        max_k: int = DEFAULT_MAX_KMER_LEN,
     ):
         kmer_to_protein_map = get_uniq_kmer_to_protein_map(
             proteins=peptides, min_k=min_k, max_k=max_k
@@ -195,10 +225,7 @@ class KmerToProteinIdMap:
         return cls(min_k=min_k, max_k=max_k, kmer_to_protein_id_map=kmer_to_protein_map)
 
     def save(self, path: Path):
-        with open(path, "wb") as f:
-            pickle.dump(
-                self.kmer_to_protein_id_map, f, protocol=pickle.HIGHEST_PROTOCOL
-            )
+        pickle_and_compress(obj=self.kmer_to_protein_id_map, path=path)
 
     @staticmethod
     def load(path: Path):
@@ -207,11 +234,19 @@ class KmerToProteinIdMap:
 
 
 class Fasta(BaseModel):
-    fasta_path: Path
+    fasta_path: ExistingPath
 
-    @field_validator("fasta_path", mode="before")
-    def str_to_path(cls, fasta_path: str) -> Path:
-        return Path(fasta_path).absolute()
+    @cached_property
+    def seqs(self):
+        """Get the sequences from the FASTA file."""
+        return [str(record.seq) for record in SeqIO.parse(self.fasta_path, "fasta")]
+
+    def contains_seq(self, query_seq: str) -> bool:
+        """Check if the query sequence exists in the FASTA file."""
+        for seq in self.seqs:
+            if query_seq in seq:
+                return True
+        return False
 
     @property
     def proteins(self) -> List[Peptide]:
@@ -252,56 +287,53 @@ def get_proteins_by_name(
     return proteins
 
 
-def get_unique_kmers(peptides: Union[List[Peptide], List[str]], k: int) -> Set[str]:
+def generate_b_ion_seqs(seq: str):
+    return [seq[:i] for i in range(1, len(seq) + 1)]  # Prefixes (b-ions)
+
+
+def generate_y_ion_seqs(seq: str):
+    return [seq[i:] for i in range(0, len(seq))]  # Suffixes (y-ions)
+
+
+def get_unique_kmers(
+    peptides: Union[List[Peptide], List[str], Path], min_k: int, max_k: int
+) -> Set[str]:
+    if isinstance(peptides, Path):
+        logger.info("Reading in FASTA file...")
+        peptides = Peptide.from_fasta(fasta_path=peptides)
+        logger.info("Done reading in FASTA file")
     uniq_kmers = set()
-    for peptide in peptides:
+    num_proteins = len(peptides)
+    logger.info(f"Number of proteins: {num_proteins}")
+    for p_idx, peptide in enumerate(peptides):
+        if p_idx % 100 == 0:
+            logger.info(f"Processing protein {p_idx+1} of {num_proteins}")
         if isinstance(peptide, str):
             peptide = Peptide(seq=peptide)
-        peptide_kmers = {kmer.seq for kmer in peptide.kmers(min_k=k, max_k=k)}
-        uniq_kmers.update(peptide_kmers)
+        uniq_kmers.update(
+            {kmer.seq for kmer in peptide.kmers(min_k=min_k, max_k=max_k)}
+        )
     return uniq_kmers
 
 
-def random_sample_of_unique_kmers(
-    k: int,
-    sample_size: int,
-    peptides: Optional[List[Peptide]] = None,
-    fasta_path: Optional[str] = None,
-) -> List[str]:
-    if fasta_path is not None:
-        peptides = Peptide.from_fasta(fasta_path=fasta_path)
-
-    uniq_kmers = get_unique_kmers(peptides=peptides, k=k)
-    if len(uniq_kmers) < sample_size:
-        raise RuntimeError(
-            f"The number of unique kmers, {len(uniq_kmers)}, must be >= than the sample size, {sample_size}"
-        )
-
-    return random.sample(sorted(uniq_kmers), k=sample_size)
-
-
 # Don't use @log_params because 'proteins' can be a list of many, many peptides
+@log_time(level=logging.DEBUG)
 def get_uniq_kmer_to_protein_map(
     proteins: List[Peptide],
-    min_k: int = DEFAULT_MIN_K,
-    max_k: int = DEFAULT_MAX_K,
+    min_k: int = DEFAULT_MIN_KMER_LEN,
+    max_k: int = DEFAULT_MAX_KMER_LEN,
+    protein_attr: str = "id",
+    verbose: bool = True,
 ) -> Dict[str, List[int]]:
     """ """
-    fcn_start_time = time()
     uniq_kmer_to_protein_map = defaultdict(list)
     num_proteins = len(proteins)
     for p_idx, protein in enumerate(proteins):
-        if p_idx % 10 == 0:
+        if verbose and (p_idx % 10 == 0):
             logger.info(f"Processing protein {p_idx+1} of {num_proteins}")
-        prot_start_time = time()
         uniq_kmers = set(kmer.seq for kmer in protein.kmers(min_k=min_k, max_k=max_k))
         for kmer in uniq_kmers:
-            uniq_kmer_to_protein_map[kmer].append(protein.id)
-        # logger.info(f"\t took {round(time()-prot_start_time, 2)} seconds")
-    total_time = time() - fcn_start_time
-    logger.info(
-        f"Creating the unique kmers-to-protein map took {get_time_in_diff_units(time_sec=total_time)}"
-    )
+            uniq_kmer_to_protein_map[kmer].append(getattr(protein, protein_attr))
     logger.info(f"Number of unique kmers {len(uniq_kmer_to_protein_map)}")
     return uniq_kmer_to_protein_map
 
@@ -322,34 +354,34 @@ def create_kmer_to_protein_id_map(
         proteins = get_proteins_by_name(proteins=proteins, protein_names=protein_names)
 
     # Create kmer-to-protein-id map
-    k_to_p_map = KmerToProteinIdMap.from_peptides(
-        peptides=proteins, min_k=min_k, max_k=max_k
+    kmer_to_protein_map = get_uniq_kmer_to_protein_map(
+        proteins=proteins, min_k=min_k, max_k=max_k
     )
 
     # Return map if you don't want to save it
     if output_path is None:
-        return k_to_p_map
+        return kmer_to_protein_map
 
     # Save map
     if output_path.is_dir():
         if protein_names is not None:
             output_path = (
                 output_path
-                / f"{fasta_path.stem}.{protein_names.stem}.kmer_to_protein_map.pkl"
+                / f"{fasta_path.stem}.{protein_names.stem}.kmer_to_protein_map.pklz"
             )
         else:
-            output_path = output_path / f"{fasta_path.stem}.kmer_to_protein_map.pkl"
-
-    k_to_p_map.save(path=output_path)
+            output_path = output_path / f"{fasta_path.stem}.kmer_to_protein_map.pklz"
+    pickle_and_compress(obj=kmer_to_protein_map, file_path=output_path)
 
     logger.info(
         f"Done creating kmer-to-protein-id map. It took {get_time_in_diff_units(time() - start_time)}"
     )
-    return k_to_p_map
+    return kmer_to_protein_map
 
 
 @click.command(
     name="create-kmer-to-protein-id-map",
+    help="Create a kmer-to-protein-id map from a FASTA file",
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
 )
 @click.option(
@@ -375,7 +407,7 @@ def create_kmer_to_protein_id_map(
     "--min_k",
     "-mk",
     type=int,
-    default=DEFAULT_MIN_K,
+    default=DEFAULT_MIN_KMER_LEN,
     show_default=True,
     help="Minimum kmer length to consider.",
 )
@@ -383,7 +415,7 @@ def create_kmer_to_protein_id_map(
     "--max_k",
     "-Mk",
     type=int,
-    default=DEFAULT_MAX_K,
+    default=DEFAULT_MAX_KMER_LEN,
     show_default=True,
     help="Maximum kmer length to consider.",
 )
@@ -413,6 +445,152 @@ def cli_create_kmer_to_protein_id_map(
     )
 
 
+@click.command(
+    name="get-uniq-kmers",
+    help="Get all unique kmers from a FASTA file. Resulting set object will be pickled and compresses",
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+)
+@click.option(
+    "--fasta_path",
+    "-f",
+    type=PathType(),
+    required=True,
+    help="Path to the FASTA file.",
+)
+@click.option(
+    "--output_path",
+    "-o",
+    type=PathType(),
+    required=True,
+    help=(
+        "Where to save the kmer-to-protein-id map. "
+        "If a directory is provided, the map will be saved as "
+        "<FASTA file stem>.<protein_names stem if provided>.kmer_to_protein_map.pkl. "
+        "If a path to a .pkl file is provided, the map will be saved to that path."
+    ),
+)
+@click.option(
+    "--min_k",
+    "-mk",
+    type=int,
+    default=DEFAULT_MIN_KMER_LEN,
+    show_default=True,
+    help="Minimum kmer length to consider.",
+)
+@click.option(
+    "--max_k",
+    "-Mk",
+    type=int,
+    default=DEFAULT_MAX_KMER_LEN,
+    show_default=True,
+    help="Maximum kmer length to consider.",
+)
+@log_time(level=logging.DEBUG)
+@log_params
+def cli_get_uniq_kmers(
+    fasta_path: Path,
+    min_k: int,
+    max_k: int,
+    output_path: Path,
+):
+    """
+    Get all unique kmers from a FASTA file. Resulting set object will be pickled and compresses
+    """
+    logger.info("Getting unique kmers...")
+    uniq_kmers = get_unique_kmers(peptides=fasta_path, min_k=min_k, max_k=max_k)
+    logger.info(f"Number of unique kmers: {len(uniq_kmers)}")
+
+    logger.info("Pickling and compressing unique kmers...")
+    if output_path.is_dir():
+        output_path = output_path / f"{fasta_path.stem}.uniq_kmers.pklz"
+    pickle_and_compress(obj=uniq_kmers, file_path=output_path)
+
+
+def get_kmer_counts_by_protein(
+    fasta: Path,
+    k: int,
+) -> Dict:
+    peptides = Peptide.from_fasta(fasta_path=fasta)
+    kmer_to_prot_to_count_map = defaultdict(lambda: defaultdict(int))
+    num_prots = len(peptides)
+    for idx, peptide in enumerate(peptides):
+        logger.debug(f"Processing protein {idx+1} of {num_prots}")
+        kmers = peptide.kmers(min_k=k, max_k=k)
+        num_kmers = len(kmers)
+        logger.debug(f"Number of kmers: {num_kmers}")
+        for kmer in kmers:
+            kmer_to_prot_to_count_map[kmer.seq][peptide.name] += 1
+
+    return dict(kmer_to_prot_to_count_map)
+
+
+@click.command(
+    name="get-kmer-info",
+    help=(
+        "Given a FASTA and a k, get the number of times each unique k-mer appears in each protein."
+    ),
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+)
+@click.option(
+    "--fasta",
+    "-f",
+    type=PathType(),
+    required=True,
+    help="Path to the FASTA file.",
+)
+@click.option(
+    "--k",
+    "-k",
+    type=int,
+    required=True,
+    help="The k-mer length, k",
+)
+@click.option(
+    "--out_path",
+    "-o",
+    type=PathType(),
+    required=True,
+    help=("The results will be saved in this location"),
+)
+@click.option(
+    "--overwrite",
+    "-ow",
+    is_flag=True,
+    help="If outputs already exist, this controls whether or not to overwrite them.",
+)
+@log_time(level=logging.DEBUG)
+@log_params
+def cli_get_kmer_counts_by_protein(
+    fasta: Path,
+    k: int,
+    out_path: Path,
+    overwrite: bool,
+):
+    # out_dir = out_dir / f"{fasta.stem}"
+    # make_directory(out_dir)
+    # k_map = {}
+    if out_path.exists() and not overwrite:
+        logger.info(f"File {out_path} already exists. Skipping...")
+        return
+    loop_start_time = time()
+    logger.info(f"Processing k={k}")
+    # k_map[k]
+    k_map = get_kmer_counts_by_protein(
+        fasta=fasta,
+        k=k,
+    )
+    pickle_and_compress(obj=k_map, file_path=out_path)
+    loop_duration = time() - loop_start_time
+    logger.info(f"Processed k={k} in {get_time_in_diff_units(loop_duration)}")
+
+
+@click.group(context_settings=dict(help_option_names=["-h", "--help"]))
+def cli():
+    pass
+
+
 if __name__ == "__main__":
-    setup_logger()
-    cli_create_kmer_to_protein_id_map()
+    logger = setup_logger()
+    cli.add_command(cli_create_kmer_to_protein_id_map)
+    cli.add_command(cli_get_uniq_kmers)
+    cli.add_command(cli_get_kmer_counts_by_protein)

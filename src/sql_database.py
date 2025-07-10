@@ -4,8 +4,7 @@ import time
 from dataclasses import Field, asdict, dataclass, field, fields
 from enum import Enum
 from pathlib import Path
-from typing import (Any, Dict, Generic, List, Optional, TypeVar, get_args)
-
+from typing import Any, Dict, Generic, List, Optional, TypeVar, get_args
 
 from src.constants import MEMORY
 from src.utils import log_time
@@ -113,14 +112,14 @@ class Sqlite3Database:
         if self.db_path != MEMORY:
             self.db_path = Path(db_path).absolute()
             if self.db_path.exists():
-                logger.info(f"The database already exists at {self.db_path}.")
+                logger.debug(f"The database already exists at {self.db_path}.")
                 if overwrite:
-                    logger.info(
+                    logger.debug(
                         "'overwrite' is True so deleting the existing databse and starting anew."
                     )
                     self.db_path.unlink()
                 else:
-                    logger.info(
+                    logger.debug(
                         "'overwrite' is False so connecting to the existing one."
                     )
         self.connection = sqlite3.connect(self.db_path)
@@ -159,9 +158,8 @@ class Sqlite3Database:
         query = f"SELECT COUNT(*) FROM {table_name}"
         return self.read_query(query=query)
 
-    @log_time
+    @log_time(level=logging.DEBUG)
     def add_index(self, table_name: str, index_name: str, colms_to_index: List[str]):
-        start_time = time.time()
         colms = ", ".join(colms_to_index)
         query = f"CREATE INDEX {index_name} ON {table_name}({colms})"
         self.execute_query(query=query)
@@ -175,7 +173,7 @@ class Sqlite3Database:
         self.execute_query(query=query)
         # logger.info(f"Created table {table_name}")
 
-    @log_time
+    @log_time(level=logging.DEBUG)
     def insert_dataclasses(
         self, table_name: str, data_classes: List[SqlTableRow]
     ) -> None:
@@ -187,17 +185,3 @@ class Sqlite3Database:
             f"INSERT INTO {table_name} VALUES({colm_str})", dataclasses_as_dicts
         )
         self.connection.commit()
-
-
-def get_dataclass_fields_as_sql_columns():
-    pass
-
-
-def column_string_for_create_table_query_from_dataclass():
-    pass
-
-
-def add_data_classes_to_table(
-    dataclasses: List[Any], table_name: str, db: Sqlite3Database
-) -> None:
-    pass

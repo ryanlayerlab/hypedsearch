@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -10,11 +11,11 @@ from src.peptides_and_ions import (
     ProductIon,
     YIonCreator,
     generate_product_ions,
+    get_kmer_counts_by_protein,
     get_proteins_by_name,
     get_proteins_from_fasta,
     get_uniq_kmer_to_protein_map,
     get_unique_kmers,
-    random_sample_of_unique_kmers,
     write_fasta,
 )
 from tests.fixtures_and_helpers import (
@@ -198,66 +199,22 @@ class Test_generate_product_ions:
             assert product_ions == expected
 
 
-class TestRandomSampleOfUniqueKmers:
-    @staticmethod
-    def test_one_peptide():
-        p_seq = "ACDE"
-        peptides = [Peptide(seq=p_seq)]
-        k, sample_size = 2, 3
-        kmers = random_sample_of_unique_kmers(
-            peptides=peptides, k=k, sample_size=sample_size
-        )
-        assert len(kmers) == sample_size
-        assert all([kmer in p_seq for kmer in kmers])
-
-    @staticmethod
-    def test_two_peptide():
-        p1_seq = "ACDEDE"
-        p2_seq = "LMAC"
-        peptides = [Peptide(seq=p1_seq), Peptide(seq=p2_seq)]
-        k, sample_size = 2, 5
-        kmers = random_sample_of_unique_kmers(
-            peptides=peptides, k=k, sample_size=sample_size
-        )
-        assert len(kmers) == sample_size
-        assert all([((kmer in p1_seq) or (kmer in p2_seq)) for kmer in kmers])
-
-    @staticmethod
-    def test_raise_error():
-        p1_seq = "ACDEDE"
-        p2_seq = "LMAC"
-        peptides = [Peptide(seq=p1_seq), Peptide(seq=p2_seq)]
-        k, sample_size = 2, 20
-        with pytest.raises(RuntimeError, match="number of unique kmers"):
-            random_sample_of_unique_kmers(
-                peptides=peptides, k=k, sample_size=sample_size
-            )
-
-    @staticmethod
-    def test_via_fasta(tmp_path):
-        p1_seq = "ACDEDE"
-        p2_seq = "LMAC"
-        file_name = "test.fasta"
-        create_fasta(seqs=[p1_seq, p2_seq], folder=tmp_path, file_name=file_name)
-        k, sample_size = 2, 4
-        kmers = random_sample_of_unique_kmers(
-            fasta_path=tmp_path / file_name, k=k, sample_size=sample_size
-        )
-        assert len(kmers) == sample_size
-        assert all([((kmer in p1_seq) or (kmer in p2_seq)) for kmer in kmers])
-
-
 class Test_get_unique_kmers:
     @staticmethod
-    def test_smoke():
+    def test_from_list_of_peptides():
         p1_seq = "ACDEDE"
         p2_seq = "LMAC"
         peptides = [Peptide(seq=p1_seq), Peptide(seq=p2_seq)]
         k = 2
         expected_kmers = {"AC", "CD", "DE", "ED", "LM", "MA"}
-        actual_kmers = get_unique_kmers(peptides=peptides, k=k)
+        actual_kmers = get_unique_kmers(peptides=peptides, min_k=k, max_k=k)
 
         assert actual_kmers == expected_kmers
+
+    @staticmethod
+    def test_from_fasta():
+        peptides = Path("fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta").absolute()
+        actual_kmers = get_unique_kmers(peptides=peptides, min_k=1, max_k=25)
 
 
 class Test_get_uniq_kmer_to_protein_map:
@@ -358,3 +315,11 @@ class Test_KmerToProteinIdMap:
             # Assert
             assert path.exists()
             assert seq_to_prot_map == KmerToProteinIdMap.load(path=path)
+
+
+class Test_get_kmer_counts_by_protein:
+    @staticmethod
+    def test_smoke():
+        fasta = "tests/data/test.fasta"
+        map = get_kmer_counts_by_protein(fasta=fasta, k=10)
+        pass

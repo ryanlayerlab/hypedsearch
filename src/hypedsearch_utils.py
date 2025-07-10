@@ -1,19 +1,22 @@
+import logging
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Union
 
-import pandas as pd
-
-from src.comet_utils import read_comet_txt_to_df
-from src.constants import HS_OUTPUT_PREFIX, HybridFormingMethods
+from src.constants import HS_PREFIX
 from src.peptides_and_ions import (
+    Fasta,
     Peptide,
     compute_peptide_mz,
+    get_proteins_by_name,
     get_uniq_kmer_to_protein_map,
     write_fasta,
 )
 from src.sql_database import SqlTableRow
 from src.utils import log_time
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -21,9 +24,16 @@ class HybridPeptide:
     b_seq: str
     y_seq: str
     b_prot_ids: Set[int] = field(default_factory=set)
-    b_prot_names: Set[str] = field(default_factory=set)
     y_prot_ids: Set[int] = field(default_factory=set)
-    y_prot_names: Set[str] = field(default_factory=set)
+    b_prot_names: Optional[Set[str]] = None
+    y_prot_names: Optional[Set[str]] = None
+    fasta_description: Optional[str] = field(init=False, default=None)
+    scan: Optional[int] = None
+    sample: Optional[str] = None
+
+    def __post_init__(self):
+        if (self.b_prot_names is not None) and (self.y_prot_names is not None):
+            self.fasta_description = f"b-prots:{','.join(self.b_prot_names)} y-prots:{','.join(self.y_prot_names)}"
 
     @property
     def seq(self):
@@ -35,7 +45,34 @@ class HybridPeptide:
 
     @property
     def fasta_name(self):
-        return f"hybrid_{self.b_seq}-{self.y_seq}"
+        return f"{HS_PREFIX}{self.b_seq}-{self.y_seq}"
+
+    @classmethod
+    def from_name(cls, name: str):
+        b_seq, y_seq = cls.parse_name_to_b_and_y_seqs(name=name)
+        return cls(
+            b_seq=b_seq,
+            y_seq=y_seq,
+        )
+
+    @staticmethod
+    def parse_name_to_b_and_y_seqs(name: str):
+        """
+        Parse the name of a hybrid peptide to extract the b and y sequences.
+        Depends on how .fasta_name works
+        """
+        if name.startswith(HS_PREFIX):
+            name = name[len(HS_PREFIX) :]
+        # For back compatibility
+        elif name.startswith("hybrid_"):
+            name = name[len("hybrid_") :]
+        else:
+            raise ValueError(
+                f"Invalid hybrid peptide name: {name}. Expected prefix '{HS_PREFIX}' or 'hybrid_'."
+            )
+
+        b_seq, y_seq = name.split("-")
+        return b_seq, y_seq
 
     def set_protein_names(self, prot_id_to_name_map: Dict[int, str]):
         self.b_prot_names = set(
@@ -47,7 +84,7 @@ class HybridPeptide:
 
     def set_fasta_info(
         self,
-        prot_id_to_name_map: Dict[int, str],
+        prot_id_to_name_map: Optional[Dict[int, str]],
     ):
         self.set_protein_names(prot_id_to_name_map=prot_id_to_name_map)
         self.fasta_description = f"b-prots:{','.join(self.b_prot_names)} y-prots:{','.join(self.y_prot_names)}"
@@ -55,28 +92,36 @@ class HybridPeptide:
     def mz(self, charge: int):
         return compute_peptide_mz(aa_seq=self.b_seq + self.y_seq, charge=charge)
 
+    def to_dict(self):
+        return {
+            "b_seq": self.b_seq,
+            "y_seq": self.y_seq,
+            "b_prot_ids": list(self.b_prot_ids),
+            "y_prot_ids": list(self.y_prot_ids),
+            "b_prot_names": list(self.b_prot_names) if self.b_prot_names else None,
+            "y_prot_names": list(self.y_prot_names) if self.y_prot_names else None,
+        }
+
+    # @classmethod
+    # def from_dict(cls, data)
+
 
 @dataclass
-class HSOutput:
-    hybrids: List[HybridPeptide]
-    comet_txt: Optional[Path]
-    run_time: Optional[float] = None
+class SeqWithMass(SqlTableRow):
+    seq: str
+    mz: float
+
+    @classmethod
+    def from_seq(cls, seq: str, charge: int):
+        mz = compute_peptide_mz(aa_seq=seq, charge=charge)
+        return cls(seq=seq, mz=mz)
 
 
 def hypedsearch_output_stem(mzml_stem: str):
-    return f"{HS_OUTPUT_PREFIX}{mzml_stem}"
+    return f"{HS_PREFIX}{mzml_stem}"
 
 
-def determe_hybrid_forming_method(
-    protein_names: Optional[Path],
-) -> HybridFormingMethods:
-    if protein_names is not None:
-        return HybridFormingMethods.all
-    else:
-        raise RuntimeError("Unrecognized hybrid forming method!")
-
-
-@log_time
+@log_time(level=logging.DEBUG)
 def remove_native_hybrids(
     proteins: List[Peptide],
     hybrids: List[HybridPeptide],
@@ -95,58 +140,77 @@ def remove_native_hybrids(
 def parse_hs_result_file_name(file_name: str):
     hs_stem, scan, ext = file_name.split(".")
     scan_num = int(scan.split("-")[0])
-    mzml_stem = hs_stem[len(HS_OUTPUT_PREFIX) :]
+    mzml_stem = hs_stem[len(HS_PREFIX) :]
     return mzml_stem, scan_num
 
 
-def get_all_hybrid_run_psms_drom_dir(folder: Path):
-    run_result_txts = list(folder.glob(f"{HS_OUTPUT_PREFIX}*"))
-    comet_psms = []
-    for comet_txt in run_result_txts:
-        # sample, _ = parse_hs_result_file_name(file_name=comet_txt.name)
-        comet_psms.append(read_comet_txt_to_df(txt_path=comet_txt))
-    comet_psms = pd.concat(comet_psms, ignore_index=True)
-    return comet_psms
+def hybrid_fasta_name(hybrid_seq: str) -> str:
+    return f"{HS_PREFIX}{hybrid_seq}"
 
 
 def create_hybrids_fasta(
-    hybrids: List[HybridPeptide],
-    fasta_path: Path,
-    other_prots: Optional[Union[List[Peptide], Path]] = None,
+    hybrid_seqs: List[str],
+    new_fasta_path: Path,
+    old_fasta: Optional[Path] = None,
+    protein_names: Optional[Union[List[str], Path]] = None,
 ) -> List[Peptide]:
     """
-    Writes a list of hybrids (hybrids) write to a FASTA file (fasta_path).
-    You can optionally include other proteins in the FASTA file with the hybrids.
-    You can include other proteins via other_prots in three different ways: if other_prots
-     is a
-        1) list - you passed a list of Peptide objects
-        2) None - there are no other proteins/peptides you want in the FASTA file; just the hybrids
-        3) Path - you passed a FASTA file; all proteins in the FASTA file will be included
-         with the hybrids
+    Writes a list of hybrids (hybrids) to a FASTA file (new_fasta_path).
+    If old_fasta is provided, it will also include the proteins from the old FASTA.
+    If protein_names is provided, it will only include those proteins from the old FASTA.
     """
     prots = []
-    if other_prots is not None:
-        if isinstance(other_prots, list):
-            prots = other_prots
-        elif isinstance(other_prots, Path):
-            prots = Peptide.from_fasta(fasta_path=other_prots)
-    for idx, hybrid in enumerate(hybrids):
+    if old_fasta is not None:
+        if protein_names is not None:
+            # Get specific proteins from FASTA by name
+            prots = get_proteins_by_name(
+                protein_names=protein_names, fasta_path=old_fasta
+            )
+        else:
+            # Get all the proteins in the FASTA
+            prots = Peptide.from_fasta(fasta_path=old_fasta)
+
+    for _, hybrid_seq in enumerate(hybrid_seqs):
         new_peptide = Peptide(
-            seq=hybrid.seq, name=hybrid.fasta_name, desc=hybrid.fasta_description
+            seq=hybrid_seq,
+            name=hybrid_fasta_name(hybrid_seq=hybrid_seq),
         )
 
         prots.append(new_peptide)
 
-    write_fasta(peptides=prots, output_path=fasta_path)
+    write_fasta(peptides=prots, output_path=new_fasta_path)
     return prots
 
 
-@dataclass
-class SeqWithMass(SqlTableRow):
-    seq: str
-    mz: float
+@log_time(level=logging.DEBUG)
+def postprocess_hybrids(
+    hybrids: List[HybridPeptide],
+    fasta_path: Path,
+    prot_id_to_name_map: Dict[int, str],
+    remove_native: bool = True,
+) -> Dict[str, List[HybridPeptide]]:
+    """
+    Remove hybrids that are native sequences (i.e., they are in the FASTA)
+    and group hybrids by their sequence (e.g., group A-BC with AB-C)
+    """
+    logger.debug(
+        f"Postprocessing hybrids... Initially there are {len(hybrids)} hybrids"
+    )
+    fasta = Fasta(fasta_path=fasta_path)
 
-    @classmethod
-    def from_seq(cls, seq: str, charge: int):
-        mz = compute_peptide_mz(aa_seq=seq, charge=charge)
-        return cls(seq=seq, mz=mz)
+    seq_to_hybrid_peptides = defaultdict(list)
+    for hybrid in hybrids:
+        hybrid.set_protein_names(prot_id_to_name_map=prot_id_to_name_map)
+        seq_to_hybrid_peptides[hybrid.seq].append(hybrid)
+
+    # Remove hybrids that are native sequences
+    if remove_native:
+        seq_to_hybrid_peptides = {
+            seq: hybrids
+            for seq, hybrids in seq_to_hybrid_peptides.items()
+            if not fasta.contains_seq(query_seq=seq)
+        }
+    logger.debug(
+        f"Finished postprocessing hybrids. There are {len(seq_to_hybrid_peptides)} hybrid sequences remaining"
+    )
+    return seq_to_hybrid_peptides

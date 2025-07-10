@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Crux FAQs</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="stylesheet" type="text/css" href="styles.css">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-V7XKGGFPYX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-V7XKGGFPYX');
+</script>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+<script type="text/javascript">
+	// Main Menu
+	$( document ).ready(function() {
+			var pull 		= $('.btn');
+				menu 		= $('nav ul');
+				menuHeight	= menu.height();
+
+			$(pull).on('click', function(e) {
+				e.preventDefault();
+				menu.slideToggle();
+			});
+
+			$(window).resize(function(){
+	    		var w = $(window).width();
+	    		if(w > 320 && menu.is(':hidden')) {
+	    			menu.removeAttr('style');
+	    		} 
+			});
+	});
+</script>
+</head>
+<body>
+  <div class="page-wrap">
+     <nav>
+      <div class="btn">
+        </div>
+        <img src="images/crux-logo.png" id="logo"></a>
+      <ul id="navitems">
+          <li><a href="index.html">Home</a></li>
+          <li><a href="download.html">Download</a></li>
+          <li><a href="fileformats.html">File Formats</a></li>
+            <li><a href="http://groups.google.com/group/crux-users">Contact</a></li> <!--Link to google support board-->
+        </ul>
+    </nav>
+    <div id="content">
+    <!-- START CONTENT -->
+    <h2>Crux Frequently Asked Questions</h2>
+
+    <ol>
+
+    <li>
+    <b>What is the difference between Tide and Comet?</b></li>
+
+    <p>
+    The differences are as follows:
+    <ul>
+    <li>
+    Tide converts your FASTA file to an index (either as part
+    of <code>tide-search</code> or by using <code>tide-index</code>),
+    whereas Comet does searching directly from the FASTA file.  The
+    indexing step allows Tide to pre-compute many parts of the search
+    procedure, thereby making the search faster.
+    <li>
+    For each match, Comet reports the <i>total</i> number of candidate
+    peptides, whereas Tide reports the number of <i>distinct</i> candidate
+    peptides.</li>
+    <li>
+    Comet provides an option to report an E-value in addition to the raw
+    XCorr score, whereas Tide provides options to report a variety of
+    different types of scores.  The methods for computing Tide's
+    various scores are described in the documentation
+    for <code>tide-index</code>.</li>
+    <li>
+    Some options are available only in Comet (various options related to
+    different types of theoretical fragment ions, max_fragment_charge,
+    nucleotide_reading_frame, etc.) whereas others are only available in
+    Tide (e.g., keep-terminal-aminos).</li>
+    </ul></p>
+
+    <p>
+    Overall, for a given set of spectra, the XCorr scores computed by
+    Comet and by Tide should be quite similar to one another, assuming
+    that the various search parameters are set similarly between the two
+    algorithms.  Below is a table summarizing the correspondence between
+    the two sets of parameters.  The specified values will yield nearly
+    identical XCorr scores from the two search engines.</p>
+
+    <table border="1">
+    <tr>
+    <td>
+    <b>Tide parameter</b></td>
+    <td>
+    <b>Tide value</b></td>
+    <td>
+    <b>Comet parameter</b></td>
+    <td>
+    <b>Comet value</b></td>
+    </tr>
+
+    <tr>
+    <td>
+    enzyme</td>
+    <td>
+    trypsin</td>
+    <td>
+    search_enzyme_number</td>
+    <td>
+    1</td>
+    </tr>
+
+    <tr>
+    <td>
+    digestion</td>
+    <td>
+    full-digest</td>
+    <td>
+    num_enzyme_termini</td>
+    <td>
+    2</td>
+    </tr>
+
+    <tr>
+    <td>
+    missed-cleavages</td>
+    <td>
+    0</td>
+    <td>
+    allowed_missed_cleavage</td>
+    <td>
+    0</td>
+    </tr>
+
+    <tr>
+    <td>
+    min-peaks</td>
+    <td>
+    10</td>
+    <td>
+    minimum_peaks</td>
+    <td>
+    10</td>
+    </tr>
+
+    <tr>
+    <td>
+    precursor-window</td>
+    <td>
+    3</td>
+    <td>
+    peptide_mass_tolerance</td>
+    <td>
+    3</td>
+    </tr>
+
+    <tr>
+    <td>
+    precursor-window-type</td>
+    <td>
+    mass</td>
+    <td>
+    peptide_mass_units</td>
+    <td>
+    0</td>
+    </tr>
+
+    <tr>
+    <td>
+    fragment-mass</td>
+    <td>
+    mono</td>
+    <td>
+    mass_type_fragment</td>
+    <td>
+    1</td>
+    </tr>
+
+    <tr>
+    <td>
+    decoy-format</td>
+    <td>
+    peptide-reverse</td>
+    <td>
+    N/A</td>
+    <td>
+    &nbsp;</td>
+    </tr>
+
+    <tr>
+    <td>
+    keep-terminal-aminos</td>
+    <td>
+    C</td>
+    <td>
+    N/A</td>
+    <td>
+    &nbsp;</td>
+    </tr>
+
+    <tr>
+    <td>
+    concat</td>
+    <td>
+    T</td>
+    <td>
+    decoy_search</td>
+    <td>
+    1</td>
+    </tr>
+
+    <tr>
+    <td>
+    top-match</td>
+    <td>
+    5</td>
+    <td>
+    num_results, num_output_lines</td>
+    <td>
+    6, 5</td>
+    </tr>
+
+    <tr>
+    <td>
+    remove-precursor-peak</td>
+    <td>
+    T</td>
+    <td>
+    remove_precursor_peak</td>
+    <td>
+    1</td>
+    </tr>
+
+    <tr>
+    <td>
+    remove-precursor-tolerance</td>
+    <td>
+    15</td>
+    <td>
+    remove_precursor_tolerance</td>
+    <td>
+    15</td>
+    </tr>
+
+    <tr>
+    <td>
+    use-flanking-peaks</td>
+    <td>
+    F</td>
+    <td>
+    theoretical_fragment_ions</td>
+    <td>
+    1</td>
+    </tr>
+
+    <tr>
+    <td>
+    use-neutral-loss-peaks</td>
+    <td>
+    F</td>
+    <td>
+    use_NL_ions</td>
+    <td>
+    F</td>
+    </tr>
+
+    <tr>
+    <td>
+    mz-bin-width</td>
+    <td>
+    1.0005079</td>
+    <td>
+    fragment_bin_tol</td>
+    <td>
+    1.0005079</td>
+    </tr>
+
+    <tr>
+    <td>
+    mz-bin-offset</td>
+    <td>
+    0.4</td>
+    <td>
+    fragment_bin_offset</td>
+    <td>
+    0.4</td>
+    </tr>
+
+    <tr>
+    <td>
+    min-mass, max-mass</td>
+    <td>
+    200, 7200</td>
+    <td>
+    digest_mass_range</td>
+    <td>
+    200 7200</td>
+    </tr>
+
+    <tr>
+    <td>
+    N/A</td>
+    <td>
+    &nbsp;</td>
+    <td>
+    max_fragment_charge</td>
+    <td>
+    2</td>
+    </tr>
+
+    </table>
+
+    <p>
+    Here is a scatter plot of XCorr scores from a search run with the
+    parameters listed above:</p>
+
+    <img src="images/stored-xcorr.png">
+
+
+    <li>
+    <b>What operating systems does Crux work with?</b></li>
+
+    <p>
+    Crux is written in C++, so in principle it should work on virtually
+    any modern operating system.  We provide pre-compiled binaries for
+    Linux, MacOS and Windows.</p>
+
+    <li><b>When I try to run Crux on my Linux system I get error messages like:</b><br/>
+    <pre>
+    /tmp/crux: /usr/lib64/libstdc++.so.6: version `CXXABI_1.3.8' not found (required by /tmp/crux)
+    /tmp/crux: /usr/lib64/libstdc++.so.6: version `GLIBCXX_3.4.20' not found (required by /tmp/crux)
+    /tmp/crux: /usr/lib64/libstdc++.so.6: version `GLIBCXX_3.4.21' not found (required by /tmp/crux)p
+    </pre>
+    <br/> Crux depends on the C and C++ runtime libraries; however,
+    newer versions of the runtime libraries are not backwards
+    compatible with older versions.  We build the Linux binary
+    distributions for Crux using GCC 4.9.  If your Linux system dates
+    from before GCC 4.9 was available, then it may have versions of
+    the runtime library that are incompatible with the Crux binary
+    distribution.  In this case, you might consider updating your
+    operating system.  Alternatively, you can build Crux from the
+    source code distribution.  To build Crux from source you'll ned to
+    install the C/C++ development tools, and CMake.  This can
+    conveniently be done using <code>yum</code> <br/>
+    <pre>
+    sudo su -
+    yum group install "Development Tools"
+    yum install cmake
+    </pre>
+    <br/>
+    Then follow the instructions in the in the 
+    <a href="tutorials/install.html#src_build">installation tutorial</a>.
+    <br/>
+
+    <li>
+    <b>How does Crux compute the masses of peptides and peptide
+      fragments?</b></li>
+
+    <p>
+    <ul>
+
+    <li>
+    Each amino acid can be characterized either by its monoisotopic mass,
+    which is the mass of the most abundant isotopic form of that amino acid,
+    or the average mass, which is a weighted average of the masses of all
+    the isotopic forms.  By default, Crux uses average mass to calculate
+    peptide masses, though this behavior can be controlled by the
+    <code>isotopic-mass</code> option to <code>tide-index</code> and the
+    <code>mass_type_parent</code> option to <code>comet</code>.  For
+    fragments, <code>tide-search</code> always uses the monoisotopic mass,
+    whereas <code>comet</code> allows selection
+    via <code>mass_type_fragment</code>.</li>
+
+    <li>
+    The neutral mass of a peptide is not the sum of the masses of its
+    amino acids.  The N-terminus and C-terminus of the peptide together
+    contribute an additional water molecule, whose mass is either
+    18.010564684 Da (monoisotopic) or 18.0153 Da (average).</li>
+    <li>
+    A charged peptide has an additional approximately 1 Da mass for each
+    charge, corresponding to the mass of a hydrogen atom.  The exact mass
+    to be added depends on whether we are using the monoisotopic mass
+    (1.007825035) or average mass (1.00794).</li>
+
+    <li>When a peptide fragments, each b-ion will have a mass equal to
+    the sum of its amino acids plus one hydrogen for each charge on the
+    fragment, while each y-ion will have a mass equal to the sum of its
+    amino acids plus water plus one hydrogen for each charge on the
+    fragment.</li>
+
+    <li>
+    By default, both Tide and Comet add a static modification of
+    57.021464 Da to all cysteines.  This is because in most protein
+    preparation protocols the peptides are alkylated with iodoacetamide,
+    resulting in carbamidomethylation of cysteine. The alkylation step
+    prevents the reformation of disulfide bonds.  Other alykylation
+    reagents may be used, in which case the appropriate mass shift can be
+    specified with the <code>C=[mass]</code> option
+    to <code>tide-index</code> or the <code>add_C_cysteine</code> option
+    to <code>comet</code>.</li>
+
+    </ul>
+    </p>
+
+    <li>
+    <b>How does Crux assign fragment masses to bins prior to computing
+    the XCorr score?</b>
+    </li>
+
+    <p>The XCorr score is essentially a dot product between a preprocessed
+    form of the observed spectrum and the theoretical spectrum derived
+    from the candidate peptide. In order to compute this dot product, the
+    masses of the fragments in both spectra are assigned to discrete mass
+    bins. This can be viewed as a form of rounding, but with more control
+    over the discrete masses. Two parameters, <code>mz-bin-width</code> and
+    <code>mz-bin-offset</code>, control the size and location of the bins,
+    and are used to convert fragment masses according to this formula:</p>
+
+    <p align=center>binned mass = floor( ( original mass / <code>bin-width</code> ) + 1.0 - <code>bin-offset</code> )</p>
+
+    <p>
+    The default values <code>bin-width</code>=0.02
+    and <code>bin-offset</code>=0.40 are suitable for most high-resolution
+    datasets.
+    </p>
+
+    <li>
+    <b>How can I use the average target-decoy competition (aTDC)
+      procedure described in this paper?</b>
+      <blockquote>
+      Uri Keich, Kaipo Tamura, and William Stafford Noble.
+      <a href="https://pubs.acs.org/doi/10.1021/acs.jproteome.8b00802">"Averaging
+  strategy to reduce variability in target-decoy estimates of false
+  discovery rate."</a> <i>Journal of Proteome Research</i>,
+  18(2):585-593, 2019.
+      </blockquote>
+      </li>
+
+    <ul>
+      <br>
+        When you build your peptide index using tide-index, you have
+        to specify the number of decoy databases to include and you
+        have to set allow-dups to be T. It's also important that you
+        leave the decoy-format option at its default value of shuffle,
+        since if you reverse the peptides then all of the databases
+        would be identical.  For example, to build an
+        index with five decoys per target from a fasta file
+        called <code>human.fasta</code>, you could do this:<br>
+
+<pre>
+crux tide-index --num-decoys-per-target 5 --allow-dups T human.fasta human
+</pre>
+
+<br>
+Also, when you search a file of spectra (<code>HepG2_f4.mzML</code>)
+using the <code>human</code> index, you must specify concat=F:<br>
+
+<pre>
+  crux tide-search --use-tailor-calibration T --concat F HepG2_f4.mzML human
+</pre>
+
+<br>
+This command stores the search results in the default output directory
+(<code>crux-output</code>) in files
+called <code>tide-search.target.txt</code>
+and <code>tide-search.decoy.txt</code>. Notably, the decoy file will
+contain five times as many PSMs as the target file, with a column
+called "decoy index" to indicate which database the decoy comes from.
+Finally, you can run aTDC by calling <code>assign-confidence</code>.
+This command will use the "decoy index" column to do the necessary
+averaging over the decoy databases:<br>
+
+<pre>
+  crux assign-confidence --score "tailor score" crux-output/tide-search.target.txt
+</pre>
+<br>
+The final results are stored in a file
+called <code>crux-output/assign-confidence.target.psms.txt</code>.
+</ul>
+
+
+    <li>
+    <b>For what settings of the score-function and mz-bin-width parameter
+    can I set exact-p-value=T?</b>
+	<ul>
+		<li>When the combined p-value score function is used (<code>--score-function=both</code>), <code>--mz-bin-width=1.0005079</code> and <code>--exact-p-value=T</code>.</li>
+		<li>When the XCorr score function is used (<code>--score-function=xcorr</code>), <code>--exact-p-value</code> can only be set to true when <code>--mz-bin-width=1.0005079</code>.</li>
+		<li>When the residue-evidence score function is used (<code>--score-function=residue-evidence</code>), <code>--exact-p-value</code> can only be set to true when <code>--mz-bin-width=1.0005079</code>. Note that high-resolution information in the residue-evidence score function is captured by <code>--fragment-tolerance</code>.</li>
+	</ul>
+    </li>
+
+    <li>
+    <b>How does Crux estimate the possible charge states of the peptides when the
+       information is not provided within the spectra file?</b>
+    </li>
+
+    <p>
+    Crux calculates the ratio of two values: (1) the sum of the
+    intensities from the peaks in the fragmentation spectrum whose m/z is
+    greater than the precursor m/z versus (2) the sum of the peaks whose
+    m/z is smaller than the precursor.  If this ratio is greater than or
+    equal to a calculated threshold based upon the location of the
+    precursor m/z and the max m/z in the spectrum, Crux then assigns both
+    +2 and +3 as possible charge states to the spectrum.  Otherwise, Crux
+    assigns +1 as the charge state.  The algorithm is based upon the
+    observation that fragmentation spectra collected from +1 peptides
+    should have no peaks above the precursor m/z.  In contrast, a peptide
+    of charge state greater than +1 can generate fragment ions of lower
+    charge whose m/z is greater than the precursor m/z, thus indicating a
+    multiply charged precursor.</p>
+
+    <p>
+    Note that, in addition, <code>comet</code> includes
+    a <code>precursor_charge</code> parameter.  If the first number in
+    this parameter is set to 0, i.e., <code>precursor_charge = 0 0</code>,
+    then the charge state rule above is applied.  However, if a user
+    specifies a precursor charge range, i.e., <code>precursor_charge = 1
+    5</code>, then Comet will search every spectrum through this range of
+    assumed charge states for every spectrum whose precursor charge
+    is unknown.</p>
+
+    <li>
+    <b>How does Crux create peptides from the given set of proteins in the
+      database?</b></li>
+
+    <p>
+    The options <code>enzyme</code> (for <code>tide-index</code>)
+    and <code>search_enzyme_number</code> (for <code>comet</code>) define
+    the enzymatic cleavage rules.  When <code>enzyme=no-enzyme</code>
+    or <code>search_enzyme_number=0</code>, then any subsequence of a
+    protein may be considered as a candidate peptide. For other values of
+    these parameters, the residues at the termini of the protein
+    subsequence must follow specific rules.  For example, trypsin requires
+    that the preceeding residue must be an R or K and the following
+    residue may not be a P.</p>
+
+    <p>
+    When <code>digestion=full-digest</code> (for <code>tide-index</code>)
+    or <code>num_enzyme_termini=2</code> (for <code>comet</code>), then
+    these rules must be true at both ends of the peptide.  When it
+    is <code>digestion=partial-digest</code>
+    or <code>num_enzyme_termini=1</code>, then the rules must be true at
+    at least one of the ends.  The <code>missed-cleavages</code>
+    and <code>allowed_missed_cleavages</code> parameters control the
+    maximum number of cleavage sites that may lie within the peptide
+    sequence.</p>
+
+    <p>
+    Note that if <code>enzyme=no-enzyme</code>
+    or <code>search_enzyme_number=0</code>, then
+    the <code>digestion</code>, <code>num_enzyme_termini</code>, <code>missed-cleavages</code>
+    and <code>allowed_missed_cleaveages</code> parameters are not used.</p>
+
+
+    <li>
+    <b>How does Crux select candidate peptides from the database?</b></li>
+
+    <p>
+    The Crux search tools (<code>tide-index</code> and <code>comet</code>)
+    select candidate peptides for each spectrum based on its precursor
+    singly charged mass (m+h) or the mass-to-charge (m/z) and an assumed
+    charge state (specified in the input file).  If the m+h and charge is
+    provided in the input file (e.g., from the Z lines of an MS2 file),
+    then the precursor mass is calculated from the m+h minus the mass of a
+    proton. Otherwise, the precursor mass is calculated from the precursor
+    m/z and an assumed charge.  A mass window is defined in one of three
+    ways based on the
+    <code>precursor-window-type</code> and <code>precursor-window</code>
+    options.</p>
+
+    <ul>
+    <li>  
+    If the <code>precursor-window-type</code> is set to <code>mz</code>,
+    then the window is calculated as spectrum precursor m/z &plusmn;
+    <code>precursor-window</code> and the resulting range is converted
+    to mass using the charge state with the formula:<br>  
+    Mass=m/z * charge - MASS_PROTON * charge, where MASS_PROTON=1.00727646677
+    </li>
+
+    <li>
+    If the <code>precursor-window-type</code> is set to <code>mass</code>, then
+    the window is defined as the precursor mass &plusmn; 
+    <code>precursor-window</code>.
+    </li>
+
+    <li>
+    If the <code>precursor-window-type</code> is set to <code>ppm</code>
+    (parts per million), then the window spans from the precursor mass /
+    (1.0 + window * 1e-6) to precursor mass / (1.0 - window * 1e-6).</li>
+    </ul>
+
+    <p>
+    Candidate peptides are those whose mass falls within the defined
+    window.  The peptide mass is computed as the sum of the average amino
+    acid masses plus 18 Da for the terminal OH group.  Candidate peptides
+    can also be constrained by minimum and maximum allowed length. </p>
+
+    <li>
+    <b>How do Tide and Comet handle combinations of static and
+    variable modifications, as well as terminal
+    modifications?</b></li>
+
+    <p>
+    Although the syntax for specifying amino acid modifications
+    differs between Comet and Tide, the logic of how those
+    modifications are applied is similar.</p>
+
+    <p>
+    First, it's important to understand that the search tools support
+    several different types of modifications.  A static modification
+    is one that applies to every occurrence of an amino acid, whereas
+    a variable modification means that the amino acid can occur in
+    either form (modified or unmodified). Furthermore, unlike standard
+    modifications that occur on amino acid side-chains, a terminal
+    modification is applied to the molecular group at the N- or
+    C-terminus of a peptide or protein. Typically, protein terminal
+    modifications correspond to biological events, whereas peptide
+    terminal modifications (which by definition must be applied after
+    enzymatic digestion) are produced by the experimental
+    workflow.</p>
+
+    <p>
+    Conceptually, all static modifications (standard ones and terminal ones) 
+    are applied first. Thereafter, variable modifications are applied on top 
+    of static modifications. Tide applies at most one static modification and 
+    one variable modification at any location, terminal or non-terminal. Comet 
+    is similar, except that modifications can also separately be applied to 
+    terminal locations. For example, the peptide DEAGFK can have a variable 
+    modification on the side chain of the lysine residue as well as a variable 
+    modification on the peptide C-terminus.</p>
+
+    <p>
+    In practice, it is an error to (try to) specify two different static 
+    modifications for the same type of residue, but perfectly legal to specify 
+    multiple variable modifications for the same residue.</p>
+
+    <p>
+    In the search engine output, you will see the unmodified peptide
+    (e.g., K[-16.9981]VLGHIR in Comet's "plain_peptide" column) and
+    the peptide with variable modifications indicated in brackets
+    (e.g., K[-16.9981]VLGHIR in Comet's "peptide" column and Tide's
+    "sequence" column). The full set of modifications (including
+    static modifications) is specified as a comma-separated list in
+    the "modifications" column, like this:
+    1_S_45.0294,1_S_45.0239_n,1_V_-16.9981.  This specification
+    indicates that the first amino acid has a standard static
+    modification of 45.0294 as well as a static n-terminal
+    modification of 45.0239.  In addition, the same residue has a
+    variable modification of -16.9981.</p>
+
+    <p>
+    Note that Comet allows slightly more flexibility than Tide in
+    specifying different types of modifications.  Terminal
+    modifications in Comet can be specified to occur within a range of
+    amino acids near the terminus.  Also, via the "binary set" flag, a
+    modification can be required to appear on all or none of the
+    residues in a given peptide.</p>
+
+    <li>
+      <b>How does Tide handle peptide and protein terminal modifications?</b></li>
+  
+      <p>
+        Peptide and protein terminal modifications are similar in their logic. 
+        The <code>(c/n)term-peptide-mods-spec</code> option applies modifications to the terminals 
+        of all peptides, whereas <code>(c/n)term-protein-mods-spec</code> applies modifications only 
+        to peptide terminals that are also protein terminals. If both peptide and protein 
+        mod specs are provided, then both will be applied. It is possible to simultaneously 
+        specify peptide and protein terminal mods for the same type of residue. If both 
+        are static then protein terminals will have both of them (sum of the mod masses). 
+        If both are variable then they will be applied one at a time.
+      </p>
+      <p>
+        Note that the Tide index does not store information about the origin of 
+        variable mods. As a result, the Tide search output, unlike Comet, does not 
+        discriminate between terminal and non-terminal mods. Thus, Tides modified 
+        sequence column always has format K[-16.9981]VLGHIR, whereas in Comet the same 
+        peptide would be specified as n[-16.9981]VLGHIR for a terminal mod and 
+        K[-16.9981]VLGHIR for a non-terminal mod.  Similarly, the modifications 
+        column in Tide search results always has the format [position]_V_[mass]. 
+        Static modifications do not have this issue: they will have a _c or _n 
+        suffix for peptide terminal mods and _C or _N for protein terminal mods.
+      </p>
+    <li>
+    <b>What happens if I decrease the size of the precursor window during
+    searching?</b></li>
+
+    <p>
+    Reducing the precursor mass tolerance has two main benefits.  One is
+    reduced search time, and the other is improved statistical power to
+    detect matches.  With a smaller window, fewer candidates are tested
+    against a spectrum.  As a result, the statistical confidence measure
+    calculated after multiple testing correction will be more significant.
+    Of course, the flipside is that if you make the precursor window too
+    small, then you may end up throwing out correct identifications.
+    Control over the size of the window is provided by the using
+    the <code>precursor-window</code> and
+    <code>precursor-window-type</code> options.</p>
+
+    <li>
+    <b>How can I search my isotopically labeled data with Tide or Comet?</b></li>
+    <p>
+    Isotopically labeled data is accommodated by specifying various static or
+    variable modifications. The specific types of modifications differ according
+    to the labeling scheme, and the syntax for specifying the modifications
+    differs between Tide (which uses options like <code>--mods-spec</code>) and
+    Comet (which uses options like <code>add_Nterm_peptide</code>). In each of
+    the following entries, we provide first the Tide options, followed by the
+    Comet options.</p>
+    <p style="color: #00f;">iTRAQ 4-plex:</p>
+    <p><code>
+    --mods-spec K+144.10253 --nterm-peptide-mods-spec X+144.10253</code></p>
+    <p><code>
+    add_Nterm_peptide = 144.10253<br>
+    add_K_lysine = 144.10253<br>
+    clear_mz_range = 113.5 117.5</code></p>
+    <p>
+    The 4-plex reagent has different  monoisotopic mass values for 114
+    (144.105918), 115 (144.09599), and 116/117 (144.102063).  The mass value
+    used above is derived from averaging the three monoisotopic masses.</p>
+    <p style="color: #00f;">iTRAQ 8-plex:</p>
+    <p><code>
+    --mods-spec K+304.2022 --nterm-peptide-mods-spec X+304.2022</code></p>
+    <p><code>
+    add_Nterm_peptide = 304.2022<br>
+    add_K_lysine = 304.2022<br>
+    clear_mz_range = 112.5 121.5</code></p>
+    <p>
+    The mass modification above is the average of the two different set of
+    masses for 115/118/119/121 (304.199040) and 113/114/116/117
+    (304.205360).</p>
+    <p style="color: #00f;">TMT 2-plex:</code></p>
+    <p><code>
+    --mods-spec K+225.155833 --nterm-peptide-mods-spec X+225.155833</code></p>
+    <p><code>
+    add_Nterm_peptide = 225.155833<br>
+    add_K_lysine = 225.155833<br>
+    clear_mz_range = 125.5 127.5</code></p>
+    <p style="color: #00f;">TMT 6-plex:</code></p>
+    <p><code>
+    --mods-spec K+229.162932 --nterm-peptide-mods-spec X+229.162932</code></p>
+    <p><code>
+    add_Nterm_peptide = 229.162932<br>
+    add_K_lysine = 229.162932<br>
+    clear_mz_range = 127.5 131.5</code></p>
+    <p style="color: #00f;">SILAC 4Da:</p>
+    <p>
+    There are a number of different SILAC reagents with a ~4 Da modification
+    (based on combinations of C13 and N15), each with different sites of
+    specificity.  The example below is for the 15N(4) reagent applied to R
+    residues.  You should adjust the modification mass and residue(s) applied
+    to as necessary.</p>
+    <p>
+    To perform a mixed light/heavy search using a variable modification
+    search:</p>
+    <p><code>
+    --mods-spec 3R+3.988140</code></p>
+    <p><code>
+    variable_mod01 = 3.988140 R 1 3 -1 0 0</code></p>
+    <p>
+    Note that, in the example above, Comet operates in “binary” mode, which
+    means that it only considers peptides in which all or none of the lysine
+    residues are light/heavy. Tide does not support binary mode searching, so it
+    will consider all peptides with up to 3 (in the above specification) heavy
+    lysines.</p>
+    <p>
+    To search just the heavy labeled sample, you can apply a static
+    modification:</p>
+    <p><code>
+    --mods-spec R+3.988140</code></p>
+    <p><code>
+    add_K_lysine = 3.988140</code></p>
+    <p style="color: #00f;">SILAC 6Da:</p>
+    <p>
+    This example uses the 13C(6) SILAC mass, assuming it is applied to both K
+    and R. You should adjust as necessary.  There is at least one more SILAC
+    reagent with ~6 Da modification mass and different residue specificity:
+    13C(5) 15N(1)</p>
+    <p>
+    To perform a mixed light/heavy search using a variable modification:</p>
+    <p><code>
+    --mods-spec 3KR+6.020129</code></p>
+    <p><code>
+    variable_mod01 = 6.020129 KR 1 3 -1 0 0</code></p>
+    <p>
+    To search just the heavy labeled sample, you can apply a static
+    modification:</p>
+    <p><code>
+    --mods-spec KR+6.020129</code></p>
+    <p><code>
+    add_K_lysine = 6.020129<br>
+    add_R_arginine = 6.020129</code></p>
+    <p style="color: #00f;">SILAC 8Da:</p>
+    <p>
+    The example below is for 13C(6) 15N(2) on K residues. Variable modification
+    search:</p>
+    <p><code>
+    --mods-spec 3K+8.014199</code></p>
+    <p><code>
+    variable_mod01 = 8.014199 K 1 3 -1 0 0</code></p>
+    <p>
+    Static modification for just the heavy labeled search:</p>
+    <p><code>
+    --mods-spec K+8.014199</code></p>
+    <p><code>
+    add_K_lysine = 8.014199</code></p>
+
+
+<p style="color: #00f;">100% 15N label:</p>
+
+<p>
+  The N15 labeling adds 0.997035 mass difference for every nitrogen in
+  each amino acid.  So for a 100% N15 analysis, specify a static
+  modification (between 1 and 4) to every amino acid residue, like
+  this:</p>
+
+<p><code>
+--mods-spec A+0.997035,C+0.997035,D+0.997035,E+0.997035,F+0.997035,G+0.997035,H+2.99111,I+0.997035,K+1.99407,L+0.997035,M+0.997035,N+1.99407,P+0.997035,Q+1.99407,R+3.98814,S+0.997035,T+0.997035,V+0.997035,W+1.99407,Y+0.997035</code></p>
+
+<p>
+<pre>
+add_G_glycine = 0.997035               # added to G - avg.  57.0513, mono.  57.02146
+add_A_alanine = 0.997035               # added to A - avg.  71.0779, mono.  71.03711
+add_S_serine = 0.997035                # added to S - avg.  87.0773, mono.  87.03203
+add_P_proline = 0.997035               # added to P - avg.  97.1152, mono.  97.05276
+add_V_valine = 0.997035                # added to V - avg.  99.1311, mono.  99.06841
+add_T_threonine = 0.997035             # added to T - avg. 101.1038, mono. 101.04768
+add_C_cysteine = 0.997035              # added to C - avg. 103.1429, mono. 103.00918
+add_L_leucine = 0.997035               # added to L - avg. 113.1576, mono. 113.08406
+add_I_isoleucine = 0.997035            # added to I - avg. 113.1576, mono. 113.08406
+add_N_asparagine = 1.99407             # added to N - avg. 114.1026, mono. 114.04293
+add_D_aspartic_acid = 0.997035         # added to D - avg. 115.0874, mono. 115.02694
+add_Q_glutamine = 1.99407              # added to Q - avg. 128.1292, mono. 128.05858
+add_K_lysine = 1.99407                 # added to K - avg. 128.1723, mono. 128.09496
+add_E_glutamic_acid = 0.997035         # added to E - avg. 129.1140, mono. 129.04259
+add_M_methionine = 0.997035            # added to M - avg. 131.1961, mono. 131.04048
+add_O_ornithine = 1.99407              # added to O - avg. 132.1610, mono  132.08988
+add_H_histidine = 2.99111              # added to H - avg. 137.1393, mono. 137.05891
+add_F_phenylalanine = 0.997035         # added to F - avg. 147.1739, mono. 147.06841
+add_U_selenocysteine = 0.997035        # added to U - avg. 150.3079, mono. 150.95363
+add_R_arginine = 3.98814               # added to R - avg. 156.1857, mono. 156.10111
+add_Y_tyrosine = 0.997035              # added to Y - avg. 163.0633, mono. 163.06333
+add_W_tryptophan = 1.99407             # added to W - avg. 186.0793, mono. 186.07931
+add_B_user_amino_acid = 0.0000         # added to B - avg.   0.0000, mono.   0.00000
+add_J_user_amino_acid = 0.0000         # added to J - avg.   0.0000, mono.   0.00000
+add_X_user_amino_acid = 0.0000         # added to X - avg.   0.0000, mono.   0.00000
+add_Z_user_amino_acid = 0.0000         # added to Z - avg.   0.0000, mono.   0.00000
+</pre>    
+
+<p>
+  If you need to adjust the cysteine mass to account for
+  carboxyamidomethylation, then use 58.018499 instead of 0.997035 for
+  C. </p>
+
+<p>
+<code>
+--mods-spec A+0.997035,C+58.018499,D+0.997035,E+0.997035,F+0.997035,G+0.997035,H+2.99111,I+0.997035,K+1.99407,L+0.997035,M+0.997035,N+1.99407,P+0.997035,Q+1.99407,R+3.98814,S+0.997035,T+0.997035,V+0.997035,W+1.99407,Y+0.997035</code></p>
+
+<p><pre>
+add_C_cysteine = 0.997035
+</pre></p>
+
+    <li>
+    <b>How can I contribute to Crux?</b></li>
+
+    <p>
+    Patches implementing new features can submitted directly as pull
+    requests on github, or can be be emailed to the development
+    team at crux-support@uw.edu for review and inclusion in subsequent
+    releases of Crux.</p>
+
+    <li>
+    <b>Where does the name "Crux" come from?</b></li>
+
+    <p>
+    Thin air.  The name is not an acronym or a reference to anything in
+    particular.</p>
+
+    </ol>
+    <!-- END CONTENT -->
+    </div>
+  </div>
+
+<footer class="site-footer">
+  <div id="centerfooter">
+    <div class="footerimportantlinks">
+      <img src="images/linkicon.png" style="width:16px; height:16px"><h3>Important links</h3>
+      <ul>
+        <li><a href="faq.html">Crux FAQ</a></li>
+        <li><a href="glossary.html">Glossary of terminology</a></li>
+        <li><a href="http://scholar.google.com/citations?hl=en&user=Rw9S1HIAAAAJ">Google Scholar profile</a></li>
+        <li><a href="https://github.com/crux-toolkit/crux-toolkit">GitHub</a></li>
+        <li><a href="release-notes.html">Release Notes</a></li>
+        <li><a href="https://mailman1.u.washington.edu/mailman/listinfo/crux-users" title="Receive announcements of new versions">Join the mailing list</a></li>
+        <li><a href="http://www.apache.org/licenses/LICENSE-2.0">Apache license</a></li>
+        <li><a href="http://groups.google.com/group/crux-users">Support Board</a></li>
+      </ul>
+    </div>
+    <div class="footerimportantlinks tutoriallinks">
+      <img src="images/tutorialicon.png" style="height:16px"><h3>Tutorials</h3>
+      <ul>
+        <li><a href="tutorials/install.html">Installation</a></li>
+        <li><a href="tutorials/gettingstarted.html">Getting started with Crux</a></li>
+        <li><a href="tutorials/search.html">Running a simple search using Tide and Percolator</a></li>
+        <li><a href="tutorials/customizedsearch.html">Customization and search options</a></li>
+        <li><a href="tutorials/spectralcounts.html">Using spectral-counts</a></li>
+      </ul>
+    </div>
+    <div id="footertext">
+      <p>
+        The original version of Crux was written by Chris Park and Aaron Klammer
+        under the supervision
+        of <a href="http://www.gs.washington.edu/faculty/maccoss.htm">Prof. Michael
+        MacCoss</a>
+        and <a href="http://noble.gs.washington.edu/~noble">Prof. William
+        Stafford Noble</a> in the Department of Genome Sciences at the
+        University of Washington, Seattle.  Website by <a href="http://www.yuvalboss.com/">Yuval Boss</a>. 
+        <br />The complete list of contributors
+        can be found <a href="contributors.html">here</a>.
+        <br />
+        <br />
+        Maintenance and development of Crux is funded by the <a href="https://www.nih.gov/">National Institutes of Health</a> award P41 GM103533. 
+      </p>
+    </div>
+  </div>
+</footer>
+  
+</body>
+
+</html>

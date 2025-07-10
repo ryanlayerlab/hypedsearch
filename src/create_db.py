@@ -5,13 +5,20 @@ from typing import List, Optional, Union
 
 import click
 
-from src.constants import (DEFAULT_MAX_K, DEFAULT_MIN_K, MEMORY,
-                           MOUSE_PROTEOME)
-from src.peptides_and_ions import (Peptide, get_proteins_by_name,
-                                   get_uniq_kmer_to_protein_map)
-from src.protein_product_ion_database import (DbKmer, DbProtein,
-                                              ProteinProductIonDb)
-from src.utils import PathType, get_time_in_diff_units, setup_logger
+from src.click_utils import PathType
+from src.constants import (
+    DEFAULT_MAX_KMER_LEN,
+    DEFAULT_MIN_KMER_LEN,
+    MEMORY,
+    MOUSE_PROTEOME,
+)
+from src.peptides_and_ions import (
+    Peptide,
+    get_proteins_by_name,
+    get_uniq_kmer_to_protein_map,
+)
+from src.protein_product_ion_database import DbKmer, DbProtein, ProteinProductIonDb
+from src.utils import get_time_in_diff_units, setup_logger
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +66,8 @@ def create_protein_table(db: ProteinProductIonDb, db_proteins: List[Peptide]) ->
 def create_product_ion_table(
     db: ProteinProductIonDb,
     db_proteins: List[Peptide],
-    min_k: int = DEFAULT_MIN_K,
-    max_k: int = DEFAULT_MAX_K,
+    min_k: int = DEFAULT_MIN_KMER_LEN,
+    max_k: int = DEFAULT_MAX_KMER_LEN,
 ) -> None:
     uniq_kmer_to_protein_map = get_uniq_kmer_to_protein_map(
         proteins=db_proteins, min_k=min_k, max_k=max_k
@@ -82,8 +89,8 @@ def create_db(
     fasta_path: Optional[Path] = None,
     proteins: Optional[Union[List[Peptide], Path]] = None,
     db_path: Union[Path, str] = MEMORY,
-    min_k: int = DEFAULT_MIN_K,
-    max_k: int = DEFAULT_MAX_K,
+    min_k: int = DEFAULT_MIN_KMER_LEN,
+    max_k: int = DEFAULT_MAX_KMER_LEN,
 ) -> ProteinProductIonDb:
     t0 = time()
     logger.info(f"Creating DB at {db_path}")
@@ -114,6 +121,7 @@ def create_db(
 @click.command(
     name="create-db",
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+    help="Create a database of product ions",
 )
 @click.option(
     "--db_path",
@@ -145,7 +153,7 @@ def create_db(
     "--min_k",
     "-mk",
     type=int,
-    default=DEFAULT_MIN_K,
+    default=DEFAULT_MIN_KMER_LEN,
     show_default=True,
     help="Minimum kmer length to consider.",
 )
@@ -153,7 +161,7 @@ def create_db(
     "--max_k",
     "-Mk",
     type=int,
-    default=DEFAULT_MAX_K,
+    default=DEFAULT_MAX_KMER_LEN,
     show_default=True,
     help="Maximum kmer length to consider.",
 )
@@ -161,8 +169,8 @@ def create_db_cli(
     fasta_path: Path,
     db_path: Path,
     proteins: Optional[Union[List[Peptide], Path]] = None,
-    min_k: int = DEFAULT_MIN_K,
-    max_k: int = DEFAULT_MAX_K,
+    min_k: int = DEFAULT_MIN_KMER_LEN,
+    max_k: int = DEFAULT_MAX_KMER_LEN,
 ):
     create_db(
         fasta_path=fasta_path,

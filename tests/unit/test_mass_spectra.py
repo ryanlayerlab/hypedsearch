@@ -1,8 +1,19 @@
+from pathlib import Path
+
 import numpy as np
+import pymzml
 
 from src.constants import SPECTRA_DIR, THOMAS_SAMPLES
-from src.mass_spectra import Peak, Spectrum, get_indices_of_largest_elements
+from src.mass_spectra import Mzml, Peak, Spectrum, get_indices_of_largest_elements
 from tests.fixtures_and_helpers import create_spectrum
+
+
+class Test_Mzml:
+    @staticmethod
+    def test_initialization_by_string(mouse_mzml):
+        mzml = Mzml(path=str(mouse_mzml))
+        assert isinstance(mzml.path, Path)
+        assert mzml.path == mouse_mzml
 
 
 class TestSpectrum:
@@ -26,11 +37,19 @@ class TestSpectrum:
         assert actual == expected
 
     @staticmethod
-    def test_parse_mzml_smoke():
+    def test_parse_mzml_1():
         # It's difficult to create a test MZML. So this test just checks that
         # the function does not fail on an actual MZML
         mzml_path = SPECTRA_DIR / f"{THOMAS_SAMPLES[0]}.mzML"
-        actual = Spectrum.from_mzml(mzml_path=mzml_path)
+        actual = Spectrum.parse_ms2_from_mzml(spectra_file=mzml_path)
+        assert len(actual) > 0
+
+    @staticmethod
+    def test_parse_mzxml_2():
+        # It's difficult to create a test MZML. So this test just checks that
+        # the function does not fail on an actual MZML
+        mzml_path = SPECTRA_DIR / f"A_10uM_Peptides_HuIslets.mzML"
+        actual = Spectrum.parse_ms2_from_mzml(spectra_file=mzml_path)
         assert len(actual) > 0
 
 
@@ -51,4 +70,5 @@ class TestGetIndicesOfLargestElements:
     def test_fewer_values_than_n_value():
         array = np.array([3, 2, 1])
         output = get_indices_of_largest_elements(array=array, top_n=5)
+        assert (array[output] == [3, 2, 1]).all()
         assert (array[output] == [3, 2, 1]).all()
