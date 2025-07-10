@@ -34,5 +34,5 @@ class Test_run_hypedsearch_on_spectrum:
         )
 
         # Assert
-        psms = CometPSM.from_txt(file_path=list(output_dir.glob("*"))[0], sample=sample)
+        psms = CometPSM.from_txt(txt_path=list(output_dir.glob("*"))[0], sample=sample)
         assert len(psms) == 20

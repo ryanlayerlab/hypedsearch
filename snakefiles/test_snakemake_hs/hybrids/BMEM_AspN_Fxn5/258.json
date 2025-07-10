@@ -1,0 +1,38 @@
+{
+  "SSAEDTATNTQSPTSLPSQ": [
+    {
+      "b_seq": "SSA",
+      "y_seq": "EDTATNTQSPTSLPSQ",
+      "b_prot_ids": [
+        946
+      ],
+      "y_prot_ids": [
+        13279
+      ],
+      "b_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ]
+    }
+  ],
+  "SSAPVDNRDHNPTSLPSQ": [
+    {
+      "b_seq": "SSAPVDNRDHN",
+      "y_seq": "PTSLPSQ",
+      "b_prot_ids": [
+        946
+      ],
+      "y_prot_ids": [
+        13279
+      ],
+      "b_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ]
+    }
+  ]
+}

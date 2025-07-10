@@ -1,0 +1,126 @@
+{
+  "QINELF": [
+    {
+      "b_seq": "QINE",
+      "y_seq": "LF",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        7724
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ]
+    }
+  ],
+  "LNQELF": [
+    {
+      "b_seq": "LNQE",
+      "y_seq": "LF",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        7724
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ]
+    }
+  ],
+  "NVAEALF": [
+    {
+      "b_seq": "NVAEA",
+      "y_seq": "LF",
+      "b_prot_ids": [
+        7724
+      ],
+      "y_prot_ids": [
+        7724
+      ],
+      "b_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ]
+    }
+  ],
+  "TQSAPLF": [
+    {
+      "b_seq": "TQSAP",
+      "y_seq": "LF",
+      "b_prot_ids": [
+        7724
+      ],
+      "y_prot_ids": [
+        7724
+      ],
+      "b_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ]
+    }
+  ],
+  "QVEQLF": [
+    {
+      "b_seq": "QVEQ",
+      "y_seq": "LF",
+      "b_prot_ids": [
+        9307
+      ],
+      "y_prot_ids": [
+        7724
+      ],
+      "b_prot_names": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ]
+    },
+    {
+      "b_seq": "QVEQL",
+      "y_seq": "F",
+      "b_prot_ids": [
+        9307
+      ],
+      "y_prot_ids": [
+        7724
+      ],
+      "b_prot_names": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ]
+    }
+  ],
+  "DLALQGF": [
+    {
+      "b_seq": "DLALQG",
+      "y_seq": "F",
+      "b_prot_ids": [
+        13279
+      ],
+      "y_prot_ids": [
+        7724
+      ],
+      "b_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ]
+    }
+  ]
+}

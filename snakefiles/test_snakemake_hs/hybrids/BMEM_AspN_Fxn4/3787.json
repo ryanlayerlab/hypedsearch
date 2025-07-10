@@ -1,0 +1,1372 @@
+{
+  "VPPIQQFPTEDWSAQPATEDWSAAPTAQATEW": [
+    {
+      "b_seq": "VP",
+      "y_seq": "PIQQFPTEDWSAQPATEDWSAAPTAQATEW",
+      "b_prot_ids": [
+        1048,
+        733,
+        13279
+      ],
+      "y_prot_ids": [
+        733
+      ],
+      "b_prot_names": [
+        "sp|P14206|RSSA_MOUSE",
+        "sp|Q03517|SCG2_MOUSE",
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ]
+    }
+  ],
+  "VPSSSEDDLQEEEQLEQAIKEHLGPGSSQEME": [
+    {
+      "b_seq": "VPS",
+      "y_seq": "SSEDDLQEEEQLEQAIKEHLGPGSSQEME",
+      "b_prot_ids": [
+        1048,
+        733,
+        13279
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|P14206|RSSA_MOUSE",
+        "sp|Q03517|SCG2_MOUSE",
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    }
+  ],
+  "VPSVPIQQFPTETEDWSAQPATEDWSAAPTAQA": [
+    {
+      "b_seq": "VPSVPIQQFPTE",
+      "y_seq": "TEDWSAQPATEDWSAAPTAQA",
+      "b_prot_ids": [
+        733
+      ],
+      "y_prot_ids": [
+        733
+      ],
+      "b_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ]
+    }
+  ],
+  "VPSVPIQQFPTEDSAQPATEDWSAAPTAQATEW": [
+    {
+      "b_seq": "VPSVPIQQFPTED",
+      "y_seq": "SAQPATEDWSAAPTAQATEW",
+      "b_prot_ids": [
+        733
+      ],
+      "y_prot_ids": [
+        733
+      ],
+      "b_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ]
+    }
+  ],
+  "VPSVPIQQFPTEDWSAQPATETEDWSAAPTAQA": [
+    {
+      "b_seq": "VPSVPIQQFPTEDWSAQPATE",
+      "y_seq": "TEDWSAAPTAQA",
+      "b_prot_ids": [
+        733
+      ],
+      "y_prot_ids": [
+        733
+      ],
+      "b_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ]
+    }
+  ],
+  "VPSVPIQQFPTEDWSAQPATEDEVPTAASSSHF": [
+    {
+      "b_seq": "VPSVPIQQFPTEDWSAQPATED",
+      "y_seq": "EVPTAASSSHF",
+      "b_prot_ids": [
+        733
+      ],
+      "y_prot_ids": [
+        13279
+      ],
+      "b_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ]
+    }
+  ],
+  "VPSVPIQQFPTEDWSAQPATEDSAAPTAQATEW": [
+    {
+      "b_seq": "VPSVPIQQFPTEDWSAQPATED",
+      "y_seq": "SAAPTAQATEW",
+      "b_prot_ids": [
+        733
+      ],
+      "y_prot_ids": [
+        733
+      ],
+      "b_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ]
+    }
+  ],
+  "VPSVPIQQFPTEDWSAQPATEDWSAAPTASSPSA": [
+    {
+      "b_seq": "VPSVPIQQFPTEDWSAQPATEDWSAAPTA",
+      "y_seq": "SSPSA",
+      "b_prot_ids": [
+        733
+      ],
+      "y_prot_ids": [
+        3392
+      ],
+      "b_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P99027|RLA2_MOUSE"
+      ]
+    }
+  ],
+  "VPSVPIQQFPTEDWSAQPATEDWSAAPTAQEDG": [
+    {
+      "b_seq": "VPSVPIQQFPTEDWSAQPATEDWSAAPTAQ",
+      "y_seq": "EDG",
+      "b_prot_ids": [
+        733
+      ],
+      "y_prot_ids": [
+        13279
+      ],
+      "b_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ]
+    }
+  ],
+  "SSVPSEDDLQEEEQLEQAIKEHLGPGSSQEME": [
+    {
+      "b_seq": "SSVP",
+      "y_seq": "SEDDLQEEEQLEQAIKEHLGPGSSQEME",
+      "b_prot_ids": [
+        946
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    }
+  ],
+  "DESVARADAHGEETEEERSYEGANGRQHRGRG": [
+    {
+      "b_seq": "DESVARADA",
+      "y_seq": "HGEETEEERSYEGANGRQHRGRG",
+      "b_prot_ids": [
+        946
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    },
+    {
+      "b_seq": "DESVARADAH",
+      "y_seq": "GEETEEERSYEGANGRQHRGRG",
+      "b_prot_ids": [
+        946
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "DESVARADAHSMVGNEKWTEGGGHSREGVDDQE": [
+    {
+      "b_seq": "DESVARADAHSM",
+      "y_seq": "VGNEKWTEGGGHSREGVDDQE",
+      "b_prot_ids": [
+        946
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "LTEKNSFPEYNTEDWSAQPATEDWSAAPTAQA": [
+    {
+      "b_seq": "LTEKNSFPEYN",
+      "y_seq": "TEDWSAQPATEDWSAAPTAQA",
+      "b_prot_ids": [
+        946
+      ],
+      "y_prot_ids": [
+        733
+      ],
+      "b_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ]
+    }
+  ],
+  "LTEKNSFPEYNYDWWCVGGSVQNPEKIPPTG": [
+    {
+      "b_seq": "LTEKNSFPEYNYDWW",
+      "y_seq": "CVGGSVQNPEKIPPTG",
+      "b_prot_ids": [
+        946
+      ],
+      "y_prot_ids": [
+        7724
+      ],
+      "b_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ]
+    }
+  ],
+  "LTEKNSFPEYNYDWWERRPSVARADAHSM": [
+    {
+      "b_seq": "LTEKNSFPEYNYDWWERRP",
+      "y_seq": "SVARADAHSM",
+      "b_prot_ids": [
+        946
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "KIESEDDLQEEEQLEQAIKEHLGPGSSQEME": [
+    {
+      "b_seq": "KIE",
+      "y_seq": "SEDDLQEEEQLEQAIKEHLGPGSSQEME",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    }
+  ],
+  "VPSPVSSEDNMNDPLFTKQWYLFNTGQADGTP": [
+    {
+      "b_seq": "VPSPVSSED",
+      "y_seq": "NMNDPLFTKQWYLFNTGQADGTP",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        7724
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ]
+    }
+  ],
+  "VPSPVSSEDDLQEEEQLEAEYGAEALERMFAS": [
+    {
+      "b_seq": "VPSPVSSEDDLQEEEQLE",
+      "y_seq": "AEYGAEALERMFAS",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        11378
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P01942|HBA_MOUSE"
+      ]
+    }
+  ],
+  "VPSPVSSEDDLQEEEQLESYEGANGRQHRGRG": [
+    {
+      "b_seq": "VPSPVSSEDDLQEEEQLE",
+      "y_seq": "SYEGANGRQHRGRG",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "VPSPVSSEDDLQEEEQLEKKDESVARADAHSM": [
+    {
+      "b_seq": "VPSPVSSEDDLQEEEQLE",
+      "y_seq": "KKDESVARADAHSM",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "VPSPVSSEDDLQEEEQLEQKDESVARADAHSM": [
+    {
+      "b_seq": "VPSPVSSEDDLQEEEQLEQ",
+      "y_seq": "KDESVARADAHSM",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "VPSPVSSEDDLQEEEQLEQPQATGDSERGLSAQ": [
+    {
+      "b_seq": "VPSPVSSEDDLQEEEQLEQ",
+      "y_seq": "PQATGDSERGLSAQ",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        13279
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ]
+    }
+  ],
+  "VPSPVSSEDDLQEEEQLEQAIKEHLDTPDDY": [
+    {
+      "b_seq": "VPSPVSSEDDLQEEEQLEQAIKEHL",
+      "y_seq": "DTPDDY",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    }
+  ],
+  "SPVSSEDDLQEEEPYALNLEKNFPVDTPDDY": [
+    {
+      "b_seq": "SPVSSEDDLQEEE",
+      "y_seq": "PYALNLEKNFPVDTPDDY",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    }
+  ],
+  "SPVSSEDDLQEEEQLEYVASYLLAALGGNSSPSA": [
+    {
+      "b_seq": "SPVSSEDDLQEEEQLE",
+      "y_seq": "YVASYLLAALGGNSSPSA",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        3392
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P99027|RLA2_MOUSE"
+      ]
+    }
+  ],
+  "SPVSSEDDLQEEEQLEQAIKELEHSQQEEDG": [
+    {
+      "b_seq": "SPVSSEDDLQEEEQLEQAIK",
+      "y_seq": "ELEHSQQEEDG",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        13279
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ]
+    },
+    {
+      "b_seq": "SPVSSEDDLQEEEQLEQAIKE",
+      "y_seq": "LEHSQQEEDG",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        13279
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ]
+    }
+  ],
+  "SPVSSEDDLQEEEQLEQAIKEHSREGVDDQE": [
+    {
+      "b_seq": "SPVSSEDDLQEEEQLEQAIKE",
+      "y_seq": "HSREGVDDQE",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    },
+    {
+      "b_seq": "SPVSSEDDLQEEEQLEQAIKEH",
+      "y_seq": "SREGVDDQE",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "SPVSSEDDLQEEEQLEQAIKEANRHGEETEE": [
+    {
+      "b_seq": "SPVSSEDDLQEEEQLEQAIKE",
+      "y_seq": "ANRHGEETEE",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "SPVSSEDDLQEEEQLEQAIKEHEEKGENQNS": [
+    {
+      "b_seq": "SPVSSEDDLQEEEQLEQAIKEH",
+      "y_seq": "EEKGENQNS",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "SPVSSEDDLQEEEQLEQAIKEHLPVDTPDDY": [
+    {
+      "b_seq": "SPVSSEDDLQEEEQLEQAIKEHL",
+      "y_seq": "PVDTPDDY",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    }
+  ],
+  "SPVSSEDDLQEEEQLEQAIKEHLGYFADSFD": [
+    {
+      "b_seq": "SPVSSEDDLQEEEQLEQAIKEHLG",
+      "y_seq": "YFADSFD",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        9625
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ]
+    }
+  ],
+  "PVPIQQFPTEDWSAQPATEDWSAAPTAQATEW": [
+    {
+      "b_seq": "P",
+      "y_seq": "VPIQQFPTEDWSAQPATEDWSAAPTAQATEW",
+      "b_prot_ids": [
+        1048,
+        9625,
+        13279
+      ],
+      "y_prot_ids": [
+        733
+      ],
+      "b_prot_names": [
+        "sp|P35564|CALX_MOUSE",
+        "sp|Q03517|SCG2_MOUSE",
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ]
+    },
+    {
+      "b_seq": "PV",
+      "y_seq": "PIQQFPTEDWSAQPATEDWSAAPTAQATEW",
+      "b_prot_ids": [
+        1048,
+        13279
+      ],
+      "y_prot_ids": [
+        733
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE",
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ]
+    }
+  ],
+  "PVSSSEDDLQEEEQLEQAIKEHLGPGSSQEME": [
+    {
+      "b_seq": "PVS",
+      "y_seq": "SSEDDLQEEEQLEQAIKEHLGPGSSQEME",
+      "b_prot_ids": [
+        1048,
+        13279
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE",
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    },
+    {
+      "b_seq": "PVSS",
+      "y_seq": "SEDDLQEEEQLEQAIKEHLGPGSSQEME",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    }
+  ],
+  "PVSSEDDLQEEASEALPSEGKGELEHSQQEEDG": [
+    {
+      "b_seq": "PVSSEDDLQE",
+      "y_seq": "EASEALPSEGKGELEHSQQEEDG",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        13279
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ]
+    },
+    {
+      "b_seq": "PVSSEDDLQEE",
+      "y_seq": "ASEALPSEGKGELEHSQQEEDG",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        13279
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ]
+    }
+  ],
+  "PVSSEDDLQEEEQVAREKAGPEEVPTAASSSHF": [
+    {
+      "b_seq": "PVSSEDDLQEEEQ",
+      "y_seq": "VAREKAGPEEVPTAASSSHF",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        13279
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ]
+    }
+  ],
+  "PVSSEDDLQEEEQLEQAIKEHLGPGSSSQEME": [
+    {
+      "b_seq": "PVSSEDDLQEEEQLEQAIKEHLGPGS",
+      "y_seq": "SSQEME",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    },
+    {
+      "b_seq": "PVSSEDDLQEEEQLEQAIKEHLGPGSS",
+      "y_seq": "SQEME",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    }
+  ],
+  "PVSSEDDLQEEEQLEQAIKEHLGPGSSQEMES": [
+    {
+      "b_seq": "PVSSEDDLQEEEQLEQAIKEHLGPGSSQEME",
+      "y_seq": "S",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        946,
+        11378
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE",
+        "sp|P01942|HBA_MOUSE"
+      ]
+    }
+  ],
+  "LQESEDDLQEEEQLEQAIKEHLGPGSSQEME": [
+    {
+      "b_seq": "LQE",
+      "y_seq": "SEDDLQEEEQLEQAIKEHLGPGSSQEME",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    }
+  ],
+  "LQEEEQLETEASEALPSEGKGELEHSQQEEDG": [
+    {
+      "b_seq": "LQEEEQLE",
+      "y_seq": "TEASEALPSEGKGELEHSQQEEDG",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        13279
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ]
+    }
+  ],
+  "VAEASEDDLQEEEQLEQAIKEHLGPGSSQEME": [
+    {
+      "b_seq": "VAEA",
+      "y_seq": "SEDDLQEEEQLEQAIKEHLGPGSSQEME",
+      "b_prot_ids": [
+        7724
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    }
+  ],
+  "VAEAWELGGQTKVGNEKWTEGGGHSREGVDDQE": [
+    {
+      "b_seq": "VAEAWELG",
+      "y_seq": "GQTKVGNEKWTEGGGHSREGVDDQE",
+      "b_prot_ids": [
+        7724
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "VAEAWELGYTGERPKIADPDAVKPDDWDEDAP": [
+    {
+      "b_seq": "VAEAWELGYTG",
+      "y_seq": "ERPKIADPDAVKPDDWDEDAP",
+      "b_prot_ids": [
+        7724
+      ],
+      "y_prot_ids": [
+        9625
+      ],
+      "b_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ]
+    }
+  ],
+  "DFSSNDPYPYPRYTGGHGAEYGAEALERMFAS": [
+    {
+      "b_seq": "DFSSNDPYPYPRYT",
+      "y_seq": "GGHGAEYGAEALERMFAS",
+      "b_prot_ids": [
+        7724
+      ],
+      "y_prot_ids": [
+        11378
+      ],
+      "b_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P01942|HBA_MOUSE"
+      ]
+    }
+  ],
+  "AIVSSEDDLQEEEQLEQAIKEHLGPGSSQEME": [
+    {
+      "b_seq": "AI",
+      "y_seq": "VSSEDDLQEEEQLEQAIKEHLGPGSSQEME",
+      "b_prot_ids": [
+        7724
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    }
+  ],
+  "AINDEREYKRNHPDSELESTANRHGEETEE": [
+    {
+      "b_seq": "AIND",
+      "y_seq": "EREYKRNHPDSELESTANRHGEETEE",
+      "b_prot_ids": [
+        7724
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "AINDGRTQGQTKVGNEKWTEGGGHSREGVDDQE": [
+    {
+      "b_seq": "AINDGRT",
+      "y_seq": "QGQTKVGNEKWTEGGGHSREGVDDQE",
+      "b_prot_ids": [
+        7724
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "AINDGRTALYDESCSQPATEDWSAAPTAQATEW": [
+    {
+      "b_seq": "AINDGRTALYDESCS",
+      "y_seq": "QPATEDWSAAPTAQATEW",
+      "b_prot_ids": [
+        7724
+      ],
+      "y_prot_ids": [
+        733
+      ],
+      "b_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ]
+    }
+  ],
+  "AINDGRTALYDESCSSTLASGEESHLAESSRDAL": [
+    {
+      "b_seq": "AINDGRTALYDESCSSTLAS",
+      "y_seq": "GEESHLAESSRDAL",
+      "b_prot_ids": [
+        7724
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    }
+  ],
+  "AINDGRTALYDESCSSTLASTFSNGRKSSQEME": [
+    {
+      "b_seq": "AINDGRTALYDESCSSTLASTFSNGRK",
+      "y_seq": "SSQEME",
+      "b_prot_ids": [
+        7724
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    }
+  ],
+  "AINDGRTALYDESCSSTLASTFSNGRKRADSFD": [
+    {
+      "b_seq": "AINDGRTALYDESCSSTLASTFSNGRKR",
+      "y_seq": "ADSFD",
+      "b_prot_ids": [
+        7724
+      ],
+      "y_prot_ids": [
+        9625
+      ],
+      "b_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ]
+    }
+  ],
+  "APVPTGEVYFADSFDQPATEDWSAAPTAQATEW": [
+    {
+      "b_seq": "APVPTGEVYFADSFD",
+      "y_seq": "QPATEDWSAAPTAQATEW",
+      "b_prot_ids": [
+        9625
+      ],
+      "y_prot_ids": [
+        733
+      ],
+      "b_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ]
+    }
+  ],
+  "ADPSSEDDLQEEEQLEQAIKEHLGPGSSQEME": [
+    {
+      "b_seq": "ADP",
+      "y_seq": "SSEDDLQEEEQLEQAIKEHLGPGSSQEME",
+      "b_prot_ids": [
+        9625
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    }
+  ],
+  "ADPDAVKPDDWDEDAPSKIPDEGEVYFADSFD": [
+    {
+      "b_seq": "ADPDAVKPDDWDEDAPSKIPDE",
+      "y_seq": "GEVYFADSFD",
+      "b_prot_ids": [
+        9625
+      ],
+      "y_prot_ids": [
+        9625
+      ],
+      "b_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ]
+    }
+  ],
+  "ADPDAVKPDDWDEDAPSKIPDEEATAESSRDAL": [
+    {
+      "b_seq": "ADPDAVKPDDWDEDAPSKIPDEEAT",
+      "y_seq": "AESSRDAL",
+      "b_prot_ids": [
+        9625
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    }
+  ],
+  "ADPDAVKPDDWDEDAPSKIPDEEATKPSQEME": [
+    {
+      "b_seq": "ADPDAVKPDDWDEDAPSKIPDEEATKP",
+      "y_seq": "SQEME",
+      "b_prot_ids": [
+        9625
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    }
+  ],
+  "DAVQEREYKRNHPDSELESTANRHGEETEE": [
+    {
+      "b_seq": "DAV",
+      "y_seq": "QEREYKRNHPDSELESTANRHGEETEE",
+      "b_prot_ids": [
+        9625
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "DAVKEREYKRNHPDSELESTANRHGEETEE": [
+    {
+      "b_seq": "DAVK",
+      "y_seq": "EREYKRNHPDSELESTANRHGEETEE",
+      "b_prot_ids": [
+        9625
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "DAVKPDDWDEDEAVAREKAGPEEVPTAASSSHF": [
+    {
+      "b_seq": "DAVKPDDWDED",
+      "y_seq": "EAVAREKAGPEEVPTAASSSHF",
+      "b_prot_ids": [
+        9625
+      ],
+      "y_prot_ids": [
+        13279
+      ],
+      "b_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ]
+    }
+  ],
+  "DAVKPDDWDEDAPSKKWTEGGGHSREGVDDQE": [
+    {
+      "b_seq": "DAVKPDDWDEDAPSK",
+      "y_seq": "KWTEGGGHSREGVDDQE",
+      "b_prot_ids": [
+        9625
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "DAVKPDDWDEDAPSKIPDEEATKVPTAASSSHF": [
+    {
+      "b_seq": "DAVKPDDWDEDAPSKIPDEEATK",
+      "y_seq": "VPTAASSSHF",
+      "b_prot_ids": [
+        9625
+      ],
+      "y_prot_ids": [
+        13279
+      ],
+      "b_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ]
+    }
+  ],
+  "DAVKPDDWDEDAPSKIPDEEATKPEESSRDAL": [
+    {
+      "b_seq": "DAVKPDDWDEDAPSKIPDEEATKPE",
+      "y_seq": "ESSRDAL",
+      "b_prot_ids": [
+        9625
+      ],
+      "y_prot_ids": [
+        1048
+      ],
+      "b_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ]
+    }
+  ],
+  "DAVKPDDWDEDAPSKIPDEEATKPEGWLDDDG": [
+    {
+      "b_seq": "DAVKPDDWDEDAPSKIPDEEATKPEGWLDD",
+      "y_seq": "DG",
+      "b_prot_ids": [
+        9625
+      ],
+      "y_prot_ids": [
+        13279
+      ],
+      "b_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ]
+    }
+  ],
+  "PEYIPDPDAEKPEDQPATEDWSAAPTAQATEW": [
+    {
+      "b_seq": "PEYIPDPDAEKPED",
+      "y_seq": "QPATEDWSAAPTAQATEW",
+      "b_prot_ids": [
+        9625
+      ],
+      "y_prot_ids": [
+        733
+      ],
+      "b_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ]
+    }
+  ],
+  "PVSPECPIQQFPTEDWSAQPATEDWSAAPTAQA": [
+    {
+      "b_seq": "PVSPEC",
+      "y_seq": "PIQQFPTEDWSAQPATEDWSAAPTAQA",
+      "b_prot_ids": [
+        13279
+      ],
+      "y_prot_ids": [
+        733
+      ],
+      "b_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ]
+    }
+  ],
+  "PVSPECLETLQGDGNEKWTEGGGHSREGVDDQE": [
+    {
+      "b_seq": "PVSPECLETLQGD",
+      "y_seq": "GNEKWTEGGGHSREGVDDQE",
+      "b_prot_ids": [
+        13279
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "VPSRDTMEKRKDSDKGQQDGFEATTEGNSSPSA": [
+    {
+      "b_seq": "VPSRDTMEKRKDSDKGQQDGFEATTE",
+      "y_seq": "GNSSPSA",
+      "b_prot_ids": [
+        13279
+      ],
+      "y_prot_ids": [
+        3392
+      ],
+      "b_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P99027|RLA2_MOUSE"
+      ]
+    },
+    {
+      "b_seq": "VPSRDTMEKRKDSDKGQQDGFEATTEG",
+      "y_seq": "NSSPSA",
+      "b_prot_ids": [
+        13279
+      ],
+      "y_prot_ids": [
+        3392
+      ],
+      "b_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P99027|RLA2_MOUSE"
+      ]
+    }
+  ],
+  "LSPVEDSQGQTKVGNEKWTEGGGHSREGVDDQE": [
+    {
+      "b_seq": "LS",
+      "y_seq": "PVEDSQGQTKVGNEKWTEGGGHSREGVDDQE",
+      "b_prot_ids": [
+        13279
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "LSRAVDGDGKTEASEALPSEGKGELEHSQQEEDG": [
+    {
+      "b_seq": "LSR",
+      "y_seq": "AVDGDGKTEASEALPSEGKGELEHSQQEEDG",
+      "b_prot_ids": [
+        13279
+      ],
+      "y_prot_ids": [
+        13279
+      ],
+      "b_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ]
+    }
+  ]
+}

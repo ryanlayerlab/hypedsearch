@@ -1,4 +1,12 @@
-from src.utils import Kmer, Position, generate_aa_kmers, get_positions_of_subseq_in_seq
+from dataclasses import dataclass
+
+from src.utils import (
+    Kmer,
+    Position,
+    generate_aa_kmers,
+    get_max_elements,
+    get_positions_of_subseq_in_seq,
+)
 
 
 class TestGenerateKmers:
@@ -62,3 +70,33 @@ class TestGetPositionsOfSubseqInSeq:
         expected = []
         actual = get_positions_of_subseq_in_seq(subseq=subseq, seq=seq)
         assert actual == expected
+
+
+class Test_get_max_elements:
+    @staticmethod
+    def test_one_max_element():
+        @dataclass
+        class Y:
+            x: float
+
+        objs = [
+            Y(x=1.0),
+            Y(x=3.0),
+            Y(x=2.0),
+        ]
+        result = get_max_elements(objs=objs, attr="x")
+        assert result == [Y(x=3.0)]
+
+    @staticmethod
+    def test_multiple_max_elements():
+        @dataclass
+        class Y:
+            x: float
+
+        objs = [
+            Y(x=1.0),
+            Y(x=3.0),
+            Y(x=3.0),
+        ]
+        result = get_max_elements(objs=objs, attr="x")
+        assert result == [Y(x=3.0), Y(x=3.0)]

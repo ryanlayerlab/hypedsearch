@@ -69,7 +69,7 @@ class TrueHybrid(HybridPeptide):
         )
 
     def compare_to_comet(self, comet_txt: Path) -> List[CometPSM]:
-        self.psms = CometPSM.from_txt(file_path=comet_txt, sample=self.sample)
+        self.psms = CometPSM.from_txt(txt_path=comet_txt, sample=self.sample)
         self.in_psms = seq_in_psms(seq=self.seq, psms=self.psms)
         self.hybrid_containing_psms = get_seq_containing_psms(
             seq=self.seq, psms=self.psms
@@ -131,4 +131,9 @@ def get_true_hybrids_from_thomas_file(
     true_hybrids = [
         TrueHybrid.from_df_row(row=row) for _, row in true_hybrids_df.iterrows()
     ]
+
+    # Remove DPQVAGNPDDSFLE hybrids
+    print("Removing DPQVAGNPDDSFLE hybrids")
+    true_hybrids = list(filter(lambda hy: hy.seq != "DPQVAGNPDDSFLE", true_hybrids))
+
     return true_hybrids

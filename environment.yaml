@@ -4,27 +4,39 @@ channels:
   - defaults
   - conda-forge
 dependencies:
-  - python=3.11
-  - jupyterlab
-  - pyteomics
-  - pydantic
-  - biopython
-  - scipy
-  - pytest
-  - ipytest
-  - tqdm
-  - more-itertools
-  - objsize
-  - seaborn
-  - click
-  - notebook
-  - jupyter_contrib_nbextensions
-  - fastparquet
-  - pyarrow
-  - pytables
-  - h5py
-  - black
   - autoflake
+  - biopython
+  - black
+  - click
+  - fastparquet
+  - h5py
+  - ipytest
   - isort
   - joblib
+  - jupyterlab
+  - more-itertools
+  - notebook
+  - objsize
+  - pyarrow
+  - pydantic
+  - pytables
+  - pyteomics
+  - pytest
+  - python=3.11
+  - scipy
+  - seaborn
+  - tqdm
+  - webcolors
+  - jsonschema
+  - jupyter
+  - jupyter_nbextensions_configurator
+  - jupyter_contrib_nbextensions
+  - autopep8
+  - statsmodels
+  - plotly
+  - bioconda::pymzml
+  - snakemake
+  - snakemake-executor-plugin-slurm
+  - pytest-snapshot
+  - bioconda::pyfaidx
 prefix: /Users/erjo3868/miniforge3/envs/hypedsearch

@@ -1,0 +1,234 @@
+{
+  "AATGATPVTKRRP": [
+    {
+      "b_seq": "AATGATP",
+      "y_seq": "VTKRRP",
+      "b_prot_ids": [
+        733
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "AATGATPIAGSRRP": [
+    {
+      "b_seq": "AATGATPIAG",
+      "y_seq": "SRRP",
+      "b_prot_ids": [
+        733
+      ],
+      "y_prot_ids": [
+        7724
+      ],
+      "b_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ]
+    }
+  ],
+  "DIAQGVGKLASVPA": [
+    {
+      "b_seq": "D",
+      "y_seq": "IAQGVGKLASVPA",
+      "b_prot_ids": [
+        946
+      ],
+      "y_prot_ids": [
+        3392
+      ],
+      "b_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P99027|RLA2_MOUSE"
+      ]
+    }
+  ],
+  "KVISAVSAAPGSAAP": [
+    {
+      "b_seq": "KVIS",
+      "y_seq": "AVSAAPGSAAP",
+      "b_prot_ids": [
+        3392
+      ],
+      "y_prot_ids": [
+        3392
+      ],
+      "b_prot_names": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P99027|RLA2_MOUSE"
+      ]
+    }
+  ],
+  "KVISVSAAPGSAAPA": [
+    {
+      "b_seq": "KVIS",
+      "y_seq": "VSAAPGSAAPA",
+      "b_prot_ids": [
+        3392
+      ],
+      "y_prot_ids": [
+        3392
+      ],
+      "b_prot_names": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P99027|RLA2_MOUSE"
+      ]
+    }
+  ],
+  "VSAAPGSVTKRRP": [
+    {
+      "b_seq": "VSAAPGS",
+      "y_seq": "VTKRRP",
+      "b_prot_ids": [
+        3392
+      ],
+      "y_prot_ids": [
+        946
+      ],
+      "b_prot_names": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P16014|SCG1_MOUSE"
+      ]
+    }
+  ],
+  "VSAAPGSAKLASVPA": [
+    {
+      "b_seq": "VSAAPGSA",
+      "y_seq": "KLASVPA",
+      "b_prot_ids": [
+        3392
+      ],
+      "y_prot_ids": [
+        3392
+      ],
+      "b_prot_names": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P99027|RLA2_MOUSE"
+      ]
+    }
+  ],
+  "KGVTIVSAAPGSAAP": [
+    {
+      "b_seq": "KGVTI",
+      "y_seq": "VSAAPGSAAP",
+      "b_prot_ids": [
+        7724
+      ],
+      "y_prot_ids": [
+        3392
+      ],
+      "b_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P99027|RLA2_MOUSE"
+      ]
+    }
+  ],
+  "KTNAIFRHKNP": [
+    {
+      "b_seq": "KTNA",
+      "y_seq": "IFRHKNP",
+      "b_prot_ids": [
+        7724
+      ],
+      "y_prot_ids": [
+        9625
+      ],
+      "b_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ]
+    }
+  ],
+  "KWLAVAREKAGP": [
+    {
+      "b_seq": "KWL",
+      "y_seq": "AVAREKAGP",
+      "b_prot_ids": [
+        9625
+      ],
+      "y_prot_ids": [
+        13279
+      ],
+      "b_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ]
+    }
+  ],
+  "KVTVAVSAAPGSAAP": [
+    {
+      "b_seq": "KVT",
+      "y_seq": "VAVSAAPGSAAP",
+      "b_prot_ids": [
+        9625
+      ],
+      "y_prot_ids": [
+        3392
+      ],
+      "b_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P99027|RLA2_MOUSE"
+      ]
+    }
+  ],
+  "ASEALPSAKLNKP": [
+    {
+      "b_seq": "ASEALP",
+      "y_seq": "SAKLNKP",
+      "b_prot_ids": [
+        13279
+      ],
+      "y_prot_ids": [
+        9625
+      ],
+      "b_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ]
+    },
+    {
+      "b_seq": "ASEALPS",
+      "y_seq": "AKLNKP",
+      "b_prot_ids": [
+        13279
+      ],
+      "y_prot_ids": [
+        9625
+      ],
+      "b_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P35564|CALX_MOUSE"
+      ]
+    }
+  ]
+}

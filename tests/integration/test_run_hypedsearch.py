@@ -1,66 +1,51 @@
-from pathlib import Path
-
-import pytest
-
-from src.comet_utils import CometPSM
-from src.mass_spectra import (
-    get_specific_spectrum_by_sample_and_scan_num,
-    get_spectrum_from_mzml,
-)
-from src.run_hypedsearch import run_hs_on_one_spectrum
+from src.mass_spectra import Mzml
+from src.run_hypedsearch import process_spectrum
 
 
-class Test_run_hs_on_one_spectrum:
+class Test_process_spectrum:
     @staticmethod
-    def test_smoke(tmp_path):
-        # Arrange
-        db_path = Path(
-            "results/comet_run_for_protein_abundances/top_10_prots.db"
-        ).absolute()
-        mzml_path = Path("data/spectra/BMEM_AspN_Fxn4.mzML").absolute()
-        scan = 7
-        spectrum = get_spectrum_from_mzml(mzml_path=mzml_path, scan_num=scan)
-
-        # Act
-        result = run_hs_on_one_spectrum(
-            db_path=db_path, spectrum=spectrum, output_dir=tmp_path
-        )
-        # Assert
-        psms = CometPSM.from_txt(file_path=result[1], sample=mzml_path.stem)
-        assert len(psms) > 0
-
-    @staticmethod
-    def test_smoke_fxn4_scan7():
-        sample = "BMEM_AspN_Fxn4"
-        scan_num = 7
-        db_path = Path("results/new_fasta/top_10_prots.db").absolute()
-        output_dir = Path("tmp")
-        spectrum = get_specific_spectrum_by_sample_and_scan_num(
-            sample=sample, scan_num=scan_num
-        )
-        run_hs_on_one_spectrum(
-            db_path=db_path,
+    def test_scan_with_native_psms(tmp_path, mouse_mzml, mouse_fasta, mouse_db):
+        spectrum = Mzml(path=mouse_mzml).get_spectrum(scan=7)
+        process_spectrum(
             spectrum=spectrum,
-            output_dir=output_dir,
-            num_peaks=0,
-            peak_to_ion_ppm_tol=10,
-            precursor_ppm_tol=20,
+            db_path=mouse_db,
+            fasta=mouse_fasta,
+            out_dir=tmp_path,
+            num_psms=10,
         )
 
+        expected_out_file_names = [
+            "native_target.txt",
+            "native_decoy.txt",
+            "hybrids.json",
+            # "hybrids.fasta",
+            "hybrids_target.txt",
+            "hybrids_decoy.txt",
+        ]
+        actual_out_file_names = [out_path.name for out_path in list(tmp_path.glob("*"))]
+
+        for name in expected_out_file_names:
+            assert name in actual_out_file_names
+
     @staticmethod
-    def test_smoke_fxn5_scan42():
-        sample = "BMEM_AspN_Fxn5"
-        scan_num = 42
-        db_path = Path("results/new_fasta/top_10_prots.db").absolute()
-        output_dir = Path("tmp")
-        spectrum = get_specific_spectrum_by_sample_and_scan_num(
-            sample=sample, scan_num=scan_num
-        )
-        run_hs_on_one_spectrum(
-            db_path=db_path,
+    def test_scan_with_no_native_psms(tmp_path, mouse_mzml, mouse_fasta, mouse_db):
+        spectrum = Mzml(path=mouse_mzml).get_spectrum(scan=1)
+        process_spectrum(
             spectrum=spectrum,
-            output_dir=output_dir,
-            num_peaks=0,
-            peak_to_ion_ppm_tol=10,
-            precursor_ppm_tol=20,
+            db_path=mouse_db,
+            fasta=mouse_fasta,
+            out_dir=tmp_path,
+            num_psms=10,
         )
+        expected_out_file_names = [
+            "native_target.txt",
+            "native_decoy.txt",
+            "hybrids.json",
+            # "hybrids.fasta",
+            "hybrids_target.txt",
+            "hybrids_decoy.txt",
+        ]
+        actual_out_file_names = [out_path.name for out_path in list(tmp_path.glob("*"))]
+
+        for name in expected_out_file_names:
+            assert name in actual_out_file_names

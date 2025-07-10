@@ -2,7 +2,13 @@ from pathlib import Path
 
 import click
 
-from src.constants import DEFAULT_MAX_K, DEFAULT_MIN_K, DEFAULT_PPM_TOLERANCE
+from src.constants import (
+    COMET_PARAMS,
+    DEFAULT_MAX_KMER_LEN,
+    DEFAULT_MIN_KMER_LEN,
+    DEFAULT_PPM_TOLERANCE,
+)
+from src.utils import get_default_comet_executable_path
 
 
 class PathType(click.ParamType):
@@ -49,7 +55,36 @@ class ClickOptions:
             "-o",
             type=PathType(),
             required=True,
-            help="The Comet .txt results will be saved here",
+            help="The outputs will be saved here",
+        )
+
+    def comet_exe(self):
+        return click.option(
+            "--comet_exe",
+            "-ce",
+            type=PathType(),
+            default=get_default_comet_executable_path(),
+            show_default=True,
+            help="Path to the comet executable.",
+        )
+
+    def db_path(self):
+        return click.option(
+            "--db_path",
+            "-d",
+            type=PathType(),
+            required=True,
+            help="Path to the product-ion database file.",
+        )
+
+    def comet_params(self):
+        return click.option(
+            "--comet_params",
+            "-cp",
+            type=PathType(),
+            default=COMET_PARAMS,
+            show_default=True,
+            help="Path to the comet.params file.",
         )
 
     def num_peaks(self):
@@ -67,7 +102,18 @@ class ClickOptions:
     def precursor_mz_ppm_tol(self):
         return click.option(
             "--precursor_mz_ppm_tol",
-            "-pt",
+            "-pmpt",
+            default=DEFAULT_PPM_TOLERANCE,
+            show_default=True,
+            help=(
+                "Precursor m/z PPM tolerance. Hybrids will be within this PPM of the precursor m/z"
+            ),
+        )
+
+    def peak_to_ion_ppm_tol(self):
+        return click.option(
+            "--peak_to_ion_ppm_tol",
+            "-pipt",
             default=DEFAULT_PPM_TOLERANCE,
             show_default=True,
             help=(
@@ -80,7 +126,7 @@ class ClickOptions:
             "--min_k",
             "-mk",
             type=int,
-            default=DEFAULT_MIN_K,
+            default=DEFAULT_MIN_KMER_LEN,
             show_default=True,
             help="Minimum kmer length to consider.",
         )
@@ -90,7 +136,7 @@ class ClickOptions:
             "--max_k",
             "-Mk",
             type=int,
-            default=DEFAULT_MAX_K,
+            default=DEFAULT_MAX_KMER_LEN,
             show_default=True,
             help="Maximum kmer length to consider.",
         )
@@ -116,6 +162,14 @@ class ClickOptions:
                 "If this is set, then the workflow will only run on the spectrum with this scan number "
                 "rather than all the spectra in the MZML which is what will happen if scan=0"
             ),
+        )
+
+    def overwrite(self):
+        return click.option(
+            "--overwrite",
+            "-ow",
+            is_flag=True,
+            help="If outputs already exist, this controls whether or not to overwrite them.",
         )
 
     def cli_options(self):

@@ -19,6 +19,12 @@ HS_DIR = DATA_DIR / "hs"
 SPECTRA_DIR = DATA_DIR / "spectra"
 COMET_EXECUTABLE = COMET_DIR / "comet.macos.exe"
 COMET_PARAMS = COMET_DIR / "comet.params"
+DEFAULT_COMET_PARAMS_FILE = COMET_DIR / "comet.params"
+DEFAULT_COMET_PRECURSOR_MZ_PPM_TOL = 20.0
+DEFAULT_NUM_PSMS = 5
+DEFAULT_COMET_SCAN_RANGE = (0, 0)
+DEFAULT_CRUX_PATH = Path("/Users/erjo3868/repos/crux-4.3.Darwin.x86_64/bin/crux")
+DEFAULT_CRUX_PARAMS = COMET_DIR / "crux.comet.params"
 
 FASTAS_DIR = GIT_REPO_DIR / "fastas"
 MOUSE_PROTEOME = FASTAS_DIR / "Uniprot_mouse.fasta"
@@ -35,6 +41,7 @@ KMER_AND_MASS = "kmer+mass"
 KMER = "kmer"
 SAMPLE = "sample"
 IONS_MATCHED = "ions_matched"
+IONS_TOTAL = "ions_total"
 SPECTRUM_ID = "spectrum_id"
 PROTEIN_COUNT = "protein_count"
 PROTEIN = "protein"
@@ -63,11 +70,16 @@ COMET_COUNTS = "comet_counts"
 VALIDATED = "validated"
 QUANTILE = "quantile"
 MEMORY = ":memory:"
-DEFAULT_NUM_COMET_PSMS = 20
-HS_OUTPUT_PREFIX = "hs_"
+DEFAULT_NUM_PSMS = 20
+HS_PREFIX = "hybrid_"
 NOT_HYBRID = 0
 HYBRID = 1
 MAYBE_HYBRID = 2
+COMET = "comet"
+CRUX = "crux"
+MZML = "mzml"
+SCAN_HYBRIDS = "scan_hybrids"
+Q_VALUE = "q_value"
 
 
 class IonTypes(Enum):
@@ -92,9 +104,11 @@ ALL_IONS = "all"
 # Numeric constants
 MAX_PEPTIDE_LEN = 50
 MAX_KMER_LEN = 50
-DEFAULT_MAX_K = 25
-DEFAULT_MIN_K = 1
+DEFAULT_MAX_KMER_LEN = 25
+DEFAULT_MIN_KMER_LEN = 1
 DEFAULT_PPM_TOLERANCE = 10
+DEFAULT_PEAK_TO_ION_PPM_TOL = 20
+DEFAULT_PRECURSOR_MZ_PPM_TOL = 20
 DEFAULT_NUM_PEAKS = 100
 DEFAULT_CHARGES = [1, 2, 3]
 B_ION_AS_INT = 0

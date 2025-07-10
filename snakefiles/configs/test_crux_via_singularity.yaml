@@ -1,0 +1,11 @@
+mzml_dir: "data/spectra/mouse_samples"
+parent_results_dir: "snakefiles/test_snakemake_hs"
+samples: [
+  "BMEM_AspN_Fxn4",
+]
+fasta: "fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
+crux_comet_params: "comet/crux.comet.params"
+top_n_proteins: 10
+q_value_threshold: 0.01
+precursor_mz_ppm_tol: 20
+peak_to_ion_ppm_tol: 20

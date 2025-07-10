@@ -1,0 +1,20 @@
+{
+  "RNQLLQKEPDLEWTAPA": [
+    {
+      "b_seq": "RNQLLQKEPDL",
+      "y_seq": "EWTAPA",
+      "b_prot_ids": [
+        1048
+      ],
+      "y_prot_ids": [
+        733
+      ],
+      "b_prot_names": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ]
+    }
+  ]
+}

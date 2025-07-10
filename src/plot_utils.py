@@ -1,8 +1,11 @@
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import plotly.express as px
 import seaborn as sns
 from matplotlib import rcParams
 from matplotlib.axes import Axes
@@ -230,15 +233,6 @@ def plot_pdf(ax, pdf, label=None, style="o"):
     ax.plot(pdf[:, 0], pdf[:, 1], style, label=label)
 
 
-# function that, given an Axes object, plots the y=x line with a adjustable but default line style, color, and size
-def plot_y_equals_x_line(ax, linestyle="--", color=ALMOST_BLACK, linewidth=0.5):
-    xlim = ax.get_xlim()
-    ylim = ax.get_ylim()
-    min_val = min(xlim[0], ylim[0])
-    max_val = max(xlim[1], ylim[1])
-    ax.plot([min_val, max_val], [min_val, max_val], linestyle, color=color)
-
-
 def plot_line(ax, m=1, b=0, label=None, ls="--", lc="black", lw=1):
     """
     Plot the y=m*x + b line
@@ -253,8 +247,6 @@ def plot_line(ax, m=1, b=0, label=None, ls="--", lc="black", lw=1):
     pass
 
 
-# Write me a function that returns a line of best fit for a given set of x and y values.
-# Return the slope, intercept
 def best_fit_line(x, y):
     """
     Returns the slope and intercept of the line of best fit for the given x and y values.
@@ -273,9 +265,9 @@ def plot_best_fit_line(ax, x, y, label=None):
     slope, intercept = best_fit_line(x, y)
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
-    min_val = min(xlim[0], ylim[0])
-    max_val = max(xlim[1], ylim[1])
-    x = np.linspace(min_val, max_val, 100)
+    # min_val = min(xlim[0], ylim[0])
+    # max_val = max(xlim[1], ylim[1])
+    x = np.linspace(xlim[0], xlim[1], 1000)
     y = slope * x + intercept
     ax.plot(x, y, label=label)
 
@@ -333,14 +325,68 @@ def save_fig(
     """
     Save the figure to a file.
     """
-    finalize(fig.axes)
     if title is not None:
         fig.suptitle(title, fontsize=16, fontweight="bold")
     plt.tight_layout()
     plt.savefig(
         path,
         dpi=dpi,
+        bbox_inches="tight",
         # bbox_inches=bbox_inches,
         # transparent=transparent,
         # format=fig_format,
     )
+
+
+@dataclass
+class InteractiveScatterplot:
+    df: pd.DataFrame
+    x_colm: str
+    y_colm: str
+    title: str = ""
+    color_colm: Optional[str] = None
+
+    def plot(self, ms: int = 6, info_colms: Optional[List[str]] = None):
+        """
+        Create an interactive scatter plot using Plotly Express.
+        """
+        if info_colms is None:
+            info_colms = list(self.df.columns)
+        fig = px.scatter(
+            self.df,
+            x=self.x_colm,
+            y=self.y_colm,
+            color=self.color_colm,  # color by a column
+            hover_data=info_colms,  # what to show on hover
+        )
+        _ = fig.update_traces(marker=dict(size=ms, opacity=0.7, line=dict(width=0)))
+        fig.show()
+        return fig
+
+
+def interactive_scatter_plot(
+    df: pd.DataFrame,
+    x_colm: str,
+    y_colm: str,
+    title: str = "",
+    color_colm: Optional[str] = None,
+):
+    info_colms = list(df.columns)
+    fig = px.scatter(
+        df,
+        x=x_colm,
+        y=y_colm,
+        color=color_colm,  # color by a column
+        hover_data=info_colms,  # what to show on hover
+    )
+    _ = fig.update_traces(
+        marker=dict(size=6, opacity=0.7, line=dict(width=0))
+    )  # improve visual clarity
+    _ = fig.update_layout(
+        title=title,
+        hovermode="closest",
+        xaxis=dict(title=x_colm),
+        yaxis=dict(title=y_colm),
+    )
+    fig.show()
+    return fig

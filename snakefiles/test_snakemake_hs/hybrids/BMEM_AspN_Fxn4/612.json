@@ -1,0 +1,38 @@
+{
+  "SRNTGQRAVLKFAAATGAQKGL": [
+    {
+      "b_seq": "SRNTGQRAVLKFAAATGA",
+      "y_seq": "QKGL",
+      "b_prot_ids": [
+        733
+      ],
+      "y_prot_ids": [
+        7724
+      ],
+      "b_prot_names": [
+        "sp|P14206|RSSA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P21661|NEC2_MOUSE"
+      ]
+    }
+  ],
+  "SLDKFLASVSTVLTSLEKVAH": [
+    {
+      "b_seq": "SLDKFLASVSTVLTS",
+      "y_seq": "LEKVAH",
+      "b_prot_ids": [
+        11378
+      ],
+      "y_prot_ids": [
+        13279
+      ],
+      "b_prot_names": [
+        "sp|P01942|HBA_MOUSE"
+      ],
+      "y_prot_names": [
+        "sp|P26339|CMGA_MOUSE"
+      ]
+    }
+  ]
+}

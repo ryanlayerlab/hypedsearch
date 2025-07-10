@@ -55,7 +55,7 @@ if __name__ == "__main__":
         logger.info(f"Processing mzML file: {mzml}")
         t0 = time()
 
-        spectra = Spectrum.from_mzml(mzml_path=mzml)
+        spectra = Spectrum.parse_ms2_from_mzml(spectra_file=mzml)
 
         if TESTING:
             spectra = spectra[:10]

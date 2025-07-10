@@ -15,7 +15,7 @@
 If you are using Conda for environment management, you can create and activate the environment using the provided `environment.yaml` file:
 
 ```bash
-conda env create -f environment.yaml
+conda env create -f environment.yamlpr
 conda activate hypedsearch
 ```
 
@@ -121,6 +121,13 @@ The `.csv` file will have a `run` column.
 The PSMs from Comet run #1 will have `run=1` and the PSMs from Comet run #2 will have `run=2`. 
 If `mzml_path=/path/to/BMEM_AspN_Fxn4.mzML` and `scan_num=7`, this step generate the file: `output_dir/BMEM_AspN_Fxn4/scan_num=7_hs_results.csv`.
 
+## Pipelines
+
+- Run Comet and `assign-confidence`:
+  ```
+  snakemake -s snakefiles/run_comet.smk --configfile snakefiles/configs/human_samples.yaml --cores 2
+  ```
+
 ## (Potentially) Helpful commands
 
 Here are some commands that may be helpful for you. 
@@ -135,15 +142,15 @@ Here are some commands that may be helpful for you.
   ```
 - Get the top N most abundant proteins:
   ```
-  python -m src.protein_abundance get-common-proteins \
-    -d results/comet_run_for_protein_abundances \
-    -n 1 -t 10 \
-    -o results/comet_run_for_protein_abundances/top_10_proteins.txt
+  python -m src.protein_abundance -d results/human_samples/native_run -q 0.01 -t 10 -o results/human_samples/db/top_10_proteins.txt
   ```
-
+- Get the PSM prefix abundances:
+  ```
+  python -m src.protein_abundance prefix-abundances --comet_results_dir results/human_samples/native_run --q_value_threshold 0.01 --out_path results/human_samples/native_run/prefix_abundances.json
+  ```
 - Create database of proteins and product ions
   ```
-  python -m src.create_db
+  python -m src.create_db -h
   python -m src.create_db \
     -d results/new_fasta/top_10_prots.db \
     -p results/new_fasta/top_10_proteins.txt \

@@ -38,7 +38,7 @@ for path in [mzml, protein_names, fasta_path, output_dir, mzmls_comet_run_txt]:
 
 # Get the scans to run
 mzml_comet_run = CometPSM.from_txt(
-    file_path=mzmls_comet_run_txt, sample=mzml.stem, as_df=True
+    txt_path=mzmls_comet_run_txt, sample=mzml.stem, as_df=True
 )
 scans = list(mzml_comet_run["scan"].unique())
 scans_formatted_as_strings = ",".join([str(scan) for scan in scans])

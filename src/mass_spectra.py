@@ -1,14 +1,16 @@
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Annotated, Dict, List, Optional, Union
 
 import numpy as np
 from matplotlib.pyplot import Axes
-from pyteomics import mzml
+from pydantic import BaseModel, BeforeValidator
+from pyteomics import mzml as mzml_reader
 
 from src.constants import SPECTRA_DIR, THOMAS_SAMPLES
 from src.plot_utils import fig_setup, set_title_axes_labels
+from src.utils import flatten_list_of_lists, to_path
 
 
 @dataclass
@@ -43,22 +45,10 @@ class Spectrum:
         return sum([peak.intensity for peak in self.peaks])
 
     @classmethod
-    def from_dict(cls, spectrum: Dict, mzml: Optional[Path] = None) -> "Spectrum":
+    def from_dict(cls, spectrum: Dict, mzml: Path):
         # Extract scan number from 'id' key
         spectrum_id = spectrum.get("id", "")
-        scan_num = int(re.search(r"scan=(\d+)", spectrum_id).group(1))
-
-        # Extract other required fields
-        precursor_mz = spectrum["precursorList"]["precursor"][0]["selectedIonList"][
-            "selectedIon"
-        ][0]["selected ion m/z"]
-        precursor_charge = spectrum["precursorList"]["precursor"][0]["selectedIonList"][
-            "selectedIon"
-        ][0]["charge state"]
-        precursor_abundance = spectrum["precursorList"]["precursor"][0][
-            "selectedIonList"
-        ]["selectedIon"][0]["peak intensity"]
-        retention_time = spectrum["scanList"]["scan"][0]["scan start time"]
+        scan_num = int(re.search(r"(?:scan|scanId)=(\d+)", spectrum_id).group(1))
 
         # Get peaks
         masses, abundances = tuple(spectrum["m/z array"]), tuple(
@@ -69,25 +59,57 @@ class Spectrum:
             for idx in range(len(masses))
         ]
         return cls(
-            # mass_over_charges=masses,
-            # abundances=abundances,
             scan=scan_num,
             peaks=peaks,
-            precursor_mz=precursor_mz,
-            precursor_charge=precursor_charge,
-            precursor_abundance=precursor_abundance,
             spectrum_id=spectrum_id,
-            retention_time=retention_time,
             mzml=mzml,
+            precursor_mz=spectrum["precursorList"]["precursor"][0]["selectedIonList"][
+                "selectedIon"
+            ][0]["selected ion m/z"],
+            precursor_charge=spectrum["precursorList"]["precursor"][0][
+                "selectedIonList"
+            ]["selectedIon"][0]["charge state"],
+            precursor_abundance=spectrum["precursorList"]["precursor"][0][
+                "selectedIonList"
+            ]["selectedIon"][0]["peak intensity"],
+            retention_time=spectrum["scanList"]["scan"][0]["scan start time"],
         )
 
     @classmethod
-    def from_mzml(cls, mzml_path: Union[str, Path]) -> List["Spectrum"]:
-        mzml_path = Path(mzml_path)
-        spectra = mzml.read(str(mzml_path))
-        return [
-            cls.from_dict(spectrum=spectrum, mzml=mzml_path) for spectrum in spectra
-        ]
+    def parse_ms2_from_mzml(cls, spectra_file: Union[str, Path]) -> List["Spectrum"]:
+        spectra_file = Path(spectra_file).absolute()
+        ms2_spectra = []
+        with mzml_reader.MzML(str(spectra_file)) as mzml:
+            for spectrum in mzml:
+                if spectrum["ms level"] == 1:
+                    continue
+                ms2_spectra.append(cls.from_dict(spectrum=spectrum, mzml=spectra_file))
+
+            return ms2_spectra
+
+    @classmethod
+    def get_spectrum(cls, scan: int, mzml: Path):
+        with mzml_reader.MzML(str(mzml)) as reader:
+            spectrum = reader.get_by_id(f"scan={scan}")
+        return cls.from_dict(spectrum=spectrum, mzml=mzml)
+
+    @classmethod
+    def load_spectra_from_path(cls, path: Union[Path, str]) -> List["Spectrum"]:
+        """
+        Load spectra from a given path on the computer. If the path is a directory, find all
+        mass spectra files in that directory and parse all their spectra
+        """
+        path = Path(path).absolute()
+        if path.is_dir():
+            spectra_files = list(path.glob("*.mzML"))
+            spectra = [
+                cls.parse_ms2_from_mzml(spectra_file=spectra_file)
+                for spectra_file in spectra_files
+            ]
+            return flatten_list_of_lists(spectra)
+
+        elif path.is_file():
+            return cls.parse_ms2_from_mzml(spectra_file=path)
 
     def filter_to_top_n_peaks(self, n: int) -> None:
         if n > 0:
@@ -104,6 +126,7 @@ class Spectrum:
         annotate: bool = True,
         log_intensity: bool = False,
         alpha: float = 1,
+        color: str = "grey",
     ):
         if ax is None:
             _, axs = fig_setup()
@@ -116,20 +139,37 @@ class Spectrum:
             alpha=alpha,
             log_intensity=log_intensity,
             title=title,
+            color=color,
         )
+        ax.set_ylim(bottom=0)
         return ax
 
 
-# def plot_peak(
-#     ax: Axes,
-#     x: float,
-#     y: float,
-#     label: str = "peaks",
-#     color: Any = "grey",
-#     alpha: float = 1,
-#     linewidth: float = 0.5,
-# ):
-#     _ = ax.vlines(x, [0], y, color=color, linewidth=linewidth, alpha=alpha, label=label)
+class Mzml(BaseModel):
+    path: Annotated[Path, BeforeValidator(lambda x: to_path(path=x, check_exists=True))]
+
+    @property
+    def ms2_spectra(self) -> List["Spectrum"]:
+        """
+        Get all spectra from the mzML file.
+        """
+        return Spectrum.parse_ms2_from_mzml(spectra_file=self.path)
+
+    @property
+    def scans(self) -> List[int]:
+        """
+        Get all scan numbers from the mzML file.
+        """
+        return [spectrum.scan for spectrum in self.ms2_spectra]
+
+    def get_spectrum(self, scan: int) -> "Spectrum":
+        for spectrum in self.ms2_spectra:
+            if spectrum.scan == scan:
+                return spectrum
+
+    @property
+    def sample(self) -> str:
+        return self.path.stem
 
 
 def plot_peaks(
@@ -139,7 +179,7 @@ def plot_peaks(
     log_intensity: bool = False,
     alpha: float = 1,
     color: str = "grey",
-    label: str = "peaks",
+    label: str = "",
     title: Optional[str] = None,
 ):
     mzs = [peak.mz for peak in peaks]
@@ -186,13 +226,13 @@ def load_mzml_data(samples: List[str] = THOMAS_SAMPLES):
     for sample in samples:
         print(f"Reading sample {sample}'s MZML")
         mzml_path = SPECTRA_DIR / f"{sample}.mzML"
-        spectra = Spectrum.from_mzml(mzml_path=mzml_path)
+        spectra = Spectrum.parse_ms2_from_mzml(spectra_file=mzml_path)
         mzml_data.extend(list(spectra))
     return mzml_data
 
 
 def get_spectrum_from_mzml(scan_num: int, mzml_path: Path):
-    spectra = Spectrum.from_mzml(mzml_path=mzml_path)
+    spectra = Spectrum.parse_ms2_from_mzml(spectra_file=mzml_path)
 
     spectrum = list(filter(lambda spectrum: spectrum.scan == scan_num, spectra))
     assert (
@@ -217,10 +257,40 @@ def get_specific_spectrum_by_sample_and_scan_num(
             f"Provided 'sample' should be type str or int. You provided {type(sample)}"
         )
     matched_spectrum = None
-    spectra = Spectrum.from_mzml(mzml_path=mzml_path)
+    spectra = Spectrum.parse_ms2_from_mzml(spectra_file=mzml_path)
     matched_spectrum = None
     for spectrum in spectra:
         if spectrum.scan == scan_num:
             matched_spectrum = spectrum
             break
     return matched_spectrum
+
+
+def get_mzml_for_sample(sample: str) -> Path:
+    """
+    Get the mzML file for a given sample.
+    """
+    mzml_path = SPECTRA_DIR / f"{sample}.mzML"
+    if not mzml_path.exists():
+        raise FileNotFoundError(f"MZML file for sample {sample} not found.")
+    return mzml_path
+
+
+def load_spectra_from_computer(path: Path) -> List[Spectrum]:
+    """
+    Load spectra from a given path on the computer. If the path is a directory, find all
+    mass spectra files in that directory and parse all their spectra
+    """
+    if path.is_dir():
+        spectra_files = list(path.glob("*.mzML"))
+        spectra = [
+            Spectrum.parse_ms2_from_mzml(spectra_file=spectra_file)
+            for spectra_file in spectra_files
+        ]
+        return flatten_list_of_lists(spectra)
+
+    elif path.is_file():
+        return Spectrum.parse_ms2_from_mzml(spectra_file=path)
+
+    spectra = Spectrum.parse_ms2_from_mzml(spectra_file=path)
+    return spectra

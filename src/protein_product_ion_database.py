@@ -4,14 +4,25 @@ from pathlib import Path
 from time import time
 from typing import Dict, List
 
-from src.constants import (AMINO_ACID_MASSES, DEFAULT_PPM_TOLERANCE, MEMORY,
-                           PRODUCT_ION_TABLE, PROTEIN_TABLE, PROTON_MASS,
-                           WATER_MASS, IonTypes)
+from src.constants import (
+    AMINO_ACID_MASSES,
+    DEFAULT_PPM_TOLERANCE,
+    MEMORY,
+    PRODUCT_ION_TABLE,
+    PROTEIN_TABLE,
+    PROTON_MASS,
+    WATER_MASS,
+    IonTypes,
+)
 from src.mass_spectra import Peak, Spectrum
-from src.peptides_and_ions import (Peptide, compute_peptide_mz)
-from src.sql_database import (PrimaryKey, Sqlite3Database, SqlTableRow)
-from src.utils import (flatten_list_of_lists, get_positions_of_subseq_in_seq, get_time_in_diff_units,
-                       relative_ppm_tolerance_in_daltons)
+from src.peptides_and_ions import Peptide, compute_peptide_mz
+from src.sql_database import PrimaryKey, Sqlite3Database, SqlTableRow
+from src.utils import (
+    flatten_list_of_lists,
+    get_positions_of_subseq_in_seq,
+    get_time_in_diff_units,
+    relative_ppm_tolerance_in_daltons,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -99,13 +110,25 @@ def get_aa_seq_corresponding_to_protein_region(
     return peptide[inclusive_start:exclusive_end]
 
 
-def b_bounds(ppm_tolerance, query_mass, charge):
+def b_ion_bounds_on_amino_acid_mass(ppm_tolerance, ref_mass, charge):
+    """
+    Let A = the sum of the masses of the amino acids in the peptide, Bp = the mass of a proton,
+    m_{zb} = the mass of a b-ion with charge z is (A/z) + Bp, and
+    Da(M, X) = X PPM of M in daltons.
+    Then you can show that if you want all b-ions for which m_{zb} is within within X ppm of a
+    given mass M (called the "reference mass"), then that means that you want
+    (M - Da(M, X)) <= m_{zb} = (A/z) + Bp <= (M + Da(M, X)) which means
+    z*((M-Da(M, X)) - Bp) <= A <= z*((M + Da(M, X)) - Bp)
+
+    If you want the b-ion m/z, m_{zb}, to be within X ppm of a given mass M (called the "reference mass")
+    e1 <= m_{zb} <= e2, then you want want
+    """
     mz_tolerance = relative_ppm_tolerance_in_daltons(
-        ppm=ppm_tolerance, ref_mass=query_mass
+        ppm=ppm_tolerance, ref_mass=ref_mass
     )
 
-    lower_mz_bound = query_mass - mz_tolerance
-    upper_mz_bound = query_mass + mz_tolerance
+    lower_mz_bound = ref_mass - mz_tolerance
+    upper_mz_bound = ref_mass + mz_tolerance
 
     lower_bound = charge * (lower_mz_bound - PROTON_MASS)
     upper_bound = charge * (upper_mz_bound - PROTON_MASS)
@@ -113,9 +136,19 @@ def b_bounds(ppm_tolerance, query_mass, charge):
     return lower_bound, upper_bound
 
 
-def y_bounds(ppm_tolerance, query_mass, charge):
-    b_lower, b_upper = b_bounds(
-        ppm_tolerance=ppm_tolerance, query_mass=query_mass, charge=charge
+def y_ion_bounds_on_amino_acid_mass(ppm_tolerance, ref_mass, charge):
+    """
+    Let A = the sum of the masses of the amino acids in the peptide, Bp = the mass of a proton,
+    Bw = the mass of water,
+    m_{zy} = the mass of a y-ion with charge z is ((A+Bw)/z) + Bp, and
+    Da(M, X) = X PPM of M in daltons.
+    Then you can show that if you want all y-ions for which m_{zy} is within within X ppm of a
+    given mass M (called the "reference mass"), then that means that you want
+    (M - Da(M, X)) <= m_{zy} <= (M + Da(M, X)) which means
+    z*((M-Da(M, X)) - Bp) - Bw <= A <= z*((M + Da(M, X)) - Bp) + Bw
+    """
+    b_lower, b_upper = b_ion_bounds_on_amino_acid_mass(
+        ppm_tolerance=ppm_tolerance, ref_mass=ref_mass, charge=charge
     )
     y_lower, y_upper = b_lower - WATER_MASS, b_upper - WATER_MASS
     return y_lower, y_upper
@@ -129,7 +162,7 @@ class ProteinProductIonDb(Sqlite3Database):
         product_ion_table_name: str = PRODUCT_ION_TABLE,
         protein_obj: type[DbProtein] = DbProtein,
         product_ion_obj: type[DbKmer] = DbKmer,
-        overwrite: bool = True,
+        overwrite: bool = False,
     ):
         super().__init__(db_path=db_path, overwrite=overwrite)
         self.protein_table_name = protein_table_name
@@ -164,7 +197,10 @@ class ProteinProductIonDb(Sqlite3Database):
         ion_types: List[IonTypes],
     ):
         # Constant only used in this function
-        bounds_fcns = {IonTypes.B_ION_TYPE: b_bounds, IonTypes.Y_ION_TYPE: y_bounds}
+        bounds_fcns = {
+            IonTypes.B_ION_TYPE: b_ion_bounds_on_amino_acid_mass,
+            IonTypes.Y_ION_TYPE: y_ion_bounds_on_amino_acid_mass,
+        }
 
         # Get the product ions that match the given peak
         results = []
@@ -173,7 +209,7 @@ class ProteinProductIonDb(Sqlite3Database):
                 bounds_fcn = bounds_fcns[ion_type]
                 lower_bound, upper_bound = bounds_fcn(
                     ppm_tolerance=ppm_tolerance,
-                    query_mass=peak_mz,
+                    ref_mass=peak_mz,
                     charge=charge,
                 )
                 query = f"""
@@ -202,7 +238,14 @@ class ProteinProductIonDb(Sqlite3Database):
                     ion.ionize(charge=charge, ion_type=ion_type)
                 # logger.info(f"Matching ions POST-filtering: {matching_ions}")
                 results.extend(matching_ions)
-        return results
+            return results
+
+    def get_protein_id_to_name_map(self):
+        query = f"""
+            SELECT id, name FROM {self.protein_table_name}
+        """
+        rows = self.read_query(query=query)
+        return {row["id"]: row["name"] for row in rows}
 
 
 @dataclass
@@ -249,7 +292,7 @@ def get_product_ions_matching_spectrum(
         peaks_and_matches.append(
             PeakWithMatchingProductIons(peak=peak, ions=matching_product_ions)
         )
-    logger.info(
+    logger.debug(
         f"Peak-to-product-ion matching took {get_time_in_diff_units(time()-start_time)}"
     )
     return peaks_and_matches
@@ -290,7 +333,7 @@ def create_db(
         db.insert_dataclasses(table_name=db.protein_table_name, data_classes=prots)
 
         # Add product ions
-        logger.info("Adding kmers to DB...")
+        logger.debug("Adding kmers to DB...")
         ions = [
             DbKmer.seq_to_ion(seq=seq, protein_ids=protein_ids)
             for seq, protein_ids in uniq_kmer_to_protein_map.items()
