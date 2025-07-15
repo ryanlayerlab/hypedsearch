@@ -15,7 +15,6 @@ import click
 import pandas as pd
 from pydantic import BaseModel, BeforeValidator, validator
 
-from src.click_utils import PathType
 from src.constants import (
     COMET,
     COMET_DIR,
@@ -48,6 +47,7 @@ from src.hypedsearch_utils import HybridPeptide
 from src.mass_spectra import Spectrum, get_specific_spectrum_by_sample_and_scan_num
 from src.utils import (
     ExistingPath,
+    PathType,
     flatten_list_of_lists,
     get_arg_fcn_of_objects,
     get_default_comet_executable_path,
@@ -131,7 +131,7 @@ class CometPSM:
         """
         Reads Comet results .txt file to a list of dataclasses or a dataframe
         """
-
+        # Check whether TXT is from a direct Comet run or a Comet run via crux
         comet_txt = CometTxt(path=Path(txt_path))
 
         # Set sample if not provided
@@ -139,6 +139,13 @@ class CometPSM:
             sample = comet_txt.sample
         if comet_txt.file_type == CRUX:
             df = pd.read_csv(comet_txt.path, sep="\t")
+            df[SAMPLE] = sample
+            if "file" in df.columns:
+                # If the 'file' column exists, it means it's the output of `crux assign-confidence`
+                # in which case we need to set the sample differently
+                df[SAMPLE] = df["file"].apply(
+                    lambda file_path: Path(file_path).stem.split(".")[0]
+                )
             df.rename(
                 columns={
                     "b/y ions matched": IONS_MATCHED,
@@ -153,16 +160,14 @@ class CometPSM:
             )
         elif comet_txt.file_type == COMET:
             df = pd.read_csv(comet_txt.path, sep="\t", header=1)
-        else:
-            raise ValueError(f"Unknown Comet txt file type: {comet_txt.file_type}")
+            df[SAMPLE] = sample
 
         if as_df:
-            df[SAMPLE] = sample
             return df
         else:
             return [
                 cls(
-                    sample=sample,
+                    sample=row[SAMPLE],
                     scan=row[SCAN],
                     num=row[NUM],
                     ions_matched=row[IONS_MATCHED],
@@ -210,11 +215,6 @@ class CometPSM:
         If a PSM is in both a hybrid protein and a native protein, that means that the "hybrid"
         is a native sequence.
         """
-        # Check if any of the proteins start with the hybrid search prefix
-        # if any([self.check_if_hybrid_prot(prot=prot) for prot in self.proteins]):
-        #     return True
-        # else:
-        #     return False
         if all(self.check_if_hybrid_prot(prot=prot) for prot in self.proteins):
             return True
         else:
@@ -293,56 +293,3 @@ def get_comet_protein_counts(
         all_prots = [remove_gene_name(protein_name=prot) for prot in all_prots]
 
     return Counter(all_prots)
-
-
-def read_comet_txts_in_dir(
-    folder: Path,
-    # as_df: bool = False,
-    recurse: bool = False,
-    # ignore_hs: bool = True,
-    # verbose: bool = False,
-) -> List[CometPSM]:
-    # Get all TXTs
-    txts = list(folder.glob("*.txt"))
-    if recurse:
-        txts += list(folder.rglob("*.txt"))
-
-    if len(txts) == 0:
-        logger.info(f"No Comet TXT files found in {folder} with recurse={recurse}")
-        return None
-
-    # Get CometPSMs from TXTs
-    data = []
-    num_txts = len(txts)
-    logger.info(f"Reading {num_txts} Comet TXTs...")
-    for idx, txt in enumerate(txts):
-        if verbose and (idx % 500 == 0):
-            logger.info(f"Reading Comet TXT {idx+1} of {num_txts}")
-
-        comet_txt = CometTxt.from_txt(file_path=txt)
-        if comet_txt.path is None:
-            # This is not a Comet output file
-            continue
-
-        if ignore_hs and comet_txt.hybrid_run:
-            # This is a hybrid run output file
-            continue
-
-        data.append(comet_txt.read_psms(as_df=as_df))
-
-    if as_df:
-        return pd.concat(data, ignore_index=True)
-    else:
-        return flatten_list_of_lists(data)
-
-
-# def get_sample_from_comet_xml_output(xml_path: Path) -> str:
-#     """
-#     Gets the sample name from the Comet XML file.
-#     """
-#     tree = ET.parse(xml_path)
-#     root = tree.getroot()
-#     namespace = {"pep": "http://regis-web.systemsbiology.net/pepXML"}
-#     msms_run_summary = root.find("pep:msms_run_summary", namespace)
-#     sample = msms_run_summary.get("base_name").split("/")[-1]
-#     return sample

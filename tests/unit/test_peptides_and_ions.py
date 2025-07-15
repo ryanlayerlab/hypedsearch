@@ -219,7 +219,7 @@ class Test_get_unique_kmers:
 
 class Test_get_uniq_kmer_to_protein_map:
     @staticmethod
-    def test_smoke():
+    def test_default():
         proteins = [Peptide(seq="ACD", id=0), Peptide(seq="CDE", id=1)]
         min_k, max_k = 1, 3
         expected = {
@@ -235,6 +235,30 @@ class Test_get_uniq_kmer_to_protein_map:
         }
         actual = get_uniq_kmer_to_protein_map(
             min_k=min_k, max_k=max_k, proteins=proteins
+        )
+
+        assert actual == expected
+
+    @staticmethod
+    def test_name():
+        proteins = [
+            Peptide(seq="ACD", id=0, name="prot 1"),
+            Peptide(seq="CDE", id=1, name="prot 2"),
+        ]
+        min_k, max_k = 1, 3
+        expected = {
+            "A": ["prot 1"],
+            "AC": ["prot 1"],
+            "ACD": ["prot 1"],
+            "C": ["prot 1", "prot 2"],
+            "CD": ["prot 1", "prot 2"],
+            "CDE": ["prot 2"],
+            "D": ["prot 1", "prot 2"],
+            "DE": ["prot 2"],
+            "E": ["prot 2"],
+        }
+        actual = get_uniq_kmer_to_protein_map(
+            min_k=min_k, max_k=max_k, proteins=proteins, protein_attr="name"
         )
 
         assert actual == expected

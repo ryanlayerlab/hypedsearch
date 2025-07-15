@@ -1,0 +1,12 @@
+mzml_dir: "data/spectra/human_samples"
+parent_results_dir: "results/samples_1a_and_1b"
+samples: [
+  "HuIslets_01_Sample1A_AspN_Fxn8_250620_JG",
+  "HuIslets_02_Sample1B_AspN_Fxn8_250620_JG",
+]
+fasta: "fastas/uniprotkb_proteome_UP000005640_AND_revi_2025_04_29.fasta"
+crux_comet_params: "comet/crux.comet.params"
+top_n_proteins: 10
+q_value_threshold: 0.01
+precursor_mz_ppm_tol: 20
+peak_to_ion_ppm_tol: 20

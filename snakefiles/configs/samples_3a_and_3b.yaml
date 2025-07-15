@@ -1,0 +1,12 @@
+mzml_dir: "data/spectra/human_samples"
+parent_results_dir: "results/samples_3a_and_3b"
+samples: [
+  "HuIslets_A7_Sample3A_AspN_Fxn7_250520_MD",
+  "HuIslets_B7_Sample3B_AspN_Fxn7_250520_MD",
+]
+fasta: "fastas/uniprotkb_proteome_UP000005640_AND_revi_2025_04_29.fasta"
+crux_comet_params: "comet/crux.comet.params"
+top_n_proteins: 10
+q_value_threshold: 0.05
+precursor_mz_ppm_tol: 20
+peak_to_ion_ppm_tol: 20

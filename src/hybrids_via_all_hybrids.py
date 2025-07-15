@@ -7,7 +7,6 @@ from typing import List, Optional, Union
 
 import click
 
-from src.click_utils import ClickOptions
 from src.constants import (
     DEFAULT_MAX_KMER_LEN,
     DEFAULT_MIN_KMER_LEN,
@@ -33,6 +32,7 @@ from src.peptides_and_ions import (
 )
 from src.sql_database import Sqlite3Database
 from src.utils import (
+    ClickOptions,
     get_time_in_diff_units,
     log_params,
     log_time,

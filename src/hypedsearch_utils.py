@@ -14,7 +14,7 @@ from src.peptides_and_ions import (
     write_fasta,
 )
 from src.sql_database import SqlTableRow
-from src.utils import log_time
+from src.utils import load_json, log_time
 
 logger = logging.getLogger(__name__)
 
@@ -102,8 +102,16 @@ class HybridPeptide:
             "y_prot_names": list(self.y_prot_names) if self.y_prot_names else None,
         }
 
-    # @classmethod
-    # def from_dict(cls, data)
+    @classmethod
+    def from_json(cls, json: Path) -> List["HybridPeptide"]:
+        hybrid_seq_to_dicts = load_json(in_path=json)
+        hybrids = []
+        for _, hybrid_dicts in hybrid_seq_to_dicts.items():
+            for hybrid_dict in hybrid_dicts:
+                hybrid_dict["sample"] = json.parent.stem
+                hybrid_dict["scan"] = int(json.stem)
+                hybrids.append(cls(**hybrid_dict))
+        return hybrids
 
 
 @dataclass

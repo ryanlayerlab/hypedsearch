@@ -594,7 +594,7 @@ class PeakIonMatch:
 
 def get_peaks_that_match_peptide_product_ions(
     spectrum: Spectrum,
-    peptide: Peptide,
+    peptide: Union[Peptide, str],
     ion_types: List[IonTypes] = [IonTypes.B_ION_TYPE, IonTypes.Y_ION_TYPE],
     peak_ppm_tolerance: float = DEFAULT_PPM_TOLERANCE,
     return_dataclasses: bool = False,
@@ -603,6 +603,8 @@ def get_peaks_that_match_peptide_product_ions(
     Compare the given spectrum to the given peptide. This method helps evaluate
     how strong the evidence is for a peptide-spectrum match (PSM).
     """
+    if isinstance(peptide, str):
+        peptide = Peptide(seq=peptide)
     # Product ions will have charge <= precursor's charge
     charges = list(range(1, spectrum.precursor_charge + 1))
 
