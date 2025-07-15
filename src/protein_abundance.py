@@ -6,19 +6,10 @@ from typing import Dict, List, Optional
 import click
 import pandas as pd
 import seaborn as sns
-from matplotlib import pyplot as plt
 
 from src.comet_utils import CometPSM
-from src.constants import DEFAULT_MAX_KMER_LEN
 from src.plot_utils import fig_setup, finalize, save_fig, set_title_axes_labels
-from src.utils import (
-    PathType,
-    flatten_list_of_lists,
-    generate_aa_kmers,
-    pickle_and_compress,
-    setup_logger,
-    to_json,
-)
+from src.utils import PathType, flatten_list_of_lists, setup_logger, to_json
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +115,6 @@ def plot_protein_counts(
     # Label the left-most N points
     colors = sns.color_palette("hsv", top_n_prots)
     for idx in range(top_n_prots):
-
         # _ = ax.text(
         _ = ax.scatter(
             idx,

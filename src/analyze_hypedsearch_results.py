@@ -15,7 +15,7 @@ from src.protein_abundance import (
     get_protein_counts_from_comet_results,
     load_comet_psms,
 )
-from src.utils import get_rank, load_json, number_greater_than, to_json
+from src.utils import load_json, number_greater_than, to_json
 
 logger = logging.getLogger(__name__)
 
@@ -213,7 +213,6 @@ class HypedsearchResults:
     def get_scan_psm(
         self, sample: str, scan: int, psm_type: Literal["native", "hybrid"]
     ) -> Dict[str, Union[CometPSM, HybridPSM]]:
-
         if psm_type == "native":
             txt_path = self.native_run_dir / "assign-confidence.target.txt"
         elif psm_type == "hybrid":

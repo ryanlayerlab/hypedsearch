@@ -1,63 +1,34 @@
 import logging
-import os
-import platform
-import subprocess
-import tempfile
-import xml.etree.ElementTree as ET
 from collections import Counter
 from dataclasses import dataclass, field
-from functools import cached_property
 from itertools import groupby
 from pathlib import Path
-from typing import Annotated, Callable, List, Literal, Optional, Tuple, Union
+from typing import Callable, List, Literal, Optional, Union
 
-import click
 import pandas as pd
-from pydantic import BaseModel, BeforeValidator, validator
 
 from src.constants import (
     COMET,
-    COMET_DIR,
-    COMET_PARAMS,
-    COMET_RUN_1_DIR,
-    COMET_RUN_2_DIR,
     CRUX,
-    DEFAULT_COMET_PARAMS_FILE,
-    DEFAULT_COMET_PRECURSOR_MZ_PPM_TOL,
-    DEFAULT_COMET_SCAN_RANGE,
-    DEFAULT_NUM_PSMS,
-    DEFAULT_PPM_TOLERANCE,
     DELTA_CN,
     EVAL,
     HS_PREFIX,
     IONS_MATCHED,
     IONS_TOTAL,
-    MOUSE_PROTEOME,
     NUM,
     PLAIN_PEPTIDE,
     PROTEIN,
-    PROTEIN_COUNT,
     Q_VALUE,
     SAMPLE,
     SCAN,
-    THOMAS_SAMPLES,
     XCORR,
 )
-from src.hypedsearch_utils import HybridPeptide
 from src.mass_spectra import Spectrum, get_specific_spectrum_by_sample_and_scan_num
 from src.utils import (
-    ExistingPath,
-    PathType,
     flatten_list_of_lists,
     get_arg_fcn_of_objects,
-    get_default_comet_executable_path,
     get_fcn_of_objects,
-    get_os,
-    log_params,
-    log_time,
-    make_directory,
     remove_gene_name,
-    setup_logger,
 )
 
 logger = logging.getLogger(__name__)
@@ -199,8 +170,6 @@ class CometPSM:
             sample=self.sample, scan_num=self.scan
         )
 
-    # @staticmethod
-    # def check_if_hybrid(proteins: List[str]) -> bool:
     @staticmethod
     def check_if_hybrid_prot(prot: str):
         if prot.startswith(HS_PREFIX) or prot.startswith("hybrid_"):
@@ -257,39 +226,3 @@ class CometPSMs:
 
     def get_arg_fcn_of_psms(self, attr: str, fcn: Callable):
         return get_arg_fcn_of_objects(objs=self.psms, attr=attr, fcn=fcn)
-
-
-@dataclass
-class ScanPSMs:
-    native_psms: CometPSMs
-    hybrid_psms: CometPSMs
-
-    def __post_init__(self):
-        # Handle if psms are passed as List[CometPSM] instead of CometPSMs
-        if isinstance(self.native_psms, list):
-            self.native_psms = CometPSMs(psms=self.native_psms)
-        if isinstance(self.hybrid_psms, list):
-            self.hybrid_psms = CometPSMs(psms=self.hybrid_psms)
-
-    @property
-    def sample(self):
-        return self.native_psms.psms[0].sample
-
-    @property
-    def scan(self):
-        return self.native_psms.psms[0].scan
-
-
-def get_comet_protein_counts(
-    comet_rows: Optional[List[CometPSM]] = None,
-    shorten_names: bool = True,
-) -> Counter:
-    # if comet_rows is None:
-    #     comet_rows = load_comet_data(as_df=False)
-
-    all_prots = flatten_list_of_lists([row.proteins for row in comet_rows])
-
-    if shorten_names is True:
-        all_prots = [remove_gene_name(protein_name=prot) for prot in all_prots]
-
-    return Counter(all_prots)

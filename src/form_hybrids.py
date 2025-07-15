@@ -1,20 +1,15 @@
-import argparse
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from time import time
 from typing import Callable, Dict, List, Literal, Optional
 
 import click
-import numpy as np
 
 from src.constants import (
     DEFAULT_MAX_KMER_LEN,
     DEFAULT_MIN_KMER_LEN,
     DEFAULT_PEAK_TO_ION_PPM_TOL,
     DEFAULT_PRECURSOR_MZ_PPM_TOL,
-    MZML,
-    SCAN_HYBRIDS,
 )
 from src.hybrids_via_clusters import get_hybrids_via_clusters
 from src.hypedsearch_utils import (
@@ -22,12 +17,11 @@ from src.hypedsearch_utils import (
     create_hybrids_fasta,
     postprocess_hybrids,
 )
-from src.mass_spectra import Mzml, Spectrum, get_spectrum_from_mzml
+from src.mass_spectra import Spectrum
 from src.protein_product_ion_database import ProteinProductIonDb
 from src.utils import (
     PathType,
     flatten_list_of_lists,
-    get_time_in_diff_units,
     load_json,
     log_params,
     log_time,
@@ -58,7 +52,6 @@ class HybridFormingMethod:
         min_k: int = DEFAULT_MIN_KMER_LEN,
         max_k: int = DEFAULT_MAX_KMER_LEN,
     ):
-
         if db_path is not None:
             hybrid_forming_fcn = lambda spectrum: get_hybrids_via_clusters(
                 spectrum=spectrum,

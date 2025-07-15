@@ -1,44 +1,24 @@
 import logging
-import shutil
-import tempfile
-from pathlib import Path
-from time import time
-from typing import List, Optional, Union
+from typing import List, Optional
 
-import click
 
 from src.constants import (
     DEFAULT_MAX_KMER_LEN,
     DEFAULT_MIN_KMER_LEN,
-    DEFAULT_NUM_PSMS,
     DEFAULT_PPM_TOLERANCE,
     PROTON_MASS,
     WATER_MASS,
-    HybridFormingMethods,
 )
 from src.hybrids_via_clusters import HybridPeptide, SeqWithMass
-from src.hypedsearch_utils import (
-    HybridPeptide,
-    create_hybrids_fasta,
-    hypedsearch_output_stem,
-    remove_native_hybrids,
-)
+from src.hypedsearch_utils import HybridPeptide, remove_native_hybrids
 from src.mass_spectra import Spectrum
 from src.peptides_and_ions import (
     Peptide,
     compute_peptide_mz,
-    get_proteins_by_name,
     get_uniq_kmer_to_protein_map,
 )
 from src.sql_database import Sqlite3Database
-from src.utils import (
-    ClickOptions,
-    get_time_in_diff_units,
-    log_params,
-    log_time,
-    relative_ppm_tolerance_in_daltons,
-    setup_logger,
-)
+from src.utils import log_time, relative_ppm_tolerance_in_daltons
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +33,6 @@ def form_all_hybrids(
     min_k: int = DEFAULT_MIN_KMER_LEN,
     max_k: int = DEFAULT_MAX_KMER_LEN,
 ) -> List[HybridPeptide]:
-
     if spectrum is not None:
         precursor_charge = spectrum.precursor_charge
         precursor_mz = spectrum.precursor_mz

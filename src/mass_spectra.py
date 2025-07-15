@@ -62,8 +62,9 @@ class Spectrum:
         scan_num = int(re.search(r"(?:scan|scanId)=(\d+)", spectrum_id).group(1))
 
         # Get peaks
-        masses, abundances = tuple(spectrum["m/z array"]), tuple(
-            spectrum["intensity array"]
+        masses, abundances = (
+            tuple(spectrum["m/z array"]),
+            tuple(spectrum["intensity array"]),
         )
         peaks = [
             Peak(mz=masses[idx], intensity=abundances[idx], id=idx)
@@ -249,9 +250,9 @@ def get_spectrum_from_mzml(scan_num: int, mzml_path: Path):
     spectra = Spectrum.parse_ms2_from_mzml(spectra_file=mzml_path)
 
     spectrum = list(filter(lambda spectrum: spectrum.scan == scan_num, spectra))
-    assert (
-        len(spectrum) == 1
-    ), f"Scan number must be unique. There were {len(spectrum)} spectra with scan number {scan_num}."
+    assert len(spectrum) == 1, (
+        f"Scan number must be unique. There were {len(spectrum)} spectra with scan number {scan_num}."
+    )
     return spectrum[0]
 
 

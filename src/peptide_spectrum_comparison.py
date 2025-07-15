@@ -17,8 +17,6 @@ from src.constants import (
     DEFAULT_PPM_TOLERANCE,
     ION_INT_TO_TYPE,
     IONS_MATCHED,
-    MAYBE_HYBRID,
-    NOT_HYBRID,
     XCORR,
     IonTypes,
 )
@@ -376,16 +374,16 @@ class PsmSpectrumComparison:
 
     @property
     def scan(self):
-        assert (
-            self.spectrum.scan == self.psm.scan
-        ), f"{self.spectrum.scan} != {self.psm.scan}"
+        assert self.spectrum.scan == self.psm.scan, (
+            f"{self.spectrum.scan} != {self.psm.scan}"
+        )
         return self.spectrum.scan
 
     @property
     def sample(self):
-        assert (
-            self.spectrum.sample == self.psm.sample
-        ), f"{self.spectrum.sample} != {self.psm.sample}"
+        assert self.spectrum.sample == self.psm.sample, (
+            f"{self.spectrum.sample} != {self.psm.sample}"
+        )
         return self.spectrum.sample
 
     @property
@@ -731,7 +729,6 @@ def peak_to_product_ion_mapping(
     num_cpus: Optional[int] = None,
     ppm_tolerance: float = DEFAULT_PPM_TOLERANCE,
 ) -> List[PeakWithMatchingProductIons]:
-
     process_peak_fcn = lambda peak: get_ions_matching_peak(
         db_path=db_path,
         peak=peak,
@@ -798,7 +795,6 @@ def create_df_from_ions(ions: List[DbKmer]) -> pd.DataFrame:
 def compare_hybrid_to_spectrum(
     hybrid: HybridPeptide, spectrum: Spectrum, peak_mz_ppm_tol: int
 ):
-
     product_ions_with_matching_peaks = get_peaks_that_match_peptide_product_ions(
         spectrum=spectrum,
         peptide=Peptide(seq=hybrid.seq),
@@ -854,9 +850,9 @@ def get_hybrid_peptide_from_comet_psm(psm: CometPSM):
         # ), f"This PSM doesn't seem to correspond to a hybrid. psm.proteins = {psm.proteins}"
 
     protein = psm.proteins[0]
-    assert (
-        protein[:7] == "hybrid_"
-    ), f"This PSM doesn't seem to correspond to a hybrid. psm.proteins = {psm.proteins}"
+    assert protein[:7] == "hybrid_", (
+        f"This PSM doesn't seem to correspond to a hybrid. psm.proteins = {psm.proteins}"
+    )
 
     protein = protein[7:]
     b_seq, y_seq = protein.split("-")

@@ -156,7 +156,7 @@ def get_time_in_diff_units(time_sec: float, decimal_places: int = 2) -> str:
     return (
         f"{rounding(time_sec)} secs = "
         f"{rounding(time_sec / 60)} mins = "
-        f"{rounding(time_sec / (60*60))} hrs"
+        f"{rounding(time_sec / (60 * 60))} hrs"
     )
 
 

@@ -179,9 +179,9 @@ class ProteinProductIonDb(Sqlite3Database):
             SELECT * FROM {self.protein_table_name} WHERE id = {protein_id}
         """
         matching_proteins = self.read_query(query=query)
-        assert (
-            len(matching_proteins) == 1
-        ), f"There should only be one protein with id = {protein_id}. There are {len(matching_proteins)}"
+        assert len(matching_proteins) == 1, (
+            f"There should only be one protein with id = {protein_id}. There are {len(matching_proteins)}"
+        )
         return self.protein_obj(**matching_proteins[0])
 
     def get_product_ions(self):
@@ -293,7 +293,7 @@ def get_product_ions_matching_spectrum(
             PeakWithMatchingProductIons(peak=peak, ions=matching_product_ions)
         )
     logger.debug(
-        f"Peak-to-product-ion matching took {get_time_in_diff_units(time()-start_time)}"
+        f"Peak-to-product-ion matching took {get_time_in_diff_units(time() - start_time)}"
     )
     return peaks_and_matches
 
@@ -347,7 +347,7 @@ def create_db(
             colms_to_index=["aa_mass"],
         )
         logger.info(
-            f"Creating and indexing DB took {round(time()-start_time, 2)} seconds"
+            f"Creating and indexing DB took {round(time() - start_time, 2)} seconds"
         )
 
     else:

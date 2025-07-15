@@ -1,10 +1,9 @@
 import logging
 import sqlite3
-import time
 from dataclasses import Field, asdict, dataclass, field, fields
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Generic, List, Optional, TypeVar, get_args
+from typing import Dict, Generic, List, Optional, TypeVar, get_args
 
 from src.constants import MEMORY
 from src.utils import log_time
@@ -177,7 +176,6 @@ class Sqlite3Database:
     def insert_dataclasses(
         self, table_name: str, data_classes: List[SqlTableRow]
     ) -> None:
-
         colm_str = data_classes[0].sql_insert_columns_str()
         # Insert dataclasses into the table
         dataclasses_as_dicts = [asdict(x) for x in data_classes]

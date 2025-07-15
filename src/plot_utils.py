@@ -8,7 +8,6 @@ import pandas as pd
 import plotly.express as px
 import seaborn as sns
 from matplotlib import rcParams
-from matplotlib.axes import Axes
 
 # Constants
 SINGLE_FIG_SIZE = (6, 4)
@@ -137,8 +136,8 @@ def lineswap_axis(fig, ax, zorder=-1000, lw=1, alpha=0.2, skip_zero=False):
 
     ylabels = [str(t.get_text()) for t in ax.get_yticklabels()]
     yticks = [t for t in ax.get_yticks()]
-    xlabels = [str(t.get_text()) for t in ax.get_xticklabels()]
-    xticks = [t for t in ax.get_xticks()]
+    [str(t.get_text()) for t in ax.get_xticklabels()]
+    [t for t in ax.get_xticks()]
 
     x_draw = [
         tick for label, tick in zip(ylabels, yticks) if label != ""
@@ -244,7 +243,6 @@ def plot_line(ax, m=1, b=0, label=None, ls="--", lc="black", lw=1):
     x = np.linspace(min_val, max_val, 100)
     y = m * x + b
     ax.plot(x, y, ls=ls, color=lc, lw=lw, label=label)
-    pass
 
 
 def best_fit_line(x, y):
@@ -264,7 +262,7 @@ def plot_best_fit_line(ax, x, y, label=None):
     """
     slope, intercept = best_fit_line(x, y)
     xlim = ax.get_xlim()
-    ylim = ax.get_ylim()
+    ax.get_ylim()
     # min_val = min(xlim[0], ylim[0])
     # max_val = max(xlim[1], ylim[1])
     x = np.linspace(xlim[0], xlim[1], 1000)

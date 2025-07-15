@@ -14,7 +14,7 @@ from src.peptide_spectrum_comparison import (
     get_start_and_end_positions_from_ions,
     ions_as_df,
 )
-from src.peptides_and_ions import BIonCreator, Peptide, YIonCreator, compute_peptide_mz
+from src.peptides_and_ions import BIonCreator, YIonCreator, compute_peptide_mz
 from src.protein_product_ion_database import (
     PositionedIon,
     ProteinProductIonDb,
@@ -23,11 +23,7 @@ from src.protein_product_ion_database import (
     get_product_ions_matching_spectrum,
 )
 from src.sql_database import Sqlite3Database
-from src.utils import (
-    generate_aa_kmers,
-    get_time_in_diff_units,
-    relative_ppm_tolerance_in_daltons,
-)
+from src.utils import get_time_in_diff_units, relative_ppm_tolerance_in_daltons
 
 logger = logging.getLogger(__name__)
 
@@ -45,16 +41,16 @@ class Cluster:
     def __post_init__(self):
         # Get ion type
         ion_type = self.ions[0].ion_type
-        assert all(
-            [ion.ion_type == ion_type for ion in self.ions]
-        ), "All ions should have the same ion type!"
+        assert all([ion.ion_type == ion_type for ion in self.ions]), (
+            "All ions should have the same ion type!"
+        )
         self.ion_type = ion_type
 
         # Get protein ID
         p_id = self.ions[0].protein_id
-        assert all(
-            [ion.protein_id == p_id for ion in self.ions]
-        ), "All ions should have same protein ID"
+        assert all([ion.protein_id == p_id for ion in self.ions]), (
+            "All ions should have same protein ID"
+        )
         self.protein_id = p_id
 
         # Make sure that
@@ -62,14 +58,14 @@ class Cluster:
         # - for y-ions, end positions should all be the same
         if self.ion_type == "b":
             start = self.ions[0].inclusive_start
-            assert all(
-                [ion.inclusive_start == start for ion in self.ions]
-            ), "All b-ions should have same start position"
+            assert all([ion.inclusive_start == start for ion in self.ions]), (
+                "All b-ions should have same start position"
+            )
         else:
             end = self.ions[0].exclusive_end
-            assert all(
-                [ion.exclusive_end == end for ion in self.ions]
-            ), "All y-ions should have same end position"
+            assert all([ion.exclusive_end == end for ion in self.ions]), (
+                "All y-ions should have same end position"
+            )
 
         # Set start and end position
         position = get_start_and_end_positions_from_ions(ions=self.ions)
@@ -353,7 +349,7 @@ class SpectrumExtendedClusters:
             )
             for cluster in clusters.y_clusters
         ]
-        logger.debug(f"Getting extended clusters took {round(time()-t0, 2)} seconds")
+        logger.debug(f"Getting extended clusters took {round(time() - t0, 2)} seconds")
 
         return cls(
             b_ext_clusters=b_extended_clusters, y_ext_clusters=y_extended_clusters
