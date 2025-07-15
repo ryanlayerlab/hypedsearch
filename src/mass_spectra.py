@@ -44,10 +44,21 @@ class Spectrum:
     def total_intensity(self):
         return sum([peak.intensity for peak in self.peaks])
 
+    @staticmethod
+    def get_scan_number_from_id(spectrum_id: str) -> int:
+        """
+        Extract the scan number from the spectrum ID.
+        """
+        match = re.search(r"(?:scan|scanId)=(\d+)", spectrum_id)
+        if match:
+            return int(match.group(1))
+        else:
+            raise ValueError(f"Invalid spectrum ID format: {spectrum_id}")
+
     @classmethod
     def from_dict(cls, spectrum: Dict, mzml: Path):
         # Extract scan number from 'id' key
-        spectrum_id = spectrum.get("id", "")
+        spectrum_id = spectrum.get("id")
         scan_num = int(re.search(r"(?:scan|scanId)=(\d+)", spectrum_id).group(1))
 
         # Get peaks
@@ -90,7 +101,10 @@ class Spectrum:
     @classmethod
     def get_spectrum(cls, scan: int, mzml: Path):
         with mzml_reader.MzML(str(mzml)) as reader:
-            spectrum = reader.get_by_id(f"scan={scan}")
+            try:
+                spectrum = reader.get_by_id(f"scan={scan}")
+            except KeyError:
+                spectrum = reader.get_by_id(f"scanId={scan}")
         return cls.from_dict(spectrum=spectrum, mzml=mzml)
 
     @classmethod

@@ -5,7 +5,6 @@ from typing import List, Optional, Union
 
 import click
 
-from src.click_utils import PathType
 from src.constants import (
     DEFAULT_MAX_KMER_LEN,
     DEFAULT_MIN_KMER_LEN,
@@ -18,7 +17,7 @@ from src.peptides_and_ions import (
     get_uniq_kmer_to_protein_map,
 )
 from src.protein_product_ion_database import DbKmer, DbProtein, ProteinProductIonDb
-from src.utils import get_time_in_diff_units, setup_logger
+from src.utils import PathType, get_time_in_diff_units, setup_logger
 
 logger = logging.getLogger(__name__)
 
@@ -72,12 +71,17 @@ def create_product_ion_table(
     uniq_kmer_to_protein_map = get_uniq_kmer_to_protein_map(
         proteins=db_proteins, min_k=min_k, max_k=max_k
     )
+    logger.info("Creating 'DbKmer' objects for the database")
     ions = [
         DbKmer.seq_to_ion(seq=seq, protein_ids=protein_ids)
         for seq, protein_ids in uniq_kmer_to_protein_map.items()
     ]
+    logger.info(
+        "Creating the table for the 'DbKmer' object and inserting the object instances"
+    )
     db.create_table_from_dataclass(table_name=db.product_ion_table_name, obj=DbKmer)
     db.insert_dataclasses(table_name=db.product_ion_table_name, data_classes=ions)
+    logger.info("Creating 'mass' index for the table")
     db.add_index(
         table_name=db.product_ion_table_name,
         index_name="mass",

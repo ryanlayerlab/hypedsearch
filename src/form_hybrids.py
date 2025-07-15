@@ -8,7 +8,6 @@ from typing import Callable, Dict, List, Literal, Optional
 import click
 import numpy as np
 
-from src.click_utils import PathType
 from src.constants import (
     DEFAULT_MAX_KMER_LEN,
     DEFAULT_MIN_KMER_LEN,
@@ -26,6 +25,7 @@ from src.hypedsearch_utils import (
 from src.mass_spectra import Mzml, Spectrum, get_spectrum_from_mzml
 from src.protein_product_ion_database import ProteinProductIonDb
 from src.utils import (
+    PathType,
     flatten_list_of_lists,
     get_time_in_diff_units,
     load_json,

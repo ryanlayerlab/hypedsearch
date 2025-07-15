@@ -13,7 +13,6 @@ import click
 from Bio import SeqIO
 from pydantic import BaseModel, field_validator
 
-from src.click_utils import PathType
 from src.constants import (
     AMINO_ACID_MASSES,
     B_ION_TYPE,
@@ -27,6 +26,7 @@ from src.constants import (
 from src.utils import (
     ExistingPath,
     Kmer,
+    PathType,
     generate_aa_kmers,
     get_time_in_diff_units,
     log_params,
@@ -75,7 +75,13 @@ class Peptide:
 
     @classmethod
     def from_fasta(cls, fasta_path: str) -> List["Peptide"]:
-        return get_proteins_from_fasta(fasta_path=fasta_path)
+        proteins = []
+        for p_id, protein in enumerate(SeqIO.parse(fasta_path, "fasta")):
+            split_desc = protein.description.split(" ")
+            name = split_desc[0]
+            desc = " ".join(split_desc[1:])
+            proteins.append(cls(seq=str(protein.seq), desc=desc, name=name, id=p_id))
+        return proteins
 
     def kmers(self, max_k: int, min_k: int = 1) -> List[Kmer]:
         return generate_aa_kmers(aa_seq=self.seq, min_k=min_k, max_k=max_k)
@@ -317,7 +323,7 @@ def get_unique_kmers(
 
 
 # Don't use @log_params because 'proteins' can be a list of many, many peptides
-@log_time(level=logging.DEBUG)
+@log_time(level=logging.INFO)
 def get_uniq_kmer_to_protein_map(
     proteins: List[Peptide],
     min_k: int = DEFAULT_MIN_KMER_LEN,
@@ -594,3 +600,4 @@ if __name__ == "__main__":
     cli.add_command(cli_create_kmer_to_protein_id_map)
     cli.add_command(cli_get_uniq_kmers)
     cli.add_command(cli_get_kmer_counts_by_protein)
+    cli()

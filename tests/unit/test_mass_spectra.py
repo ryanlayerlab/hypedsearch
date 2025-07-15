@@ -16,7 +16,7 @@ class Test_Mzml:
         assert mzml.path == mouse_mzml
 
 
-class TestSpectrum:
+class Test_Spectrum:
     @staticmethod
     def test_parse_spectrum_from_dict():
         spectrum = create_spectrum(scan_num=1)
@@ -53,7 +53,7 @@ class TestSpectrum:
         assert len(actual) > 0
 
 
-class TestGetIndicesOfLargestElements:
+class Test_get_indices_of_largest_elements:
     @staticmethod
     def test_unique_values():
         array = np.array([5, 8, 1, 4, 6])

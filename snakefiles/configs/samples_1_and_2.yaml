@@ -1,0 +1,12 @@
+mzml_dir: "data/spectra/human_samples"
+parent_results_dir: "results/human_samples_1_and_2"
+samples: [
+  "SAMPLE_1",
+  "SAMPLE_2",
+]
+fasta: "fastas/uniprotkb_proteome_UP000005640_AND_revi_2025_04_29.fasta"
+crux_comet_params: "comet/crux.comet.params"
+top_n_proteins: 10
+q_value_threshold: 0.01
+precursor_mz_ppm_tol: 20
+peak_to_ion_ppm_tol: 20

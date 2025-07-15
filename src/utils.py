@@ -10,7 +10,7 @@ import shlex
 import shutil
 import subprocess
 import sys
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import wraps
 from itertools import chain
@@ -18,6 +18,7 @@ from pathlib import Path
 from time import time
 from typing import Annotated, Any, Callable, Dict, List, Literal, Optional, Union
 
+import click
 import pandas as pd
 from pydantic import BeforeValidator
 from scipy.stats import percentileofscore
@@ -176,22 +177,22 @@ def relative_ppm_tolerance_in_daltons(ppm: float, ref_mass: float) -> float:
     return (ppm * ref_mass) / (10**6)
 
 
-def run_in_parallel(fcn_of_one_variable: Callable, input_array: List) -> List:
+def run_in_parallel(
+    fcn_of_one_variable: Callable,
+    input_array: List,
+    parallel_type: Literal["thread", "process"] = "thread",
+) -> List:
     # results = []
-    with ThreadPoolExecutor() as executor:
-        results = list(executor.map(fcn_of_one_variable, input_array))
-
-        # futures = {
-        #     executor.submit(fcn_of_one_variable, item): item for item in input_array
-        # }
-
-        # # Use tqdm to show progress
-        # for future in tqdm(
-        #     as_completed(futures), total=len(input_array), desc="Processing"
-        # ):
-        #     results.append(future.result())
-    # Flatten list
-    # return flatten_list_of_lists(result)
+    if parallel_type == "thread":
+        with ThreadPoolExecutor() as executor:
+            results = list(executor.map(fcn_of_one_variable, input_array))
+    elif parallel_type == "process":
+        with ProcessPoolExecutor() as executor:
+            results = list(executor.map(fcn_of_one_variable, input_array))
+    else:
+        raise ValueError(
+            f"Invalid parallel_type: {parallel_type}. Use 'thread' or 'process'."
+        )
     return results
 
 
@@ -333,6 +334,13 @@ def get_rank(values, query_val) -> int:
     return int(rank_map.get(query_val, 0))
 
 
+def number_greater_than(values: List[float], query_value: float) -> int:
+    """
+    Returns the number of values in the list that are greater than the query value.
+    """
+    return sum(1 for val in values if val > query_value)
+
+
 def check_path_exists(path: Union[Path, str]):
     if isinstance(path, str):
         path = Path(path)
@@ -365,3 +373,13 @@ def to_json(data: Any, out_path: Union[str, Path]):
 def load_json(in_path: Union[str, Path]) -> Dict:
     with open(in_path, "r") as f:
         return json.load(f)
+
+
+class PathType(click.ParamType):
+    name = "path"
+
+    def convert(self, value, param, ctx):
+        try:
+            return Path(value).resolve()  # Convert to absolute Path object
+        except Exception as e:
+            self.fail(f"{value} is not a valid path: {e}", param, ctx)

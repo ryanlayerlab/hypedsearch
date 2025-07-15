@@ -1,6 +1,5 @@
 import logging
 from collections import Counter, defaultdict
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -9,11 +8,11 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 
-from src.click_utils import PathType
-from src.comet_utils import CometPSM, read_comet_txts_in_dir
+from src.comet_utils import CometPSM
 from src.constants import DEFAULT_MAX_KMER_LEN
 from src.plot_utils import fig_setup, finalize, save_fig, set_title_axes_labels
 from src.utils import (
+    PathType,
     flatten_list_of_lists,
     generate_aa_kmers,
     pickle_and_compress,
@@ -146,16 +145,17 @@ def plot_protein_counts(
 
 def get_and_plot_most_common_proteins(
     comet_results_dir: Path,
+    out_path: Path,
     top_n_proteins: int = 10,
     q_value_threshold: Optional[float] = None,
     top_n_psms: Optional[int] = None,
-    out_path: Optional[Path] = None,
 ):
     psms = load_comet_psms(
         comet_results_dir=comet_results_dir,
         q_value_threshold=q_value_threshold,
         top_n_psms=top_n_psms,
     )
+
     prot_counts = get_protein_counts_from_comet_results(psms=psms)
     most_common_proteins = get_most_common_proteins(
         protein_counts=prot_counts, top_n=top_n_proteins
@@ -250,6 +250,23 @@ def cli_get_and_plot_most_common_proteins(
     )
 
 
+def get_and_save_prefix_counts_by_length(
+    comet_results_dir: Path,
+    out_path: Path,
+    q_value_threshold: Optional[float] = None,
+    top_n_psms: Optional[int] = None,
+):
+    psms = load_comet_psms(
+        comet_results_dir=comet_results_dir,
+        q_value_threshold=q_value_threshold,
+        top_n_psms=top_n_psms,
+    )
+    prefix_counts_by_length = get_prefix_counts_by_length(
+        seqs=[psm.seq for psm in psms]
+    )
+    to_json(data=prefix_counts_by_length, out_path=out_path)
+
+
 @click.command(
     name="prefix-abundances",
     context_settings={
@@ -297,15 +314,12 @@ def cli_get_prefix_counts_by_length(
     q_value_threshold: Optional[float] = None,
     top_n_psms: Optional[int] = None,
 ):
-    psms = load_comet_psms(
+    get_and_save_prefix_counts_by_length(
         comet_results_dir=comet_results_dir,
+        out_path=out_path,
         q_value_threshold=q_value_threshold,
         top_n_psms=top_n_psms,
     )
-    prefix_counts_by_length = get_prefix_counts_by_length(
-        seqs=[psm.seq for psm in psms]
-    )
-    to_json(data=prefix_counts_by_length, out_path=out_path)
 
 
 @click.group(
