@@ -1,6 +1,6 @@
 import pytest
 
-from src.comet_utils import CometPSM, read_comet_txts_in_dir
+from src.comet_utils import CometPSM
 
 
 class Test_CometPSM:

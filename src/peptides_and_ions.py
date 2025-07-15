@@ -1,6 +1,5 @@
 import logging
 import pickle
-import random
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -11,7 +10,7 @@ from typing import Dict, List, Optional, Set, Union
 
 import click
 from Bio import SeqIO
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
 from src.constants import (
     AMINO_ACID_MASSES,
@@ -31,9 +30,7 @@ from src.utils import (
     get_time_in_diff_units,
     log_params,
     log_time,
-    make_directory,
     pickle_and_compress,
-    run_in_parallel,
     setup_logger,
 )
 
@@ -313,7 +310,7 @@ def get_unique_kmers(
     logger.info(f"Number of proteins: {num_proteins}")
     for p_idx, peptide in enumerate(peptides):
         if p_idx % 100 == 0:
-            logger.info(f"Processing protein {p_idx+1} of {num_proteins}")
+            logger.info(f"Processing protein {p_idx + 1} of {num_proteins}")
         if isinstance(peptide, str):
             peptide = Peptide(seq=peptide)
         uniq_kmers.update(
@@ -336,7 +333,7 @@ def get_uniq_kmer_to_protein_map(
     num_proteins = len(proteins)
     for p_idx, protein in enumerate(proteins):
         if verbose and (p_idx % 10 == 0):
-            logger.info(f"Processing protein {p_idx+1} of {num_proteins}")
+            logger.info(f"Processing protein {p_idx + 1} of {num_proteins}")
         uniq_kmers = set(kmer.seq for kmer in protein.kmers(min_k=min_k, max_k=max_k))
         for kmer in uniq_kmers:
             uniq_kmer_to_protein_map[kmer].append(getattr(protein, protein_attr))
@@ -520,7 +517,7 @@ def get_kmer_counts_by_protein(
     kmer_to_prot_to_count_map = defaultdict(lambda: defaultdict(int))
     num_prots = len(peptides)
     for idx, peptide in enumerate(peptides):
-        logger.debug(f"Processing protein {idx+1} of {num_prots}")
+        logger.debug(f"Processing protein {idx + 1} of {num_prots}")
         kmers = peptide.kmers(min_k=k, max_k=k)
         num_kmers = len(kmers)
         logger.debug(f"Number of kmers: {num_kmers}")
