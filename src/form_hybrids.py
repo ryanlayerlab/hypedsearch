@@ -18,7 +18,6 @@ from src.hypedsearch_utils import (
     postprocess_hybrids,
 )
 from src.mass_spectra import Spectrum
-from src.protein_product_ion_database import ProteinProductIonDb
 from src.utils import (
     PathType,
     flatten_list_of_lists,

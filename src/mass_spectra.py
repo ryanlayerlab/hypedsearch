@@ -56,7 +56,7 @@ class Spectrum:
             raise ValueError(f"Invalid spectrum ID format: {spectrum_id}")
 
     @classmethod
-    def from_dict(cls, spectrum: Dict, mzml: Path):
+    def from_dict(cls, spectrum: Dict, mzml: Optional[Path] = None):
         # Extract scan number from 'id' key
         spectrum_id = spectrum.get("id")
         scan_num = int(re.search(r"(?:scan|scanId)=(\d+)", spectrum_id).group(1))
@@ -100,7 +100,8 @@ class Spectrum:
             return ms2_spectra
 
     @classmethod
-    def get_spectrum(cls, scan: int, mzml: Path):
+    def get_spectrum(cls, scan: int, mzml: Union[str, Path]):
+        mzml = Path(mzml)
         with mzml_reader.MzML(str(mzml)) as reader:
             try:
                 spectrum = reader.get_by_id(f"scan={scan}")
@@ -250,9 +251,9 @@ def get_spectrum_from_mzml(scan_num: int, mzml_path: Path):
     spectra = Spectrum.parse_ms2_from_mzml(spectra_file=mzml_path)
 
     spectrum = list(filter(lambda spectrum: spectrum.scan == scan_num, spectra))
-    assert len(spectrum) == 1, (
-        f"Scan number must be unique. There were {len(spectrum)} spectra with scan number {scan_num}."
-    )
+    assert (
+        len(spectrum) == 1
+    ), f"Scan number must be unique. There were {len(spectrum)} spectra with scan number {scan_num}."
     return spectrum[0]
 
 

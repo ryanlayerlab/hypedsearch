@@ -1,17 +1,13 @@
 import subprocess
-from pathlib import Path
 
-import pytest
-from click.testing import CliRunner
 
-from src.constants import SCAN_HYBRIDS
 from src.form_hybrids import (
     combine_hybrids_from_scans,
     form_hybrids_for_spectrum,
     load_hybrid_peptides_from_json,
 )
-from src.mass_spectra import Mzml, Spectrum
-from src.utils import load_json, to_json
+from src.mass_spectra import Spectrum
+from src.utils import load_json
 
 
 class Test_form_hybrids_for_spectrum:
@@ -157,4 +153,3 @@ class Test_combine_hybrids_from_scans:
             text=True,
         )
         hybrids = combine_hybrids_from_scans(hybrids_dir=tmp_path, out_path=None)
-        pass

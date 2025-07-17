@@ -1,9 +1,7 @@
 from pathlib import Path
 
 import numpy as np
-import pymzml
 
-from src.constants import SPECTRA_DIR, THOMAS_SAMPLES
 from src.mass_spectra import Mzml, Peak, Spectrum, get_indices_of_largest_elements
 from tests.fixtures_and_helpers import create_spectrum
 
@@ -37,18 +35,10 @@ class Test_Spectrum:
         assert actual == expected
 
     @staticmethod
-    def test_parse_mzml_1():
+    def test_parse_mzml(test_data_dir):
         # It's difficult to create a test MZML. So this test just checks that
         # the function does not fail on an actual MZML
-        mzml_path = SPECTRA_DIR / f"{THOMAS_SAMPLES[0]}.mzML"
-        actual = Spectrum.parse_ms2_from_mzml(spectra_file=mzml_path)
-        assert len(actual) > 0
-
-    @staticmethod
-    def test_parse_mzxml_2():
-        # It's difficult to create a test MZML. So this test just checks that
-        # the function does not fail on an actual MZML
-        mzml_path = SPECTRA_DIR / f"A_10uM_Peptides_HuIslets.mzML"
+        mzml_path = test_data_dir / "spectra/10_mouse_spectra.mzML"
         actual = Spectrum.parse_ms2_from_mzml(spectra_file=mzml_path)
         assert len(actual) > 0
 
