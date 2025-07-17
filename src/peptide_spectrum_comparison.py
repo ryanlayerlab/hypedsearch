@@ -41,17 +41,9 @@ class ProductIonWithMatchingPeaks:
 
 
 @dataclass
-class PeakProductIonMatch:
-    seq: str
-    peak: Peak
-    ion_type: str
-    charge: int
-
-
-@dataclass
 class PeptideSpectrumComparison:
     spectrum: Spectrum
-    peptide: Peptide
+    peptide: Union[str, Peptide]
     hybrid_seq: Optional[str] = None
     peak_to_ion_ppm_tolerance: float = DEFAULT_PEAK_TO_ION_PPM_TOL
     ion_types: List[IonTypes] = field(
@@ -374,16 +366,16 @@ class PsmSpectrumComparison:
 
     @property
     def scan(self):
-        assert self.spectrum.scan == self.psm.scan, (
-            f"{self.spectrum.scan} != {self.psm.scan}"
-        )
+        assert (
+            self.spectrum.scan == self.psm.scan
+        ), f"{self.spectrum.scan} != {self.psm.scan}"
         return self.spectrum.scan
 
     @property
     def sample(self):
-        assert self.spectrum.sample == self.psm.sample, (
-            f"{self.spectrum.sample} != {self.psm.sample}"
-        )
+        assert (
+            self.spectrum.sample == self.psm.sample
+        ), f"{self.spectrum.sample} != {self.psm.sample}"
         return self.spectrum.sample
 
     @property
@@ -765,12 +757,6 @@ def ions_as_df(ions: List[DbKmer]):
     return df
 
 
-def get_start_and_end_positions_from_ions(ions: List[DbKmer]) -> Position:
-    start = min([ion.inclusive_start for ion in ions])
-    end = max([ion.exclusive_end for ion in ions])
-    return Position(inclusive_start=start, exclusive_end=end)
-
-
 def create_df_from_ions(ions: List[DbKmer]) -> pd.DataFrame:
     rows = []
     for ion in ions:
@@ -850,9 +836,9 @@ def get_hybrid_peptide_from_comet_psm(psm: CometPSM):
         # ), f"This PSM doesn't seem to correspond to a hybrid. psm.proteins = {psm.proteins}"
 
     protein = psm.proteins[0]
-    assert protein[:7] == "hybrid_", (
-        f"This PSM doesn't seem to correspond to a hybrid. psm.proteins = {psm.proteins}"
-    )
+    assert (
+        protein[:7] == "hybrid_"
+    ), f"This PSM doesn't seem to correspond to a hybrid. psm.proteins = {psm.proteins}"
 
     protein = protein[7:]
     b_seq, y_seq = protein.split("-")

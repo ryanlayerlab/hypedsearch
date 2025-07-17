@@ -5,12 +5,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Union
 
 from src.constants import HS_PREFIX
+from src.create_db import KmerToProteinMap
 from src.peptides_and_ions import (
     Fasta,
     Peptide,
     compute_peptide_mz,
     get_proteins_by_name,
-    get_uniq_kmer_to_protein_map,
     write_fasta,
 )
 from src.sql_database import SqlTableRow
@@ -136,8 +136,10 @@ def remove_native_hybrids(
     min_k: int,
     max_k: int,
 ) -> List[HybridPeptide]:
-    kmer_to_prot_id_map = get_uniq_kmer_to_protein_map(
-        proteins=proteins, min_k=min_k, max_k=max_k
+    kmer_to_prot_id_map = KmerToProteinMap.create(
+        proteins=proteins,
+        min_k=min_k,
+        max_k=max_k,
     )
     non_native_hybrids = list(
         filter(lambda hybrid: hybrid.seq not in kmer_to_prot_id_map, hybrids)

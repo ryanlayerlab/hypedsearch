@@ -13,7 +13,7 @@ def create_fasta(
     fasta_path = folder / file_name
     lines = []
     for seq_num, seq in enumerate(seqs):
-        lines.append(f">seq{seq_num+1}\n")
+        lines.append(f">seq{seq_num + 1}\n")
         lines.append(f"{seq}\n")
     with fasta_path.open("w") as f:
         for line in lines:

@@ -1,5 +1,4 @@
 import logging
-from collections import Counter
 from dataclasses import dataclass, field
 from itertools import groupby
 from pathlib import Path
@@ -25,10 +24,8 @@ from src.constants import (
 )
 from src.mass_spectra import Spectrum, get_specific_spectrum_by_sample_and_scan_num
 from src.utils import (
-    flatten_list_of_lists,
     get_arg_fcn_of_objects,
     get_fcn_of_objects,
-    remove_gene_name,
 )
 
 logger = logging.getLogger(__name__)

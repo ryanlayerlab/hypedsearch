@@ -1,18 +1,60 @@
+import sys
+from pathlib import Path
+
+repo_dir = Path(workflow.basedir).absolute().parent
+sys.path.append(str(repo_dir))
+
+from types import SimpleNamespace
+
+fasta_stem = Path(config["fasta"]).stem
+# Use python's SimpleNamespace to convert the config dict
+# object into something that let's me refer to keys with dot notation
+config = SimpleNamespace(**config)
+
+kmer_to_protein_json = f"{config.out_dir}/{fasta_stem}.pklz"
+kmer_db = f"{config.out_dir}/{fasta_stem}.db"
 
 rule all:
     input:
-        f"{config['db_path']}/top_{config['top_n_proteins']}_proteins.txt",
-        f"{config['db_path']}/protein_abundances.png"
+        kmer_to_protein_json,
+        kmer_db
 
-rule get_most_common_proteins:
+
+rule create_kmer_to_protein_map:
     input:
-        "{out_dir}/assign-confidence.target.txt"
+        fasta = config.fasta
     output:
-        f"{{db_dir}}/top_{config['top_n_proteins']}_proteins.txt",
-        f"{config['db_dir']}/protein_abundances.png"
-    shell:
-        "python -m src.protein_abundance "
-        "--comet_results_dir {config[out_dir]} "
-        "--q_value_threshold {config[q_value_threshold]} "
-        "--top_n_proteins {config[top_n_proteins]} "
-        "--out_path {config[db_dir]}/top_{config[top_n_proteins]}_proteins.txt "  
+        kmer_to_protein_json = kmer_to_protein_json,
+    # shell:
+    #     "python -m src.peptides_and_ions create-kmer-to-protein-map "
+    #     "--fasta {config.fasta} "
+    #     "--protein_attr name "
+    #     "--output_path {config.out_dir}/{fasta_stem}.json"
+    run:
+        from src.utils import setup_logger
+        from src.create_db import KmerToProteinMap
+        setup_logger()
+        kmer_to_protein_map = KmerToProteinMap.create(
+            fasta=input.fasta,
+            protein_attr="name",
+        )
+        kmer_to_protein_map.save(output.kmer_to_protein_json)
+
+
+
+rule create_db:
+    input:
+        kmer_to_protein_json = kmer_to_protein_json,
+    output:
+        kmer_db = kmer_db
+    run:
+        from src.utils import setup_logger
+        from src.create_db import KmerDatabase
+        setup_logger()
+        kmer_db = KmerDatabase.create_db(
+            db_path=output.kmer_db,
+            kmer_to_protein_map=input.kmer_to_protein_json,
+        )
+
+
+

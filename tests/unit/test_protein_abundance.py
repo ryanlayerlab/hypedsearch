@@ -1,8 +1,5 @@
-from collections import Counter
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
-from src.comet_utils import CometPSM
 from src.protein_abundance import (
     get_and_plot_most_common_proteins,
     get_prefix_counts_by_length,

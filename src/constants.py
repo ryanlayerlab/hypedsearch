@@ -25,6 +25,8 @@ DEFAULT_NUM_PSMS = 5
 DEFAULT_COMET_SCAN_RANGE = (0, 0)
 DEFAULT_CRUX_PATH = Path("/Users/erjo3868/repos/crux-4.3.Darwin.x86_64/bin/crux")
 DEFAULT_CRUX_PARAMS = COMET_DIR / "crux.comet.params"
+MIN_CLUSTER_LENGTH = 3
+MIN_CLUSTER_SUPPORT = 2
 
 FASTAS_DIR = GIT_REPO_DIR / "fastas"
 MOUSE_PROTEOME = FASTAS_DIR / "Uniprot_mouse.fasta"

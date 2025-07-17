@@ -1,5 +1,4 @@
-from dataclasses import dataclass, field, fields
-from functools import cached_property
+from dataclasses import dataclass, fields
 
 from src.sql_database import (
     SQL_PRIMARY_KEY,
