@@ -1,0 +1,2 @@
+out_dir: "tmp/create_db"
+fasta: "tests/data/test.fasta"

@@ -50,6 +50,14 @@ class Kmer:
     position: Position
 
 
+def prefixes(seq: str) -> List[str]:
+    return [seq[:i] for i in range(1, len(seq) + 1)]
+
+
+def suffixes(seq: str) -> List[str]:
+    return [seq[i:] for i in range(0, len(seq))]
+
+
 def remove_gene_name(protein_name: str) -> str:
     """
     Make column for shortened name <database>|<accession number> instead of
@@ -205,8 +213,8 @@ def flatten_list_of_lists(list_of_lists: List[List]):
     return list(chain.from_iterable(list_of_lists))
 
 
-def mass_difference_in_ppm(ref_mass: float, query_mass: float) -> float:
-    return (abs(ref_mass - query_mass) / ref_mass) * (10**6)
+def mass_difference_in_ppm(mass1: float, mass2: float) -> float:
+    return (abs(mass1 - mass2) / mass1) * (10**6)
 
 
 def pickle_and_compress(obj: Any, file_path: str):
@@ -373,6 +381,12 @@ def to_json(data: Any, out_path: Union[str, Path]):
 def load_json(in_path: Union[str, Path]) -> Dict:
     with open(in_path, "r") as f:
         return json.load(f)
+
+
+def read_new_line_separated_file(path: Union[str, Path]) -> List[str]:
+    with open(path, "r") as f:
+        lines = [line.strip() for line in f]
+        return lines
 
 
 class PathType(click.ParamType):

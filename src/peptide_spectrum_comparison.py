@@ -21,14 +21,14 @@ from src.constants import (
     IonTypes,
 )
 from src.hypedsearch_utils import HybridPeptide
+from src.kmer_database import DbKmer
 from src.mass_spectra import Peak, Spectrum, plot_peaks
-from src.peptides_and_ions import Peptide, ProductIon, compute_peptide_mz
-from src.plot_utils import fig_setup, finalize
-from src.protein_product_ion_database import (
-    DbKmer,
-    PeakWithMatchingProductIons,
-    ProteinProductIonDb,
+from src.peptides_and_ions import (
+    Peptide,
+    UnpositionedProductIon,
+    compute_peptide_precursor_mz,
 )
+from src.plot_utils import fig_setup, finalize
 from src.utils import Position, flatten_list_of_lists, log_time, mass_difference_in_ppm
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ProductIonWithMatchingPeaks:
-    product_ion: ProductIon
+    product_ion: UnpositionedProductIon
     peaks: List[Peak]
 
 
@@ -237,11 +237,11 @@ class PeptideSpectrumComparison:
 
     @property
     def ppm_diff(self):
-        peptide_mz = compute_peptide_mz(
+        peptide_mz = compute_peptide_precursor_mz(
             aa_seq=self.peptide.seq, charge=self.spectrum.precursor_charge
         )
         return mass_difference_in_ppm(
-            ref_mass=peptide_mz, query_mass=self.spectrum.precursor_mz
+            mass1=peptide_mz, mass2=self.spectrum.precursor_mz
         )
 
     def plot_ions(
@@ -534,10 +534,7 @@ def get_peaks_near_mz(
     """
     matching_peaks = []
     for peak in peaks:
-        if (
-            mass_difference_in_ppm(ref_mass=peak.mz, query_mass=query_mz)
-            <= ppm_tolerance
-        ):
+        if mass_difference_in_ppm(mass1=peak.mz, mass2=query_mz) <= ppm_tolerance:
             matching_peaks.append(peak)
     return matching_peaks
 
@@ -607,7 +604,7 @@ def get_peaks_that_match_peptide_product_ions(
     peak_ion_matches = []
     for ion in product_ions:
         matching_peaks = get_peaks_near_mz(
-            query_mz=ion.neutral_mass,
+            query_mz=ion.mz,
             peaks=spectrum.peaks,
             ppm_tolerance=peak_ppm_tolerance,
         )
@@ -616,7 +613,7 @@ def get_peaks_that_match_peptide_product_ions(
             peak_ion_matches.extend(
                 [
                     PeakIonMatch(
-                        ion_mz=ion.neutral_mass,
+                        ion_mz=ion.mz,
                         ion_charge=ion.charge,
                         ion_type=ion.ion_type_as_str,
                         ion_seq=ion.seq,
@@ -633,7 +630,7 @@ def get_peaks_that_match_peptide_product_ions(
                 [
                     ion.charge,
                     ion.ion_type_as_str,
-                    ion.neutral_mass,
+                    ion.mz,
                     ion.seq,
                     matching_peaks,
                 ]
@@ -683,59 +680,6 @@ def group_product_ions_and_matching_peaks_by_charge_and_ion_type(
         ignore_index=True,
     )
     return product_ion_seqs_with_matching_peaks
-
-
-def get_ions_matching_peak(
-    peak: Peak,
-    precursor_charge: int,
-    precursor_mz: float,
-    ppm_tolerance: float = DEFAULT_PPM_TOLERANCE,
-    db_path: Optional[str] = None,
-    db: Optional[ProteinProductIonDb] = None,
-) -> PeakWithMatchingProductIons:
-    # Load database if it's not provided
-    if db is None:
-        db = ProteinProductIonDb(db_path=db_path)
-
-    # Get product ions from database that are within the given PPM of the peak
-    matching_ions = db.get_ions_within_mass_tolerance(
-        query_mass=peak.mz, ppm_tolerance=ppm_tolerance
-    )
-
-    # Filter out ions with (1) charge > precursor charge or
-    # (2) the charge=precursor charge m/z of the ion's AA seq is > precursor m/z
-    charge_filtered_ions = []
-    for ion in matching_ions:
-        if ion.charge <= precursor_charge:
-            aa_seq = ion.set_aa_seq(db=db)
-            mz = compute_peptide_mz(aa_seq=aa_seq, charge=precursor_charge)
-            if mz <= precursor_mz:
-                charge_filtered_ions.append(ion)
-
-    return PeakWithMatchingProductIons(peak=peak, ions=charge_filtered_ions)
-
-
-def peak_to_product_ion_mapping(
-    spectrum: Spectrum,
-    db_path: str,
-    num_cpus: Optional[int] = None,
-    ppm_tolerance: float = DEFAULT_PPM_TOLERANCE,
-) -> List[PeakWithMatchingProductIons]:
-    process_peak_fcn = lambda peak: get_ions_matching_peak(
-        db_path=db_path,
-        peak=peak,
-        precursor_charge=spectrum.precursor_charge,
-        ppm_tolerance=ppm_tolerance,
-        precursor_mz=spectrum.precursor_mz,
-    )
-
-    if num_cpus is None:
-        num_cpus = multiprocessing.cpu_count()
-
-    with ThreadPoolExecutor(max_workers=num_cpus) as executor:
-        peaks_with_matches = list(executor.map(process_peak_fcn, spectrum.peaks))
-
-    return peaks_with_matches
 
 
 def ions_as_df(ions: List[DbKmer]):

@@ -5,13 +5,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set, Union
 
 from src.constants import HS_PREFIX
-from src.create_db import KmerToProteinMap
+from src.kmer_database import KmerToProteinMap
 from src.peptides_and_ions import (
     Fasta,
     Peptide,
-    compute_peptide_mz,
+    compute_peptide_precursor_mz,
     get_proteins_by_name,
-    write_fasta,
 )
 from src.sql_database import SqlTableRow
 from src.utils import load_json, log_time
@@ -90,7 +89,7 @@ class HybridPeptide:
         self.fasta_description = f"b-prots:{','.join(self.b_prot_names)} y-prots:{','.join(self.y_prot_names)}"
 
     def mz(self, charge: int):
-        return compute_peptide_mz(aa_seq=self.b_seq + self.y_seq, charge=charge)
+        return compute_peptide_precursor_mz(seq=self.b_seq + self.y_seq, charge=charge)
 
     def to_dict(self):
         return {
@@ -121,7 +120,7 @@ class SeqWithMass(SqlTableRow):
 
     @classmethod
     def from_seq(cls, seq: str, charge: int):
-        mz = compute_peptide_mz(aa_seq=seq, charge=charge)
+        mz = compute_peptide_precursor_mz(seq=seq, charge=charge)
         return cls(seq=seq, mz=mz)
 
 
@@ -158,38 +157,38 @@ def hybrid_fasta_name(hybrid_seq: str) -> str:
     return f"{HS_PREFIX}{hybrid_seq}"
 
 
-def create_hybrids_fasta(
-    hybrid_seqs: List[str],
-    new_fasta_path: Path,
-    old_fasta: Optional[Path] = None,
-    protein_names: Optional[Union[List[str], Path]] = None,
-) -> List[Peptide]:
-    """
-    Writes a list of hybrids (hybrids) to a FASTA file (new_fasta_path).
-    If old_fasta is provided, it will also include the proteins from the old FASTA.
-    If protein_names is provided, it will only include those proteins from the old FASTA.
-    """
-    prots = []
-    if old_fasta is not None:
-        if protein_names is not None:
-            # Get specific proteins from FASTA by name
-            prots = get_proteins_by_name(
-                protein_names=protein_names, fasta_path=old_fasta
-            )
-        else:
-            # Get all the proteins in the FASTA
-            prots = Peptide.from_fasta(fasta_path=old_fasta)
+# def create_hybrids_fasta(
+#     hybrid_seqs: List[str],
+#     new_fasta_path: Path,
+#     old_fasta: Optional[Path] = None,
+#     protein_names: Optional[Union[List[str], Path]] = None,
+# ) -> List[Peptide]:
+#     """
+#     Writes a list of hybrids (hybrids) to a FASTA file (new_fasta_path).
+#     If old_fasta is provided, it will also include the proteins from the old FASTA.
+#     If protein_names is provided, it will only include those proteins from the old FASTA.
+#     """
+#     prots = []
+#     if old_fasta is not None:
+#         if protein_names is not None:
+#             # Get specific proteins from FASTA by name
+#             prots = get_proteins_by_name(
+#                 protein_names=protein_names, fasta_path=old_fasta
+#             )
+#         else:
+#             # Get all the proteins in the FASTA
+#             prots = Peptide.from_fasta(fasta_path=old_fasta)
 
-    for _, hybrid_seq in enumerate(hybrid_seqs):
-        new_peptide = Peptide(
-            seq=hybrid_seq,
-            name=hybrid_fasta_name(hybrid_seq=hybrid_seq),
-        )
+#     for _, hybrid_seq in enumerate(hybrid_seqs):
+#         new_peptide = Peptide(
+#             seq=hybrid_seq,
+#             name=hybrid_fasta_name(hybrid_seq=hybrid_seq),
+#         )
 
-        prots.append(new_peptide)
+#         prots.append(new_peptide)
 
-    write_fasta(peptides=prots, output_path=new_fasta_path)
-    return prots
+#     write_fasta(peptides=prots, output_path=new_fasta_path)
+#     return prots
 
 
 @log_time(level=logging.DEBUG)
@@ -206,7 +205,7 @@ def postprocess_hybrids(
     logger.debug(
         f"Postprocessing hybrids... Initially there are {len(hybrids)} hybrids"
     )
-    fasta = Fasta(fasta_path=fasta_path)
+    fasta = Fasta(path=fasta_path)
 
     seq_to_hybrid_peptides = defaultdict(list)
     for hybrid in hybrids:

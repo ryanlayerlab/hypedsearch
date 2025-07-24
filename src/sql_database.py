@@ -157,7 +157,7 @@ class Sqlite3Database:
         query = f"SELECT COUNT(*) FROM {table_name}"
         return self.read_query(query=query)
 
-    @log_time(level=logging.DEBUG)
+    @log_time(level=logging.INFO)
     def add_index(self, table_name: str, index_name: str, colms_to_index: List[str]):
         colms = ", ".join(colms_to_index)
         query = f"CREATE INDEX {index_name} ON {table_name}({colms})"
@@ -172,7 +172,7 @@ class Sqlite3Database:
         self.execute_query(query=query)
         # logger.info(f"Created table {table_name}")
 
-    @log_time(level=logging.DEBUG)
+    @log_time(level=logging.INFO)
     def insert_dataclasses(
         self, table_name: str, data_classes: List[SqlTableRow]
     ) -> None:
