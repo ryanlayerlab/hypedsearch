@@ -30,57 +30,84 @@ from src.utils import (
     log_params,
     log_time,
     pickle_and_compress,
+    prefixes,
     setup_logger,
+    suffixes,
 )
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
-class ProductIon:
+class UnpositionedProductIon:
     seq: str
     charge: int
-    ion_type: Literal["b", "y"]
-    neutral_mass: float = field(init=False)
+    ion_type: Literal[B_ION_TYPE, Y_ION_TYPE]
     proteins: Optional[List[Union[str, int]]] = None
 
-    def __post_init__(self):
-        if self.ion_type == B_ION_TYPE:
-            self.neutral_mass = compute_b_ion_neutral_mass(
-                aa_seq=self.seq, charge=self.charge
+    @property
+    def mz(self) -> float:
+        return self.compute_ion_mz(
+            seq=self.seq,
+            charge=self.charge,
+            ion_type=self.ion_type,
+        )
+
+    @staticmethod
+    def compute_b_ion_mz(
+        seq: str,
+        charge: int,
+        amino_acid_mass_lookup: Dict[str, float] = AMINO_ACID_MASSES,
+    ) -> float:
+        aa_mass_sum = sum([amino_acid_mass_lookup[aa] for aa in seq])
+        neutral_mass = (aa_mass_sum + (charge * PROTON_MASS)) / charge
+        return neutral_mass
+
+    @staticmethod
+    def compute_y_ion_mz(
+        seq: str,
+        charge: int,
+        amino_acid_mass_lookup: Dict[str, float] = AMINO_ACID_MASSES,
+    ) -> float:
+        aa_mass_sum = sum([amino_acid_mass_lookup[aa] for aa in seq])
+        neutral_mass = (aa_mass_sum + WATER_MASS + (charge * PROTON_MASS)) / charge
+        return neutral_mass
+
+    @staticmethod
+    def compute_ion_mz(
+        seq: str,
+        charge: int,
+        ion_type: Literal[B_ION_TYPE, Y_ION_TYPE],
+        amino_acid_mass_lookup: Dict[str, float] = AMINO_ACID_MASSES,
+    ):
+        if ion_type == B_ION_TYPE:
+            return UnpositionedProductIon.compute_b_ion_mz(
+                seq=seq,
+                charge=charge,
+                amino_acid_mass_lookup=amino_acid_mass_lookup,
             )
-        elif self.ion_type == Y_ION_TYPE:
-            self.neutral_mass = compute_y_ion_neutral_mass(
-                aa_seq=self.seq, charge=self.charge
+        elif ion_type == Y_ION_TYPE:
+            return UnpositionedProductIon.compute_y_ion_mz(
+                seq=seq,
+                charge=charge,
+                amino_acid_mass_lookup=amino_acid_mass_lookup,
             )
         else:
-            msg = (
-                "Can't compute ion neutral mass because the ion type isn't supported. "
-                f"Received ion type {self.ion_type}"
-            )
-            raise RuntimeError(msg)
-
-    @staticmethod
-    def get_b_ion_seqs(seq: str) -> List[str]:
-        return [seq[:i] for i in range(1, len(seq) + 1)]  # Prefixes (b-ions)
-
-    @staticmethod
-    def get_y_ion_seqs(seq: str) -> List[str]:
-        return [seq[i:] for i in range(0, len(seq))]  # Suffixes (y-ions)
+            raise ValueError(f"Unsupported ion type: {ion_type}")
 
     @classmethod
     def generate_product_ions(
         cls,
         seq: str,
         charges: List[int],
-        ion_types: Set[Literal["b", "y"]] = {B_ION_TYPE, Y_ION_TYPE},
-    ) -> List["ProductIon"]:
+        ion_types: Set[Literal[B_ION_TYPE, Y_ION_TYPE]] = {B_ION_TYPE, Y_ION_TYPE},
+    ) -> List["UnpositionedProductIon"]:
         product_ions = []
         for ion_type in ion_types:
             if ion_type == B_ION_TYPE:
-                seq_generator = cls.get_b_ion_seqs
+                seq_generator = prefixes
             elif ion_type == Y_ION_TYPE:
-                seq_generator = cls.get_y_ion_seqs
+                seq_generator = suffixes
             else:
                 raise ValueError(f"Unsupported ion type: {ion_type}")
             for charge in charges:
@@ -114,20 +141,20 @@ class Peptide:
         return generate_aa_kmers(aa_seq=self.seq, min_k=min_k, max_k=max_k)
 
     def product_ions(
-        self,
-        charges: List[int],
-        ion_types: List[IonTypes] = [IonTypes.B_ION_TYPE, IonTypes.Y_ION_TYPE],
-    ) -> List[ProductIon]:
-        return generate_product_ions(seq=self.seq, charges=charges, ion_types=ion_types)
+        self, charges: List[int], ion_types: List[IonTypes] = {B_ION_TYPE, Y_ION_TYPE}
+    ) -> List[UnpositionedProductIon]:
+        return UnpositionedProductIon.generate_product_ions(
+            seq=self.seq, charges=charges, ion_types=ion_types
+        )
 
 
 class Fasta(BaseModel):
-    fasta_path: ExistingPath
+    path: ExistingPath
 
     @cached_property
     def seqs(self):
         """Get the sequences from the FASTA file."""
-        return [str(record.seq) for record in SeqIO.parse(self.fasta_path, "fasta")]
+        return [str(record.seq) for record in SeqIO.parse(self.path, "fasta")]
 
     def contains_seq(self, query_seq: str) -> bool:
         """Check if the query sequence exists in the FASTA file."""
@@ -138,90 +165,41 @@ class Fasta(BaseModel):
 
     @property
     def proteins(self) -> List[Peptide]:
-        return Peptide.from_fasta(fasta_path=self.fasta_path)
+        return Peptide.from_fasta(fasta_path=self.path)
+
+    def get_proteins_by_name(
+        self, protein_names: Union[List[str], str, Path]
+    ) -> List[Peptide]:
+        return get_proteins_by_name(protein_names=protein_names, fasta_path=self.path)
+
+    @staticmethod
+    def write_fasta(peptides: List[Peptide], out_path: str) -> None:
+        """
+        Write a list of Peptide objects to a FASTA file.
+        Each peptide will get two lines in the FASTA file:
+        ><peptide.name> <peptide.desc>
+        <peptide.seq>
+        """
+        with open(out_path, "w") as f:
+            for peptide in peptides:
+                header_parts = []
+                if peptide.name:
+                    header_parts.append(peptide.name)
+                if peptide.desc:
+                    header_parts.append(peptide.desc)
+
+                header = " ".join(header_parts)
+                f.write(f">{header}\n")
+                f.write(f"{peptide.seq}\n")
 
 
-def write_fasta(peptides: List[Peptide], output_path: str) -> None:
-    with open(output_path, "w") as f:
-        for peptide in peptides:
-            header_parts = []
-            if peptide.name:
-                header_parts.append(peptide.name)
-            # if peptide.id is not None:
-            #     header_parts.append(f"id:{peptide.id}")
-            if peptide.desc:
-                header_parts.append(peptide.desc)
-
-            header = " ".join(header_parts)
-            f.write(f">{header}\n")
-            f.write(f"{peptide.seq}\n")
-
-
-def compute_b_ion_neutral_mass(
-    aa_seq: str,
-    charge: int,
-    amino_acid_mass_lookup: Dict[str, float] = AMINO_ACID_MASSES,
-) -> float:
-    aa_mass_sum = sum([amino_acid_mass_lookup[aa] for aa in aa_seq])
-    neutral_mass = (aa_mass_sum + (charge * PROTON_MASS)) / charge
-    return neutral_mass
-
-
-def compute_y_ion_neutral_mass(
-    aa_seq: str,
-    charge: int,
-    amino_acid_mass_lookup: Dict[str, float] = AMINO_ACID_MASSES,
-) -> float:
-    aa_mass_sum = sum([amino_acid_mass_lookup[aa] for aa in aa_seq])
-    neutral_mass = (aa_mass_sum + WATER_MASS + (charge * PROTON_MASS)) / charge
-    return neutral_mass
-
-
-def compute_peptide_mz(
-    aa_seq: str,
-    charge: int,
-    amino_acid_mass_lookup: Dict[str, float] = AMINO_ACID_MASSES,
-) -> float:
-    return compute_y_ion_neutral_mass(
-        aa_seq=aa_seq, charge=charge, amino_acid_mass_lookup=amino_acid_mass_lookup
-    )
-
-
-def generate_product_ions(
-    seq: str, charges: List[int], ion_types: List[Literal["b", "y"]]
-):
-    product_ion_seq_generators = {
-        B_ION_TYPE: lambda seq: [
-            seq[:i] for i in range(1, len(seq) + 1)
-        ],  # Prefixes (b-ions)
-        Y_ION_TYPE: lambda seq: [
-            seq[i:] for i in range(0, len(seq))
-        ],  # Suffixes (y-ions)
-    }
-    product_ions = []
-    for ion_type in ion_types:
-        seq_generator = product_ion_seq_generators.get(ion_type)
-        for charge in charges:
-            product_ions.extend(
-                [
-                    ProductIon(seq=ion_seq, charge=charge, ion_type=ion_type)
-                    for ion_seq in seq_generator(seq=seq)
-                ]
-            )
-    return product_ions
-
-
-def get_proteins_from_fasta(fasta_path: str) -> List[Peptide]:
+def compute_peptide_precursor_mz(seq: str, charge: int):
     """
-    Get the proteins from a FASTA file.
+    The m/z of a peptide as a precursor
+        peptide_mz = (sum_AA + WATER + z*PROTON) / z
+    which is the same as the same as if the sequence is considered a y-ion
     """
-    proteins = []
-    for p_id, protein in enumerate(SeqIO.parse(fasta_path, "fasta")):
-        split_desc = protein.description.split(" ")
-        name = split_desc[0]
-        desc = " ".join(split_desc[1:])
-        proteins.append(Peptide(seq=str(protein.seq), desc=desc, name=name, id=p_id))
-    return proteins
+    return UnpositionedProductIon.compute_y_ion_mz(seq=seq, charge=charge)
 
 
 def get_proteins_by_name(
@@ -238,17 +216,13 @@ def get_proteins_by_name(
     return proteins
 
 
-def generate_b_ion_seqs(seq: str):
-    return [seq[:i] for i in range(1, len(seq) + 1)]  # Prefixes (b-ions)
-
-
-def generate_y_ion_seqs(seq: str):
-    return [seq[i:] for i in range(0, len(seq))]  # Suffixes (y-ions)
-
-
 def get_unique_kmers(
     peptides: Union[List[Peptide], List[str], Path], min_k: int, max_k: int
 ) -> Set[str]:
+    """
+    Given a list of amino acid sequences (either as strings, Peptide objects, or a path to a FASTA file),
+    return all unique k-mers from the sequences for k=min_k, min_k + 1, ..., max_k
+    """
     if isinstance(peptides, Path):
         logger.info("Reading in FASTA file...")
         peptides = Peptide.from_fasta(fasta_path=peptides)
@@ -331,7 +305,11 @@ def cli_get_uniq_kmers(
 def get_kmer_counts_by_protein(
     fasta: Path,
     k: int,
-) -> Dict:
+) -> Dict[str, Dict[str, int]]:
+    """
+    Given a FASTA file and a k, return a dictionary that looks like the following:
+    {<kmer sequence>: {<protein name>: <number of time kmer appears in protein>}}
+    """
     peptides = Peptide.from_fasta(fasta_path=fasta)
     kmer_to_prot_to_count_map = defaultdict(lambda: defaultdict(int))
     num_prots = len(peptides)
@@ -388,15 +366,11 @@ def cli_get_kmer_counts_by_protein(
     out_path: Path,
     overwrite: bool,
 ):
-    # out_dir = out_dir / f"{fasta.stem}"
-    # make_directory(out_dir)
-    # k_map = {}
     if out_path.exists() and not overwrite:
         logger.info(f"File {out_path} already exists. Skipping...")
         return
     loop_start_time = time()
     logger.info(f"Processing k={k}")
-    # k_map[k]
     k_map = get_kmer_counts_by_protein(
         fasta=fasta,
         k=k,

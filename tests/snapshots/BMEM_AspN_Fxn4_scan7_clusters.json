@@ -1,0 +1,180 @@
+{
+  "b": [
+    {
+      "exclusive_end": 37,
+      "extended_seq": "KILDSVGIEADDD",
+      "inclusive_start": 24,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 40,
+      "extended_seq": "IEADDDRLNKVIS",
+      "inclusive_start": 31,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 53,
+      "extended_seq": "KVISELNGKNIED",
+      "inclusive_start": 40,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 79,
+      "extended_seq": "ASVPAGGAVAVSAAPGSAA",
+      "inclusive_start": 62,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 80,
+      "extended_seq": "SVPAGGAVAVSAAPGSAA",
+      "inclusive_start": 63,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 89,
+      "extended_seq": "AVSAAPGSAAPAAGSAPAA",
+      "inclusive_start": 71,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 90,
+      "extended_seq": "VSAAPGSAAPAAGSAPAAA",
+      "inclusive_start": 72,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 85,
+      "extended_seq": "SAAPGSAAPAAGSAPAAAE",
+      "inclusive_start": 73,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 86,
+      "extended_seq": "AAPGSAAPAAGSAPAAAE",
+      "inclusive_start": 74,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 87,
+      "extended_seq": "APGSAAPAAGSAPAAAEE",
+      "inclusive_start": 75,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 86,
+      "extended_seq": "PGSAAPAAGSAPAAAEE",
+      "inclusive_start": 76,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 89,
+      "extended_seq": "GSAAPAAGSAPAAAEEK",
+      "inclusive_start": 77,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 84,
+      "extended_seq": "SAAPAAGSAPAAAEEKK",
+      "inclusive_start": 78,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 89,
+      "extended_seq": "AAPAAGSAPAAAEEKK",
+      "inclusive_start": 79,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 95,
+      "extended_seq": "APAAGSAPAAAEEKKD",
+      "inclusive_start": 80,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 92,
+      "extended_seq": "PAAGSAPAAAEEKKD",
+      "inclusive_start": 81,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 88,
+      "extended_seq": "AAGSAPAAAEEKKDE",
+      "inclusive_start": 82,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 89,
+      "extended_seq": "AGSAPAAAEEKKDEK",
+      "inclusive_start": 83,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 90,
+      "extended_seq": "GSAPAAAEEKKDEK",
+      "inclusive_start": 84,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 91,
+      "extended_seq": "SAPAAAEEKKDEKK",
+      "inclusive_start": 85,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    }
+  ],
+  "y": [
+    {
+      "exclusive_end": 12,
+      "extended_seq": "MRYVASYLLAAL",
+      "inclusive_start": 0,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 33,
+      "extended_seq": "KDIKKILDSVGIE",
+      "inclusive_start": 25,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 41,
+      "extended_seq": "SVGIEADDDRLNK",
+      "inclusive_start": 30,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 74,
+      "extended_seq": "GVGKLASVPAGGAVAVS",
+      "inclusive_start": 59,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 79,
+      "extended_seq": "LASVPAGGAVAVSAAPGS",
+      "inclusive_start": 62,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 80,
+      "extended_seq": "ASVPAGGAVAVSAAPGSA",
+      "inclusive_start": 62,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 81,
+      "extended_seq": "ASVPAGGAVAVSAAPGSAA",
+      "inclusive_start": 63,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 86,
+      "extended_seq": "GGAVAVSAAPGSAAPAAGS",
+      "inclusive_start": 68,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    },
+    {
+      "exclusive_end": 95,
+      "extended_seq": "SAAPAAGSAPAAAEEKK",
+      "inclusive_start": 78,
+      "protein": "sp|P99027|RLA2_MOUSE"
+    }
+  ]
+}

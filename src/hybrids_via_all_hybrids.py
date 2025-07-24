@@ -1,7 +1,6 @@
 import logging
 from typing import List, Optional
 
-
 from src.constants import (
     DEFAULT_MAX_KMER_LEN,
     DEFAULT_MIN_KMER_LEN,
@@ -45,7 +44,7 @@ def form_all_hybrids(
         protein_attr="name",
     )
     db_rows = [
-        SeqWithMass.from_seq(seq=seq, charge=precursor_charge)
+        SeqWithMass.from_seq_and_charge(seq=seq, charge=precursor_charge)
         for seq in uniq_kmer_to_protein_map
     ]
     db = Sqlite3Database()

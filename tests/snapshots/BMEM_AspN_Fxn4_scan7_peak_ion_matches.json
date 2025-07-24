@@ -1,0 +1,2132 @@
+[
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "GGNS"
+    },
+    "peak": {
+      "id": 5,
+      "intensity": 72.88109588623047,
+      "mz": 112.04951477050781
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "K"
+    },
+    "peak": {
+      "id": 8,
+      "intensity": 57.67567443847656,
+      "mz": 129.10342407226562
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "KK"
+    },
+    "peak": {
+      "id": 8,
+      "intensity": 57.67567443847656,
+      "mz": 129.10342407226562
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "KN"
+    },
+    "peak": {
+      "id": 9,
+      "intensity": 275.5562438964844,
+      "mz": 131.08053588867188
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "NK"
+    },
+    "peak": {
+      "id": 9,
+      "intensity": 275.5562438964844,
+      "mz": 131.08053588867188
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AA"
+    },
+    "peak": {
+      "id": 12,
+      "intensity": 232.84698486328125,
+      "mz": 143.0811309814453
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AGGAVA"
+    },
+    "peak": {
+      "id": 12,
+      "intensity": 232.84698486328125,
+      "mz": 143.0811309814453
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "GGAV"
+    },
+    "peak": {
+      "id": 12,
+      "intensity": 232.84698486328125,
+      "mz": 143.0811309814453
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "LNG"
+    },
+    "peak": {
+      "id": 12,
+      "intensity": 232.84698486328125,
+      "mz": 143.0811309814453
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "QGV"
+    },
+    "peak": {
+      "id": 12,
+      "intensity": 232.84698486328125,
+      "mz": 143.0811309814453
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AS"
+    },
+    "peak": {
+      "id": 13,
+      "intensity": 1764.8875732421875,
+      "mz": 159.07606506347656
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SA"
+    },
+    "peak": {
+      "id": 13,
+      "intensity": 1764.8875732421875,
+      "mz": 159.07606506347656
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAEEK"
+    },
+    "peak": {
+      "id": 19,
+      "intensity": 37.4766960144043,
+      "mz": 183.09278869628906
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "PS"
+    },
+    "peak": {
+      "id": 21,
+      "intensity": 268.7943115234375,
+      "mz": 185.08934020996094
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SP"
+    },
+    "peak": {
+      "id": 21,
+      "intensity": 268.7943115234375,
+      "mz": 185.08934020996094
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "GSAAPAAGS"
+    },
+    "peak": {
+      "id": 23,
+      "intensity": 909.2021484375,
+      "mz": 230.1143035888672
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SAA"
+    },
+    "peak": {
+      "id": 23,
+      "intensity": 909.2021484375,
+      "mz": 230.1143035888672
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAPAAGSAP"
+    },
+    "peak": {
+      "id": 24,
+      "intensity": 81.73975372314453,
+      "mz": 238.1233673095703
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAPGSAAPA"
+    },
+    "peak": {
+      "id": 24,
+      "intensity": 81.73975372314453,
+      "mz": 238.1233673095703
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "APAAGSAPA"
+    },
+    "peak": {
+      "id": 24,
+      "intensity": 81.73975372314453,
+      "mz": 238.1233673095703
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "APGSAAPAA"
+    },
+    "peak": {
+      "id": 24,
+      "intensity": 81.73975372314453,
+      "mz": 238.1233673095703
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AVSAAPGSA"
+    },
+    "peak": {
+      "id": 24,
+      "intensity": 81.73975372314453,
+      "mz": 238.1233673095703
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "EDVI"
+    },
+    "peak": {
+      "id": 24,
+      "intensity": 81.73975372314453,
+      "mz": 238.1233673095703
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "IEDV"
+    },
+    "peak": {
+      "id": 24,
+      "intensity": 81.73975372314453,
+      "mz": 238.1233673095703
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "PAAGSAPAA"
+    },
+    "peak": {
+      "id": 24,
+      "intensity": 81.73975372314453,
+      "mz": 238.1233673095703
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "VSAAPGSAA"
+    },
+    "peak": {
+      "id": 24,
+      "intensity": 81.73975372314453,
+      "mz": 238.1233673095703
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAP"
+    },
+    "peak": {
+      "id": 25,
+      "intensity": 320.2884521484375,
+      "mz": 240.13548278808594
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "APA"
+    },
+    "peak": {
+      "id": 25,
+      "intensity": 320.2884521484375,
+      "mz": 240.13548278808594
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "PAA"
+    },
+    "peak": {
+      "id": 25,
+      "intensity": 320.2884521484375,
+      "mz": 240.13548278808594
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAGS"
+    },
+    "peak": {
+      "id": 29,
+      "intensity": 53.63520431518555,
+      "mz": 287.1347351074219
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AGSA"
+    },
+    "peak": {
+      "id": 29,
+      "intensity": 53.63520431518555,
+      "mz": 287.1347351074219
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "GSAA"
+    },
+    "peak": {
+      "id": 29,
+      "intensity": 53.63520431518555,
+      "mz": 287.1347351074219
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAPG"
+    },
+    "peak": {
+      "id": 30,
+      "intensity": 206.7042236328125,
+      "mz": 297.15478515625
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "PAAG"
+    },
+    "peak": {
+      "id": 30,
+      "intensity": 206.7042236328125,
+      "mz": 297.15478515625
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "ADDDRLNK"
+    },
+    "peak": {
+      "id": 33,
+      "intensity": 161.93882751464844,
+      "mz": 310.15557861328125
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "DSVGIE"
+    },
+    "peak": {
+      "id": 33,
+      "intensity": 161.93882751464844,
+      "mz": 310.15557861328125
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "IEADDDRL"
+    },
+    "peak": {
+      "id": 33,
+      "intensity": 161.93882751464844,
+      "mz": 310.15557861328125
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "MGFGLF"
+    },
+    "peak": {
+      "id": 35,
+      "intensity": 36.96052551269531,
+      "mz": 327.16046142578125
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SAAP"
+    },
+    "peak": {
+      "id": 35,
+      "intensity": 36.96052551269531,
+      "mz": 327.16046142578125
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SAPA"
+    },
+    "peak": {
+      "id": 35,
+      "intensity": 36.96052551269531,
+      "mz": 327.16046142578125
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "ASY"
+    },
+    "peak": {
+      "id": 36,
+      "intensity": 102.55681610107422,
+      "mz": 340.1560363769531
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "IEADDDRLN"
+    },
+    "peak": {
+      "id": 37,
+      "intensity": 32.54166793823242,
+      "mz": 348.1705017089844
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "ISE"
+    },
+    "peak": {
+      "id": 37,
+      "intensity": 32.54166793823242,
+      "mz": 348.1705017089844
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SEL"
+    },
+    "peak": {
+      "id": 37,
+      "intensity": 32.54166793823242,
+      "mz": 348.1705017089844
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAPGS"
+    },
+    "peak": {
+      "id": 40,
+      "intensity": 180.5742645263672,
+      "mz": 384.1820373535156
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AGSAP"
+    },
+    "peak": {
+      "id": 40,
+      "intensity": 180.5742645263672,
+      "mz": 384.1820373535156
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "APGSA"
+    },
+    "peak": {
+      "id": 40,
+      "intensity": 180.5742645263672,
+      "mz": 384.1820373535156
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "GSAAP"
+    },
+    "peak": {
+      "id": 40,
+      "intensity": 180.5742645263672,
+      "mz": 384.1820373535156
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "GSAPA"
+    },
+    "peak": {
+      "id": 40,
+      "intensity": 180.5742645263672,
+      "mz": 384.1820373535156
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "PAAGS"
+    },
+    "peak": {
+      "id": 40,
+      "intensity": 180.5742645263672,
+      "mz": 384.1820373535156
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "PGSAA"
+    },
+    "peak": {
+      "id": 40,
+      "intensity": 180.5742645263672,
+      "mz": 384.1820373535156
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "PGSAAPAAGS"
+    },
+    "peak": {
+      "id": 40,
+      "intensity": 180.5742645263672,
+      "mz": 384.1820373535156
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SAAPG"
+    },
+    "peak": {
+      "id": 40,
+      "intensity": 180.5742645263672,
+      "mz": 384.1820373535156
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SAAPA"
+    },
+    "peak": {
+      "id": 41,
+      "intensity": 39.25961685180664,
+      "mz": 398.20166015625
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SAPAA"
+    },
+    "peak": {
+      "id": 41,
+      "intensity": 39.25961685180664,
+      "mz": 398.20166015625
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "ASYLLAAL"
+    },
+    "peak": {
+      "id": 44,
+      "intensity": 26.0,
+      "mz": 411.23394775390625
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "GNSSPSAKDIKK"
+    },
+    "peak": {
+      "id": 44,
+      "intensity": 26.0,
+      "mz": 411.23394775390625
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "LDSV"
+    },
+    "peak": {
+      "id": 49,
+      "intensity": 1294.5008544921875,
+      "mz": 433.229736328125
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "PAAGSAPAAAEEKK"
+    },
+    "peak": {
+      "id": 49,
+      "intensity": 1294.5008544921875,
+      "mz": 433.229736328125
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SVPAGGAVAVSAAPGS"
+    },
+    "peak": {
+      "id": 49,
+      "intensity": 1294.5008544921875,
+      "mz": 433.229736328125
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AVAVSAAPGSA"
+    },
+    "peak": {
+      "id": 51,
+      "intensity": 39.3684196472168,
+      "mz": 450.7372741699219
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "VAVSAAPGSAA"
+    },
+    "peak": {
+      "id": 51,
+      "intensity": 39.3684196472168,
+      "mz": 450.7372741699219
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "APAAGSAPAAAEEKK"
+    },
+    "peak": {
+      "id": 52,
+      "intensity": 266.1259460449219,
+      "mz": 450.906982421875
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "ASVPAGGAVAVSAAPGS"
+    },
+    "peak": {
+      "id": 52,
+      "intensity": 266.1259460449219,
+      "mz": 450.906982421875
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "PAGGAVAVSAAPGSAAP"
+    },
+    "peak": {
+      "id": 52,
+      "intensity": 266.1259460449219,
+      "mz": 450.906982421875
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SVPAGGAVAVSAAPGSA"
+    },
+    "peak": {
+      "id": 52,
+      "intensity": 266.1259460449219,
+      "mz": 450.906982421875
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAGSAP"
+    },
+    "peak": {
+      "id": 53,
+      "intensity": 104.24500274658203,
+      "mz": 455.21990966796875
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAPGSA"
+    },
+    "peak": {
+      "id": 53,
+      "intensity": 104.24500274658203,
+      "mz": 455.21990966796875
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAPGSAAPAAGS"
+    },
+    "peak": {
+      "id": 53,
+      "intensity": 104.24500274658203,
+      "mz": 455.21990966796875
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AGSAPA"
+    },
+    "peak": {
+      "id": 53,
+      "intensity": 104.24500274658203,
+      "mz": 455.21990966796875
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "APAAGS"
+    },
+    "peak": {
+      "id": 53,
+      "intensity": 104.24500274658203,
+      "mz": 455.21990966796875
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "APGSAA"
+    },
+    "peak": {
+      "id": 53,
+      "intensity": 104.24500274658203,
+      "mz": 455.21990966796875
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "APGSAAPAAGSA"
+    },
+    "peak": {
+      "id": 53,
+      "intensity": 104.24500274658203,
+      "mz": 455.21990966796875
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "GSAAPA"
+    },
+    "peak": {
+      "id": 53,
+      "intensity": 104.24500274658203,
+      "mz": 455.21990966796875
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "GSAAPAAGSAPA"
+    },
+    "peak": {
+      "id": 53,
+      "intensity": 104.24500274658203,
+      "mz": 455.21990966796875
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "GSAPAA"
+    },
+    "peak": {
+      "id": 53,
+      "intensity": 104.24500274658203,
+      "mz": 455.21990966796875
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "PAAGSA"
+    },
+    "peak": {
+      "id": 53,
+      "intensity": 104.24500274658203,
+      "mz": 455.21990966796875
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SAAPGSAAPAAG"
+    },
+    "peak": {
+      "id": 53,
+      "intensity": 104.24500274658203,
+      "mz": 455.21990966796875
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "APAAGSAPAAAEEKK"
+    },
+    "peak": {
+      "id": 54,
+      "intensity": 462.0856018066406,
+      "mz": 456.91278076171875
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "ASVPAGGAVAVSAAPGS"
+    },
+    "peak": {
+      "id": 54,
+      "intensity": 462.0856018066406,
+      "mz": 456.91278076171875
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SVPAGGAVAVSAAPGSA"
+    },
+    "peak": {
+      "id": 54,
+      "intensity": 462.0856018066406,
+      "mz": 456.91278076171875
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAPAAG"
+    },
+    "peak": {
+      "id": 55,
+      "intensity": 510.0,
+      "mz": 457.24169921875
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "APAAAEEKK"
+    },
+    "peak": {
+      "id": 58,
+      "intensity": 138.29090881347656,
+      "mz": 457.7501525878906
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SSPSAKDIK"
+    },
+    "peak": {
+      "id": 58,
+      "intensity": 138.29090881347656,
+      "mz": 457.7501525878906
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SVPAGGAVAVS"
+    },
+    "peak": {
+      "id": 58,
+      "intensity": 138.29090881347656,
+      "mz": 457.7501525878906
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AVSAAPGSAAPAAGSAPA"
+    },
+    "peak": {
+      "id": 60,
+      "intensity": 45.61249923706055,
+      "mz": 469.23992919921875
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SAAPAA"
+    },
+    "peak": {
+      "id": 60,
+      "intensity": 45.61249923706055,
+      "mz": 469.23992919921875
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SAPAAA"
+    },
+    "peak": {
+      "id": 60,
+      "intensity": 45.61249923706055,
+      "mz": 469.23992919921875
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SVPAGG"
+    },
+    "peak": {
+      "id": 60,
+      "intensity": 45.61249923706055,
+      "mz": 469.23992919921875
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "VSAAPGSAAPAAGSAPAA"
+    },
+    "peak": {
+      "id": 60,
+      "intensity": 45.61249923706055,
+      "mz": 469.23992919921875
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "RYVA"
+    },
+    "peak": {
+      "id": 63,
+      "intensity": 183.77784729003906,
+      "mz": 490.2738952636719
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "MRYVASYL"
+    },
+    "peak": {
+      "id": 64,
+      "intensity": 263.22320556640625,
+      "mz": 492.7532043457031
+    }
+  },
+  {
+    "ion": {
+      "charge": 3,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SAAPAAGSAPAAAEEKK"
+    },
+    "peak": {
+      "id": 68,
+      "intensity": 252.41346740722656,
+      "mz": 509.59942626953125
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "GSAPAAAEEKK"
+    },
+    "peak": {
+      "id": 72,
+      "intensity": 55.14814758300781,
+      "mz": 529.7861328125
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "VASYL"
+    },
+    "peak": {
+      "id": 74,
+      "intensity": 48.0113639831543,
+      "mz": 534.2928466796875
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AGSAPAAAEEKK"
+    },
+    "peak": {
+      "id": 77,
+      "intensity": 149.23880004882812,
+      "mz": 565.2989501953125
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAGSAPAAAEEKK"
+    },
+    "peak": {
+      "id": 83,
+      "intensity": 380.23309326171875,
+      "mz": 600.8113403320312
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "NGKNIEDVIAQ"
+    },
+    "peak": {
+      "id": 83,
+      "intensity": 380.23309326171875,
+      "mz": 600.8113403320312
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AEEKK"
+    },
+    "peak": {
+      "id": 85,
+      "intensity": 103.81095123291016,
+      "mz": 604.3353881835938
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAPGSAAP"
+    },
+    "peak": {
+      "id": 87,
+      "intensity": 30.185606002807617,
+      "mz": 623.306884765625
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "APAAGSAP"
+    },
+    "peak": {
+      "id": 87,
+      "intensity": 30.185606002807617,
+      "mz": 623.306884765625
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "APGSAAPA"
+    },
+    "peak": {
+      "id": 87,
+      "intensity": 30.185606002807617,
+      "mz": 623.306884765625
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "GIEADDDRLNK"
+    },
+    "peak": {
+      "id": 87,
+      "intensity": 30.185606002807617,
+      "mz": 623.306884765625
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "PAAGSAPA"
+    },
+    "peak": {
+      "id": 87,
+      "intensity": 30.185606002807617,
+      "mz": 623.306884765625
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "PGSAAPAA"
+    },
+    "peak": {
+      "id": 87,
+      "intensity": 30.185606002807617,
+      "mz": 623.306884765625
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SAPAAAEEKKDE"
+    },
+    "peak": {
+      "id": 87,
+      "intensity": 30.185606002807617,
+      "mz": 623.306884765625
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "DDRLNKVISEL"
+    },
+    "peak": {
+      "id": 89,
+      "intensity": 42.028846740722656,
+      "mz": 642.363037109375
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "GKLASVPAGGAVAVS"
+    },
+    "peak": {
+      "id": 89,
+      "intensity": 42.028846740722656,
+      "mz": 642.363037109375
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "PAAGSAPAAAEEKK"
+    },
+    "peak": {
+      "id": 91,
+      "intensity": 1762.2049560546875,
+      "mz": 649.3405151367188
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SVPAGGAVAVSAAPGS"
+    },
+    "peak": {
+      "id": 91,
+      "intensity": 1762.2049560546875,
+      "mz": 649.3405151367188
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "ASYLLAALGGNSSP"
+    },
+    "peak": {
+      "id": 100,
+      "intensity": 107.02765655517578,
+      "mz": 660.8489379882812
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "YLLAALGGNSSPSA"
+    },
+    "peak": {
+      "id": 100,
+      "intensity": 107.02765655517578,
+      "mz": 660.8489379882812
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAEEKK"
+    },
+    "peak": {
+      "id": 103,
+      "intensity": 96.96154022216797,
+      "mz": 675.375
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "APAAGSAPAAAEEKK"
+    },
+    "peak": {
+      "id": 104,
+      "intensity": 108.5999984741211,
+      "mz": 684.8599243164062
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "ASVPAGGAVAVSAAPGS"
+    },
+    "peak": {
+      "id": 104,
+      "intensity": 108.5999984741211,
+      "mz": 684.8599243164062
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SVPAGGAVAVSAAPGSA"
+    },
+    "peak": {
+      "id": 104,
+      "intensity": 108.5999984741211,
+      "mz": 684.8599243164062
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "LNGKNIEDVIAQG"
+    },
+    "peak": {
+      "id": 107,
+      "intensity": 172.83999633789062,
+      "mz": 685.867431640625
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "MRYVASYLLAAL"
+    },
+    "peak": {
+      "id": 107,
+      "intensity": 172.83999633789062,
+      "mz": 685.867431640625
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAGSAPAAA"
+    },
+    "peak": {
+      "id": 108,
+      "intensity": 57.40833282470703,
+      "mz": 686.34130859375
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "KILDSVGIEADDD"
+    },
+    "peak": {
+      "id": 108,
+      "intensity": 57.40833282470703,
+      "mz": 686.34130859375
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAPAAGSAP"
+    },
+    "peak": {
+      "id": 110,
+      "intensity": 39.38461685180664,
+      "mz": 694.3381958007812
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAPGSAAPA"
+    },
+    "peak": {
+      "id": 110,
+      "intensity": 39.38461685180664,
+      "mz": 694.3381958007812
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "APAAGSAPA"
+    },
+    "peak": {
+      "id": 110,
+      "intensity": 39.38461685180664,
+      "mz": 694.3381958007812
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "APGSAAPAA"
+    },
+    "peak": {
+      "id": 110,
+      "intensity": 39.38461685180664,
+      "mz": 694.3381958007812
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "PAAGSAPAA"
+    },
+    "peak": {
+      "id": 110,
+      "intensity": 39.38461685180664,
+      "mz": 694.3381958007812
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAPAAGSAPAAAEEKK"
+    },
+    "peak": {
+      "id": 111,
+      "intensity": 135.22500610351562,
+      "mz": 720.3775024414062
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "ASVPAGGAVAVSAAPGSA"
+    },
+    "peak": {
+      "id": 111,
+      "intensity": 135.22500610351562,
+      "mz": 720.3775024414062
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "GIEADDDRLNKVI"
+    },
+    "peak": {
+      "id": 111,
+      "intensity": 135.22500610351562,
+      "mz": 720.3775024414062
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SVPAGGAVAVSAAPGSAA"
+    },
+    "peak": {
+      "id": 111,
+      "intensity": 135.22500610351562,
+      "mz": 720.3775024414062
+    }
+  },
+  {
+    "ion": {
+      "charge": 2,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "KVISELNGKNIED"
+    },
+    "peak": {
+      "id": 112,
+      "intensity": 166.71505737304688,
+      "mz": 720.8899536132812
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAAEEKK"
+    },
+    "peak": {
+      "id": 114,
+      "intensity": 74.69898223876953,
+      "mz": 746.399658203125
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAPAAGSAPA"
+    },
+    "peak": {
+      "id": 115,
+      "intensity": 42.306819915771484,
+      "mz": 765.3919677734375
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "AAPGSAAPAA"
+    },
+    "peak": {
+      "id": 115,
+      "intensity": 42.306819915771484,
+      "mz": 765.3919677734375
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "APAAGSAPAA"
+    },
+    "peak": {
+      "id": 115,
+      "intensity": 42.306819915771484,
+      "mz": 765.3919677734375
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "PAAGSAPAAA"
+    },
+    "peak": {
+      "id": 115,
+      "intensity": 42.306819915771484,
+      "mz": 765.3919677734375
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "PAAAEEKK"
+    },
+    "peak": {
+      "id": 119,
+      "intensity": 221.5,
+      "mz": 843.4566650390625
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "ILDSVGIE"
+    },
+    "peak": {
+      "id": 121,
+      "intensity": 66.20833587646484,
+      "mz": 845.475341796875
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "SPSAKDIK"
+    },
+    "peak": {
+      "id": 121,
+      "intensity": 66.20833587646484,
+      "mz": 845.475341796875
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "PAAGSAPAAAE"
+    },
+    "peak": {
+      "id": 123,
+      "intensity": 54.50893020629883,
+      "mz": 894.42431640625
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "GSAPAAAEEKK"
+    },
+    "peak": {
+      "id": 127,
+      "intensity": 31.28928565979004,
+      "mz": 1058.54833984375
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "y",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "GAVAVSAAPGSAAPAAGS"
+    },
+    "peak": {
+      "id": 131,
+      "intensity": 42.69422912597656,
+      "mz": 1411.716796875
+    }
+  },
+  {
+    "ion": {
+      "charge": 1,
+      "ion_type": "b",
+      "proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "seq": "VISELNGKNIEDV"
+    },
+    "peak": {
+      "id": 131,
+      "intensity": 42.69422912597656,
+      "mz": 1411.716796875
+    }
+  }
+]
