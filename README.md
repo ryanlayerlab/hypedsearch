@@ -1,11 +1,8 @@
 # Hypedsearch <!-- omit in toc -->
 
-- [Installation](#installation)
-  - [Using Conda (recommended)](#using-conda-recommended)
-  - [Without using Conda (using `pip` and `venv`)](#without-using-conda-using-pip-and-venv)
-  - [Comet](#comet)
-- [Usage](#usage)
-- [(Potentially) Helpful commands](#potentially-helpful-commands)
+- [Hypedsearch algorithm](#hypedsearch-algorithm)
+  - [Pipelines](#pipelines)
+  - [(Potentially) Helpful commands](#potentially-helpful-commands)
 
 
 ## Installation
