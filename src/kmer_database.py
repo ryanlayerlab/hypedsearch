@@ -1,7 +1,6 @@
 import logging
-import time
 from collections import defaultdict
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Set, Union
 
@@ -9,15 +8,11 @@ import click
 
 from src.constants import (
     AMINO_ACID_MASSES,
-    B_ION_TYPE,
     DEFAULT_MAX_KMER_LEN,
     DEFAULT_MIN_KMER_LEN,
     MEMORY,
-    PRODUCT_ION_TABLE,
     PROTON_MASS,
     WATER_MASS,
-    Y_ION_TYPE,
-    IonTypes,
 )
 from src.mass_spectra import Peak, Spectrum
 from src.peptides_and_ions import (
@@ -30,7 +25,6 @@ from src.sql_database import Sqlite3Database, SqlTableRow
 from src.utils import (
     PathType,
     decompress_and_depickle,
-    get_time_in_diff_units,
     load_json,
     log_time,
     pickle_and_compress,
@@ -44,6 +38,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class KmerToProteinMap:
+    """A class for the mapping from kmers to the proteins those kmers are found in"""
+
     kmer_to_protein_map: Dict[str, List[Union[int, str]]]
 
     @classmethod
@@ -85,7 +81,9 @@ class KmerToProteinMap:
         protein_attr: str = "id",
         verbose: bool = True,
     ) -> Dict[str, List[Union[int, str]]]:
-        """ """
+        """
+        Given a list of proteins get a dictionary mapping kmers to proteins
+        """
         uniq_kmer_to_protein_map = defaultdict(list)
         num_proteins = len(proteins)
         for p_idx, protein in enumerate(proteins):
@@ -101,6 +99,7 @@ class KmerToProteinMap:
 
     @log_time(level=logging.INFO)
     def save(self, out_path: Union[str, Path]) -> None:
+        """Save the kmer-to-protein map to a file."""
         out_path = Path(out_path)
         if out_path.suffix == ".pklz":
             pickle_and_compress(obj=self.kmer_to_protein_map, file_path=out_path)
@@ -112,6 +111,7 @@ class KmerToProteinMap:
     @classmethod
     @log_time(level=logging.INFO)
     def load(cls, path: Union[str, Path]) -> "KmerToProteinMap":
+        """Load a saved kmer-to-protein map from a file."""
         path = Path(path)
         if path.suffix == ".pklz":
             kmer_to_protein_map = decompress_and_depickle(path)
@@ -124,6 +124,8 @@ class KmerToProteinMap:
 
 @dataclass
 class DbKmer(SqlTableRow):
+    """Object to represent rows of the kmer database table"""
+
     seq: str
     aa_mass: float
     proteins: str
@@ -135,39 +137,9 @@ class DbKmer(SqlTableRow):
         proteins: List[Union[int, str]],
         amino_acid_mass_lookup: Dict[str, float] = AMINO_ACID_MASSES,
     ) -> "DbKmer":
+        """Create a DbKmer object, given a kmer seqeuence and the proteins the kmer is found in"""
         aa_mass = sum([amino_acid_mass_lookup[aa] for aa in seq])
         return cls(seq=seq, aa_mass=aa_mass, proteins=",".join(map(str, proteins)))
-
-    def set_charge(self, charge: int):
-        self._charge = charge
-
-    @property
-    def charge(self):
-        return self._charge
-
-    @property
-    def z(self):
-        return self._charge
-
-    @property
-    def ion_type(self):
-        return self._ion_type
-
-    @property
-    def ion(self):
-        return self._ion_type
-
-    @property
-    def protein_ids_as_ints(self):
-        return [int(p_id) for p_id in self.proteins.split(",")]
-
-    def ionize(self, charge: int, ion_type: Literal["b", "y"]):
-        self._ion_type = ion_type
-        self._charge = charge
-        return self
-
-    def __str__(self):
-        return f"{self.ion}-{self.z}-{self.seq}"
 
 
 @dataclass
@@ -227,6 +199,8 @@ def y_ion_bounds_on_amino_acid_mass(ppm_tolerance, ref_mass, charge):
 
 @dataclass
 class KmerDatabase:
+    """Object to represent the kmer database"""
+
     db_path: Path
     db: Sqlite3Database = field(init=False)
     table_name = "kmers"
@@ -336,7 +310,6 @@ class KmerDatabase:
         peak_ion_matches = []
         for charge in range(1, precursor_charge + 1):
             for ion_type in ion_types:
-
                 charge_ion_matches = self.get_matching_product_ions(
                     query_mz=peak.mz,
                     charge=charge,
@@ -394,7 +367,11 @@ def create_db(
     max_k: int = DEFAULT_MAX_KMER_LEN,
 ) -> KmerDatabase:
     """
-    Create kmer database
+    Create the kmer database.
+    If the kmer-to-protein map does not exist at the given path, it will be created.
+    If it does exist, it is loaded.
+    If the database does not exist at the given path, it will be created.
+    If it does exist it is loaded and returned.
     """
     if not kmer_to_protein_path.exists():
         logger.info(
@@ -429,7 +406,12 @@ def create_db(
 @click.command(
     name="create-db",
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-    help="Create a database of product ions",
+    help=(
+        "Create the kmer database. If the kmer-to-protein map does not exist at the given path, "
+        "it will be created. If it does exist, it WILL NOT be re-created. "
+        "If the database does not exist at the given path, it will be created. "
+        "If it does exist, it WILL NOT be re-created."
+    ),
 )
 @click.option(
     "--db_path",

@@ -1,68 +1,101 @@
 # Hypedsearch <!-- omit in toc -->
+- [Installation via Conda](#installation-via-conda)
+- [Overview](#overview)
+- [Code organization](#code-organization)
+  - [Create the kmer database (and kmer-to-protein map)](#create-the-kmer-database-and-kmer-to-protein-map)
+  - [Form hybrids](#form-hybrids)
+    - [Running via `snakemake`](#running-via-snakemake)
+- [Running `msconvert` to convert files to MZML, subset spectra in MZML files, etc.](#running-msconvert-to-convert-files-to-mzml-subset-spectra-in-mzml-files-etc)
 
-- [Hypedsearch algorithm](#hypedsearch-algorithm)
-  - [Pipelines](#pipelines)
-  - [(Potentially) Helpful commands](#potentially-helpful-commands)
 
-
-## Installation
-
-### Using Conda (recommended)
+## Installation via Conda
 
 If you are using Conda for environment management, you can create and activate the environment using the provided `environment.yaml` file:
 
 ```bash
-conda env create -f environment.yamlpr
+conda env create -f environment.yaml
 conda activate hypedsearch
 ```
 
-### Without using Conda (using `pip` and `venv`)
+## Overview
 
-If you are not using Conda, you can:
+Blah.
 
-1. ensure you have Python installed (preferably a version matching the one in `enivornment.yaml`),
-2. create a virtual environment, 
-3. manually extract the dependencies from `environment.yaml` into a `requirements.txt` file, and
-4. install dependencies using pip:
+## Code organization
 
-```bash
-python -m venv hypedsearch
-source hypedsearch/bin/activate # Activate it (use `myenv\Scripts\activate` on Windows)
-# manually extract the dependencies from environment.yaml to requirements.txt
-pip install -r requirements.txt  # Install dependencies
+### Create the kmer database (and kmer-to-protein map)
+
+This code lives in `kmer_database.py`. 
+To see the help message: `python -m src.kmer_database -h`.
+Here's an example usage:
+
+```
+python -m src.kmer_database \
+  --min_k 1 \
+  --max_k 25 \
+  --fasta fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta \
+  --kmer_to_protein tmp/mouse_top_10_proteins.json \
+  --db_path tmp/mouse_top_10_proteins.db \
+  --protein_names results/mouse_samples/db/top_10_proteins.txt
 ```
 
-### Comet
+### Form hybrids
 
-Hypedsearch depends on [Comet](https://comet-ms.sourceforge.net/). 
-So make sure you have a Comet executable locally and can run Comet. 
-If you're running Hypedsearch on a Mac, the executable `comet/comet.macos.exe` in this repo may work for you.
+This code lives in `hybrids_via_clusters.py`.
+To see the help message: `python -m src.hybrids_via_clusters -h`. 
+Here's an example usage in which we form hybrids for a single scan:
 
-<!-- ## Usage
-
-Make sure `hypedsearch` or the environment in which you installed the Hypedsearch dependencies is activated. 
-Once the environment is activated, the following command should work and show the help page:
-
-```bash 
-python hypedsearch.py -h
+```
+python -m src.hybrids_via_clusters \
+  --mzml data/spectra/mouse_samples/BMEM_AspN_Fxn4.mzML \
+  --fasta fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta \
+  --scan 1 \
+  --database tmp/mouse_top_10_proteins.db \
+  --precursor_mz_ppm_tol 20 \
+  --peak_to_ion_ppm_tol 20 \
+  --out_dir tmp
 ```
 
-Here's an example usage of Hypedsearch that should work after cloning the repo, following the installation requirements above, and, if needed, updating the paths to the Comet executable and `comet.params` file:
+#### Running via `snakemake`
 
-```bash
-python hypedsearch.py \
---mzml_dir data/spectra \
---mzml_path data/spectra/BMEM_AspN_Fxn4.mzML \
---output_dir results/test \
---db_path results/test/test.db \
---scan_num 7 \
---top_n_proteins 50 \
---num_peaks 100 \
---comet_exe_path comet/comet.macos.exe \
---comet_params_path comet/comet.params \
---fasta_path fastas/Uniprot_mouse.fasta \
---cleanup False
-``` -->
+Here's a command that you can run to make sure that you can form hybrids via snakemake:
+
+```
+snakemake -s snakefiles/form_hybrids.smk --configfile snakefiles/tests/test_form_hybrids.yaml --cores 4
+```
+
+## Running `msconvert` to convert files to MZML, subset spectra in MZML files, etc.
+
+Run [the following Docker container](https://hub.docker.com/r/proteowizard/pwiz-skyline-i-agree-to-the-vendor-licenses), mounting any directories that you'd like available in the Docker container. 
+
+
+```
+docker pull proteowizard/pwiz-skyline-i-agree-to-the-vendor-licenses:skyline_daily_25.1.1.174-b787f12
+
+docker run -it --rm \
+  -v /Users/erjo3868/repos/hypedsearch/hypedsearch/data/spectra/mouse_samples:/data \
+  proteowizard/pwiz-skyline-i-agree-to-the-vendor-licenses:skyline_daily_25.1.1.174-b787f12 \
+  /bin/bash
+```
+
+Note that the tag=`skyline_daily_25.1.1.174-b787f12` image worked on my arm64 processor Mac.
+Other tags did not work.
+You may need to play around to find an image that works on your computer.
+
+Then run [`msconvert`](https://proteowizard.sourceforge.io/tools/msconvert.html) via [`wine`](https://gitlab.winehq.org/wine/wine) (which is a program that allows one to run Windows programs on Unix).
+Here are some examples:
+
+```
+# msconvert command-line help
+wine msconvert --help
+
+# generate an mzML containing a subset of another mzML's spectra
+wine msconvert BMEM_AspN_Fxn4.mzML --filter "index [0,19]" --outfile BMEM_AspN_Fxn4_scans1-20.mzML -o subset_spectra_for_testing
+
+# convert raw mass spectrometry data to mzML format 
+msconvert <input_file(s)> -o <output_directory> --mzML
+```
+<!-- 
 
 # Hypedsearch algorithm
 
@@ -181,4 +214,4 @@ Here are some commands that may be helpful for you.
   sbatch --array=9,10,15 slurm/form_all_hybrids.sbatch
   ```
 
-- Running on Slurm-managed supercomputer:
+- Running on Slurm-managed supercomputer: -->

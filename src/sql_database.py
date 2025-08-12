@@ -50,15 +50,15 @@ class SqlColumn:
             field_type = get_args(field_type)[0]
             primary_key = True
 
-        if field_type == int:
+        if field_type is int:
             sql_type = SqlColumnTypes.SQL_INT
-        elif field_type == str:
+        elif field_type is str:
             sql_type = SqlColumnTypes.SQL_TEXT
-        elif field_type == float:
+        elif field_type is float:
             sql_type = SqlColumnTypes.SQL_REAL
         else:
             raise RuntimeError(
-                f"Field type {field_type} is not supported. Allowed types are {cls.allowed_types}"
+                f"Field type {field_type} is not supported. Allowed types are {self.allowed_types}"
             )
         self.sql_type = sql_type
         self.primary_key = primary_key

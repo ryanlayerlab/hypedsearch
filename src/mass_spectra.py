@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated, Dict, List, Optional, Union
 
+import click
 import numpy as np
 from matplotlib.pyplot import Axes
 from pydantic import BaseModel, BeforeValidator
@@ -310,3 +311,37 @@ def load_spectra_from_computer(path: Path) -> List[Spectrum]:
 
     spectra = Spectrum.parse_ms2_from_mzml(spectra_file=path)
     return spectra
+
+
+@click.command(
+    name="mzml-info",
+    context_settings={
+        "help_option_names": ["-h", "--help"],
+    },
+    help=("Print information about the given mzML file"),
+)
+@click.option(
+    "--mzml",
+    "-m",
+    type=click.Path(exists=True, path_type=Path),
+    required=True,
+    help="Path to the MZML file.",
+)
+def cli_mzml_info(mzml: Path):
+    mzml = Mzml(path=mzml)
+    print(f"MZML: {mzml.path}")
+    print(f"\t - number of scans: {len(mzml.scans)}")
+    if len(mzml.scans) < 50:
+        print(f"\t - scans: {mzml.scans}")
+
+
+@click.group(
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200}
+)
+def cli():
+    pass
+
+
+if __name__ == "__main__":
+    cli.add_command(cli_mzml_info)
+    cli()

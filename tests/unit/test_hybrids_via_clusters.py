@@ -1,10 +1,8 @@
 import json
 from dataclasses import asdict
-from unittest.mock import patch
 
 import pytest
 
-from src.comet_utils import CometPSM
 from src.constants import B_ION_TYPE, Y_ION_TYPE
 from src.hybrids_via_clusters import (
     Cluster,
@@ -14,7 +12,7 @@ from src.hybrids_via_clusters import (
     form_hybrids_from_clusters,
     form_spectrum_hybrids_via_clustering,
 )
-from src.kmer_database import KmerToProteinMap, create_db
+from src.kmer_database import create_db
 from src.mass_spectra import Spectrum
 from src.peptides_and_ions import UnpositionedProductIon, compute_peptide_precursor_mz
 from src.utils import mass_difference_in_ppm
@@ -488,9 +486,6 @@ class Test_form_spectrum_hybrids_via_clustering:
                 )
                 <= ppm_tol
             )
-
-            # for hybrid in hybrids:
-            #     hybrid.
 
 
 def test_stuff(test_data_dir, tmp_path):

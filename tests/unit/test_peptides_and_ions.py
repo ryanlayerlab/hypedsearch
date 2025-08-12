@@ -1,9 +1,8 @@
 from pathlib import Path
-from unittest.mock import patch
 
 from pytest import approx
 
-from src.constants import B_ION_TYPE, Y_ION_TYPE, IonTypes
+from src.constants import B_ION_TYPE, Y_ION_TYPE
 from src.peptides_and_ions import (
     Fasta,
     Peptide,
@@ -12,13 +11,9 @@ from src.peptides_and_ions import (
     get_proteins_by_name,
     get_unique_kmers,
 )
-from tests.fixtures_and_helpers import (
-    B_NEUTRAL_MASS_CALCULATOR,
-    Y_NEUTRAL_MASS_CALCULATOR,
-)
 
 
-class Test_ProductIon:
+class Test_UnpositionedProductIon:
     class Test_compute_b_ion_mz:
         @staticmethod
         def test_default_aa_mass_lookup():
@@ -88,18 +83,6 @@ class Test_ProductIon:
             )
             assert result == approx(154.54917946688)
 
-    @staticmethod
-    def test_get_b_ion_seqs():
-        seq = "ACD"
-        result = UnpositionedProductIon.get_b_ion_seqs(seq=seq)
-        assert result == ["A", "AC", "ACD"]
-
-    @staticmethod
-    def test_get_y_ion_seqs():
-        seq = "ACD"
-        result = UnpositionedProductIon.get_y_ion_seqs(seq=seq)
-        assert result == ["ACD", "CD", "D"]
-
     class Test_generate_product_ions:
         @staticmethod
         def test_default():
@@ -159,7 +142,7 @@ class Test_Fasta:
         assert content == expected_content
 
 
-def test_get_kmer_ccounts_by_protein(tmp_path: Path):
+def test_get_kmer_counts_by_protein(tmp_path: Path):
     # Arrange
     peptides = [
         Peptide(seq="ACACD", name="protein1", desc="blah"),
