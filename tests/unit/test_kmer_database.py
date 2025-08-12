@@ -1,15 +1,12 @@
 import json
 from dataclasses import asdict
 
-import numpy as np
 
-from src.constants import MEMORY, IonTypes
 from src.kmer_database import KmerDatabase, KmerToProteinMap, create_db
 from src.mass_spectra import Spectrum
 from src.peptides_and_ions import Peptide, UnpositionedProductIon
 from src.utils import (
     flatten_list_of_lists,
-    mass_difference_in_ppm,
     read_new_line_separated_file,
 )
 

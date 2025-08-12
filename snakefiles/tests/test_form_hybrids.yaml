@@ -1,0 +1,9 @@
+mzml_dir: "tests/data/spectra"
+samples: [
+  "BMEM_AspN_Fxn4_scans1-20",
+]
+hybrids_dir: "tmp/hybrids_BMEM_AspN_Fxn4_scans1-20"
+database: "tests/data/mouse_top_10_proteins.db"
+fasta: "fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
+precursor_mz_ppm_tol: 20
+peak_to_ion_ppm_tol: 20

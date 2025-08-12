@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from src.protein_abundance import (
     get_and_plot_most_common_proteins,
@@ -56,13 +55,3 @@ class Test_get_and_plot_most_common_proteins:
         )
         assert (tmp_path / "top_10_proteins.txt").exists()
         assert (tmp_path / "protein_abundances.png").exists()
-
-    @staticmethod
-    def test_too_few_proteins(tmp_path, test_data_dir):
-        get_and_plot_most_common_proteins(
-            # comet_results_dir=test_data_dir / "too_few_proteins",
-            comet_results_dir=Path("results/samples_3a_and_3b/native_run"),
-            q_value_threshold=0.01,
-            top_n_proteins=10,
-            out_path=tmp_path,
-        )

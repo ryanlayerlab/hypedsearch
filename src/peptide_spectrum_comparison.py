@@ -1,7 +1,5 @@
 import logging
 import math
-import multiprocessing
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
@@ -29,7 +27,7 @@ from src.peptides_and_ions import (
     compute_peptide_precursor_mz,
 )
 from src.plot_utils import fig_setup, finalize
-from src.utils import Position, flatten_list_of_lists, log_time, mass_difference_in_ppm
+from src.utils import flatten_list_of_lists, log_time, mass_difference_in_ppm
 
 logger = logging.getLogger(__name__)
 
@@ -366,16 +364,16 @@ class PsmSpectrumComparison:
 
     @property
     def scan(self):
-        assert (
-            self.spectrum.scan == self.psm.scan
-        ), f"{self.spectrum.scan} != {self.psm.scan}"
+        assert self.spectrum.scan == self.psm.scan, (
+            f"{self.spectrum.scan} != {self.psm.scan}"
+        )
         return self.spectrum.scan
 
     @property
     def sample(self):
-        assert (
-            self.spectrum.sample == self.psm.sample
-        ), f"{self.spectrum.sample} != {self.psm.sample}"
+        assert self.spectrum.sample == self.psm.sample, (
+            f"{self.spectrum.sample} != {self.psm.sample}"
+        )
         return self.spectrum.sample
 
     @property
@@ -772,7 +770,7 @@ def get_scan_results(
 
 def get_hybrid_peptide_from_comet_psm(psm: CometPSM):
     if len(psm.proteins) > 1:
-        print(f"There is more than one protein for this hybrid!")
+        print("There is more than one protein for this hybrid!")
         protein = psm.proteins[0]
 
         # assert (
@@ -780,9 +778,9 @@ def get_hybrid_peptide_from_comet_psm(psm: CometPSM):
         # ), f"This PSM doesn't seem to correspond to a hybrid. psm.proteins = {psm.proteins}"
 
     protein = psm.proteins[0]
-    assert (
-        protein[:7] == "hybrid_"
-    ), f"This PSM doesn't seem to correspond to a hybrid. psm.proteins = {psm.proteins}"
+    assert protein[:7] == "hybrid_", (
+        f"This PSM doesn't seem to correspond to a hybrid. psm.proteins = {psm.proteins}"
+    )
 
     protein = protein[7:]
     b_seq, y_seq = protein.split("-")

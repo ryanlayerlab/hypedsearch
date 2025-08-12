@@ -1,11 +1,9 @@
 import logging
 from collections import defaultdict
-from dataclasses import asdict, dataclass, field
-from functools import cached_property
+from dataclasses import dataclass, field
 from itertools import groupby
 from pathlib import Path
-from time import time
-from typing import DefaultDict, Dict, List, Literal, Optional, Set, Union
+from typing import Dict, List, Literal, Optional, Set, Union
 from venv import logger
 
 import click
@@ -14,7 +12,6 @@ import numpy as np
 from src.constants import (
     B_ION_TYPE,
     DEFAULT_PEAK_TO_ION_PPM_TOL,
-    DEFAULT_PPM_TOLERANCE,
     DEFAULT_PRECURSOR_MZ_PPM_TOL,
     HS_PREFIX,
     MIN_CLUSTER_LENGTH,
@@ -35,12 +32,9 @@ from src.sql_database import Sqlite3Database, SqlTableRow
 from src.utils import (
     Position,
     get_positions_of_subseq_in_seq,
-    get_time_in_diff_units,
     log_time,
-    prefixes,
     relative_ppm_tolerance_in_daltons,
     setup_logger,
-    suffixes,
     to_json,
 )
 
@@ -623,7 +617,11 @@ def serialize_hybrids(seq_to_hybrids: Dict[str, List[HybridPeptide]]) -> Dict:
     context_settings={
         "help_option_names": ["-h", "--help"],
     },
-    help="Form hybrids for the given spectra",
+    help=(
+        "Form hybrids for the given spectra. If no `--scan` (`-s`) is given, then hybrids "
+        "will be formed for all scans in the MZML file. The hybrids will be saved as "
+        "'<scan>.json' in the specified output directory."
+    ),
 )
 @click.option(
     "--mzml",
@@ -644,7 +642,7 @@ def serialize_hybrids(seq_to_hybrids: Dict[str, List[HybridPeptide]]) -> Dict:
     "-d",
     type=click.Path(exists=True, path_type=Path),
     required=True,
-    help="Path to the k-mer database",
+    help="Path to the kmer database",
 )
 @click.option(
     "--precursor_mz_ppm_tol",
@@ -660,7 +658,7 @@ def serialize_hybrids(seq_to_hybrids: Dict[str, List[HybridPeptide]]) -> Dict:
     type=float,
     default=DEFAULT_PEAK_TO_ION_PPM_TOL,
     show_default=True,
-    help="The PPM tolerance within which a spectrum peak will match a fragment ion",
+    help="The PPM tolerance within which spectra peaks and matched fragment ions must be",
 )
 @click.option(
     "--fasta",
