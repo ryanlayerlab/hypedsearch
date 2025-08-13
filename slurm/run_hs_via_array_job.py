@@ -1,4 +1,3 @@
-import os
 import shlex
 import subprocess
 import sys
@@ -9,7 +8,7 @@ repo_dir = Path(__file__).parents[1]
 sys.path.append(str(repo_dir))
 
 from src.comet_utils import CometPSM
-from src.constants import GIT_REPO_DIR, RESULTS_DIR
+from src.constants import GIT_REPO_DIR
 from src.utils import make_directory
 
 ARRAY_BATCH_SIZE = 800

@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class CmdResult:
+class CmdLineResult:
     stdout: Optional[str] = None
     stderr: Optional[str] = None
     code: Optional[int] = None
@@ -256,10 +256,14 @@ def log_time(level=logging.INFO):
     return decorator
 
 
-def run_command_line_cmd(cmd: str):
+def run_command_line_cmd(
+    cmd: str,
+) -> CmdLineResult:
     run_args = shlex.split(cmd)
     result = subprocess.run(run_args, capture_output=True, text=True)
-    return CmdResult(code=result.returncode, stdout=result.stdout, stderr=result.stderr)
+    return CmdLineResult(
+        code=result.returncode, stdout=result.stdout, stderr=result.stderr
+    )
 
 
 # function that takes in a list of any one kind dataclass and spits out a dataframe with one row per dataclass list element.

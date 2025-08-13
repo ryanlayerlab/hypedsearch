@@ -1,0 +1,8 @@
+mzml_to_scans: {
+    tests/data/mouse_spectra.mzML: [1, 3, 7, 10],
+    tests/data/mouse_BMEM_AspN_Fxn4.mzML: [2, 4]
+}  
+out_dir: tmp/test_hs_run
+fasta: tests/data/mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta
+crux_comet_params: tests/data/crux.comet.params
+database: tests/data/mouse_top_10_proteins.db

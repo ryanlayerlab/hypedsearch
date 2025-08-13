@@ -5,6 +5,7 @@
   - [Create the kmer database (and kmer-to-protein map)](#create-the-kmer-database-and-kmer-to-protein-map)
   - [Form hybrids](#form-hybrids)
     - [Running via `snakemake`](#running-via-snakemake)
+  - [Run Hypedsearch](#run-hypedsearch)
 - [Running `msconvert` to convert files to MZML, subset spectra in MZML files, etc.](#running-msconvert-to-convert-files-to-mzml-subset-spectra-in-mzml-files-etc)
 
 
@@ -63,6 +64,29 @@ Here's a command that you can run to make sure that you can form hybrids via sna
 ```
 snakemake -s snakefiles/form_hybrids.smk --configfile snakefiles/tests/test_form_hybrids.yaml --cores 4
 ```
+
+### Run Hypedsearch
+
+Via Python from the command-line: 
+
+```
+python -m src.hypedsearch_utils \
+  --mzml tests/data/mouse_spectra.mzML \
+  --scan 7 \
+  --database tests/data/mouse_top_10_proteins.db \
+  --fasta tests/data/mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta \
+  --crux_comet_params tests/data/crux.comet.params \
+  --out_dir tmp
+```
+
+Via Snakemake:
+
+```
+snakemake -s snakefiles/run_hypedsearch.smk \
+  --configfile snakefiles/configs/test_run_hypedsearch.yaml \
+  --cores 4
+```
+
 
 ## Running `msconvert` to convert files to MZML, subset spectra in MZML files, etc.
 

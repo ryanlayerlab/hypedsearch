@@ -20,13 +20,18 @@ def comet_params(test_data_dir):
 
 
 @pytest.fixture
+def crux_comet_params(test_data_dir):
+    return test_data_dir / "crux.comet.params"
+
+
+@pytest.fixture
 def mouse_mzml(test_data_dir):
     return test_data_dir / "spectra/10_mouse_spectra.mzML"
 
 
 @pytest.fixture
 def mouse_fasta(test_data_dir):
-    return test_data_dir / "mouse_proteome.fasta"
+    return test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
 
 
 @pytest.fixture
