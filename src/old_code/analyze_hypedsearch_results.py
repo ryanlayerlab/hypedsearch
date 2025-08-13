@@ -8,7 +8,7 @@ from typing import Dict, List, Literal, Optional, Tuple, Union
 import yaml
 
 from src.comet_utils import CometPSM
-from src.hypedsearch_utils import HybridPeptide
+from src.hybrids_via_clusters import HybridPeptide
 from src.mass_spectra import Spectrum
 from src.protein_abundance import (
     get_and_save_prefix_counts_by_length,

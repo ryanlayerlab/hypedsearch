@@ -1,7 +1,5 @@
-import os
 import subprocess
 
-import numpy as np
 
 # Print current working directory
 # cwd = os.getcwd()
