@@ -160,3 +160,9 @@ data/Hypedsearch_outputs
 data/OLD_comet_run_1
 data/specmill_psms
 old_stuff
+no_git
+data/spectra/human_samples
+results
+logs
+dev_code
+.snakemake
