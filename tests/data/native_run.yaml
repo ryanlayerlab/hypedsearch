@@ -1,0 +1,9 @@
+crux_comet_params: /Users/erjo3868/repos/hypedsearch/hypedsearch/comet/crux.comet.params
+decoy_search: 2
+fasta: /Users/erjo3868/repos/hypedsearch/hypedsearch/fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta
+mzml_to_scans:
+  tests/data/spectra/100_mouse_spectra.mzML:
+  - 0
+  tests/data/spectra/10_mouse_spectra.mzML:
+  - 0
+out_dir: tmp/mouse_testing/native_run

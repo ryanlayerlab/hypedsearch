@@ -1,0 +1,9 @@
+crux_comet_params: /Users/erjo3868/repos/hypedsearch/hypedsearch/comet/crux.comet.params
+decoy_search: 2
+fasta: /Users/erjo3868/repos/hypedsearch/hypedsearch/fastas/Uniprot_mouse.fasta
+mzml_to_scans:
+  data/spectra/mouse_samples/BMEM_AspN_Fxn4.mzML:
+  - 0
+  data/spectra/mouse_samples/BMEM_AspN_Fxn5.mzML:
+  - 0
+overwrite: false

@@ -1,5 +1,5 @@
 # Expected items in config file:
-# 1. mzml_to_scans: dictionary mapping paths to mzML files to scan numbers
+# 1. mzmls: list of paths to mzML files on which Comet will be run
 # 2. out_dir: directory to store the output files
 # 3. fasta: path to the native FASTA file
 # 4. crux_comet_params: path to the `crux comet` parameter file
@@ -20,57 +20,32 @@ from pathlib import Path
 repo_dir = Path(workflow.basedir).absolute().parent
 sys.path.append(str(repo_dir))
 
+from typing import List
 from types import SimpleNamespace
 from src.mass_spectra import Mzml
-from src.hypedsearch_utils import HypedsearchOutput
-from dataclasses import asdict
+from src.constants import TARGET
+from src.hypedsearch import HybridRunConfig
+from src.crux import get_expected_comet_outputs
 
-# Use python's SimpleNamespace to convert the config dict
-# object into something that lets us refer to keys with dot notation
+hs_config = HybridRunConfig(**config)
 config = SimpleNamespace(**config)
-
-# Get expected outputs
-expected_outputs = []
-for mzml, scans in config.mzml_to_scans.items():
-    if isinstance(scans, str):
-        assert scans == "all", "Only 'all' scans are supported"
-        scans = Mzml(path=mzml).scans
-
-    for scan in scans:
-        hs_outputs = HypedsearchOutput.get_hypedsearch_outputs(
-            mzml=Path(mzml),
-            scan=scan,
-            out_dir=Path(config.out_dir),
-        )
-        outputs = [str(v) for v in asdict(hs_outputs).values()]
-        expected_outputs.extend(outputs)
+expected_outputs = hs_config.expected_outputs
+print(f"There are {len(expected_outputs)} expected output files")
 
 rule all:
-    input: 
+    input:
         expected_outputs
 
-rule run_hypedsearch_on_spectrum:
-    input:
-        mzml=lambda wildcards: next(
-            Path(m) for m in config.mzml_to_scans.keys() if Path(m).stem == wildcards.sample
+rule run_hypedsearch:
+    input: 
+        mzml = lambda wildcards: next(
+            Path(mzml) for mzml in config.mzml_to_scans.keys() if Mzml.get_mzml_name(mzml) == wildcards.sample
         ),
-        fasta = config.fasta,
-        crux_comet_params = config.crux_comet_params,
-        database = config.database,
     output:
-        native_target = "{out_dir}/native_{sample}.comet.{scan}-{scan}.target.txt",
-        native_decoy = "{out_dir}/native_{sample}.comet.{scan}-{scan}.decoy.txt",
-        hybrid_target = "{out_dir}/hybrid_{sample}.comet.{scan}-{scan}.target.txt",
-        hybrid_decoy = "{out_dir}/hybrid_{sample}.comet.{scan}-{scan}.decoy.txt",
-        hybrids = "{out_dir}/{sample}_scan={scan}.json",
-    shell:
-        """
-        python -m src.hypedsearch_utils \
-            --mzml {input.mzml} \
-            --scan {wildcards.scan} \
-            --database {input.database} \
-            --fasta {input.fasta} \
-            --crux_comet_params {input.crux_comet_params} \
-            --out_dir {wildcards.out_dir}
-        """
-
+        target = f"{config.out_dir}/{{sample}}.comet.{{scan}}-{{scan}}.target.txt"
+    benchmark:
+        "logs/hypedsearch/{sample}.{scan}.log"
+    singularity: 
+        "docker://airikjohnson/hypedsearch:latest"
+    script:
+        "run_hypedsearch.py"

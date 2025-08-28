@@ -176,6 +176,8 @@ class Sqlite3Database:
     def insert_dataclasses(
         self, table_name: str, data_classes: List[SqlTableRow]
     ) -> None:
+        if len(data_classes) == 0:
+            return
         colm_str = data_classes[0].sql_insert_columns_str()
         # Insert dataclasses into the table
         dataclasses_as_dicts = [asdict(x) for x in data_classes]

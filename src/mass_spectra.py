@@ -163,14 +163,14 @@ class Spectrum:
 
 
 class Mzml(BaseModel):
-    path: Annotated[Path, BeforeValidator(lambda x: to_path(path=x, check_exists=True))]
+    mzml: Annotated[Path, BeforeValidator(lambda x: to_path(path=x, check_exists=True))]
 
     @property
     def ms2_spectra(self) -> List["Spectrum"]:
         """
         Get all spectra from the mzML file.
         """
-        return Spectrum.parse_ms2_from_mzml(spectra_file=self.path)
+        return Spectrum.parse_ms2_from_mzml(spectra_file=self.mzml)
 
     @property
     def scans(self) -> List[int]:
@@ -186,7 +186,17 @@ class Mzml(BaseModel):
 
     @property
     def sample(self) -> str:
-        return self.path.stem
+        return self.mzml.stem
+
+    @property
+    def name(self) -> str:
+        return self.get_mzml_name(mzml=self.mzml)
+
+    @staticmethod
+    def get_mzml_name(mzml: Union[str, Path]):
+        """Remove .mzML extension"""
+        mzml = Path(mzml)
+        return f"{mzml.name[:-5]}"
 
 
 def plot_peaks(
@@ -328,7 +338,7 @@ def load_spectra_from_computer(path: Path) -> List[Spectrum]:
     help="Path to the MZML file.",
 )
 def cli_mzml_info(mzml: Path):
-    mzml = Mzml(path=mzml)
+    mzml = Mzml(mzml=mzml)
     print(f"MZML: {mzml.path}")
     print(f"\t - number of scans: {len(mzml.scans)}")
     if len(mzml.scans) < 50:

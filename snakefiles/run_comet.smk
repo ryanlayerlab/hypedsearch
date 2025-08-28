@@ -1,3 +1,18 @@
+# Expected items in config file:
+# 1. mzmls: list of paths to mzML files on which Comet will be run
+# 2. out_dir: directory to store the output files
+# 3. fasta: path to the native FASTA file
+# 4. crux_comet_params: path to the `crux comet` parameter file
+# 5. database: path to the k-mer database file from which we'll form hybrids from
+# Here's an example config:
+# config["mzml_to_scans"] = {
+#     "tests/data/mouse_spectra.mzML": [1, 3, 7, 10],
+#     "tests/data/mouse_BMEM_AspN_Fxn4.mzML": [2, 4]
+# }  
+# config["out_dir"] = "tmp/test_hs_run"
+# config["fasta"] = "tests/data/mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
+# config["crux_comet_params"] = "tests/data/crux.comet.params"
+# config["database"] = "tests/data/mouse_top_10_proteins.db"
 
 import sys
 from pathlib import Path
@@ -5,125 +20,50 @@ from pathlib import Path
 repo_dir = Path(workflow.basedir).absolute().parent
 sys.path.append(str(repo_dir))
 
+from typing import List
 from types import SimpleNamespace
 from src.mass_spectra import Mzml
-import time
+from src.crux import CometConfig
+from src.constants import TARGET
 
 
-config["mzml_dir"] = "/localscratch/spectra"
-config["samples"] = [   
-  "HuIslets_A5_Sample2A_AspN_Fxn5_250520_MD",
-  "HuIslets_B5_Sample2B_AspN_Fxn5_250520_MD",
-]
-config["hybrids_dir"] = "/localscratch/hybrids"
-config["fasta"] = "/localscratch/uniprotkb_proteome_UP000005640_AND_revi_2025_04_29.fasta"
-config["crux_comet_params"] = "/localscratch/crux.comet.params"
-config["fasta_dir"] = "/localscratch/fastas"
-config["comet_results_dir"] = "/localscratch/comet"
-
-# Use python's SimpleNamespace to convert the config dict
-# object into something that lets us refer to keys with dot notation
+comet_config = CometConfig(**config)
 config = SimpleNamespace(**config)
-
-# Get the path to all the expected hybrid JSONs
-print("Gathering outputs...")
-t0 = time.perf_counter()
-comet_outputs = []
-for sample in config.samples:
-    mzml = Mzml(path=f"{config.mzml_dir}/{sample}.mzML")
-    comet_outputs.extend(
-        [f"{config.comet_results_dir}/{sample}.comet.{scan}-{scan}.target.txt" for scan in mzml.scans]
-    )
-# comet_outputs = comet_outputs[:100]
-# comet_outputs = [optional(p) for p in comet_outputs]
-print(f"Finished gathering outputs. Took {round(time.perf_counter() - t0, 2)} seconds.")
+expected_outputs = comet_config.expected_outputs(
+    out_dir=config.out_dir, psm_type=TARGET
+)
+print(f"There are {len(expected_outputs)} expected outputs.")
 
 rule all:
+    input:
+        expected_outputs
+
+rule run_comet:
     input: 
-        comet_outputs
-
-rule create_hybrids_fasta:
-    input:
-        fasta = config.fasta,
-        hybrid_json = f"{config.hybrids_dir}/{{sample}}_{{scan}}.json"
+        mzml = lambda wildcards: next(
+            Path(mzml) for mzml in config.mzml_to_scans.keys() if Mzml.get_mzml_name(mzml) == wildcards.sample
+        ),
     output:
-        hybrid_fasta = temp(
-            f"{config.fasta_dir}/{{sample}}_{{scan}}.fasta"
-        )
-    shell:
-        """
-        python -m src.form_hybrids hybrids-to-fasta \
-            --hybrids_path {input.hybrid_json} \
-            --new_fasta_path {output.hybrid_fasta} \
-            --old_fasta {input.fasta}
-        """
+        target = "{out_dir}/{sample}.comet.{scan}-{scan}.target.txt"
+    singularity: 
+        "docker://airikjohnson/hypedsearch:latest"
+    script:
+        "run_comet.py"
+    # run:
+    #     from src.crux import Crux
+    #     from src.utils import setup_logger
+    #     log_file = Path(f"logs/{Mzml.get_mzml_name(input.mzml)}_{wildcards.scan}.log")
+    #     logger = setup_logger(str(log_file))
+    #     logger.info(f"Logging to {log_file}")
+    #     Crux.run_comet(
+    #         mzml=input.mzml,
+    #         fasta=config.fasta,
+    #         crux_comet_params=config.crux_comet_params,
+    #         decoy_search=config.decoy_search,
+    #         out_dir=config.out_dir,
+    #         file_root=wildcards.sample,
+    #         scan_min=int(wildcards.scan),
+    #         scan_max=int(wildcards.scan)
+    #     )
+    #     log_file.unlink()
 
-rule comet_via_singularity_on_scan:
-    input:
-        mzml = f"{config.mzml_dir}/{{sample}}.mzML",
-        fasta = config.fasta,
-        hybrid_fasta = f"{config.fasta_dir}/{{sample}}_{{scan}}.fasta"
-    output:
-        target_out = "{out_dir}/{sample}.comet.{scan}-{scan}.target.txt",
-        decoy_out = "{out_dir}/{sample}.comet.{scan}-{scan}.decoy.txt"
-    # params:
-        # decoy_search = 2
-    shell:
-        """
-        tmpdir=$(mktemp -d)
-        set +e  # turn off 'exit on error'
-        singularity exec \
-            --bind {input.mzml}:/data/mzml.mzML \
-            --bind {input.hybrid_fasta}:/data/fasta.fasta \
-            --bind {config.crux_comet_params}:/data/crux.comet.params \
-            --bind $tmpdir:/results \
-            hypedsearch_latest.sif \
-            bash -c "crux comet \
-            --parameter-file /data/crux.comet.params \
-            --num_threads 1 \
-            --decoy_search 2 \
-            --fileroot {wildcards.sample} \
-            --scan_range '{wildcards.scan} {wildcards.scan}' \
-            --output-dir /results \
-            --verbosity 60 \
-            --overwrite T \
-            --spectrum_batch_size 500 \
-            /data/mzml.mzML /data/fasta.fasta"
-        
-        set -e  # restore default behavior if needed
-
-        # Copy the expected outputs where they should go and create empty ones if Comet didn't
-        # spit anything out
-        target_file=$tmpdir/{wildcards.sample}.comet.{wildcards.scan}-{wildcards.scan}.target.txt
-        if [ -f "$target_file" ]; then
-            cp "$target_file" {wildcards.out_dir}
-        else
-            touch {output.target_out}
-        fi
-
-        decoy_file=$tmpdir/{wildcards.sample}.comet.{wildcards.scan}-{wildcards.scan}.decoy.txt
-        if [ -f "$decoy_file" ]; then
-            cp "$decoy_file" {wildcards.out_dir}
-        else
-            touch {output.decoy_out}
-        fi
-        """
-        
-        # "singularity exec "
-        # "--bind {input.mzml}:/data/mzml.mzML "
-        # "--bind {input.fasta}:/data/fasta.fasta "
-        # "--bind {config.crux_comet_params}:/data/crux.comet.params "
-        # "--bind {wildcards.out_dir}:/results "
-        # "{config.singularity_image} "
-        # "bash -c '"
-        # "crux comet "
-        # "--parameter-file /data/crux.comet.params "
-        # "--decoy_search {params.decoy_search} "
-        # "--output-dir /results "
-        # "--fileroot {wildcards.sample} "
-        # "--verbosity 60 "
-        # "--overwrite T "
-        # "--spectrum_batch_size 500 "
-        # "/data/mzml.mzML /data/fasta.fasta "
-        # "&& rm /results/{wildcards.sample}.comet.params.txt "
-        # "&& rm /results/{wildcards.sample}.comet.log.txt'"

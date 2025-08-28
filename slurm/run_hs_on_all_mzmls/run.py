@@ -14,9 +14,7 @@ from src.constants import SPECTRA_DIR
 
 # mzml_paths = [SPECTRA_DIR / "BMEM_AspN_Fxn5.mzML"]  # for testing
 
-df = CometPSM.from_txt(
-    txt_path=Path("results/new_fasta/BMEM_AspN_Fxn5.txt"), as_df=True
-)
+df = CometPSM.from_txt(txt=Path("results/new_fasta/BMEM_AspN_Fxn5.txt"), as_df=True)
 scans = list(df["scan"].unique())
 print(f"Number of total scans = {len(scans)}")
 

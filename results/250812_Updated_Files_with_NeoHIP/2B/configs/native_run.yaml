@@ -1,0 +1,17 @@
+crux_comet_params: results/250812_Updated_Files_with_NeoHIP/configs/crux.comet.params
+decoy_search: 2
+fasta: /Users/erjo3868/repos/hypedsearch/hypedsearch/fastas/uniprotkb_proteome_UP000005640_AND_revi_2025_04_29.fasta
+mzml_to_scans:
+  data/spectra/human_samples/250812_Updated_Files_with_NeoHIP/HuIslets_250525_MD_2B_IL1B_24hr_AspN_Fxn2.mzML:
+  - 0
+  data/spectra/human_samples/250812_Updated_Files_with_NeoHIP/HuIslets_250525_MD_2B_IL1B_24hr_AspN_Fxn3.mzML:
+  - 0
+  data/spectra/human_samples/250812_Updated_Files_with_NeoHIP/HuIslets_250525_MD_2B_IL1B_24hr_AspN_Fxn4.mzML:
+  - 0
+  data/spectra/human_samples/250812_Updated_Files_with_NeoHIP/HuIslets_250525_MD_2B_IL1B_24hr_AspN_Fxn5.mzML:
+  - 0
+  data/spectra/human_samples/250812_Updated_Files_with_NeoHIP/HuIslets_250525_MD_2B_IL1B_24hr_AspN_Fxn6.mzML:
+  - 0
+  data/spectra/human_samples/250812_Updated_Files_with_NeoHIP/HuIslets_250525_MD_2B_IL1B_24hr_AspN_Fxn7.mzML:
+  - 0
+out_dir: results/250812_Updated_Files_with_NeoHIP/2B/native_run

@@ -9,9 +9,9 @@ from tests.fixtures_and_helpers import create_spectrum
 class Test_Mzml:
     @staticmethod
     def test_initialization_by_string(mouse_mzml):
-        mzml = Mzml(path=str(mouse_mzml))
-        assert isinstance(mzml.path, Path)
-        assert mzml.path == mouse_mzml
+        mzml = Mzml(mzml=str(mouse_mzml))
+        assert isinstance(mzml.mzml, Path)
+        assert mzml.mzml == mouse_mzml
 
 
 class Test_Spectrum:

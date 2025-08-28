@@ -1,0 +1,10 @@
+mzml_to_scans: {
+    tests/data/spectra/BMEM_AspN_Fxn4_scans1-20.mzML: "all",
+    tests/data/mouse_BMEM_AspN_Fxn4.mzML: [2, 4]
+}  
+database: tests/data/mouse_top_10_proteins.db
+out_dir: tmp/test_hs_run
+fasta: tests/data/mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta
+crux_comet_params: tests/data/crux.comet.params
+precursor_mz_ppm_tol: 20
+peak_to_ion_ppm_tol: 20

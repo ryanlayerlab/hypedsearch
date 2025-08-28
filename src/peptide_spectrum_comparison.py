@@ -18,7 +18,8 @@ from src.constants import (
     XCORR,
     IonTypes,
 )
-from src.hypedsearch_utils import HybridPeptide
+
+# from src.hypedsearch_utils import HybridPeptide
 from src.kmer_database import DbKmer
 from src.mass_spectra import Peak, Spectrum, plot_peaks
 from src.peptides_and_ions import (
@@ -364,16 +365,16 @@ class PsmSpectrumComparison:
 
     @property
     def scan(self):
-        assert self.spectrum.scan == self.psm.scan, (
-            f"{self.spectrum.scan} != {self.psm.scan}"
-        )
+        assert (
+            self.spectrum.scan == self.psm.scan
+        ), f"{self.spectrum.scan} != {self.psm.scan}"
         return self.spectrum.scan
 
     @property
     def sample(self):
-        assert self.spectrum.sample == self.psm.sample, (
-            f"{self.spectrum.sample} != {self.psm.sample}"
-        )
+        assert (
+            self.spectrum.sample == self.psm.sample
+        ), f"{self.spectrum.sample} != {self.psm.sample}"
         return self.spectrum.sample
 
     @property
@@ -537,19 +538,19 @@ def get_peaks_near_mz(
     return matching_peaks
 
 
-def sort_peak_product_ions(
-    ions: List[PeakProductIonMatch],
-) -> List[PeakProductIonMatch]:
-    # Define desired ion_type order
-    ion_type_order = {"b": 0, "y": 1}  # Add more types if needed
+# def sort_peak_product_ions(
+#     ions: List[PeakProductIonMatch],
+# ) -> List[PeakProductIonMatch]:
+#     # Define desired ion_type order
+#     ion_type_order = {"b": 0, "y": 1}  # Add more types if needed
 
-    return sorted(
-        ions,
-        key=lambda ion: (
-            ion_type_order.get(ion.ion_type, 99),  # Default to 99 if not in dict
-            len(ion.seq),
-        ),
-    )
+#     return sorted(
+#         ions,
+#         key=lambda ion: (
+#             ion_type_order.get(ion.ion_type, 99),  # Default to 99 if not in dict
+#             len(ion.seq),
+#         ),
+#     )
 
 
 @dataclass
@@ -720,47 +721,47 @@ def create_df_from_ions(ions: List[DbKmer]) -> pd.DataFrame:
     return df
 
 
-def compare_hybrid_to_spectrum(
-    hybrid: HybridPeptide, spectrum: Spectrum, peak_mz_ppm_tol: int
-):
-    product_ions_with_matching_peaks = get_peaks_that_match_peptide_product_ions(
-        spectrum=spectrum,
-        peptide=Peptide(seq=hybrid.seq),
-        peak_ppm_tolerance=peak_mz_ppm_tol,
-    )
-    df = group_product_ions_and_matching_peaks_by_charge_and_ion_type(
-        product_ions_with_matching_peaks=product_ions_with_matching_peaks
-    )
-    df["hybrid"] = 1
+# def compare_hybrid_to_spectrum(
+#     hybrid: HybridPeptide, spectrum: Spectrum, peak_mz_ppm_tol: int
+# ):
+#     product_ions_with_matching_peaks = get_peaks_that_match_peptide_product_ions(
+#         spectrum=spectrum,
+#         peptide=Peptide(seq=hybrid.seq),
+#         peak_ppm_tolerance=peak_mz_ppm_tol,
+#     )
+#     df = group_product_ions_and_matching_peaks_by_charge_and_ion_type(
+#         product_ions_with_matching_peaks=product_ions_with_matching_peaks
+#     )
+#     df["hybrid"] = 1
 
-    df.loc[
-        (df["ion_type"] == "b") & (df["seq"].apply(lambda seq: seq in hybrid.b_seq)),
-        "hybrid",
-    ] = 0
-    df.loc[
-        (df["ion_type"] == "y") & (df["seq"].apply(lambda seq: seq in hybrid.y_seq)),
-        "hybrid",
-    ] = 0
+#     df.loc[
+#         (df["ion_type"] == "b") & (df["seq"].apply(lambda seq: seq in hybrid.b_seq)),
+#         "hybrid",
+#     ] = 0
+#     df.loc[
+#         (df["ion_type"] == "y") & (df["seq"].apply(lambda seq: seq in hybrid.y_seq)),
+#         "hybrid",
+#     ] = 0
 
-    # num_non_hybrid_b_ions = df[(df["hybrid"] == 0) & (df["ion_type"] == "b")].shape[0]
-    # num_non_hybrid_y_ions = df[(df["hybrid"] == 0) & (df["ion_type"] == "y")].shape[0]
-    num_hybrid_supporting_ions = sum(df["hybrid"])
-    num_hybrid_supporting_ions_with_peak_match = df[
-        (df["hybrid"] == 1) & (df["num_matching_peaks"] != 0)
-    ].shape[0]
+#     # num_non_hybrid_b_ions = df[(df["hybrid"] == 0) & (df["ion_type"] == "b")].shape[0]
+#     # num_non_hybrid_y_ions = df[(df["hybrid"] == 0) & (df["ion_type"] == "y")].shape[0]
+#     num_hybrid_supporting_ions = sum(df["hybrid"])
+#     num_hybrid_supporting_ions_with_peak_match = df[
+#         (df["hybrid"] == 1) & (df["num_matching_peaks"] != 0)
+#     ].shape[0]
 
-    return HybridSpectrumComparison(
-        num_hybrid_supporting_ions=num_hybrid_supporting_ions,
-        num_hybrid_supporting_ions_with_peak_match=num_hybrid_supporting_ions_with_peak_match,
-        df=df,
-    )
+#     return HybridSpectrumComparison(
+#         num_hybrid_supporting_ions=num_hybrid_supporting_ions,
+#         num_hybrid_supporting_ions_with_peak_match=num_hybrid_supporting_ions_with_peak_match,
+#         df=df,
+#     )
 
 
 def get_scan_results(
     native_txt: Path, hybrid_txt: Path, sample: str, scan: Optional[int] = None
 ):
-    native_run_psms = CometPSM.from_txt(txt_path=native_txt, sample=sample)
-    hybrid_run_psms = CometPSM.from_txt(txt_path=hybrid_txt, sample=sample)
+    native_run_psms = CometPSM.from_txt(txt=native_txt, sample=sample)
+    hybrid_run_psms = CometPSM.from_txt(txt=hybrid_txt, sample=sample)
 
     if scan is not None:
         native_run_psms = list(filter(lambda psm: psm.scan == scan, native_run_psms))
@@ -768,23 +769,23 @@ def get_scan_results(
     return native_run_psms, hybrid_run_psms
 
 
-def get_hybrid_peptide_from_comet_psm(psm: CometPSM):
-    if len(psm.proteins) > 1:
-        print("There is more than one protein for this hybrid!")
-        protein = psm.proteins[0]
+# def get_hybrid_peptide_from_comet_psm(psm: CometPSM):
+#     if len(psm.proteins) > 1:
+#         print("There is more than one protein for this hybrid!")
+#         protein = psm.proteins[0]
 
-        # assert (
-        #     0 == 1
-        # ), f"This PSM doesn't seem to correspond to a hybrid. psm.proteins = {psm.proteins}"
+#         # assert (
+#         #     0 == 1
+#         # ), f"This PSM doesn't seem to correspond to a hybrid. psm.proteins = {psm.proteins}"
 
-    protein = psm.proteins[0]
-    assert protein[:7] == "hybrid_", (
-        f"This PSM doesn't seem to correspond to a hybrid. psm.proteins = {psm.proteins}"
-    )
+#     protein = psm.proteins[0]
+#     assert (
+#         protein[:7] == "hybrid_"
+#     ), f"This PSM doesn't seem to correspond to a hybrid. psm.proteins = {psm.proteins}"
 
-    protein = protein[7:]
-    b_seq, y_seq = protein.split("-")
-    return HybridPeptide(b_seq=b_seq, y_seq=y_seq)
+#     protein = protein[7:]
+#     b_seq, y_seq = protein.split("-")
+#     return HybridPeptide(b_seq=b_seq, y_seq=y_seq)
 
 
 @log_time(level=logging.DEBUG)
@@ -824,12 +825,12 @@ def compare_mzml_spectra_to_comet_psms(
     return results
 
 
-def process_one_mzml(
-    mzml_path, psms, peak_ppm_tolerance=10, verbose=False
-) -> List[PsmSpectrumComparison]:
-    return compare_mzml_spectra_to_comet_psms(
-        psms=psms,
-        mzml=mzml_path,
-        peak_ppm_tolerance=peak_ppm_tolerance,
-        verbose=verbose,
-    )
+# def process_one_mzml(
+#     mzml_path, psms, peak_ppm_tolerance=10, verbose=False
+# ) -> List[PsmSpectrumComparison]:
+#     return compare_mzml_spectra_to_comet_psms(
+#         psms=psms,
+#         mzml=mzml_path,
+#         peak_ppm_tolerance=peak_ppm_tolerance,
+#         verbose=verbose,
+#     )
