@@ -20,6 +20,7 @@ from typing import Annotated, Any, Callable, Dict, List, Literal, Optional, Unio
 
 import click
 import pandas as pd
+import yaml
 from pydantic import BeforeValidator
 from scipy.stats import percentileofscore
 
@@ -27,6 +28,7 @@ from src.constants import COMET_DIR
 
 MAC_OS = "macos"
 LINUX_OS = "linux"
+StrOrPath = Union[str, Path]
 
 logger = logging.getLogger(__name__)
 
@@ -126,8 +128,8 @@ def get_positions_of_subseq_in_seq(subseq: str, seq: str) -> List[Position]:
 
 
 def setup_logger(
-    log_file: str = "app.log",
-    mode: Literal["a", "w"] = "a",
+    log_file: str = "",
+    mode: Literal["a", "w"] = "w",
     log_level: int = logging.INFO,
 ) -> logging.Logger:
     """
@@ -137,10 +139,6 @@ def setup_logger(
     logger = logging.getLogger()
     logger.setLevel(log_level)
 
-    # Create a handlers
-    file_handler = logging.FileHandler(log_file, mode=mode)
-    file_handler.setLevel(log_level)
-
     # Create a console handler
     console_handler = logging.StreamHandler(stream=sys.stdout)
     console_handler.setLevel(log_level)
@@ -149,12 +147,15 @@ def setup_logger(
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
-    file_handler.setFormatter(formatter)
     console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)  # add handler to root logger
 
-    # Add handlers to the root logger
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
+    # Create a file handler
+    if len(log_file) > 0:
+        file_handler = logging.FileHandler(log_file, mode=mode)
+        file_handler.setLevel(log_level)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
 
     return logger
 
@@ -256,9 +257,10 @@ def log_time(level=logging.INFO):
     return decorator
 
 
-def run_command_line_cmd(
-    cmd: str,
-) -> CmdLineResult:
+def run_command_line_cmd(cmd: Union[str, List[str]], env=Dict) -> CmdLineResult:
+    result = subprocess.run(
+        cmd, capture_output=True, text=True, shell=True, env=self.env
+    )
     run_args = shlex.split(cmd)
     result = subprocess.run(run_args, capture_output=True, text=True)
     return CmdLineResult(
@@ -377,9 +379,29 @@ def get_default_comet_executable_path():
         )
 
 
-def to_json(data: Any, out_path: Union[str, Path]):
-    with open(out_path, "w") as f:
+def to_json(data: Any, path: Union[str, Path]):
+    with open(path, "w") as f:
         json.dump(data, f, indent=2)
+
+
+def to_yaml(data: Any, path: Union[str, Path]):
+    with open(path, "w") as f:
+        yaml.safe_dump(data, f)
+
+
+def save_dict(data: Dict, path: Union[str, Path]):
+    path = Path(path)
+    if path.suffix == ".json":
+        to_json(data=data, path=path)
+    elif path.suffix == ".yaml":
+        to_yaml(data=data, path=path)
+    else:
+        raise ValueError("Path must be a .json or .yaml file")
+
+
+def load_yaml(path: Union[str, Path]):
+    with open(path, "r") as f:
+        return yaml.safe_load(f)
 
 
 def load_json(in_path: Union[str, Path]) -> Dict:
@@ -393,6 +415,12 @@ def read_new_line_separated_file(path: Union[str, Path]) -> List[str]:
         return lines
 
 
+def write_new_line_separated_file(lines: List[str], path: Union[str, Path]) -> None:
+    with open(path, "w") as f:
+        for line in lines:
+            f.write(f"{line}\n")
+
+
 class PathType(click.ParamType):
     name = "path"
 
@@ -401,3 +429,12 @@ class PathType(click.ParamType):
             return Path(value).resolve()  # Convert to absolute Path object
         except Exception as e:
             self.fail(f"{value} is not a valid path: {e}", param, ctx)
+
+
+def copy_file(src: Union[str, Path], dest: Union[str, Path]) -> None:
+    with open(src, "rb") as fsrc, open(dest, "wb") as fdest:
+        shutil.copyfileobj(fsrc, fdest)
+
+
+def next_multiple_of_10(n: int) -> int:
+    return ((n // 10) + 1) * 10

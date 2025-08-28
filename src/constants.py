@@ -23,14 +23,15 @@ DEFAULT_COMET_PARAMS_FILE = COMET_DIR / "comet.params"
 DEFAULT_COMET_PRECURSOR_MZ_PPM_TOL = 20.0
 DEFAULT_NUM_PSMS = 5
 DEFAULT_COMET_SCAN_RANGE = (0, 0)
-DEFAULT_CRUX_PATH = Path("/Users/erjo3868/repos/crux-4.3.Darwin.x86_64/bin/crux")
 DEFAULT_CRUX_PARAMS = COMET_DIR / "crux.comet.params"
-MIN_CLUSTER_LENGTH = 3
-MIN_CLUSTER_SUPPORT = 2
+DEFAULT_MIN_CLUSTER_LENGTH = 3
+DEFAULT_MIN_CLUSTER_SUPPORT = 2
 
 FASTAS_DIR = GIT_REPO_DIR / "fastas"
-MOUSE_PROTEOME = FASTAS_DIR / "Uniprot_mouse.fasta"
-
+MOUSE_PROTEOME = FASTAS_DIR / "SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
+HUMAN_PROTEOME = FASTAS_DIR / "uniprotkb_proteome_UP000005640_AND_revi_2025_04_29.fasta"
+RUN_COMET_SMK = GIT_REPO_DIR / "snakefiles/run_comet.smk"
+RUN_HYPEDSEARCH_SMK = GIT_REPO_DIR / "snakefiles/run_hypedsearch.smk"
 
 # Strings
 MASS = "mass"
@@ -82,6 +83,16 @@ CRUX = "crux"
 MZML = "mzml"
 SCAN_HYBRIDS = "scan_hybrids"
 Q_VALUE = "q_value"
+PRECURSOR_MZ_PPM_TOL = "precursor_mz_ppm_tol"
+PEAK_TO_ION_PPM_TOL = "peak_to_ion_ppm_tol"
+MZML_EXT = "mzML"
+NATIVE = "native"
+HYBRID = "hybrid"
+TARGET = "target"
+DECOY = "decoy"
+FOREGROUND = "foreground"
+BACKGROUND = "background"
+CRUX_PATH_IN_SINGULARITY = "/usr/local/bin/crux"
 
 
 class IonTypes(Enum):
@@ -116,6 +127,7 @@ DEFAULT_CHARGES = [1, 2, 3]
 B_ION_AS_INT = 0
 Y_ION_AS_INT = 1
 ION_CHARGES_TO_CONSIDER = [1, 2]
+DEFAULT_Q_VALUE_THRESH = 0.01
 
 # For simplicity
 samples = [f"BMEM_AspN_Fxn{val}" for val in [4, 5, 6, 7, 8, 9]]

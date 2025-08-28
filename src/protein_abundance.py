@@ -40,7 +40,7 @@ def load_comet_psms(
     if q_value_threshold is not None:
         # Load PSMs from the assign-confidence.target.txt file
         assign_confidence_file = comet_results_dir / "assign-confidence.target.txt"
-        psms = CometPSM.from_txt(txt_path=assign_confidence_file)
+        psms = CometPSM.from_txt(txt=assign_confidence_file)
         # Filter PSMs by q_value threshold
         psms = filter(lambda psm: psm.q_value <= q_value_threshold, psms)
         return psms
@@ -49,7 +49,7 @@ def load_comet_psms(
         comet_target_files = comet_results_dir.glob("*.comet.target.txt")
         psms = []
         for comet_target_file in comet_target_files:
-            psms.extend(CometPSM.from_txt(txt_path=comet_target_file))
+            psms.extend(CometPSM.from_txt(txt=comet_target_file))
         return psms
     else:
         raise RuntimeError("Either q_value_threshold or top_n_psms must be provided.")
@@ -254,7 +254,7 @@ def get_and_save_prefix_counts_by_length(
     prefix_counts_by_length = get_prefix_counts_by_length(
         seqs=[psm.seq for psm in psms]
     )
-    to_json(data=prefix_counts_by_length, out_path=out_path)
+    to_json(data=prefix_counts_by_length, path=out_path)
 
 
 @click.command(

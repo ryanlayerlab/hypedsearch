@@ -11,11 +11,11 @@ import numpy as np
 
 from src.constants import (
     B_ION_TYPE,
+    DEFAULT_MIN_CLUSTER_LENGTH,
+    DEFAULT_MIN_CLUSTER_SUPPORT,
     DEFAULT_PEAK_TO_ION_PPM_TOL,
     DEFAULT_PRECURSOR_MZ_PPM_TOL,
     HS_PREFIX,
-    MIN_CLUSTER_LENGTH,
-    MIN_CLUSTER_SUPPORT,
     PROTON_MASS,
     WATER_MASS,
     Y_ION_TYPE,
@@ -32,6 +32,7 @@ from src.sql_database import Sqlite3Database, SqlTableRow
 from src.utils import (
     Position,
     get_positions_of_subseq_in_seq,
+    load_json,
     log_time,
     relative_ppm_tolerance_in_daltons,
     setup_logger,
@@ -256,8 +257,8 @@ class SpectrumClusters:
     @log_time(level=logging.INFO)
     def filter_clusters(
         self,
-        min_len: int = MIN_CLUSTER_LENGTH,
-        min_support: int = MIN_CLUSTER_SUPPORT,
+        min_len: int = DEFAULT_MIN_CLUSTER_LENGTH,
+        min_support: int = DEFAULT_MIN_CLUSTER_SUPPORT,
     ):
         """
         Filter b- and y-clusters.
@@ -319,19 +320,16 @@ class SpectrumClusters:
 
 
 def form_extended_clusters_for_spectrum(
-    db_path: Path,
+    kmer_db: KmerDatabase,
     spectrum: Spectrum,
-    fasta: Union[str, Path],
-    min_cluster_len: int = MIN_CLUSTER_LENGTH,
-    min_cluster_support: int = MIN_CLUSTER_SUPPORT,
+    protein_name_to_seq_map: Dict[str, str],
+    min_cluster_len: int = DEFAULT_MIN_CLUSTER_LENGTH,
+    min_cluster_support: int = DEFAULT_MIN_CLUSTER_SUPPORT,
     peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
     precursor_mz_ppm_tol: float = DEFAULT_PRECURSOR_MZ_PPM_TOL,
 ) -> SpectrumClusters:
-    # Load the database and a protein name-to-sequence map
-    db = KmerDatabase(db_path=db_path)
-    protein_name_to_seq_map = {pep.name: pep.seq for pep in Peptide.from_fasta(fasta)}
     # Get peak-ion matches for the spectrum
-    peak_ion_matches = db.get_peak_ion_matches_for_spectrum(
+    peak_ion_matches = kmer_db.get_peak_ion_matches_for_spectrum(
         spectrum=spectrum,
         ppm_tolerance=peak_to_ion_ppm_tol,
     )
@@ -554,15 +552,14 @@ def form_hybrids_from_left_and_right_seqs(
 
 @log_time(level=logging.INFO)
 def form_spectrum_hybrids_via_clustering(
-    database: Path,
-    fasta: Path,
+    spectrum: Spectrum,
+    kmer_db: KmerDatabase,
+    protein_name_to_seq_map: Dict[str, str],
+    kmer_to_proteins_map: Dict[str, List[str]],
     precursor_mz_ppm_tol: float = DEFAULT_PRECURSOR_MZ_PPM_TOL,
     peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
-    spectrum: Optional[Spectrum] = None,
-    mzml: Optional[Path] = None,
-    scan: Optional[int] = None,
-    min_cluster_len: int = MIN_CLUSTER_LENGTH,
-    min_cluster_support: int = MIN_CLUSTER_SUPPORT,
+    min_cluster_len: int = DEFAULT_MIN_CLUSTER_LENGTH,
+    min_cluster_support: int = DEFAULT_MIN_CLUSTER_SUPPORT,
 ) -> Dict[str, List[HybridPeptide]]:
     """
     This function will
@@ -570,12 +567,11 @@ def form_spectrum_hybrids_via_clustering(
     2. remove native hybrids
     3. return a dictionary mapping hybrid sequences to lists of HybridPeptide objects
     """
-    if spectrum is None:
-        spectrum = Spectrum.get_spectrum(scan=scan, mzml=mzml)
+    # Form clusters
     clusters = form_extended_clusters_for_spectrum(
-        db_path=database,
+        kmer_db=kmer_db,
         spectrum=spectrum,
-        fasta=fasta,
+        protein_name_to_seq_map=protein_name_to_seq_map,
         peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
         precursor_mz_ppm_tol=precursor_mz_ppm_tol,
         min_cluster_len=min_cluster_len,
@@ -590,18 +586,18 @@ def form_spectrum_hybrids_via_clustering(
         scan=spectrum.scan,
         sample=spectrum.sample,
     )
-    # Group hybrids by sequence, e.g., group A-BC with AB-C
+    # Remove hybrids that are native sequences and
+    # group hybrids by sequence (e.g., group A-BC with AB-C)
+    logger.info(
+        "Removing hybrids that correspond to native sequences. Then grouping the non-native "
+        "hybrid peptides by sequence"
+    )
     seq_to_hybrids = defaultdict(list)
     for hybrid in hybrids:
+        if hybrid.seq in kmer_to_proteins_map:
+            continue
         seq_to_hybrids[hybrid.seq].append(hybrid)
 
-    # Remove native hybrids
-    fasta = Fasta(path=fasta)
-    seq_to_hybrids = {
-        seq: hybrids
-        for seq, hybrids in seq_to_hybrids.items()
-        if not fasta.contains_seq(query_seq=seq)
-    }
     return seq_to_hybrids
 
 
@@ -689,7 +685,7 @@ def cli_form_hybrids(
         for spectrum in Spectrum.parse_ms2_from_mzml(mzml):
             logger.info(f"Processing scan {spectrum.scan} in {mzml}")
             seq_to_hybrids = form_spectrum_hybrids_via_clustering(
-                database=database,
+                kmer_db=database,
                 fasta=fasta,
                 precursor_mz_ppm_tol=precursor_mz_ppm_tol,
                 peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
@@ -698,13 +694,13 @@ def cli_form_hybrids(
             # Save the hybrids to a JSON file
             to_json(
                 data=serialize_hybrids(seq_to_hybrids=seq_to_hybrids),
-                out_path=out_dir / f"{spectrum.scan}.json",
+                path=out_dir / f"{spectrum.scan}.json",
             )
     else:
         logger.info(f"Processing scan {scan} in {mzml}")
         spectrum = Spectrum.get_spectrum(scan=scan, mzml=mzml)
         seq_to_hybrids = form_spectrum_hybrids_via_clustering(
-            database=database,
+            kmer_db=database,
             fasta=fasta,
             precursor_mz_ppm_tol=precursor_mz_ppm_tol,
             peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
@@ -713,7 +709,7 @@ def cli_form_hybrids(
         # Save the hybrids to a JSON file
         to_json(
             data=serialize_hybrids(seq_to_hybrids=seq_to_hybrids),
-            out_path=out_dir / f"{spectrum.scan}.json",
+            path=out_dir / f"{spectrum.scan}.json",
         )
 
 

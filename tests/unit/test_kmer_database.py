@@ -1,14 +1,10 @@
 import json
 from dataclasses import asdict
 
-
-from src.kmer_database import KmerDatabase, KmerToProteinMap, create_db
+from src.kmer_database import KmerDatabase, KmerToProteinMap, create_kmer_database
 from src.mass_spectra import Spectrum
 from src.peptides_and_ions import Peptide, UnpositionedProductIon
-from src.utils import (
-    flatten_list_of_lists,
-    read_new_line_separated_file,
-)
+from src.utils import flatten_list_of_lists, read_new_line_separated_file
 
 
 class Test_KmerToProteinMap:
@@ -251,9 +247,9 @@ class Test_create_db:
         fasta = test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
         proteins = test_data_dir / "mouse_data_top_10_proteins.txt"
         # Act
-        kmer_db = create_db(
+        kmer_db = create_kmer_database(
             fasta=fasta,
-            kmer_to_protein_path=tmp_path / "test.pklz",
+            kmer_to_proteins_path=tmp_path / "test.pklz",
             db_path=tmp_path / "test.db",
             proteins=proteins,
         )

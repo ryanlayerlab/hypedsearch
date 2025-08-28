@@ -12,7 +12,7 @@ from src.hybrids_via_clusters import (
     form_hybrids_from_clusters,
     form_spectrum_hybrids_via_clustering,
 )
-from src.kmer_database import create_db
+from src.kmer_database import create_kmer_database
 from src.mass_spectra import Spectrum
 from src.peptides_and_ions import UnpositionedProductIon, compute_peptide_precursor_mz
 from src.utils import mass_difference_in_ppm
@@ -358,8 +358,8 @@ class Test_form_extended_clusters_for_spectrum:
         mzml, scan = test_data_dir / "BMEM_AspN_Fxn4.mzML", 7
         fasta = test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
         db_path = tmp_path / "test.db"
-        create_db(
-            kmer_to_protein_path=tmp_path / "test.pklz",
+        create_kmer_database(
+            kmer_to_proteins_path=tmp_path / "test.pklz",
             fasta=fasta,
             proteins=[
                 "sp|P99027|RLA2_MOUSE"
@@ -414,8 +414,8 @@ class Test_form_hybrids_from_clusters:
         mzml, scan = test_data_dir / "BMEM_AspN_Fxn4.mzML", 7
         fasta = test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
         db_path = tmp_path / "test.db"
-        create_db(
-            kmer_to_protein_path=tmp_path / "test.pklz",
+        create_kmer_database(
+            kmer_to_proteins_path=tmp_path / "test.pklz",
             fasta=fasta,
             proteins=test_data_dir
             / "mouse_data_top_10_proteins.txt",  # using this protein because the top Comet PSM for this scan comes from this protein,
@@ -460,8 +460,8 @@ class Test_form_spectrum_hybrids_via_clustering:
         spectrum = Spectrum.get_spectrum(scan=scan, mzml=mzml)
         fasta = test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
         db_path = tmp_path / "test.db"
-        create_db(
-            kmer_to_protein_path=tmp_path / "test.json",
+        create_kmer_database(
+            kmer_to_proteins_path=tmp_path / "test.json",
             fasta=fasta,
             proteins=test_data_dir
             / "mouse_data_top_10_proteins.txt",  # using this protein because the top Comet PSM for this scan comes from this protein,
@@ -470,7 +470,7 @@ class Test_form_spectrum_hybrids_via_clustering:
         ppm_tol = 20
         # Act
         seq_to_hybrids = form_spectrum_hybrids_via_clustering(
-            database=db_path,
+            kmer_db=db_path,
             spectrum=spectrum,
             fasta=fasta,
             precursor_mz_ppm_tol=ppm_tol,
@@ -493,8 +493,8 @@ def test_stuff(test_data_dir, tmp_path):
     spectrum = Spectrum.get_spectrum(scan=scan, mzml=mzml)
     fasta = test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
     db_path = tmp_path / "test.db"
-    create_db(
-        kmer_to_protein_path=tmp_path / "test.json",
+    create_kmer_database(
+        kmer_to_proteins_path=tmp_path / "test.json",
         fasta=fasta,
         proteins=test_data_dir
         / "mouse_data_top_10_proteins.txt",  # using this protein because the top Comet PSM for this scan comes from this protein,
@@ -503,7 +503,7 @@ def test_stuff(test_data_dir, tmp_path):
     ppm_tol = 20
     # Act
     seq_to_hybrids = form_spectrum_hybrids_via_clustering(
-        database=db_path,
+        kmer_db=db_path,
         spectrum=spectrum,
         fasta=fasta,
         precursor_mz_ppm_tol=ppm_tol,

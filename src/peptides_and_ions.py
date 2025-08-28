@@ -191,6 +191,10 @@ class Fasta(BaseModel):
                 f.write(f">{header}\n")
                 f.write(f"{peptide.seq}\n")
 
+    @property
+    def protein_name_to_seq_map(self):
+        return {pep.name: pep.seq for pep in self.proteins}
+
 
 def compute_peptide_precursor_mz(seq: str, charge: int):
     """

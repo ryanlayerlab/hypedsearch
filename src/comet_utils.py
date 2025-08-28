@@ -1,8 +1,8 @@
 import logging
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from itertools import groupby
 from pathlib import Path
-from typing import Callable, List, Literal, Optional, Union
+from typing import Callable, Iterable, List, Literal, Optional, Set, Tuple, Union
 
 import pandas as pd
 
@@ -23,10 +23,7 @@ from src.constants import (
     XCORR,
 )
 from src.mass_spectra import Spectrum, get_specific_spectrum_by_sample_and_scan_num
-from src.utils import (
-    get_arg_fcn_of_objects,
-    get_fcn_of_objects,
-)
+from src.utils import get_arg_fcn_of_objects, get_fcn_of_objects
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +52,7 @@ class CometTxt:
         Reads the Comet output file to a list of dataclasses or a dataframe
         """
         if self.path is not None:
-            return CometPSM.from_txt(txt_path=self.path, as_df=as_df)
+            return CometPSM.from_txt(txt=self.path, as_df=as_df)
         else:
             raise ValueError("No Comet output file found!")
 
@@ -68,7 +65,7 @@ class CometTxt:
             return self.path.read_text().split("\n")[2]
 
     def get_top_psms(self) -> List["CometPSM"]:
-        psms = CometPSM.from_txt(txt_path=self.path)
+        psms = CometPSM.from_txt(txt=self.path)
         return [psm for psm in psms if psm.num == 1]
 
 
@@ -92,7 +89,7 @@ class CometPSM:
     @classmethod
     def from_txt(
         cls,
-        txt_path: str,
+        txt: str,
         as_df: bool = False,
         sample: str = "",
     ) -> Union[List["CometPSM"], pd.DataFrame]:
@@ -100,7 +97,7 @@ class CometPSM:
         Reads Comet results .txt file to a list of dataclasses or a dataframe
         """
         # Check whether TXT is from a direct Comet run or a Comet run via crux
-        comet_txt = CometTxt(path=Path(txt_path))
+        comet_txt = CometTxt(path=Path(txt))
 
         # Set sample if not provided
         if len(sample) == 0:
@@ -203,6 +200,9 @@ class CometPSM:
             delta_cn=self.delta_cn,
         )
 
+    def to_dict(self):
+        return asdict(self)
+
 
 @dataclass
 class CometPSMs:
@@ -223,3 +223,21 @@ class CometPSMs:
 
     def get_arg_fcn_of_psms(self, attr: str, fcn: Callable):
         return get_arg_fcn_of_objects(objs=self.psms, attr=attr, fcn=fcn)
+
+    def get_high_confidence_psms(self, q_value_threshold: float) -> "CometPSMs":
+        return CometPSMs(
+            psms=[psm for psm in self.psms if psm.q_value <= q_value_threshold]
+        )
+
+    @property
+    def scans(self) -> Set[Tuple[str, int]]:
+        return {(psm.sample, psm.scan) for psm in self.psms}
+
+    def get_psms_for_scans(self, scans: Iterable[Tuple[str, int]]) -> "CometPSMs":
+        """
+        Args:
+            scans (Iterable[Tuple[str, int]]): Iterable of (sample, scan) tuples
+        """
+        return CometPSMs(
+            psms=list(filter(lambda psm: (psm.sample, psm.scan) in scans, self.psms))
+        )

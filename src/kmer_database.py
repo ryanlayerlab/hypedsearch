@@ -104,7 +104,7 @@ class KmerToProteinMap:
         if out_path.suffix == ".pklz":
             pickle_and_compress(obj=self.kmer_to_protein_map, file_path=out_path)
         elif out_path.suffix == ".json":
-            to_json(data=self.kmer_to_protein_map, out_path=out_path)
+            to_json(data=self.kmer_to_protein_map, path=out_path)
         else:
             raise ValueError("Output path must be a .pklz or .json file.")
 
@@ -227,13 +227,15 @@ class KmerDatabase:
         db = Sqlite3Database(db_path=db_path, overwrite=overwrite)
         db.create_table_from_dataclass(table_name=cls.table_name, obj=cls.row_object)
         logger.info("Adding 'DbKmer' objects to the database...")
-        db.insert_dataclasses(
-            table_name=cls.table_name,
-            data_classes=[
-                DbKmer.from_seq_and_proteins(seq=seq, proteins=proteins)
-                for seq, proteins in kmer_to_protein_map.items()
-            ],
-        )
+        rows = [
+            DbKmer.from_seq_and_proteins(seq=seq, proteins=proteins)
+            for seq, proteins in kmer_to_protein_map.items()
+        ]
+        if len(rows) > 0:
+            db.insert_dataclasses(
+                table_name=cls.table_name,
+                data_classes=rows,
+            )
         logger.info("Creating index...")
         db.add_index(
             table_name=cls.table_name,
@@ -358,10 +360,9 @@ class KmerDatabase:
         return peak_ion_matches
 
 
-def create_db(
-    kmer_to_protein_path: Path,
-    fasta: Path = None,
-    proteins: Optional[Union[List[str], Path]] = None,
+def create_kmer_database(
+    proteins: List[Peptide],
+    kmer_to_proteins_path: Path,
     db_path: Union[Path, str] = MEMORY,
     min_k: int = DEFAULT_MIN_KMER_LEN,
     max_k: int = DEFAULT_MAX_KMER_LEN,
@@ -373,22 +374,22 @@ def create_db(
     If the database does not exist at the given path, it will be created.
     If it does exist it is loaded and returned.
     """
-    if not kmer_to_protein_path.exists():
+    if not kmer_to_proteins_path.exists():
         logger.info(
-            f"kmer-to-protein map doesn't exist at {kmer_to_protein_path}. "
+            f"kmer-to-protein map doesn't exist at {kmer_to_proteins_path}. "
             "Creating it now..."
         )
         kmer_to_protein_map = KmerToProteinMap.create(
-            fasta=fasta,
+            proteins=proteins,
             min_k=min_k,
             max_k=max_k,
             protein_attr="name",
             protein_names=proteins,
         )
-        kmer_to_protein_path.parent.mkdir(parents=True, exist_ok=True)
-        kmer_to_protein_map.save(kmer_to_protein_path)
+        kmer_to_proteins_path.parent.mkdir(parents=True, exist_ok=True)
+        kmer_to_protein_map.save(kmer_to_proteins_path)
     else:
-        kmer_to_protein_map = KmerToProteinMap.load(kmer_to_protein_path)
+        kmer_to_protein_map = KmerToProteinMap.load(kmer_to_proteins_path)
         logger.info("kmer-to-protein map already exists... Skipping creation")
     if not db_path.exists():
         logger.info(f"Database does not exist at {db_path}. Creating it now...")
@@ -416,14 +417,14 @@ def create_db(
 @click.option(
     "--db_path",
     "-d",
-    type=PathType(),
+    type=click.Path(path_type=Path),
     required=True,
     help="Path to the database.",
 )
 @click.option(
     "--protein_names",
     "-pn",
-    type=PathType(),
+    type=click.Path(path_type=Path),
     required=False,
     help=(
         "Path to a new-line separated file with protein names to include in the database. "
@@ -433,14 +434,14 @@ def create_db(
 @click.option(
     "--fasta",
     "-f",
-    type=PathType(),
+    type=click.Path(path_type=Path),
     required=True,
     help="Path to the FASTA file.",
 )
 @click.option(
     "--kmer_to_protein",
     "-ktp",
-    type=PathType(),
+    type=click.Path(path_type=Path),
     required=True,
     help=("Path to the kmer-to-protein map."),
 )
@@ -469,9 +470,9 @@ def cli_create_db(
     min_k: int,
     max_k: int,
 ):
-    create_db(
+    create_kmer_database(
         fasta=fasta,
-        kmer_to_protein_path=kmer_to_protein,
+        kmer_to_proteins_path=kmer_to_protein,
         db_path=db_path,
         min_k=min_k,
         max_k=max_k,
