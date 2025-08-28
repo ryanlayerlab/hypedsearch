@@ -48,7 +48,7 @@ rule run_comet:
     singularity: 
         "docker://airikjohnson/hypedsearch:latest"
     script:
-        "run_comet.py"
+        "scripts/run_comet.py"
     # run:
     #     from src.crux import Crux
     #     from src.utils import setup_logger

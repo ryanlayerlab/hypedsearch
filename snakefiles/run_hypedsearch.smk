@@ -48,4 +48,4 @@ rule run_hypedsearch:
     singularity: 
         "docker://airikjohnson/hypedsearch:latest"
     script:
-        "run_hypedsearch.py"
+        "scripts/run_hypedsearch.py"
