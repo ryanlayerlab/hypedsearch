@@ -1,12 +1,13 @@
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated, Dict, List, Optional, Union
+from typing import Annotated, Dict, List, Optional, Tuple, Union
 
 import click
 import numpy as np
+import pymzml
 from matplotlib.pyplot import Axes
-from pydantic import BaseModel, BeforeValidator
+from pydantic import BaseModel, BeforeValidator, Field
 from pyteomics import mzml as mzml_reader
 
 from src.constants import SPECTRA_DIR, THOMAS_SAMPLES
@@ -60,7 +61,7 @@ class Spectrum:
     def from_dict(cls, spectrum: Dict, mzml: Optional[Path] = None):
         # Extract scan number from 'id' key
         spectrum_id = spectrum.get("id")
-        scan_num = int(re.search(r"(?:scan|scanId)=(\d+)", spectrum_id).group(1))
+        scan_num = cls.get_scan_number_from_id(spectrum_id=spectrum_id)
 
         # Get peaks
         masses, abundances = (
@@ -89,14 +90,14 @@ class Spectrum:
         )
 
     @classmethod
-    def parse_ms2_from_mzml(cls, spectra_file: Union[str, Path]) -> List["Spectrum"]:
-        spectra_file = Path(spectra_file).absolute()
+    def parse_ms2_from_mzml(cls, mzml: Union[str, Path]) -> List["Spectrum"]:
+        mzml = Path(mzml).absolute()
         ms2_spectra = []
-        with mzml_reader.MzML(str(spectra_file)) as mzml:
+        with mzml_reader.MzML(str(mzml)) as mzml:
             for spectrum in mzml:
                 if spectrum["ms level"] == 1:
                     continue
-                ms2_spectra.append(cls.from_dict(spectrum=spectrum, mzml=spectra_file))
+                ms2_spectra.append(cls.from_dict(spectrum=spectrum, mzml=mzml))
 
             return ms2_spectra
 
@@ -120,13 +121,13 @@ class Spectrum:
         if path.is_dir():
             spectra_files = list(path.glob("*.mzML"))
             spectra = [
-                cls.parse_ms2_from_mzml(spectra_file=spectra_file)
+                cls.parse_ms2_from_mzml(mzml=spectra_file)
                 for spectra_file in spectra_files
             ]
             return flatten_list_of_lists(spectra)
 
         elif path.is_file():
-            return cls.parse_ms2_from_mzml(spectra_file=path)
+            return cls.parse_ms2_from_mzml(mzml=path)
 
     def filter_to_top_n_peaks(self, n: int) -> None:
         if n > 0:
@@ -170,19 +171,22 @@ class Mzml(BaseModel):
         """
         Get all spectra from the mzML file.
         """
-        return Spectrum.parse_ms2_from_mzml(spectra_file=self.mzml)
+        return Spectrum.parse_ms2_from_mzml(mzml=self.mzml)
 
     @property
-    def scans(self) -> List[int]:
+    def msn_scan_numbers(self) -> List[int]:
         """
         Get all scan numbers from the mzML file.
         """
-        return [spectrum.scan for spectrum in self.ms2_spectra]
+        scan_numbers = []
+        with pymzml.run.Reader(str(self.mzml)) as reader:
+            for spec in reader:
+                if spec.ms_level > 1:  # MS2 or higher
+                    scan_numbers.append(int(spec.ID))
+        return scan_numbers
 
     def get_spectrum(self, scan: int) -> "Spectrum":
-        for spectrum in self.ms2_spectra:
-            if spectrum.scan == scan:
-                return spectrum
+        return Spectrum.get_spectrum(scan=scan, mzml=self.mzml)
 
     @property
     def sample(self) -> str:
@@ -253,44 +257,9 @@ def load_mzml_data(samples: List[str] = THOMAS_SAMPLES):
     for sample in samples:
         print(f"Reading sample {sample}'s MZML")
         mzml_path = SPECTRA_DIR / f"{sample}.mzML"
-        spectra = Spectrum.parse_ms2_from_mzml(spectra_file=mzml_path)
+        spectra = Spectrum.parse_ms2_from_mzml(mzml=mzml_path)
         mzml_data.extend(list(spectra))
     return mzml_data
-
-
-def get_spectrum_from_mzml(scan_num: int, mzml_path: Path):
-    spectra = Spectrum.parse_ms2_from_mzml(spectra_file=mzml_path)
-
-    spectrum = list(filter(lambda spectrum: spectrum.scan == scan_num, spectra))
-    assert (
-        len(spectrum) == 1
-    ), f"Scan number must be unique. There were {len(spectrum)} spectra with scan number {scan_num}."
-    return spectrum[0]
-
-
-def get_specific_spectrum_by_sample_and_scan_num(
-    sample: Union[str, int], scan_num: int
-) -> Spectrum:
-    """
-    Args:
-        - scan_num is the spectrum's 1-based index
-    """
-    if isinstance(sample, str):
-        mzml_path = SPECTRA_DIR / f"{sample}.mzML"
-    elif isinstance(sample, int):
-        mzml_path = SPECTRA_DIR / f"BMEM_AspN_Fxn{sample}.mzML"
-    else:
-        raise RuntimeError(
-            f"Provided 'sample' should be type str or int. You provided {type(sample)}"
-        )
-    matched_spectrum = None
-    spectra = Spectrum.parse_ms2_from_mzml(spectra_file=mzml_path)
-    matched_spectrum = None
-    for spectrum in spectra:
-        if spectrum.scan == scan_num:
-            matched_spectrum = spectrum
-            break
-    return matched_spectrum
 
 
 def get_mzml_for_sample(sample: str) -> Path:
@@ -311,16 +280,31 @@ def load_spectra_from_computer(path: Path) -> List[Spectrum]:
     if path.is_dir():
         spectra_files = list(path.glob("*.mzML"))
         spectra = [
-            Spectrum.parse_ms2_from_mzml(spectra_file=spectra_file)
+            Spectrum.parse_ms2_from_mzml(mzml=spectra_file)
             for spectra_file in spectra_files
         ]
         return flatten_list_of_lists(spectra)
 
     elif path.is_file():
-        return Spectrum.parse_ms2_from_mzml(spectra_file=path)
+        return Spectrum.parse_ms2_from_mzml(mzml=path)
 
-    spectra = Spectrum.parse_ms2_from_mzml(spectra_file=path)
+    spectra = Spectrum.parse_ms2_from_mzml(mzml=path)
     return spectra
+
+
+def create_sample_scan_to_spectrum_map(
+    spectra_dir: Optional[Union[str, Path]] = None, mzmls: Optional[List[Path]] = None
+) -> Dict[Tuple[str, int], Spectrum]:
+    sample_scan_to_spectrum_map = {}
+    if mzmls is not None:
+        for mzml in mzmls:
+            for spectrum in Mzml(mzml=mzml).ms2_spectra:
+                sample_scan_to_spectrum_map[(spectrum.sample, spectrum.scan)] = spectrum
+    else:
+        for mzml in Path(spectra_dir).glob("*.mzML"):
+            for spectrum in Mzml(mzml=mzml).ms2_spectra:
+                sample_scan_to_spectrum_map[(spectrum.sample, spectrum.scan)] = spectrum
+    return sample_scan_to_spectrum_map
 
 
 @click.command(

@@ -1,7 +1,7 @@
 import logging
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
 import click
 import pandas as pd
@@ -55,7 +55,7 @@ def load_comet_psms(
         raise RuntimeError("Either q_value_threshold or top_n_psms must be provided.")
 
 
-def get_protein_counts_from_comet_results(
+def get_protein_counts_from_comet_psms(
     psms: List[CometPSM],
 ) -> Counter[str, int]:
     """ """
@@ -146,7 +146,7 @@ def get_and_plot_most_common_proteins(
         top_n_psms=top_n_psms,
     )
 
-    prot_counts = get_protein_counts_from_comet_results(psms=psms)
+    prot_counts = get_protein_counts_from_comet_psms(psms=psms)
     most_common_proteins = get_most_common_proteins(
         protein_counts=prot_counts, top_n=top_n_proteins
     )
@@ -167,11 +167,11 @@ def get_and_plot_most_common_proteins(
     )
 
 
-def get_most_common_proteins(protein_counts: Counter, top_n: int) -> List[str]:
+def get_most_common_proteins(protein_counts: Counter, top_n: int) -> Set[str]:
     most_common_proteins = [
         protein_and_count[0] for protein_and_count in protein_counts.most_common(top_n)
     ]
-    return most_common_proteins
+    return set(most_common_proteins)
 
 
 @click.command(

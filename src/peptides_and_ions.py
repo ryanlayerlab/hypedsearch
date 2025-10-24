@@ -25,13 +25,13 @@ from src.utils import (
     Kmer,
     PathType,
     generate_aa_kmers,
+    get_prefixes,
+    get_suffixes,
     get_time_in_diff_units,
     log_params,
     log_time,
     pickle_and_compress,
-    prefixes,
     setup_logger,
-    suffixes,
 )
 
 logger = logging.getLogger(__name__)
@@ -104,9 +104,9 @@ class UnpositionedProductIon:
         product_ions = []
         for ion_type in ion_types:
             if ion_type == B_ION_TYPE:
-                seq_generator = prefixes
+                seq_generator = get_prefixes
             elif ion_type == Y_ION_TYPE:
-                seq_generator = suffixes
+                seq_generator = get_suffixes
             else:
                 raise ValueError(f"Unsupported ion type: {ion_type}")
             for charge in charges:
@@ -140,7 +140,9 @@ class Peptide:
         return generate_aa_kmers(aa_seq=self.seq, min_k=min_k, max_k=max_k)
 
     def product_ions(
-        self, charges: List[int], ion_types: List[IonTypes] = {B_ION_TYPE, Y_ION_TYPE}
+        self,
+        charges: List[int],
+        ion_types: Set[Literal[B_ION_TYPE, Y_ION_TYPE]] = {B_ION_TYPE, Y_ION_TYPE},
     ) -> List[UnpositionedProductIon]:
         return UnpositionedProductIon.generate_product_ions(
             seq=self.seq, charges=charges, ion_types=ion_types
@@ -161,6 +163,15 @@ class Fasta(BaseModel):
             if query_seq in seq:
                 return True
         return False
+
+    def proteins_that_contain_seqs(self, seqs: List[str]) -> Dict[str, Set]:
+        """Get the proteins that contain any of the query sequences."""
+        seq_to_proteins = defaultdict(set)
+        for protein in self.proteins:
+            for seq in seqs:
+                if seq in protein.seq:
+                    seq_to_proteins[seq].add(protein.name)
+        return dict(seq_to_proteins)
 
     @property
     def proteins(self) -> List[Peptide]:
@@ -302,7 +313,7 @@ def cli_get_uniq_kmers(
     logger.info("Pickling and compressing unique kmers...")
     if output_path.is_dir():
         output_path = output_path / f"{fasta_path.stem}.uniq_kmers.pklz"
-    pickle_and_compress(obj=uniq_kmers, file_path=output_path)
+    pickle_and_compress(obj=uniq_kmers, path=output_path)
 
 
 def get_kmer_counts_by_protein(
@@ -378,7 +389,7 @@ def cli_get_kmer_counts_by_protein(
         fasta=fasta,
         k=k,
     )
-    pickle_and_compress(obj=k_map, file_path=out_path)
+    pickle_and_compress(obj=k_map, path=out_path)
     loop_duration = time() - loop_start_time
     logger.info(f"Processed k={k} in {get_time_in_diff_units(loop_duration)}")
 

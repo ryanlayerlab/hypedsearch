@@ -1,8 +1,7 @@
-
 from src.protein_abundance import (
     get_and_plot_most_common_proteins,
     get_prefix_counts_by_length,
-    get_protein_counts_from_comet_results,
+    get_protein_counts_from_comet_psms,
     load_comet_psms,
 )
 
@@ -15,7 +14,7 @@ class Test_get_protein_counts_from_comet_results:
             comet_results_dir=comet_results_dir,
             q_value_threshold=0.5,
         )
-        protein_counts = get_protein_counts_from_comet_results(psms=psms)
+        protein_counts = get_protein_counts_from_comet_psms(psms=psms)
         assert len(protein_counts) > 0
 
     @staticmethod
@@ -25,7 +24,7 @@ class Test_get_protein_counts_from_comet_results:
             comet_results_dir=comet_results_dir,
             top_n_psms=1,
         )
-        protein_counts = get_protein_counts_from_comet_results(psms=psms)
+        protein_counts = get_protein_counts_from_comet_psms(psms=psms)
         assert len(protein_counts) > 0
 
 

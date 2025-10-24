@@ -27,16 +27,18 @@ precursor_mz_ppm_tol = int(snakemake.config.precursor_mz_ppm_tol)
 peak_to_ion_ppm_tol = int(snakemake.config.peak_to_ion_ppm_tol)
 min_cluster_len = int(snakemake.config.min_cluster_len)
 min_cluster_support = int(snakemake.config.min_cluster_support)
+max_allowed_ion_charge = int(snakemake.config.max_allowed_ion_charge)
 log_dir = snakemake.config.log_dir
 
 # Setup logger
-if len(log_dir) > 0:
-    log_file = Path(log_dir) / f"{Mzml.get_mzml_name(mzml=mzml)}.{scan}.log"
-    logger = setup_logger(str(log_file))
-    logger.info(f"Logging to {log_file}")
-else:
-    log_file = ""
-    logger = setup_logger()
+logger = setup_logger()
+# if len(log_dir) > 0:
+#     log_file = Path(log_dir) / f"{Mzml.get_mzml_name(mzml=mzml)}.{scan}.log"
+#     logger = setup_logger(str(log_file))
+#     logger.info(f"Logging to {log_file}")
+# else:
+#     log_file = ""
+#     logger = setup_logger()
 
 # Run
 create_and_score_hybrids_for_spectrum(
@@ -53,7 +55,9 @@ create_and_score_hybrids_for_spectrum(
     fasta=fasta,
     crux_path=crux_path,
     num_peaks=num_peaks,
+    max_allowed_ion_charge=max_allowed_ion_charge,
 )
-if len(log_dir) > 0:
-    logger.info("Deleteing log file...")
-    log_file.unlink()
+
+# if len(log_dir) > 0:
+#     logger.info("Deleteing log file...")
+#     log_file.unlink()

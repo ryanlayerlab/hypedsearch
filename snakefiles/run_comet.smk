@@ -32,6 +32,7 @@ config = SimpleNamespace(**config)
 expected_outputs = comet_config.expected_outputs(
     out_dir=config.out_dir, psm_type=TARGET
 )
+# print(f"Config: {config}")
 print(f"There are {len(expected_outputs)} expected outputs.")
 
 rule all:

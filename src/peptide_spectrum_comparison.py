@@ -11,26 +11,192 @@ from matplotlib.pyplot import Axes
 
 from src.comet_utils import CometPSM
 from src.constants import (
+    B_ION_TYPE,
     DEFAULT_PEAK_TO_ION_PPM_TOL,
     DEFAULT_PPM_TOLERANCE,
     ION_INT_TO_TYPE,
     IONS_MATCHED,
     XCORR,
+    Y_ION_TYPE,
     IonTypes,
 )
 
 # from src.hypedsearch_utils import HybridPeptide
 from src.kmer_database import DbKmer
-from src.mass_spectra import Peak, Spectrum, plot_peaks
+from src.mass_spectra import (
+    Peak,
+    Spectrum,
+    create_sample_scan_to_spectrum_map,
+    plot_peaks,
+)
 from src.peptides_and_ions import (
     Peptide,
     UnpositionedProductIon,
     compute_peptide_precursor_mz,
 )
 from src.plot_utils import fig_setup, finalize
-from src.utils import flatten_list_of_lists, log_time, mass_difference_in_ppm
+from src.utils import (
+    dataclass_list_to_df,
+    flatten_list_of_lists,
+    get_prefixes,
+    get_suffixes,
+    log_time,
+    mass_difference_in_ppm,
+)
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PeakIonMatch:
+    ion_mz: float
+    ion_charge: int
+    ion_seq: str
+    ion_type: str
+    peak_mz: float
+    peak_intensity: float
+    sample: Optional[str]
+    scan: Optional[int]
+
+    def mz_diff(self, type: Literal["rel", "rel_ppm"] = "rel_ppm"):
+        """
+        Mass (more precisely, m/z) difference between the theoretical ion and the peak.
+        Let x_i = theoretical ion mass, x_p = peak mass,
+        then returns
+            - (x_i - x_t) / x_i when type='rel'
+            - ((x_i - x_t) / x_i) * (10**6) when type='rel_ppm'
+        """
+        if type == "rel":
+            return (self.ion_mz - self.peak_mz) / self.ion_mz
+        elif type == "rel_ppm":
+            return ((self.ion_mz - self.peak_mz) / self.ion_mz) * (10**6)
+
+
+@dataclass
+class PSM:
+    spectrum: Spectrum
+    peptide: Union[str, Peptide]
+    peak_ion_matches: List[PeakIonMatch] = field(init=False)
+    peak_to_ion_ppm_tolerance: float = DEFAULT_PEAK_TO_ION_PPM_TOL
+    comet_psm: Optional[CometPSM] = None
+
+    def __post_init__(self):
+        if isinstance(self.peptide, str):
+            self.peptide = Peptide(seq=self.peptide)
+
+        self.peak_ion_matches = get_peak_product_ion_matches(
+            spectrum=self.spectrum,
+            peptide=self.peptide,
+            peak_to_ion_ppm_tolerance=self.peak_to_ion_ppm_tolerance,
+        )
+
+    @classmethod
+    def from_comet_psms(
+        cls,
+        comet_psms: List[CometPSM],
+        spectra_dir: Union[str, Path],
+        peak_to_ion_ppm_threshold: float,
+    ) -> List["PSM"]:
+        psms = []
+        mzml_names = set(psm.sample for psm in comet_psms)
+        mzmls = [Path(spectra_dir) / f"{name}.mzML" for name in mzml_names]
+        sample_scan_to_spectrum_map = create_sample_scan_to_spectrum_map(mzmls=mzmls)
+        for comet_psm in comet_psms:
+            psms.append(
+                cls(
+                    spectrum=sample_scan_to_spectrum_map[
+                        (comet_psm.sample, comet_psm.scan)
+                    ],
+                    peptide=comet_psm.seq,
+                    peak_to_ion_ppm_tolerance=peak_to_ion_ppm_threshold,
+                    comet_psm=comet_psm,
+                )
+            )
+        return psms
+
+    @property
+    def df(self):
+        return dataclass_list_to_df(dataclass_list=self.peak_ion_matches)
+
+    @property
+    def num_b_ions_supported(self):
+        return len(
+            self.df[self.df.ion_type == B_ION_TYPE].groupby(
+                by=["ion_charge", "ion_seq"]
+            )
+        )
+
+    @property
+    def num_ions_supported(self):
+        return self.num_b_ions_supported + self.num_y_ions_supported
+
+    @property
+    def num_y_ions_supported(self):
+        return len(
+            self.df[self.df.ion_type == Y_ION_TYPE].groupby(
+                by=["ion_charge", "ion_seq"]
+            )
+        )
+
+    def sequences_supported(
+        self,
+        ion_type: Literal[B_ION_TYPE, Y_ION_TYPE],
+    ):
+        if len(self.peak_ion_matches) == 0:
+            return set()
+        return set(self.df.loc[self.df.ion_type == ion_type, "ion_seq"].unique())
+
+    @property
+    def prefixes_supported(self):
+        return self.sequences_supported(ion_type=B_ION_TYPE)
+
+    @property
+    def suffixes_supported(self):
+        return self.sequences_supported(ion_type=Y_ION_TYPE)
+
+    def left_seq_support(self, left_seq: str):
+        assert (
+            self.peptide.seq[: len(left_seq)] == left_seq
+        ), f"{self.peptide.seq} does not start with {left_seq}"
+        prefixes = get_prefixes(seq=left_seq)
+        return len(
+            self.df[
+                (self.df.ion_type == B_ION_TYPE) & (self.df.ion_seq.isin(prefixes))
+            ].groupby(by=["ion_seq"])
+        )
+
+    def right_seq_support(self, right_seq: str):
+        assert (
+            self.peptide.seq[-len(right_seq) :] == right_seq
+        ), f"{self.peptide.seq} does not end with {right_seq}"
+        suffixes = get_suffixes(seq=right_seq)
+        return len(
+            self.df[
+                (self.df.ion_type == Y_ION_TYPE) & (self.df.ion_seq.isin(suffixes))
+            ].groupby(by=["ion_seq"])
+        )
+
+    @property
+    def intensity_supported(self):
+        return sum(
+            [peak_ion_match.peak_intensity for peak_ion_match in self.peak_ion_matches]
+        )
+
+    @property
+    def prop_intensity_supported(self):
+        return self.intensity_supported / self.spectrum.total_intensity
+
+    @property
+    def prop_prefixes_supported(self):
+        return len(self.prefixes_supported) / len(self.peptide.seq)
+
+    @property
+    def prop_suffixes_supported(self):
+        return len(self.suffixes_supported) / len(self.peptide.seq)
+
+    @property
+    def prop_ions_matched(self):
+        return self.comet_psm.ions_matched / self.comet_psm.ions_total
 
 
 @dataclass
@@ -124,11 +290,11 @@ class PeptideSpectrumComparison:
 
     @cached_property
     def product_ions_with_matching_peaks(self):
-        return get_peaks_that_match_peptide_product_ions(
+        return get_peak_product_ion_matches(
             spectrum=self.spectrum,
             peptide=self.peptide,
             ion_types=self.ion_types,
-            peak_ppm_tolerance=self.peak_to_ion_ppm_tolerance,
+            peak_to_ion_ppm_tolerance=self.peak_to_ion_ppm_tolerance,
         )
 
     @cached_property
@@ -553,38 +719,12 @@ def get_peaks_near_mz(
 #     )
 
 
-@dataclass
-class PeakIonMatch:
-    ion_mz: float
-    ion_charge: int
-    ion_seq: str
-    ion_type: str
-    peak_mz: float
-    peak_intensity: float
-    sample: Optional[str]
-    scan: Optional[int]
-
-    def mz_diff(self, type: Literal["rel", "rel_ppm"] = "rel_ppm"):
-        """
-        Mass (more precisely, m/z) difference between the theoretical ion and the peak.
-        Let x_i = theoretical ion mass, x_p = peak mass,
-        then returns
-            - (x_i - x_t) / x_i when type='rel'
-            - ((x_i - x_t) / x_i) * (10**6) when type='rel_ppm'
-        """
-        if type == "rel":
-            return (self.ion_mz - self.peak_mz) / self.ion_mz
-        elif type == "rel_ppm":
-            return ((self.ion_mz - self.peak_mz) / self.ion_mz) * (10**6)
-
-
-def get_peaks_that_match_peptide_product_ions(
+def get_peak_product_ion_matches(
     spectrum: Spectrum,
     peptide: Union[Peptide, str],
-    ion_types: List[IonTypes] = [IonTypes.B_ION_TYPE, IonTypes.Y_ION_TYPE],
-    peak_ppm_tolerance: float = DEFAULT_PPM_TOLERANCE,
-    return_dataclasses: bool = False,
-) -> Union[List[PeakIonMatch], pd.DataFrame]:
+    ion_types: Set[Literal[B_ION_TYPE, Y_ION_TYPE]] = {B_ION_TYPE, Y_ION_TYPE},
+    peak_to_ion_ppm_tolerance: float = DEFAULT_PPM_TOLERANCE,
+) -> List[PeakIonMatch]:
     """
     Compare the given spectrum to the given peptide. This method helps evaluate
     how strong the evidence is for a peptide-spectrum match (PSM).
@@ -599,49 +739,31 @@ def get_peaks_that_match_peptide_product_ions(
     assert 2 * len(peptide.seq) * len(charges) == len(product_ions)
 
     # Get peaks that match a product ion
-    product_ions_with_matching_peaks = []
     peak_ion_matches = []
     for ion in product_ions:
         matching_peaks = get_peaks_near_mz(
             query_mz=ion.mz,
             peaks=spectrum.peaks,
-            ppm_tolerance=peak_ppm_tolerance,
+            ppm_tolerance=peak_to_ion_ppm_tolerance,
         )
 
-        if return_dataclasses:
-            peak_ion_matches.extend(
-                [
-                    PeakIonMatch(
-                        ion_mz=ion.mz,
-                        ion_charge=ion.charge,
-                        ion_type=ion.ion_type_as_str,
-                        ion_seq=ion.seq,
-                        peak_mz=peak.mz,
-                        peak_intensity=peak.intensity,
-                        sample=spectrum.sample,
-                        scan=spectrum.scan,
-                    )
-                    for peak in matching_peaks
-                ]
-            )
-        else:
-            product_ions_with_matching_peaks.append(
-                [
-                    ion.charge,
-                    ion.ion_type_as_str,
-                    ion.mz,
-                    ion.seq,
-                    matching_peaks,
-                ]
-            )
-    if return_dataclasses:
-        return peak_ion_matches
-    else:
-        product_ions_with_matching_peaks = pd.DataFrame(
-            product_ions_with_matching_peaks,
-            columns=["charge", "ion_type", "m/z", "seq", "matching_peaks"],
+        peak_ion_matches.extend(
+            [
+                PeakIonMatch(
+                    ion_mz=ion.mz,
+                    ion_charge=ion.charge,
+                    ion_type=ion.ion_type,
+                    ion_seq=ion.seq,
+                    peak_mz=peak.mz,
+                    peak_intensity=peak.intensity,
+                    sample=spectrum.sample,
+                    scan=spectrum.scan,
+                )
+                for peak in matching_peaks
+            ]
         )
-        return product_ions_with_matching_peaks
+
+    return peak_ion_matches
 
 
 def group_product_ions_and_matching_peaks_by_charge_and_ion_type(

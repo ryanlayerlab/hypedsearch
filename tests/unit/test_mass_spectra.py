@@ -39,7 +39,7 @@ class Test_Spectrum:
         # It's difficult to create a test MZML. So this test just checks that
         # the function does not fail on an actual MZML
         mzml_path = test_data_dir / "spectra/10_mouse_spectra.mzML"
-        actual = Spectrum.parse_ms2_from_mzml(spectra_file=mzml_path)
+        actual = Spectrum.parse_ms2_from_mzml(mzml=mzml_path)
         assert len(actual) > 0
 
 

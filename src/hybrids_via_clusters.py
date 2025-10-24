@@ -1,4 +1,5 @@
 import logging
+import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from itertools import groupby
@@ -11,6 +12,7 @@ import numpy as np
 
 from src.constants import (
     B_ION_TYPE,
+    DEFAULT_MAX_ALLOWED_ION_CHARGE,
     DEFAULT_MIN_CLUSTER_LENGTH,
     DEFAULT_MIN_CLUSTER_SUPPORT,
     DEFAULT_PEAK_TO_ION_PPM_TOL,
@@ -32,6 +34,7 @@ from src.sql_database import Sqlite3Database, SqlTableRow
 from src.utils import (
     Position,
     get_positions_of_subseq_in_seq,
+    get_time_in_diff_units,
     load_json,
     log_time,
     relative_ppm_tolerance_in_daltons,
@@ -254,7 +257,7 @@ class SpectrumClusters:
         )
         return filtered_clusters
 
-    @log_time(level=logging.INFO)
+    @log_time(level=logging.DEBUG)
     def filter_clusters(
         self,
         min_len: int = DEFAULT_MIN_CLUSTER_LENGTH,
@@ -301,7 +304,7 @@ class SpectrumClusters:
         return clusters
 
     @classmethod
-    @log_time(level=logging.INFO)
+    @log_time(level=logging.DEBUG)
     def from_positioned_ions(
         cls, positioned_ions: List[PositionedProductIon]
     ) -> "SpectrumClusters":
@@ -327,11 +330,13 @@ def form_extended_clusters_for_spectrum(
     min_cluster_support: int = DEFAULT_MIN_CLUSTER_SUPPORT,
     peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
     precursor_mz_ppm_tol: float = DEFAULT_PRECURSOR_MZ_PPM_TOL,
+    max_allowed_ion_charge: int = DEFAULT_MAX_ALLOWED_ION_CHARGE,
 ) -> SpectrumClusters:
     # Get peak-ion matches for the spectrum
     peak_ion_matches = kmer_db.get_peak_ion_matches_for_spectrum(
         spectrum=spectrum,
         ppm_tolerance=peak_to_ion_ppm_tol,
+        max_allowed_ion_charge=max_allowed_ion_charge,
     )
     # For each peak-ion match, find all its potential locations in the proteins
     positioned_ions = []
@@ -345,11 +350,11 @@ def form_extended_clusters_for_spectrum(
 
     # Get clusters for spectrum
     clusters = SpectrumClusters.from_positioned_ions(positioned_ions=positioned_ions)
-    logger.info(
+    logger.debug(
         f"Before filtering, there are {len(clusters.b_clusters)} b-clusters and {len(clusters.y_clusters)} y-clusters."
     )
     clusters.filter_clusters(min_len=min_cluster_len, min_support=min_cluster_support)
-    logger.info(
+    logger.debug(
         f"After filtering, there are {len(clusters.b_clusters)} b-clusters and {len(clusters.y_clusters)} y-clusters."
     )
 
@@ -448,7 +453,7 @@ class HybridPeptide:
         )
 
 
-@log_time(level=logging.INFO)
+@log_time(level=logging.DEBUG)
 def form_hybrids_from_clusters(
     b_clusters: List[Cluster],
     y_clusters: List[Cluster],
@@ -496,7 +501,7 @@ def form_hybrids_from_clusters(
     return hybrids
 
 
-@log_time(level=logging.INFO)
+@log_time(level=logging.DEBUG)
 def form_hybrids_from_left_and_right_seqs(
     left_seqs: List[str],
     right_seqs: List[str],
@@ -550,7 +555,6 @@ def form_hybrids_from_left_and_right_seqs(
     return hybrids
 
 
-@log_time(level=logging.INFO)
 def form_spectrum_hybrids_via_clustering(
     spectrum: Spectrum,
     kmer_db: KmerDatabase,
@@ -560,6 +564,7 @@ def form_spectrum_hybrids_via_clustering(
     peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
     min_cluster_len: int = DEFAULT_MIN_CLUSTER_LENGTH,
     min_cluster_support: int = DEFAULT_MIN_CLUSTER_SUPPORT,
+    max_allowed_ion_charge: int = DEFAULT_MAX_ALLOWED_ION_CHARGE,
 ) -> Dict[str, List[HybridPeptide]]:
     """
     This function will
@@ -567,6 +572,8 @@ def form_spectrum_hybrids_via_clustering(
     2. remove native hybrids
     3. return a dictionary mapping hybrid sequences to lists of HybridPeptide objects
     """
+    logger.info(f"Forming hybrids for spectrum ({spectrum.sample}, {spectrum.scan})")
+    start_time = time.perf_counter()
     # Form clusters
     clusters = form_extended_clusters_for_spectrum(
         kmer_db=kmer_db,
@@ -576,6 +583,7 @@ def form_spectrum_hybrids_via_clustering(
         precursor_mz_ppm_tol=precursor_mz_ppm_tol,
         min_cluster_len=min_cluster_len,
         min_cluster_support=min_cluster_support,
+        max_allowed_ion_charge=max_allowed_ion_charge,
     )
     hybrids = form_hybrids_from_clusters(
         b_clusters=clusters.b_clusters,
@@ -588,7 +596,7 @@ def form_spectrum_hybrids_via_clustering(
     )
     # Remove hybrids that are native sequences and
     # group hybrids by sequence (e.g., group A-BC with AB-C)
-    logger.info(
+    logger.debug(
         "Removing hybrids that correspond to native sequences. Then grouping the non-native "
         "hybrid peptides by sequence"
     )
@@ -598,6 +606,10 @@ def form_spectrum_hybrids_via_clustering(
             continue
         seq_to_hybrids[hybrid.seq].append(hybrid)
 
+    duration = time.perf_counter() - start_time
+    logger.info(
+        f"Completed forming hybrids for spectrum ({spectrum.sample}, {spectrum.scan})\nIt took {get_time_in_diff_units(duration)}"
+    )
     return seq_to_hybrids
 
 
@@ -670,7 +682,7 @@ def serialize_hybrids(seq_to_hybrids: Dict[str, List[HybridPeptide]]) -> Dict:
     required=True,
     help="Where hybrid .json files will be saved as '<scan>.json'",
 )
-@log_time(level=logging.INFO)
+@log_time(level=logging.DEBUG)
 def cli_form_hybrids(
     mzml: Path,
     database: Path,

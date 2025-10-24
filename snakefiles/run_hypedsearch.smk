@@ -43,6 +43,8 @@ rule run_hypedsearch:
         ),
     output:
         target = f"{config.out_dir}/{{sample}}.comet.{{scan}}-{{scan}}.target.txt"
+    resources: 
+        runtime = "10m"
     benchmark:
         "logs/hypedsearch/{sample}.{scan}.log"
     singularity: 

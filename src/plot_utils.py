@@ -270,45 +270,19 @@ def plot_best_fit_line(ax, x, y, label=None):
     ax.plot(x, y, label=label)
 
 
-def hist_plot(
+def add_counts_to_box_plot(
     ax,
-    data,
-    nbins: int = 10,
-    kde: bool = True,
-    box_counts: bool = True,
-    bw_adjust: float = 2,
-    # label=None, color=None, alpha=0.5
 ):
-    """
-    Plot a histogram of the given data.
-    """
-    sns.histplot(
-        data,
-        bins=nbins,
-        ax=ax,
-        kde=kde,
-        kde_kws=dict(bw_adjust=bw_adjust),
-    )
-    # if kde:
-    #     sns.kdeplot(
-    #         data,
-    #         ax=ax,
-    #         bw_adjust=2,
-    #         label="KDE",
-    #     )
-
-    # Add count numbers to top of histogram boxes
-    if box_counts:
-        for patch in ax.patches:
-            height = patch.get_height()
-            if height > 0:  # only label non-empty bins
-                _ = ax.text(
-                    patch.get_x() + patch.get_width() / 2,
-                    height,
-                    f"{int(height)}",
-                    ha="center",
-                    va="bottom",
-                )
+    for patch in ax.patches:
+        height = patch.get_height()
+        if height > 0:  # only label non-empty bins
+            _ = ax.text(
+                patch.get_x() + patch.get_width() / 2,
+                height,
+                f"{int(height)}",
+                ha="center",
+                va="bottom",
+            )
 
 
 def save_fig(

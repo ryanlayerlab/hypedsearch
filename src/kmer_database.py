@@ -8,6 +8,7 @@ import click
 
 from src.constants import (
     AMINO_ACID_MASSES,
+    DEFAULT_MAX_ALLOWED_ION_CHARGE,
     DEFAULT_MAX_KMER_LEN,
     DEFAULT_MIN_KMER_LEN,
     MEMORY,
@@ -37,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class KmerToProteinMap:
+class KmerToProteinsMap:
     """A class for the mapping from kmers to the proteins those kmers are found in"""
 
     kmer_to_protein_map: Dict[str, List[Union[int, str]]]
@@ -51,7 +52,7 @@ class KmerToProteinMap:
         max_k: int = DEFAULT_MAX_KMER_LEN,
         protein_attr: Literal["id", "name"] = "id",
         protein_names: Optional[Union[List[str], Path]] = None,
-    ) -> "KmerToProteinMap":
+    ) -> "KmerToProteinsMap":
         """
         Create a kmer to protein map from a FASTA file or a list of Peptides
         """
@@ -73,7 +74,7 @@ class KmerToProteinMap:
 
     # Don't use @log_params because 'proteins' can be a list of many, many peptides
     @staticmethod
-    @log_time(level=logging.INFO)
+    @log_time(level=logging.DEBUG)
     def get_uniq_kmer_to_protein_map(
         proteins: List[Peptide],
         min_k: int = DEFAULT_MIN_KMER_LEN,
@@ -97,20 +98,20 @@ class KmerToProteinMap:
         logger.info(f"Number of unique kmers {len(uniq_kmer_to_protein_map)}")
         return dict(uniq_kmer_to_protein_map)
 
-    @log_time(level=logging.INFO)
+    @log_time(level=logging.DEBUG)
     def save(self, out_path: Union[str, Path]) -> None:
         """Save the kmer-to-protein map to a file."""
         out_path = Path(out_path)
         if out_path.suffix == ".pklz":
-            pickle_and_compress(obj=self.kmer_to_protein_map, file_path=out_path)
+            pickle_and_compress(obj=self.kmer_to_protein_map, path=out_path)
         elif out_path.suffix == ".json":
             to_json(data=self.kmer_to_protein_map, path=out_path)
         else:
             raise ValueError("Output path must be a .pklz or .json file.")
 
     @classmethod
-    @log_time(level=logging.INFO)
-    def load(cls, path: Union[str, Path]) -> "KmerToProteinMap":
+    @log_time(level=logging.DEBUG)
+    def load(cls, path: Union[str, Path]) -> "KmerToProteinsMap":
         """Load a saved kmer-to-protein map from a file."""
         path = Path(path)
         if path.suffix == ".pklz":
@@ -299,6 +300,7 @@ class KmerDatabase:
         precursor_charge: int,
         precursor_mz: float,
         ppm_tolerance: float,
+        max_allowed_ion_charge: int,
         ion_types: Set[Literal["b", "y"]] = {"b", "y"},
     ) -> List[PeakIonMatch]:
         """
@@ -310,7 +312,8 @@ class KmerDatabase:
                 is <= precursor m/z (i.e., the product ion isn't too big)
         """
         peak_ion_matches = []
-        for charge in range(1, precursor_charge + 1):
+        max_charge = min(precursor_charge, max_allowed_ion_charge)
+        for charge in range(1, max_charge + 1):
             for ion_type in ion_types:
                 charge_ion_matches = self.get_matching_product_ions(
                     query_mz=peak.mz,
@@ -335,11 +338,12 @@ class KmerDatabase:
                 )
         return peak_ion_matches
 
-    @log_time(level=logging.INFO)
+    @log_time(level=logging.DEBUG)
     def get_peak_ion_matches_for_spectrum(
         self,
         spectrum: Spectrum,
         ppm_tolerance: float,
+        max_allowed_ion_charge: int,
         ion_types: Set[Literal["b", "y"]] = {"b", "y"},
     ) -> List[PeakIonMatch]:
         """
@@ -355,6 +359,7 @@ class KmerDatabase:
                     precursor_mz=spectrum.precursor_mz,
                     ppm_tolerance=ppm_tolerance,
                     ion_types=ion_types,
+                    max_allowed_ion_charge=max_allowed_ion_charge,
                 )
             )
         return peak_ion_matches
@@ -379,17 +384,16 @@ def create_kmer_database(
             f"kmer-to-protein map doesn't exist at {kmer_to_proteins_path}. "
             "Creating it now..."
         )
-        kmer_to_protein_map = KmerToProteinMap.create(
+        kmer_to_protein_map = KmerToProteinsMap.create(
             proteins=proteins,
             min_k=min_k,
             max_k=max_k,
             protein_attr="name",
-            protein_names=proteins,
         )
         kmer_to_proteins_path.parent.mkdir(parents=True, exist_ok=True)
         kmer_to_protein_map.save(kmer_to_proteins_path)
     else:
-        kmer_to_protein_map = KmerToProteinMap.load(kmer_to_proteins_path)
+        kmer_to_protein_map = KmerToProteinsMap.load(kmer_to_proteins_path)
         logger.info("kmer-to-protein map already exists... Skipping creation")
     if not db_path.exists():
         logger.info(f"Database does not exist at {db_path}. Creating it now...")
@@ -461,7 +465,7 @@ def create_kmer_database(
     show_default=True,
     help="Maximum kmer length to consider.",
 )
-@log_time(level=logging.INFO)
+@log_time(level=logging.DEBUG)
 def cli_create_db(
     kmer_to_protein: Path,
     protein_names: Path,

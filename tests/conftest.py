@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 repo_dir = Path(__file__).parents[1]
@@ -62,3 +63,20 @@ def comet_txt(test_data_dir):
 @pytest.fixture
 def crux_txt(test_data_dir):
     return test_data_dir / "crux.comet.1-10.txt"
+
+
+def normalize(obj):
+    """
+    Recursively convert numpy types to builtin Python types.
+    For snapshot testing to fix 'TypeError: Object of type <some type, e.g., float32>
+    is not JSON serializable'
+    """
+    if isinstance(obj, np.generic):  # e.g. np.float32, np.int64
+        return obj.item()
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, dict):
+        return {k: normalize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [normalize(v) for v in obj]
+    return obj

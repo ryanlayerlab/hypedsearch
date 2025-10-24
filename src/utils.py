@@ -52,11 +52,11 @@ class Kmer:
     position: Position
 
 
-def prefixes(seq: str) -> List[str]:
+def get_prefixes(seq: str) -> List[str]:
     return [seq[:i] for i in range(1, len(seq) + 1)]
 
 
-def suffixes(seq: str) -> List[str]:
+def get_suffixes(seq: str) -> List[str]:
     return [seq[i:] for i in range(0, len(seq))]
 
 
@@ -218,13 +218,13 @@ def mass_difference_in_ppm(mass1: float, mass2: float) -> float:
     return (abs(mass1 - mass2) / mass1) * (10**6)
 
 
-def pickle_and_compress(obj: Any, file_path: str):
-    with gzip.open(file_path, "wb") as file:
+def pickle_and_compress(obj: Any, path: str):
+    with gzip.open(path, "wb") as file:
         pickle.dump(obj, file, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def decompress_and_depickle(file_path: str):
-    with gzip.open(file_path, "rb") as file:
+def decompress_and_depickle(path: str):
+    with gzip.open(path, "rb") as file:
         return pickle.load(file)
 
 
@@ -343,6 +343,7 @@ def get_percentile(value, values):
 
 
 def get_rank(values, query_val) -> int:
+    # Sort the unique values in descending order and assign ranks
     sorted_unique = sorted(set(values), reverse=True)
     rank_map = {val: rank + 1 for rank, val in enumerate(sorted_unique)}
     return int(rank_map.get(query_val, 0))
@@ -404,8 +405,8 @@ def load_yaml(path: Union[str, Path]):
         return yaml.safe_load(f)
 
 
-def load_json(in_path: Union[str, Path]) -> Dict:
-    with open(in_path, "r") as f:
+def load_json(path: Union[str, Path]) -> Dict:
+    with open(path, "r") as f:
         return json.load(f)
 
 
@@ -438,3 +439,20 @@ def copy_file(src: Union[str, Path], dest: Union[str, Path]) -> None:
 
 def next_multiple_of_10(n: int) -> int:
     return ((n // 10) + 1) * 10
+
+
+def delete_empty_files(directory):
+    """
+    Delete all empty files in the specified directory (non-recursive).
+
+    Parameters:
+        directory (str or Path): Path to the directory.
+    """
+    directory = Path(directory)
+    if not directory.is_dir():
+        raise ValueError(f"{directory} is not a valid directory")
+
+    for file in directory.iterdir():
+        if file.is_file() and file.stat().st_size == 0:
+            file.unlink()  # delete the file
+            print(f"Deleted empty file: {file}")

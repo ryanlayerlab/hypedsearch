@@ -1,10 +1,26 @@
 import logging
+from collections import defaultdict
 from dataclasses import asdict, dataclass, field
+from functools import cached_property
 from itertools import groupby
 from pathlib import Path
-from typing import Callable, Iterable, List, Literal, Optional, Set, Tuple, Union
+from typing import (
+    Callable,
+    Counter,
+    Dict,
+    Iterable,
+    List,
+    Literal,
+    Optional,
+    Self,
+    Set,
+    Tuple,
+    Union,
+)
 
 import pandas as pd
+from pydantic import BaseModel
+from scipy.stats import percentileofscore
 
 from src.constants import (
     COMET,
@@ -22,8 +38,15 @@ from src.constants import (
     SCAN,
     XCORR,
 )
-from src.mass_spectra import Spectrum, get_specific_spectrum_by_sample_and_scan_num
-from src.utils import get_arg_fcn_of_objects, get_fcn_of_objects
+from src.kmer_database import KmerToProteinsMap
+from src.mass_spectra import Mzml, Spectrum
+from src.peptides_and_ions import Peptide
+from src.utils import (
+    flatten_list_of_lists,
+    get_arg_fcn_of_objects,
+    get_fcn_of_objects,
+    load_json,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +90,57 @@ class CometTxt:
     def get_top_psms(self) -> List["CometPSM"]:
         psms = CometPSM.from_txt(txt=self.path)
         return [psm for psm in psms if psm.num == 1]
+
+
+class HybridPeptide(BaseModel):
+    left_seq: str
+    right_seq: str
+    left_proteins: List[str]
+    right_proteins: List[str]
+
+    @property
+    def seq(self) -> str:
+        return self.left_seq + self.right_seq
+
+    def get_left_protein_max_percentile(self, protein_counts: Counter) -> float:
+        return max(
+            [
+                percentileofscore(list(protein_counts.values()), protein_counts[prot])
+                for prot in self.left_proteins
+            ],
+        )
+
+    def get_right_protein_max_percentile(self, protein_counts: Counter) -> float:
+        return max(
+            [
+                percentileofscore(list(protein_counts.values()), protein_counts[prot])
+                for prot in self.right_proteins
+            ],
+        )
+
+    def get_left_seq_kmer_percentile(self, kmer_counts: Dict[int, Counter]) -> float:
+        return percentileofscore(
+            list(kmer_counts[len(self.left_seq)].values()),
+            kmer_counts[len(self.left_seq)][self.left_seq],
+        )
+
+    def get_right_seq_kmer_percentile(self, kmer_counts: Dict[int, Counter]) -> float:
+        return percentileofscore(
+            list(kmer_counts[len(self.right_seq)].values()),
+            kmer_counts[len(self.right_seq)][self.right_seq],
+        )
+
+
+def read_comet_psms_from_dir(
+    dir_path: Union[str, Path], glob_pattern: Optional[str] = None
+):
+    if glob_pattern is None:
+        glob_pattern = "*.txt"
+    all_psms = []
+    for txt_file in Path(dir_path).glob(glob_pattern):
+        psms = CometPSM.from_txt(txt=txt_file)
+        all_psms.extend(psms)
+    return all_psms
 
 
 @dataclass
@@ -156,14 +230,6 @@ class CometPSM:
         else:
             return self.seq
 
-    def get_corresponding_spectrum(self) -> Spectrum:
-        """
-        Gets the spectrum corresponding to the Comet-returned PSM
-        """
-        return get_specific_spectrum_by_sample_and_scan_num(
-            sample=self.sample, scan_num=self.scan
-        )
-
     @staticmethod
     def check_if_hybrid_prot(prot: str):
         if prot.startswith(HS_PREFIX) or prot.startswith("hybrid_"):
@@ -203,41 +269,34 @@ class CometPSM:
     def to_dict(self):
         return asdict(self)
 
-
-@dataclass
-class CometPSMs:
-    psms: List[CometPSM]
-
-    def get_psms_for_sample_and_scan(self, sample: str, scan: int):
-        return list(
-            filter(lambda psm: (psm.sample == sample) and (psm.scan == scan), self.psms)
-        )
-
-    def loop_over_psms_by_sample_and_scan(self):
-        self.psms = sorted(self.psms, key=lambda x: (x.sample, x.scan))
-        for key, group in groupby(self.psms, key=lambda x: (x.sample, x.scan)):
-            yield key[0], key[1], list(group)
-
-    def get_fcn_of_psms(self, attr: str, fcn: Callable):
-        return get_fcn_of_objects(objs=self.psms, attr=attr, fcn=fcn)
-
-    def get_arg_fcn_of_psms(self, attr: str, fcn: Callable):
-        return get_arg_fcn_of_objects(objs=self.psms, attr=attr, fcn=fcn)
-
-    def get_high_confidence_psms(self, q_value_threshold: float) -> "CometPSMs":
-        return CometPSMs(
-            psms=[psm for psm in self.psms if psm.q_value <= q_value_threshold]
+    def get_possible_hybrid_peptides(
+        self, kmer_to_proteins_map: Dict[str, List[str]], min_side_len: int
+    ) -> List[HybridPeptide]:
+        return get_possible_hybrid_peptides_for_seq(
+            seq=self.seq,
+            kmer_to_proteins_map=kmer_to_proteins_map,
+            min_side_len=min_side_len,
         )
 
     @property
-    def scans(self) -> Set[Tuple[str, int]]:
-        return {(psm.sample, psm.scan) for psm in self.psms}
+    def mzml_name(self) -> str:
+        return Mzml.get_mzml_name(mzml=self.sample)
 
-    def get_psms_for_scans(self, scans: Iterable[Tuple[str, int]]) -> "CometPSMs":
-        """
-        Args:
-            scans (Iterable[Tuple[str, int]]): Iterable of (sample, scan) tuples
-        """
-        return CometPSMs(
-            psms=list(filter(lambda psm: (psm.sample, psm.scan) in scans, self.psms))
-        )
+
+def get_possible_hybrid_peptides_for_seq(
+    seq: str, kmer_to_proteins_map: Dict[str, List[str]], min_side_len: int
+) -> List[HybridPeptide]:
+    possible_hybrids = []
+    for breakpoint in range(min_side_len, len(seq) - min_side_len + 1):
+        left = seq[:breakpoint]
+        right = seq[breakpoint:]
+        if (left in kmer_to_proteins_map) and (right in kmer_to_proteins_map):
+            possible_hybrids.append(
+                HybridPeptide(
+                    left_seq=left,
+                    right_seq=right,
+                    left_proteins=kmer_to_proteins_map[left],
+                    right_proteins=kmer_to_proteins_map[right],
+                )
+            )
+    return possible_hybrids

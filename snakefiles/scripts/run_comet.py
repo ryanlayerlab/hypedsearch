@@ -16,12 +16,17 @@ sample = snakemake.wildcards.sample
 out_dir = Path(snakemake.wildcards.out_dir)
 
 # Setup logger
-log_file = Path(
-    f"logs/{Mzml.get_mzml_name(snakemake.input.mzml)}_{snakemake.wildcards.scan}.log"
+# log_file = Path(
+#     f"logs/{Mzml.get_mzml_name(snakemake.input.mzml)}_{snakemake.wildcards.scan}.log"
+# )
+logger = setup_logger()
+logger.debug("Starting Comet search via run_comet.py script")
+logger.debug(
+    f"Running with params:\n\tmzml={mzml},\n\tscan={scan},\n\tsample={sample},\n\t"
+    f"out_dir={out_dir},\n\t Snakemake config: {snakemake.config}"
 )
-logger = setup_logger(str(log_file))
-logger.info(f"Logging to {log_file}")
-Crux(path=snakemake.config.crux_path).run_comet(
+crux = Crux(path=snakemake.config.crux_path)
+crux.run_comet(
     mzml=snakemake.input.mzml,
     fasta=snakemake.config.fasta,
     crux_comet_params=snakemake.config.crux_comet_params,
@@ -30,5 +35,5 @@ Crux(path=snakemake.config.crux_path).run_comet(
     file_root=snakemake.wildcards.sample,
     scan_min=int(snakemake.wildcards.scan),
     scan_max=int(snakemake.wildcards.scan),
+    num_threads=int(snakemake.config.num_threads),
 )
-log_file.unlink()

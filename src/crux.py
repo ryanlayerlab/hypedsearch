@@ -1,3 +1,4 @@
+import logging
 import os
 import platform
 import shutil
@@ -14,12 +15,12 @@ import yaml
 from pydantic import BaseModel
 
 from src.comet_utils import CometPSM
-from src.constants import COMET_DIR, DECOY, RUN_COMET_SMK, TARGET
+from src.constants import COMET_DIR, DECOY, GIT_REPO_DIR, RUN_COMET_SMK, TARGET
 from src.kmer_database import create_kmer_database
 from src.mass_spectra import Mzml
 from src.protein_abundance import (
     get_most_common_proteins,
-    get_protein_counts_from_comet_results,
+    get_protein_counts_from_comet_psms,
 )
 from src.utils import (
     PathType,
@@ -32,6 +33,7 @@ from src.utils import (
 )
 
 COMET_SMK = Path("snakefiles/run_comet.smk")
+logger = logging.getLogger(__name__)
 
 
 class CometConfig(BaseModel):
@@ -41,6 +43,7 @@ class CometConfig(BaseModel):
     fasta: Path
     out_dir: Path
     crux_path: Path
+    num_threads: int = 0
 
     @classmethod
     def from_yaml(cls, path: Union[str, Path]) -> "CometConfig":
@@ -69,8 +72,8 @@ class CometConfig(BaseModel):
             psm_type=psm_type,
         )
 
-    def run_comet_snakemake_command(self, config_path: Union[str, Path]) -> str:
-        return f"snakemake -s {RUN_COMET_SMK} --configfile {config_path} ..."
+    def get_cmd_2_run_comet_via_snakemake(self, config_path: Union[str, Path]) -> str:
+        return f"snakemake -s {RUN_COMET_SMK.relative_to(GIT_REPO_DIR)} --configfile {config_path} [...]"
 
 
 def get_expected_comet_outputs(
@@ -192,7 +195,7 @@ class Crux:
     def validate_comet_output(result: subprocess.CompletedProcess):
         if result.returncode != 0:
             if (result.returncode == 1) and "no spectra searched" in result.stderr:
-                logger.info(
+                logger.debug(
                     f"Warning: `crux comet` finished with return code 1 and 'no spectra searched' in stderr. "
                     "This can happen and generally is not an error even though the return code is 1"
                 )
@@ -216,6 +219,7 @@ class Crux:
         num_threads: Optional[int] = None,
         # run_method: Literal["background", "foreground"],
     ) -> CometOutputs:
+        logger.info("Running `crux comet`...")
         # Check if expected outputs already exist and skip Comet run if they do
         expected_outputs = CometOutputs.standardized_comet_outputs(
             out_dir=Path(out_dir),
@@ -250,11 +254,10 @@ class Crux:
             logger.info(f"Running Comet with command:\n{cmd}")
             result = subprocess.run(
                 cmd,
-                capture_output=True,
-                text=True,
                 shell=True,
             )
-            self.validate_comet_output(result=result)
+            print(result)
+            # self.validate_comet_output(result=result)
             # Move the Comet outputs to out_dir
             tmp_outputs = CometOutputs.crux_comet_outputs(
                 out_dir=tmp_path,
@@ -264,7 +267,9 @@ class Crux:
                 decoy_search=decoy_search,
             )
             try:
-                logger.info(f"Moving {tmp_outputs.target} to {expected_outputs.target}")
+                logger.debug(
+                    f"Moving {tmp_outputs.target} to {expected_outputs.target}"
+                )
                 shutil.move(tmp_outputs.target, expected_outputs.target)
                 if tmp_outputs.decoy is not None:
                     shutil.move(tmp_outputs.decoy, expected_outputs.decoy)
@@ -295,7 +300,7 @@ class Crux:
         out_path.write_text("\n".join(file_lines))
         return file_lines
 
-    def run_assign_confidence(self, target_txts: List[Path], out_path: Path) -> Path:
+    def run_assign_confidence(self, target_txts: List[Path], out_path: Path):
         logger.info("Running 'crux assign-confidence'...")
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
@@ -324,34 +329,6 @@ class Crux:
             tmp_file = tmp_path / "assign-confidence.target.txt"
             shutil.copy(tmp_file, out_path)
         logger.info("Finished running 'crux assign-confidence'")
-
-    @staticmethod
-    def native_comet_snakemake_config_and_cmd(
-        mzml_to_scans: Dict[Path, List[int]],
-        crux_comet_params: Path,
-        decoy_search: int,
-        fasta: Path,
-        native_run_dir: Path,
-        native_run_smk_config: Path,
-        crux_path: Path,
-    ) -> Tuple[str, CometConfig]:
-        # Create config for snakemake
-        config = CometConfig(
-            mzml_to_scans=self.mzml_to_scans,
-            crux_comet_params=self.crux_comet_params,
-            decoy_search=2,
-            fasta=self.fasta,
-            out_dir=self.native_run_dir,
-            crux_path=self.crux_path,
-        )
-        config.save(path=self.native_run_smk_config)
-
-        # Print command to run snakemake
-        cmd = f"snakemake -s {RUN_COMET_SMK} --configfile {self.native_run_smk_config} ..."
-        logger.info(
-            f"Saved native Comet run snakemake config to {self.native_run_smk_config}. To run snakemake, use this command:\n{cmd}"
-        )
-        return (cmd, config)
 
 
 @dataclass
@@ -413,7 +390,7 @@ class HSConfig:
             logger.info(f"Database {self.db_path} already exists. Skipping creation.")
         else:
             psms = CometPSM.from_txt(txt=self.native_assign_confidence_txt)
-            prot_counts = get_protein_counts_from_comet_results(psms=psms)
+            prot_counts = get_protein_counts_from_comet_psms(psms=psms)
             most_common_proteins = get_most_common_proteins(
                 protein_counts=prot_counts, top_n=self.top_n_proteins
             )

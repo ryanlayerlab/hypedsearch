@@ -1,7 +1,7 @@
 import json
 from dataclasses import asdict
 
-from src.kmer_database import KmerDatabase, KmerToProteinMap, create_kmer_database
+from src.kmer_database import KmerDatabase, KmerToProteinsMap, create_kmer_database
 from src.mass_spectra import Spectrum
 from src.peptides_and_ions import Peptide, UnpositionedProductIon
 from src.utils import flatten_list_of_lists, read_new_line_separated_file
@@ -24,7 +24,7 @@ class Test_KmerToProteinMap:
                 "DE": [1],
                 "E": [1],
             }
-            actual = KmerToProteinMap.get_uniq_kmer_to_protein_map(
+            actual = KmerToProteinsMap.get_uniq_kmer_to_protein_map(
                 min_k=min_k, max_k=max_k, proteins=proteins
             )
 
@@ -48,7 +48,7 @@ class Test_KmerToProteinMap:
                 "DE": ["prot 2"],
                 "E": ["prot 2"],
             }
-            actual = KmerToProteinMap.get_uniq_kmer_to_protein_map(
+            actual = KmerToProteinsMap.get_uniq_kmer_to_protein_map(
                 min_k=min_k, max_k=max_k, proteins=proteins, protein_attr="name"
             )
 
@@ -61,7 +61,7 @@ class Test_KmerToProteinMap:
             ]
             min_k, max_k = 1, 1
             expected = {"A": ["prot 1"]}
-            actual = KmerToProteinMap.get_uniq_kmer_to_protein_map(
+            actual = KmerToProteinsMap.get_uniq_kmer_to_protein_map(
                 min_k=min_k, max_k=max_k, proteins=proteins, protein_attr="name"
             )
             assert actual == expected
@@ -70,7 +70,7 @@ class Test_KmerToProteinMap:
         @staticmethod
         def test_from_fasta(test_data_dir):
             fasta_path = test_data_dir / "three_proteins.fasta"
-            kmer_to_prot_map = KmerToProteinMap.create(
+            kmer_to_prot_map = KmerToProteinsMap.create(
                 fasta=fasta_path, min_k=1, max_k=3
             )
             assert len(kmer_to_prot_map.kmer_to_protein_map) > 0
@@ -80,7 +80,7 @@ class Test_KmerToProteinMap:
             peptides = Peptide.from_fasta(
                 fasta_path=test_data_dir / "three_proteins.fasta"
             )
-            kmer_to_prot_map = KmerToProteinMap.create(
+            kmer_to_prot_map = KmerToProteinsMap.create(
                 proteins=peptides, min_k=1, max_k=3
             )
             assert len(kmer_to_prot_map.kmer_to_protein_map) > 0
@@ -91,7 +91,7 @@ class Test_KmerToProteinMap:
                 test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
             )
             protein_names = test_data_dir / "mouse_data_top_10_proteins.txt"
-            kmer_to_prot_map = KmerToProteinMap.create(
+            kmer_to_prot_map = KmerToProteinsMap.create(
                 fasta=fasta,
                 min_k=1,
                 max_k=3,
@@ -111,24 +111,24 @@ class Test_KmerToProteinMap:
         @staticmethod
         def test_pklz(tmp_path, test_data_dir):
             fasta_path = test_data_dir / "three_proteins.fasta"
-            kmer_to_prot_map = KmerToProteinMap.create(
+            kmer_to_prot_map = KmerToProteinsMap.create(
                 fasta=fasta_path, min_k=1, max_k=3
             )
             out_path = tmp_path / "out.pklz"
             kmer_to_prot_map.save(out_path=out_path)
             assert out_path.exists()
-            assert len(KmerToProteinMap.load(out_path).kmer_to_protein_map) > 0
+            assert len(KmerToProteinsMap.load(out_path).kmer_to_protein_map) > 0
 
         @staticmethod
         def test_json(tmp_path, test_data_dir):
             fasta_path = test_data_dir / "three_proteins.fasta"
-            kmer_to_prot_map = KmerToProteinMap.create(
+            kmer_to_prot_map = KmerToProteinsMap.create(
                 fasta=fasta_path, min_k=1, max_k=3
             )
             out_path = tmp_path / "out.json"
             kmer_to_prot_map.save(out_path=out_path)
             assert out_path.exists()
-            assert len(KmerToProteinMap.load(out_path).kmer_to_protein_map) > 0
+            assert len(KmerToProteinsMap.load(out_path).kmer_to_protein_map) > 0
 
 
 class Test_KmerDatabase:
@@ -137,7 +137,7 @@ class Test_KmerDatabase:
         def test_smoke(test_data_dir, tmp_path, snapshot, snapshot_dir):
             # Arrange
             fasta_path = test_data_dir / "three_proteins.fasta"
-            kmer_to_prot_map = KmerToProteinMap.create(
+            kmer_to_prot_map = KmerToProteinsMap.create(
                 fasta=fasta_path, min_k=1, max_k=25, protein_attr="name"
             )
 
@@ -167,7 +167,7 @@ class Test_KmerDatabase:
             peak_mz = 720.3775024414062
             # Create DB
             fasta = test_data_dir / "three_proteins.fasta"
-            kmer_to_prot_map = KmerToProteinMap.create(
+            kmer_to_prot_map = KmerToProteinsMap.create(
                 fasta=fasta, min_k=1, max_k=25, protein_attr="name"
             )
             kmer_db = KmerDatabase.create_db(
@@ -202,7 +202,7 @@ class Test_KmerDatabase:
             fasta = (
                 test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
             )
-            kmer_to_prot_map = KmerToProteinMap.create(
+            kmer_to_prot_map = KmerToProteinsMap.create(
                 fasta=fasta,
                 min_k=1,
                 max_k=25,
