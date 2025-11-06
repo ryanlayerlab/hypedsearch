@@ -1,0 +1,202 @@
+[
+  {
+    "ion_charge": 1,
+    "ion_mz": 746.40429476688,
+    "ion_seq": "AAAEEKK",
+    "ion_type": "y",
+    "peak_intensity": 74.69898223876953,
+    "peak_mz": 746.399658203125,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 1,
+    "ion_mz": 675.36718096688,
+    "ion_seq": "AAEEKK",
+    "ion_type": "y",
+    "peak_intensity": 96.96154022216797,
+    "peak_mz": 675.375,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 2,
+    "ion_mz": 600.81458431688,
+    "ion_seq": "AAGSAPAAAEEKK",
+    "ion_type": "y",
+    "peak_intensity": 380.23309326171875,
+    "peak_mz": 600.8113403320312,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 2,
+    "ion_mz": 720.37808006688,
+    "ion_seq": "AAPAAGSAPAAAEEKK",
+    "ion_type": "y",
+    "peak_intensity": 135.22500610351562,
+    "peak_mz": 720.3775024414062,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 1,
+    "ion_mz": 604.33006716688,
+    "ion_seq": "AEEKK",
+    "ion_type": "y",
+    "peak_intensity": 103.81095123291016,
+    "peak_mz": 604.3353881835938,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 2,
+    "ion_mz": 565.29602741688,
+    "ion_seq": "AGSAPAAAEEKK",
+    "ion_type": "y",
+    "peak_intensity": 149.23880004882812,
+    "peak_mz": 565.2989501953125,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 2,
+    "ion_mz": 457.75072446688,
+    "ion_seq": "APAAAEEKK",
+    "ion_type": "y",
+    "peak_intensity": 138.29090881347656,
+    "peak_mz": 457.7501525878906,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 2,
+    "ion_mz": 684.85952316688,
+    "ion_seq": "APAAGSAPAAAEEKK",
+    "ion_type": "y",
+    "peak_intensity": 108.5999984741211,
+    "peak_mz": 684.8599243164062,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 3,
+    "ion_mz": 456.90877426688,
+    "ion_seq": "APAAGSAPAAAEEKK",
+    "ion_type": "y",
+    "peak_intensity": 462.0856018066406,
+    "peak_mz": 456.91278076171875,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 1,
+    "ion_mz": 1058.54766456688,
+    "ion_seq": "GSAPAAAEEKK",
+    "ion_type": "y",
+    "peak_intensity": 31.28928565979004,
+    "peak_mz": 1058.54833984375,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 2,
+    "ion_mz": 529.7774705168799,
+    "ion_seq": "GSAPAAAEEKK",
+    "ion_type": "y",
+    "peak_intensity": 55.14814758300781,
+    "peak_mz": 529.7861328125,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 1,
+    "ion_mz": 843.4570586668799,
+    "ion_seq": "PAAAEEKK",
+    "ion_type": "y",
+    "peak_intensity": 221.5,
+    "peak_mz": 843.4566650390625,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 2,
+    "ion_mz": 649.34096626688,
+    "ion_seq": "PAAGSAPAAAEEKK",
+    "ion_type": "y",
+    "peak_intensity": 1762.2049560546875,
+    "peak_mz": 649.3405151367188,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 3,
+    "ion_mz": 433.22973633354667,
+    "ion_seq": "PAAGSAPAAAEEKK",
+    "ion_type": "y",
+    "peak_intensity": 1294.5008544921875,
+    "peak_mz": 433.229736328125,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 1,
+    "ion_mz": 159.07641866688,
+    "ion_seq": "SA",
+    "ion_type": "b",
+    "peak_intensity": 1764.8875732421875,
+    "peak_mz": 159.07606506347656,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 1,
+    "ion_mz": 230.11353246687997,
+    "ion_seq": "SAA",
+    "ion_type": "b",
+    "peak_intensity": 909.2021484375,
+    "peak_mz": 230.1143035888672,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 1,
+    "ion_mz": 327.16629636688,
+    "ion_seq": "SAAP",
+    "ion_type": "b",
+    "peak_intensity": 36.96052551269531,
+    "peak_mz": 327.16046142578125,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 1,
+    "ion_mz": 398.20341016687996,
+    "ion_seq": "SAAPA",
+    "ion_type": "b",
+    "peak_intensity": 39.25961685180664,
+    "peak_mz": 398.20166015625,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 1,
+    "ion_mz": 469.24052396687995,
+    "ion_seq": "SAAPAA",
+    "ion_type": "b",
+    "peak_intensity": 45.61249923706055,
+    "peak_mz": 469.23992919921875,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  },
+  {
+    "ion_charge": 3,
+    "ion_mz": 509.59848833354664,
+    "ion_seq": "SAAPAAGSAPAAAEEKK",
+    "ion_type": "y",
+    "peak_intensity": 252.41346740722656,
+    "peak_mz": 509.59942626953125,
+    "sample": "BMEM_AspN_Fxn4_scans1-20",
+    "scan": 7
+  }
+]

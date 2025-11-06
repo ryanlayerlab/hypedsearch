@@ -29,7 +29,7 @@ from src.crux import get_expected_comet_outputs
 
 hs_config = HybridRunConfig(**config)
 config = SimpleNamespace(**config)
-expected_outputs = hs_config.expected_outputs
+expected_outputs = hs_config.expected_target_outputs
 print(f"There are {len(expected_outputs)} expected output files")
 
 rule all:
@@ -45,8 +45,8 @@ rule run_hypedsearch:
         target = f"{config.out_dir}/{{sample}}.comet.{{scan}}-{{scan}}.target.txt"
     resources: 
         runtime = "10m"
-    benchmark:
-        "logs/hypedsearch/{sample}.{scan}.log"
+    # benchmark:
+    #     "logs/hypedsearch/{sample}.{scan}.log"
     singularity: 
         "docker://airikjohnson/hypedsearch:latest"
     script:

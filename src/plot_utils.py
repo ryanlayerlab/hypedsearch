@@ -362,3 +362,19 @@ def interactive_scatter_plot(
     )
     fig.show()
     return fig
+
+
+def add_counts_to_histogram_boxes(
+    ax: plt.Axes,
+):
+    for p in ax.patches:
+        height = p.get_height()
+        if height > 0:  # Only label non-empty bars
+            _ = ax.text(
+                p.get_x() + p.get_width() / 2,  # x position (center of bar)
+                height,  # y position (top of bar)
+                f"{int(height)}",  # text (integer count)
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )

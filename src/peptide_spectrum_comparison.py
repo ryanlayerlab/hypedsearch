@@ -71,23 +71,87 @@ class PeakIonMatch:
         elif type == "rel_ppm":
             return ((self.ion_mz - self.peak_mz) / self.ion_mz) * (10**6)
 
+    @property
+    def ion_id(self):
+        return f"{self.ion_type}-{self.ion_seq}-z{self.ion_charge}"
+
 
 @dataclass
 class PSM:
-    spectrum: Spectrum
     peptide: Union[str, Peptide]
-    peak_ion_matches: List[PeakIonMatch] = field(init=False)
-    peak_to_ion_ppm_tolerance: float = DEFAULT_PEAK_TO_ION_PPM_TOL
-    comet_psm: Optional[CometPSM] = None
+    peak_ion_matches: List[PeakIonMatch]
+    peak_to_ion_ppm_tolerance: float
+    prop_intensity_supported: float
+    prop_ions_matched: float
+    spectrum: Optional[Spectrum] = None
+    spectrum_id: Optional[str] = None
+    xcorr: Optional[float] = None
+    q_value: Optional[float] = None
 
     def __post_init__(self):
         if isinstance(self.peptide, str):
             self.peptide = Peptide(seq=self.peptide)
 
-        self.peak_ion_matches = get_peak_product_ion_matches(
-            spectrum=self.spectrum,
-            peptide=self.peptide,
-            peak_to_ion_ppm_tolerance=self.peak_to_ion_ppm_tolerance,
+        assert (
+            self.spectrum is not None or self.spectrum_id is not None
+        ), "Both spectrum and spectrum_id cannot be None."
+
+    @classmethod
+    def from_spectrum_and_seq(
+        cls,
+        spectrum: Spectrum,
+        seq: str,
+        peak_to_ion_ppm_tolerance: float,
+    ):
+        peak_to_ion_matches = get_peak_product_ion_matches(
+            spectrum=spectrum,
+            peptide=seq,
+            peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
+        )
+        intensity_supported = sum(
+            [peak_ion_match.peak_intensity for peak_ion_match in peak_to_ion_matches]
+        )
+        # Compute the proportion of ions matched
+        num_product_ions = len(
+            Peptide(seq=seq).product_ions(
+                charges=list(range(1, spectrum.precursor_charge + 1))
+            )
+        )
+        num_found_ions = len(set(x.ion_id for x in peak_to_ion_matches))
+        return cls(
+            peptide=seq,
+            peak_ion_matches=peak_to_ion_matches,
+            peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
+            spectrum_id=spectrum.uid,
+            prop_intensity_supported=intensity_supported / spectrum.total_intensity,
+            prop_ions_matched=num_found_ions / num_product_ions,
+        )
+
+    @classmethod
+    def from_spectrum_and_comet_psm(
+        cls,
+        comet_psm: CometPSM,
+        spectrum: Spectrum,
+        peak_to_ion_ppm_tolerance: float,
+    ):
+        peptide = comet_psm.seq
+        peak_to_ion_matches = get_peak_product_ion_matches(
+            spectrum=spectrum,
+            peptide=peptide,
+            peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
+        )
+        intensity_supported = sum(
+            [peak_ion_match.peak_intensity for peak_ion_match in peak_to_ion_matches]
+        )
+        return cls(
+            peptide=peptide,
+            peak_ion_matches=peak_to_ion_matches,
+            peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
+            spectrum_id=spectrum.uid,
+            xcorr=comet_psm.xcorr,
+            q_value=comet_psm.q_value,
+            prop_intensity_supported=intensity_supported / spectrum.total_intensity,
+            prop_ions_matched=comet_psm.prop_ions_matched,
         )
 
     @classmethod
@@ -113,6 +177,10 @@ class PSM:
                 )
             )
         return psms
+
+    @property
+    def seq(self):
+        return self.peptide.seq
 
     @property
     def df(self):
@@ -183,20 +251,12 @@ class PSM:
         )
 
     @property
-    def prop_intensity_supported(self):
-        return self.intensity_supported / self.spectrum.total_intensity
-
-    @property
     def prop_prefixes_supported(self):
         return len(self.prefixes_supported) / len(self.peptide.seq)
 
     @property
     def prop_suffixes_supported(self):
         return len(self.suffixes_supported) / len(self.peptide.seq)
-
-    @property
-    def prop_ions_matched(self):
-        return self.comet_psm.ions_matched / self.comet_psm.ions_total
 
 
 @dataclass

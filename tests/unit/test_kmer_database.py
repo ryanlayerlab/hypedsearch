@@ -3,7 +3,7 @@ from dataclasses import asdict
 
 from src.kmer_database import KmerDatabase, KmerToProteinsMap, create_kmer_database
 from src.mass_spectra import Spectrum
-from src.peptides_and_ions import Peptide, UnpositionedProductIon
+from src.peptides_and_ions import Fasta, Peptide, UnpositionedProductIon
 from src.utils import flatten_list_of_lists, read_new_line_separated_file
 
 
@@ -218,10 +218,12 @@ class Test_KmerDatabase:
 
             # Act
             peak_ion_matches = kmer_db.get_peak_ion_matches_for_spectrum(
-                spectrum=spectrum, ppm_tolerance=20
+                spectrum=spectrum, ppm_tolerance=20, max_allowed_ion_charge=4
             )
 
             # Assert
+            # Doing a snapshot test because there are 142 peak-ion matches which is too
+            # many to individually test
             peak_ion_matches = [asdict(p) for p in peak_ion_matches]
             peak_ion_matches_sorted = sorted(
                 peak_ion_matches,
@@ -242,22 +244,34 @@ class Test_KmerDatabase:
 
 class Test_create_db:
     @staticmethod
-    def test_fasta_restricted_proteins(test_data_dir, tmp_path, snapshot, snapshot_dir):
+    def test_smoke(test_data_dir, tmp_path, snapshot, snapshot_dir):
         # Arrange
-        fasta = test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
-        proteins = test_data_dir / "mouse_data_top_10_proteins.txt"
+        fasta = Fasta(
+            path=test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
+        )
+        protein_names = [
+            "sp|P01326|INS2_MOUSE",
+            "sp|P01325|INS1_MOUSE",
+            "sp|P12968B|IAPP_MOUSE",
+            "sp|P12968|IAPP_MOUSE",
+            "sp|P26339|CMGA_MOUSE",
+            "sp|Q03517|SCG2_MOUSE",
+            "sp|P16014|SCG1_MOUSE",
+            "sp|P99027|RLA2_MOUSE",
+            "sp|P01942|HBA_MOUSE",
+            "sp|Q9QXV0|PCSK1_MOUSE",
+        ]
         # Act
         kmer_db = create_kmer_database(
-            fasta=fasta,
             kmer_to_proteins_path=tmp_path / "test.pklz",
             db_path=tmp_path / "test.db",
-            proteins=proteins,
+            proteins=fasta.get_proteins_by_name(protein_names=protein_names),
         )
 
         # Arrange
         assert kmer_db.db.indices() == [kmer_db.index_name]
         snapshot.snapshot_dir = snapshot_dir
-        snapshot_file = f"{fasta.stem}_{proteins.stem}.json"
+        snapshot_file = "create_db_smoke_test.json"
         # Since we grab the unique kmers in the FASTA, sorting by sequence should
         # produce a unique, reproducible order
         db_rows = kmer_db.db.all_table_rows(kmer_db.table_name)

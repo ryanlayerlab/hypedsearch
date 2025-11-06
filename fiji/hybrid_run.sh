@@ -3,7 +3,7 @@
 # Default values
 MEM="500GB"
 CORES=192
-PARTITION="sandbox"
+PARTITION="sandbox" 
 FIJI_NODE="fijinode-62"
 DATA_DIR="/localscratch"
 
@@ -15,6 +15,7 @@ while [[ "$#" -gt 0 ]]; do
         --mem) MEM="$2"; shift ;;
         --partition) PARTITION="$2"; shift ;;
         --cores) CORES="$2"; shift ;;
+        --node) FIJI_NODE="$2"; shift ;;
         *) echo "Unknown parameter: $1"; exit 1 ;;
     esac
     shift
@@ -36,7 +37,7 @@ sbatch <<EOT
 #SBATCH --partition=$PARTITION
 #SBATCH --nodes=1
 #SBATCH --time=24:00:00
-#SBATCH --nodelist=$FIJI_NODE
+# #SBATCH --nodelist=$FIJI_NODE
 #SBATCH --output=logs/hybrid_run/$NAME.out
 #SBATCH --error=logs/hybrid_run/$NAME.err           
 

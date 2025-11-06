@@ -52,6 +52,10 @@ class UnpositionedProductIon:
             ion_type=self.ion_type,
         )
 
+    @property
+    def uid(self):
+        return f"{self.ion_type}-{self.seq}-z{self.charge}"
+
     @staticmethod
     def compute_b_ion_mz(
         seq: str,
@@ -147,6 +151,9 @@ class Peptide:
         return UnpositionedProductIon.generate_product_ions(
             seq=self.seq, charges=charges, ion_types=ion_types
         )
+
+    def mz(self, charge: int) -> float:
+        return compute_peptide_precursor_mz(seq=self.seq, charge=charge)
 
 
 class Fasta(BaseModel):

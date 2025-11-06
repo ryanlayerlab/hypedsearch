@@ -1,11 +1,24 @@
+import logging
 import os
 import re
 import time
+from abc import ABC, abstractmethod
 from collections import defaultdict
-from dataclasses import Field, dataclass
+from dataclasses import Field, dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Counter, Dict, List, Literal, Optional, Set, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Counter,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 from venv import logger
 
 import click
@@ -14,6 +27,7 @@ import seaborn as sns
 import yaml
 from matplotlib import pyplot as plt
 from pydantic import BaseModel, model_validator
+from scipy.stats import ecdf
 from typing_extensions import Self
 
 from src.blastp import run_blastp
@@ -43,10 +57,10 @@ from src.crux import CometConfig, CometOutputs, Crux, get_expected_comet_outputs
 from src.dataclasses import CometPSMs, PSMScoring
 from src.hybrids_via_clusters import form_spectrum_hybrids_via_clustering
 from src.kmer_database import KmerDatabase, create_kmer_database
-from src.mass_spectra import Mzml, Spectrum
+from src.mass_spectra import Mzml, Spectrum, create_sample_scan_to_spectrum_map
 from src.peptide_spectrum_comparison import PSM
 from src.peptides_and_ions import Fasta, Peptide, get_proteins_by_name
-from src.plot_utils import fig_setup, finalize, set_title_axes_labels
+from src.plot_utils import fig_setup, finalize, save_fig, set_title_axes_labels
 from src.protein_abundance import (
     get_most_common_proteins,
     get_protein_counts_from_comet_psms,
@@ -58,21 +72,125 @@ from src.utils import (
     get_time_in_diff_units,
     load_json,
     load_yaml,
+    log_time,
+    mass_difference_in_ppm,
     save_dict,
+    setup_logger,
     to_json,
     write_new_line_separated_file,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class HybridPeptide(BaseModel):
     left_seq: str
     right_seq: str
-    left_proteins: List[str]
-    right_proteins: List[str]
+    left_proteins: List[str] = []
+    right_proteins: List[str] = []
 
     @property
     def seq(self) -> str:
         return self.left_seq + self.right_seq
+
+    def mz(self, charge: int) -> float:
+        return Peptide(seq=self.seq).mz(charge=charge)
+
+    @property
+    def hyphen_seq(self) -> str:
+        return f"{self.left_seq}-{self.right_seq}"
+
+    @classmethod
+    def from_hyphen_str(cls, hybrid_str: str) -> "HybridPeptide":
+        left_seq, right_seq = hybrid_str.split("-")
+        return cls(left_seq=left_seq, right_seq=right_seq)
+
+    @staticmethod
+    def hybrid_str_to_seq(hybrid_str: str) -> str:
+        left_seq, right_seq = hybrid_str.split("-")
+        return left_seq + right_seq
+
+
+class TrueHybrid(HybridPeptide):
+    spectra: List[Spectrum] = []
+    rt: Optional[float] = None  # retention time
+    id: Optional[Union[str, int]] = None
+    precursor_mz: Optional[float] = None
+
+    @classmethod
+    def from_excel(
+        cls, path: Union[str, Path], hyphen_seq_colm: str = "hyphen_seq"
+    ) -> List["TrueHybrid"]:
+        df = pd.read_excel(path)
+
+        hybrids = []
+        for row_idx, row in df.iterrows():
+            try:
+                left_seq, right_seq = row[hyphen_seq_colm].split("-")
+            except:
+                logger.info(
+                    f"Skipping row (0-based) {row_idx} because the sequence {row[hyphen_seq_colm]} couldn't be split by `-`"
+                )
+                continue
+            hybrids.append(
+                cls(
+                    id=row.id,
+                    left_seq=left_seq,
+                    right_seq=right_seq,
+                    rt=row.rt if isinstance(row.rt, (int, float)) else None,
+                    precursor_mz=row.mz if isinstance(row.mz, (int, float)) else None,
+                )
+            )
+        return hybrids
+
+    @staticmethod
+    def get_proteins_for_true_hybrids(
+        true_hybrids: List["TrueHybrid"],
+        fasta: Union[Path, str],
+    ):
+
+        fasta_obj = Fasta(path=fasta)
+        seqs = flatten_list_of_lists(
+            [hybrid.left_seq, hybrid.right_seq] for hybrid in true_hybrids
+        )
+        seq_to_protein = fasta_obj.proteins_that_contain_seqs(seqs=seqs)
+        for hybrid in true_hybrids:
+            hybrid.left_proteins = list(seq_to_protein[hybrid.left_seq])
+            hybrid.right_proteins = list(seq_to_protein[hybrid.right_seq])
+
+    @staticmethod
+    def get_spectra_for_true_hybrids(
+        true_hybrids: List["TrueHybrid"],
+        mzmls: List[Path],
+        precursor_mz_ppm_tol: float,
+        retention_time_tol: float,
+    ) -> None:
+        sample_scan_to_spectrum_map = create_sample_scan_to_spectrum_map(mzmls=mzmls)
+        for sample_scan, spectrum in sample_scan_to_spectrum_map.items():
+            for hybrid in true_hybrids:
+                try:
+                    ppm_diff = mass_difference_in_ppm(
+                        mass1=spectrum.precursor_mz, mass2=hybrid.precursor_mz
+                    )
+                    rt_diff = abs(spectrum.retention_time - hybrid.rt)
+                except:
+                    continue
+                if ppm_diff <= precursor_mz_ppm_tol and rt_diff <= retention_time_tol:
+                    hybrid.spectra.append(spectrum)
+        # return true_hybrids
+
+
+@dataclass
+class TrueHybrids:
+    hybrids: List[TrueHybrid]
+
+    @property
+    def seqs(self) -> Set[str]:
+        return set(hy.seq for hy in self.hybrids)
+
+    @property
+    def hyphen_seqs(self) -> Set[str]:
+        return set(hy.hyphen_seq for hy in self.hybrids)
 
 
 @dataclass
@@ -139,13 +257,15 @@ class HybridRunConfig(BaseModel):
         return cls(**load_json(path=path))
 
     @property
-    def expected_outputs(self):
-        return get_expected_comet_outputs(
+    def expected_target_outputs(self):
+        expected_outputs = get_expected_comet_outputs(
             mzml_to_scans=self.mzml_to_scans,
             out_dir=Path(self.out_dir),
             decoy_search=2,
             psm_type=TARGET,
+            remove_existing_files=False,
         )
+        return expected_outputs
 
 
 def combine_comet_scan_results(scan_results_dir: Path, out_dir: Path):
@@ -364,7 +484,9 @@ class HypedsearchConfig(BaseModel):
             out_path=self.native_assign_confidence_txt,
         )
 
-    def create_hybrid_run_snakemake_config_and_cmd(self) -> HybridRunConfig:
+    def create_hybrid_run_snakemake_config_and_cmd(
+        self, out_path: Optional[Union[str, Path]] = None
+    ) -> HybridRunConfig:
         hybrid_run_config = HybridRunConfig(
             mzml_to_scans=self.mzml_to_scans,
             out_dir=self.hybrid_scan_results_dir,
@@ -381,10 +503,12 @@ class HypedsearchConfig(BaseModel):
             num_peaks=self.num_peaks,
             max_allowed_ion_charge=self.max_allowed_ion_charge,
         )
-        hybrid_run_config.save(path=self.hybrid_run_smk_config)
+        if out_path is None:
+            out_path = self.hybrid_run_smk_config
+        hybrid_run_config.save(path=out_path)
         logger.info(
             f"Saved hybrid Comet run snakemake config to {self.hybrid_run_smk_config}. To run snakemake, use this command:\n"
-            f"snakemake -s {RUN_HYPEDSEARCH_SMK.relative_to(GIT_REPO_DIR)} --configfile {self.hybrid_run_smk_config} ..."
+            f"snakemake -s {RUN_HYPEDSEARCH_SMK.relative_to(GIT_REPO_DIR)} --configfile {out_path} ..."
         )
         return hybrid_run_config
 
@@ -772,24 +896,76 @@ class HSRunAnalysis:
     native_assign_confidence: List[CometPSM]
     native_decoys: List[CometPSM]
     hybrid_targets: List[CometPSM]
-    hybrid_assign_confidence: List[CometPSM]
+    # hybrid_assign_confidence: List[CometPSM]
     hybrid_decoys: List[CometPSM]
     kmer_to_proteins_map: Dict[str, List[str]]
     sample_scan_to_spectrum_map: Dict[Tuple[str, int], Spectrum]
 
     def __post_init__(self):
         self.hybrid_targets = remove_non_hybrid_psms(psms=self.hybrid_targets)
-        self.hybrid_assign_confidence = remove_non_hybrid_psms(
-            psms=self.hybrid_assign_confidence
-        )
+        # self.hybrid_assign_confidence = remove_non_hybrid_psms(
+        #     psms=self.hybrid_assign_confidence
+        # )
         assert all([psm.is_hybrid for psm in self.hybrid_targets])
-        assert all([psm.is_hybrid for psm in self.hybrid_assign_confidence])
+        # assert all([psm.is_hybrid for psm in self.hybrid_assign_confidence])
         assert all([psm.num == 1 for psm in self.native_targets])
         assert all([psm.num == 1 for psm in self.native_decoys])
         assert all([psm.num == 1 for psm in self.hybrid_targets])
         assert all([psm.num == 1 for psm in self.hybrid_decoys])
         assert all([psm.num == 1 for psm in self.native_assign_confidence])
-        assert all([psm.num == 1 for psm in self.hybrid_assign_confidence])
+        # assert all([psm.num == 1 for psm in self.hybrid_assign_confidence])
+
+    @classmethod
+    def from_hypedsearch_config(
+        cls, config: Union[str, Path, HypedsearchConfig]
+    ) -> "HSRunAnalysis":
+        if not isinstance(config, HypedsearchConfig):
+            hs_config = HypedsearchConfig.from_json(path=config)
+
+        logger.info("Loading PSMs...")
+        native_targets = flatten_list_of_lists(
+            [
+                CometPSM.from_txt(txt=txt)
+                for txt in hs_config.native_run_dir.glob("*target.txt")
+            ]
+        )
+        native_decoys = flatten_list_of_lists(
+            [
+                CometPSM.from_txt(txt=txt)
+                for txt in hs_config.native_run_dir.glob("*decoy.txt")
+            ]
+        )
+        native_assign_confidene = CometPSM.from_txt(
+            txt=hs_config.native_assign_confidence_txt
+        )
+        hybrid_targets = flatten_list_of_lists(
+            [
+                CometPSM.from_txt(txt=txt)
+                for txt in hs_config.hybrid_run_dir.glob("*target.txt")
+            ]
+        )
+        hybrid_decoys = flatten_list_of_lists(
+            [
+                CometPSM.from_txt(txt=txt)
+                for txt in hs_config.hybrid_run_dir.glob("*decoy.txt")
+            ]
+        )
+        logger.info(
+            "Loading kmer-to-proteins map and creating (sample, scan) to spectrum map..."
+        )
+        kmer_to_proteins_map = load_json(path=hs_config.kmer_to_proteins_map_path)
+        sample_scan_to_spectrum_map = create_sample_scan_to_spectrum_map(
+            mzmls=list(hs_config.mzml_to_scans.keys())
+        )
+        return cls(
+            native_targets=native_targets,
+            native_assign_confidence=native_assign_confidene,
+            native_decoys=native_decoys,
+            hybrid_targets=hybrid_targets,
+            hybrid_decoys=hybrid_decoys,
+            kmer_to_proteins_map=kmer_to_proteins_map,
+            sample_scan_to_spectrum_map=sample_scan_to_spectrum_map,
+        )
 
     def protein_counts(self, native_q_value_threshold: float):
         return get_protein_counts_from_comet_psms(
@@ -948,7 +1124,7 @@ class HSRunAnalysis:
             for psm in self.native_assign_confidence
             if psm.q_value <= native_psm_q_value_threshold
         )
-        hybrid_comet_psms = self.hybrid_assign_confidence
+        hybrid_comet_psms = self.hybrid_targets
         hybrid_comet_psms = [
             psm
             for psm in hybrid_comet_psms
@@ -1120,13 +1296,537 @@ class HSRunAnalysis:
             axis=1,
         )
 
+    def seq_to_hybrids(self, min_side_len: int):
+        seq_to_hybrids = {}
+        for psm in self.hybrid_targets:
+            hybrids = find_possible_hybrids(
+                seq=psm.seq,
+                kmer_to_proteins_map=self.kmer_to_proteins_map,
+                min_side_len=min_side_len,
+            )
+            if len(hybrids) > 0:
+                seq_to_hybrids[psm.seq] = hybrids
+        return seq_to_hybrids
+
+
+@dataclass
+class SpectrumPSMs:
+    spectrum: Spectrum
+    native_target: Optional[PSM] = None
+    native_decoy: Optional[PSM] = None
+    hybrid_target: Optional[PSM] = None
+    hybrid_decoy: Optional[PSM] = None
+    native_assign_confidence: Optional[PSM] = None
+
+    psm_types = [
+        "native_target",
+        "native_decoy",
+        "hybrid_target",
+        "hybrid_decoy",
+        "native_assign_confidence",
+    ]
+    scores = [
+        "xcorr",
+        "prop_ions_matched",
+        "prop_prefixes_supported",
+        "prop_suffixes_supported",
+        "prop_intensity_supported",
+    ]
+
+    def __post_init__(self):
+        # Make sure all the PSMs correspond to the same spectrum
+        for psm_type in self.psm_types:
+            psm = getattr(self, psm_type)
+            if psm is not None:
+                assert (
+                    psm.spectrum_id == self.spectrum.uid
+                ), f"PSM spectrum ID ({psm.spectrum_id}) does not match spectrum's ID ({self.spectrum.uid}) for {psm_type}."
+
+    @classmethod
+    def from_hs_run(
+        cls,
+        hs_run: HSRunAnalysis,
+        peak_to_ion_ppm_tolerance: float,
+    ) -> Dict[Tuple[str, int], "SpectrumPSMs"]:
+        spectrum_to_native_target = {
+            comet_psm.spectrum_uid: comet_psm for comet_psm in hs_run.native_targets
+        }
+        spectrum_to_native_decoy = {
+            comet_psm.spectrum_uid: comet_psm for comet_psm in hs_run.native_decoys
+        }
+        spectrum_to_hybrid_target = {
+            comet_psm.spectrum_uid: comet_psm for comet_psm in hs_run.hybrid_targets
+        }
+        spectrum_to_hybrid_decoy = {
+            comet_psm.spectrum_uid: comet_psm for comet_psm in hs_run.hybrid_decoys
+        }
+        spectrum_to_native_assign_confidence = {
+            comet_psm.spectrum_uid: comet_psm
+            for comet_psm in hs_run.native_assign_confidence
+        }
+        logger.info(
+            "There are:\n"
+            + f"\t - {len(set(spectrum_to_native_target.keys()))} native target PSMs\n"
+            + f"\t - {len(set(spectrum_to_native_decoy.keys()))} native decoy PSMs\n"
+            + f"\t - {len(set(spectrum_to_native_assign_confidence.keys()))} native assign-confidence PSMs\n"
+            + f"\t - {len(set(spectrum_to_hybrid_target.keys()))} hybrid target PSMs\n"
+            + f"\t - {len(set(spectrum_to_hybrid_decoy.keys()))} hybrid decoy PSMs\n"
+        )
+        spectra_with_results = set().union(
+            *[
+                set(spectrum_to_native_target.keys()),
+                set(spectrum_to_native_decoy.keys()),
+                set(spectrum_to_hybrid_target.keys()),
+                set(spectrum_to_hybrid_decoy.keys()),
+            ]
+        )
+        logger.info(
+            f"Number of spectra with any PSM results: {len(spectra_with_results)}"
+        )
+        data = []
+        logger.info(f"Creating SpectrumPSMs for {len(spectra_with_results)} spectra...")
+        for idx, spectrum_id in enumerate(spectra_with_results):
+            if idx % 1000 == 0:
+                logger.info(
+                    f"Processing spectrum {idx + 1}/{len(spectra_with_results)}"
+                )
+            spectrum = hs_run.sample_scan_to_spectrum_map[spectrum_id]
+            native_target = spectrum_to_native_target.get(spectrum_id, None)
+            if native_target is not None:
+                native_target = PSM.from_spectrum_and_comet_psm(
+                    comet_psm=native_target,
+                    spectrum=spectrum,
+                    peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
+                )
+            native_decoy = spectrum_to_native_decoy.get(spectrum_id, None)
+            if native_decoy is not None:
+                native_decoy = PSM.from_spectrum_and_comet_psm(
+                    comet_psm=native_decoy,
+                    spectrum=spectrum,
+                    peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
+                )
+            hybrid_target = spectrum_to_hybrid_target.get(spectrum_id, None)
+            if hybrid_target is not None:
+                hybrid_target = PSM.from_spectrum_and_comet_psm(
+                    comet_psm=hybrid_target,
+                    spectrum=spectrum,
+                    peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
+                )
+            hybrid_decoy = spectrum_to_hybrid_decoy.get(spectrum_id, None)
+            if hybrid_decoy is not None:
+                hybrid_decoy = PSM.from_spectrum_and_comet_psm(
+                    comet_psm=hybrid_decoy,
+                    spectrum=spectrum,
+                    peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
+                )
+            native_assign_confidence = spectrum_to_native_assign_confidence.get(
+                spectrum_id, None
+            )
+            if native_assign_confidence is not None:
+                native_assign_confidence = PSM.from_spectrum_and_comet_psm(
+                    comet_psm=native_assign_confidence,
+                    spectrum=spectrum,
+                    peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
+                )
+            data.append(
+                cls(
+                    spectrum=spectrum,
+                    native_target=native_target,
+                    native_decoy=native_decoy,
+                    hybrid_target=hybrid_target,
+                    hybrid_decoy=hybrid_decoy,
+                    native_assign_confidence=native_assign_confidence,
+                )
+            )
+        return data
+
+    @property
+    def top_target_psm(self) -> Tuple[Literal[NATIVE, HYBRID], PSM]:
+        if self.native_target is not None:
+            native_xcorr = self.native_target.xcorr
+        else:
+            native_xcorr = -100
+        if self.hybrid_target is not None:
+            hybrid_xcorr = self.hybrid_target.xcorr
+        else:
+            hybrid_xcorr = native_xcorr - 1
+
+        if native_xcorr >= hybrid_xcorr:
+            return NATIVE, self.native_target
+        else:
+            return HYBRID, self.hybrid_target
+
+    @property
+    def top_decoy_psm(self) -> PSM:
+        if self.native_decoy is not None:
+            native_xcorr = self.native_decoy.xcorr
+        else:
+            native_xcorr = -100
+        if self.hybrid_decoy is not None:
+            hybrid_xcorr = self.hybrid_decoy.xcorr
+        else:
+            hybrid_xcorr = native_xcorr - 1
+
+        if native_xcorr >= hybrid_xcorr:
+            return NATIVE, self.native_decoy
+        else:
+            return HYBRID, self.hybrid_decoy
+
+    def to_dict(self):
+        row = {
+            "spectrum": self.spectrum.uid,
+            "precursor_mz": self.spectrum.precursor_mz,
+            "precursor_charge": self.spectrum.precursor_charge,
+            "retention_time": self.spectrum.retention_time,
+        }
+        for psm_type in [
+            "native_target",
+            "native_decoy",
+            "hybrid_target",
+            "hybrid_decoy",
+        ]:
+            for score_name in [
+                "xcorr",
+                "prop_intensity_supported",
+                "prop_ions_matched",
+                "prop_prefixes_supported",
+                "prop_suffixes_supported",
+                "seq",
+            ]:
+                psm = getattr(self, psm_type)
+                row[f"{psm_type}_{score_name}"] = (
+                    getattr(psm, score_name) if psm is not None else None
+                )
+
+        # Add information from assign-confidence PSM
+        psm = getattr(self, "native_assign_confidence")
+        row["native_target_q_value"] = psm.q_value if psm is not None else None
+
+        return row
+
+    @staticmethod
+    def to_df(spectra_psms: List["SpectrumPSMs"]) -> pd.DataFrame:
+        data = [spectrum_psms.to_dict() for spectrum_psms in spectra_psms]
+        return pd.DataFrame(data)
+
+    @property
+    def spectrum_id(self):
+        return self.spectrum.uid
+
+    @staticmethod
+    def plot_info(spectra_psms: List["SpectrumPSMs"]) -> pd.DataFrame:
+        pass
+
+
+def psm_score_histogram(ax, data, label):
+    _ = sns.histplot(
+        data,
+        # element="step",
+        kde=True,
+        stat="density",
+        common_norm=False,
+        ax=ax,
+        label=f"{label} (n={len(data)})",
+        # fill=False,
+        alpha=0.4,
+    )
+
+
+@dataclass
+class PSMAcceptanceResult:
+    accepted_targets: List[SpectrumPSMs]
+    accepted_decoys: List[SpectrumPSMs]
+
+    @property
+    def accepted_hybrids(self) -> List[SpectrumPSMs]:
+        return [
+            psms for psms in self.accepted_targets if psms.top_target_psm[0] == HYBRID
+        ]
+
+    @property
+    def fdr(self):
+        return len(self.accepted_decoys) / max(len(self.accepted_targets), 1)
+
+    @property
+    def hybrid_seq_to_spectrum_map(self) -> Dict[str, List[str]]:
+        hybrid_seq_to_spectrum = defaultdict(list)
+        for hy in self.accepted_hybrids:
+            assert hy.top_target_psm[0] == HYBRID
+            psm = hy.top_target_psm[1]
+            hybrid_seq_to_spectrum[psm.seq].append(psm.spectrum_id)
+        return dict(hybrid_seq_to_spectrum)
+
+    @property
+    def hybrid_seqs(self) -> Set[str]:
+        return set(self.hybrid_seq_to_spectrum_map.keys())
+
+    def log_info(self):
+        logger.info(f"Number of accepted target PSMs: {len(self.accepted_targets)}")
+        logger.info(f"Number of accepted decoy PSMs: {len(self.accepted_decoys)}")
+        logger.info(f"Estimated FDR: {self.fdr:.4f}")
+        logger.info(f"Number of accepted hybrid PSMs: {len(self.accepted_hybrids)}")
+
+    def compare_to_true_hybrids(self, true_hybrids: TrueHybrids):
+        logger.info(
+            f"True hybrid sequences (n={len(true_hybrids.seqs)}):\n{true_hybrids.seqs}"
+        )
+        shared_seqs = self.hybrid_seqs.intersection(true_hybrids.seqs)
+        logger.info(
+            f"True hybrid sequences amongst accepted hybrids (n={len(shared_seqs)}):\n{shared_seqs}"
+        )
+
+
+@dataclass
+class Threshold:
+    score_name: str
+    operator: Literal[">", "<", ">=", "<="]
+    threshold: float
+
+    def accept_psm(self, psm: PSM) -> bool:
+        if self.operator == ">":
+            return getattr(psm, self.score_name) > self.threshold
+        elif self.operator == "<":
+            return getattr(psm, self.score_name) < self.threshold
+        elif self.operator == ">=":
+            return getattr(psm, self.score_name) >= self.threshold
+        elif self.operator == "<=":
+            return getattr(psm, self.score_name) <= self.threshold
+        else:
+            raise ValueError(f"Invalid operator: {self.operator}")
+
+
+def scores_above_thresholds(
+    psm: PSM,
+    thresholds: List[Threshold],
+):
+    return all([threshold.accept_psm(psm=psm) for threshold in thresholds])
+
+
+def accept_psms(
+    spectra_psms: List[SpectrumPSMs],
+    acceptance_fcn: Callable,
+) -> PSMAcceptanceResult:
+    accepted_targets = [
+        psms for psms in spectra_psms if acceptance_fcn(psms.top_target_psm[1])
+    ]
+    accepted_decoys = [
+        psms for psms in spectra_psms if acceptance_fcn(psms.top_decoy_psm[1])
+    ]
+    return PSMAcceptanceResult(
+        accepted_targets=accepted_targets,
+        accepted_decoys=accepted_decoys,
+    )
+
+
+def plot_scores(
+    df: pd.DataFrame, by_charge: bool = True, out_path: Optional[Path] = None
+):
+    column_to_label = {
+        "native_target": "Native targets",
+        "native_decoy": "Native decoys",
+        "hybrid_target": "Hybrid targets",
+        # "hybrid_decoy": "Hybrid run decoys",
+    }
+    scores = SpectrumPSMs.scores
+
+    if by_charge:
+        charge_to_plot_idx = {
+            charge: idx for idx, charge in enumerate(df.precursor_charge.unique())
+        }
+        ncols = len(charge_to_plot_idx)
+    else:
+        ncols = 1
+
+    # Plotting
+    _, axs = fig_setup(nrows=len(scores), ncols=ncols)
+    for score_idx, score in enumerate(scores):
+        for colm, label in column_to_label.items():
+            colm = f"{colm}_{score}"
+            if by_charge:
+                for charge, group_df in df.groupby("precursor_charge"):
+                    ax = axs[score_idx * ncols + charge_to_plot_idx[charge]]
+                    data = group_df[colm].dropna()
+                    psm_score_histogram(ax=ax, data=data, label=f"{label}, z={charge}")
+                    if "decoy" in colm:
+                        ecdf(data).cdf.plot(ax=ax, label=f"{label} z={charge}, ECDF")
+                    set_title_axes_labels(
+                        ax=ax,
+                        xlabel=score,
+                        ylabel="Density",
+                    )
+            else:
+                ax = axs[score_idx * ncols]
+                data = df[colm].dropna()
+                psm_score_histogram(ax=ax, data=data, label=label)
+                if "decoy" in colm:
+                    ecdf(data).cdf.plot(ax=ax, label=f"{label}, ECDF")
+                set_title_axes_labels(
+                    ax=ax,
+                    xlabel=score,
+                    ylabel="Density",
+                )
+    finalize(axs)
+    if out_path is not None:
+        save_fig(path=out_path)
+
+
+def get_seq_to_psms_map(
+    seqs: List[str], psms: List[CometPSM]
+) -> Dict[str, List[CometPSM]]:
+    seqs = set(seqs)
+    seq_to_psms = {seq: list(filter(lambda psm: psm.seq == seq, psms)) for seq in seqs}
+    return seq_to_psms
+
+
+@dataclass
+class PSMScore(ABC):
+    name: str
+
+    @abstractmethod
+    def set(self):
+        pass
+
+    @abstractmethod
+    def plot(self):
+        pass
+
+    @abstractmethod
+    def score_psm(self):
+        pass
+
+
+@dataclass
+class ScoreByCharge(PSMScore):
+    target_values_by_charge: Dict[int, List[float]] = field(
+        init=False, default_factory=lambda: defaultdict(list)
+    )
+    decoy_values_by_charge: Dict[int, List[float]] = field(
+        init=False, default_factory=lambda: defaultdict(list)
+    )
+    target_ecdfs_by_charge: Dict[int, Any] = field(init=False)
+
+    @classmethod
+    def set(
+        cls,
+        run: HSRunAnalysis,
+        peak_to_ion_ppm_tolerance: float,
+        scores_by_charge: List[str],
+    ) -> Dict[str, "ScoreByCharge"]:
+        scores = {}
+        for score_name in scores_by_charge:
+            scores[score_name] = cls(name=score_name)
+
+        logger.info("Processing decoy PSMs...")
+        decoy_psms = run.native_decoys  # + run.hybrid_decoys
+        for decoy_psm in decoy_psms:
+            spectrum = run.sample_scan_to_spectrum_map[
+                (decoy_psm.sample, decoy_psm.scan)
+            ]
+            psm = PSM(
+                spectrum=spectrum,
+                peptide=decoy_psm.seq,
+                comet_psm=decoy_psm,
+                peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
+            )
+            for score_name in scores_by_charge:
+                scores[score_name].decoy_values_by_charge[
+                    spectrum.precursor_charge
+                ].append(getattr(psm, score_name))
+
+        logger.info("Processing target PSMs...")
+        target_psms = run.native_targets
+        for target_psm in target_psms:
+            spectrum = run.sample_scan_to_spectrum_map[
+                (target_psm.sample, target_psm.scan)
+            ]
+            psm = PSM(
+                spectrum=spectrum,
+                peptide=target_psm.seq,
+                comet_psm=target_psm,
+                peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
+            )
+            for score_name in scores_by_charge:
+                scores[score_name].target_values_by_charge[
+                    spectrum.precursor_charge
+                ].append(getattr(psm, score_name))
+
+        # Set ECDFs
+        logger.info("Setting ECDFs...")
+        for score_name in scores_by_charge:
+            score = scores[score_name]
+            score.target_ecdfs_by_charge = dict()
+            score.decoy_ecdfs_by_charge = dict()
+            for charge, values in score.target_values_by_charge.items():
+                score.target_ecdfs_by_charge[charge] = ecdf(values)
+            for charge, values in score.decoy_values_by_charge.items():
+                score.decoy_ecdfs_by_charge[charge] = ecdf(values)
+
+        return scores
+
+    def plot(self):
+        _, axs = fig_setup(1, 2)
+        ax = axs[0]
+        for charge, vals in self.target_values_by_charge.items():
+            _ = sns.histplot(
+                vals,
+                stat="density",
+                common_norm=False,
+                ax=ax,
+                label=f"z={charge} (n={len(vals)})",
+                alpha=0.5,
+                # fill=False,
+            )
+            _ = self.target_ecdfs_by_charge[charge].cdf.plot(
+                ax=ax,
+                label=f"z={charge} ECDF",
+            )
+        set_title_axes_labels(
+            ax=ax,
+            title=f"Score: {self.name} on target PSMs",
+            xlabel=self.name,
+            ylabel="Density",
+        )
+        ax = axs[1]
+        for charge, vals in self.decoy_values_by_charge.items():
+            _ = sns.histplot(
+                vals,
+                stat="density",
+                common_norm=False,
+                ax=ax,
+                label=f"z={charge} (n={len(vals)})",
+                alpha=0.5,
+                # fill=False,
+            )
+            _ = self.decoy_ecdfs_by_charge[charge].cdf.plot(
+                ax=ax,
+                label=f"z={charge} ECDF",
+            )
+        set_title_axes_labels(
+            ax=ax,
+            title=f"Score: {self.name} on decoy PSMs",
+            xlabel=self.name,
+            ylabel="Density",
+        )
+        finalize(axs)
+
+    def score_psm(self, psm: PSM) -> float:
+        score = getattr(psm, self.name)
+        return float(
+            self.decoy_ecdfs_by_charge[psm.spectrum.precursor_charge].cdf.evaluate(
+                score
+            )
+        )
+
 
 @click.command(
     name="combine-comet-scan-results",
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-    help=(
-        "Given a directory containing the Comet output for each scan, combine them by mzML"
-    ),
+    help="""
+    Given a directory containing the Comet output for each scan, combine them by mzML.
+    For each mzML file, two files will be created in out_dir:\n
+    1) <mzML name>.comet.target.txt - containing all the target PSMs, and\n
+    2) <mzML name>.comet.decoy.txt - containing all the decoy PSMs.
+    """,
 )
 @click.option(
     "--scan_results_dir",
@@ -1146,6 +1846,40 @@ def cli_combine_comet_scan_results(scan_results_dir: Path, out_dir: Path):
     combine_comet_scan_results(scan_results_dir=scan_results_dir, out_dir=out_dir)
 
 
+@click.command(
+    name="check-for-missing-scans",
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+    help="""
+    Given a directory containing the Comet output for each scan and a hybrid run config,
+    check which scans were and were not processed.
+    """,
+)
+@click.option(
+    "--scan_results_dir",
+    "-srd",
+    type=PathType(),
+    required=True,
+    help="Path to the directory containing scan results",
+)
+@click.option(
+    "--hybrid_config",
+    "-hc",
+    type=PathType(),
+    required=True,
+    help="Path to the hybrid run config file",
+)
+def cli_check_for_missing_scans(scan_results_dir: Path, hybrid_config: Path):
+    hy_config = HybridRunConfig.from_json(path=hybrid_config)
+    expected_target_outputs = set(
+        [Path(txt).name for txt in hy_config.expected_target_outputs]
+    )
+    actual_target_outputs = set(
+        [txt.name for txt in scan_results_dir.glob(f"*{TARGET}*")]
+    )
+    missing_scans = expected_target_outputs - actual_target_outputs
+    logger.info(f"There are {len(missing_scans)} scans missing")
+
+
 @click.group(
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200}
 )
@@ -1154,7 +1888,7 @@ def cli():
 
 
 if __name__ == "__main__":
+    setup_logger()
     cli.add_command(cli_combine_comet_scan_results)
-    cli()
-    cli()
+    cli.add_command(cli_check_for_missing_scans)
     cli()

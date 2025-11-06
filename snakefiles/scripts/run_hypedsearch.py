@@ -21,7 +21,7 @@ fasta = Path(snakemake.config.fasta)
 protein_name_to_seq_map = Fasta(path=fasta).protein_name_to_seq_map
 crux_comet_params = Path(snakemake.config.crux_comet_params)
 kmer_db = KmerDatabase(db_path=Path(snakemake.config.kmer_db))
-kmer_to_protein_map = load_json(Path(snakemake.config.kmer_to_protein_map))
+kmer_to_protein_map = load_json(Path(snakemake.config.kmer_to_proteins_map))
 num_peaks = int(snakemake.config.num_peaks)
 precursor_mz_ppm_tol = int(snakemake.config.precursor_mz_ppm_tol)
 peak_to_ion_ppm_tol = int(snakemake.config.peak_to_ion_ppm_tol)

@@ -1,41 +1,50 @@
-from pathlib import Path
-
-from src.constants import COMET_DIR, DEFAULT_CRUX_PARAMS, MOUSE_PROTEOME
-from src.crux import Crux, HSConfig
-
-
-def test_create_native_run_comet_config(tmp_path, test_data_dir):
-
-    name = "mouse_testing"
-    mzml_to_scans = {
-        # Path("data/spectra/mouse_samples/BMEM_AspN_Fxn4.mzML"): [0],
-        # Path("data/spectra/mouse_samples/BMEM_AspN_Fxn5.mzML"): [0]
-        test_data_dir / "spectra/10_mouse_spectra.mzML": [0],
-        test_data_dir / "spectra/100_mouse_spectra.mzML": [0],
-    }
-    crux_comet_params = DEFAULT_CRUX_PARAMS
-    fasta = MOUSE_PROTEOME
-    # parent_out_dir = tmp_path
-    parent_out_dir = Path("tmp")
-    decoy_search = 2
-
-    config = HSConfig(
-        name=name,
-        mzml_to_scans=mzml_to_scans,
-        crux_comet_params=crux_comet_params,
-        fasta=fasta,
-        decoy_search=decoy_search,
-        parent_out_dir=parent_out_dir,
-        top_n_proteins=50,
-    )
-    config.create_native_run_comet_config()
+from src.comet_utils import CometPSM
+from src.constants import MAC_CRUX_EXECUTABLE
+from src.crux import Crux, run_comet_on_custom_seqs
+from src.mass_spectra import Spectrum
 
 
-def test_run_comet(tmp_path, test_data_dir):
-    Crux(path=COMET_DIR / "crux-4.3.Darwin.x86_64/bin/crux").run_comet(
-        mzml=test_data_dir / "spectra/BMEM_AspN_Fxn4_scans1-20.mzML",
-        fasta=test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta",
-        crux_comet_params=test_data_dir / "crux.comet.params",
-        decoy_search=2,
-        out_dir=tmp_path,
-    )
+class Test_Crux:
+    class Test_run_comet:
+        @staticmethod
+        def test_smoke(tmp_path, test_data_dir):
+            comet_outputs = Crux(path=MAC_CRUX_EXECUTABLE).run_comet(
+                mzml=test_data_dir / "spectra/BMEM_AspN_Fxn4_scans1-20.mzML",
+                fasta=test_data_dir
+                / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta",
+                crux_comet_params=test_data_dir / "crux.comet.params",
+                decoy_search=2,
+                out_dir=tmp_path,
+            )
+            target_psms = CometPSM.from_txt(txt=comet_outputs.target)
+            assert len(target_psms) > 0
+
+    class Test_run_assign_confidence:
+        @staticmethod
+        def test_smoke(tmp_path, test_data_dir):
+            crux = Crux(path=MAC_CRUX_EXECUTABLE)
+            out_path = tmp_path / "assign-confidence.txt"
+            crux.run_assign_confidence(
+                target_txts=[test_data_dir / "BMEM_AspN_Fxn4.target.txt"],
+                out_path=out_path,
+            )
+            psms = CometPSM.from_txt(txt=out_path)
+            assert len(psms) > 0
+
+
+class Test_run_comet_on_custom_seqs:
+    @staticmethod
+    def test_smoke(test_data_dir):
+        seqs = ["EPVDPNRGLRTL", "SAAPAAGSAPAAAEEKK"]
+        mzml = test_data_dir / "spectra/BMEM_AspN_Fxn4_scans1-20.mzML"
+        spectra = Spectrum.parse_ms2_from_mzml(mzml=mzml)
+        spectrum_to_psms = run_comet_on_custom_seqs(
+            seqs=seqs,
+            spectra=spectra,
+            crux_path=MAC_CRUX_EXECUTABLE,
+            comet_params=test_data_dir / "crux.comet.params",
+        )
+        assert isinstance(
+            spectrum_to_psms["mzml=BMEM_AspN_Fxn4_scans1-20;scan=1"], CometPSM
+        )
+        assert spectrum_to_psms["mzml=BMEM_AspN_Fxn4_scans1-20;scan=4"] is None

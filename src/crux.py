@@ -7,7 +7,7 @@ import sys
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Tuple, Union
+from typing import Dict, List, Literal, Optional, Set, Tuple, Union
 from venv import logger
 
 import click
@@ -17,7 +17,8 @@ from pydantic import BaseModel
 from src.comet_utils import CometPSM
 from src.constants import COMET_DIR, DECOY, GIT_REPO_DIR, RUN_COMET_SMK, TARGET
 from src.kmer_database import create_kmer_database
-from src.mass_spectra import Mzml
+from src.mass_spectra import Mzml, Spectrum
+from src.peptides_and_ions import Fasta, Peptide
 from src.protein_abundance import (
     get_most_common_proteins,
     get_protein_counts_from_comet_psms,
@@ -32,7 +33,6 @@ from src.utils import (
     write_new_line_separated_file,
 )
 
-COMET_SMK = Path("snakefiles/run_comet.smk")
 logger = logging.getLogger(__name__)
 
 
@@ -74,38 +74,6 @@ class CometConfig(BaseModel):
 
     def get_cmd_2_run_comet_via_snakemake(self, config_path: Union[str, Path]) -> str:
         return f"snakemake -s {RUN_COMET_SMK.relative_to(GIT_REPO_DIR)} --configfile {config_path} [...]"
-
-
-def get_expected_comet_outputs(
-    mzml_to_scans: Dict[str, List[int]],
-    out_dir: Path,
-    decoy_search: Literal[0, 1, 2],
-    psm_type: Literal["both", TARGET, DECOY],
-    remove_existing_files: bool = True,
-) -> List[str]:
-    expected_outputs = {TARGET: [], DECOY: []}
-    for mzml, scans in mzml_to_scans.items():
-        for scan in scans:
-            comet_outputs = CometOutputs.standardized_comet_outputs(
-                out_dir=out_dir,
-                decoy_search=decoy_search,
-                file_root=Mzml.get_mzml_name(mzml=mzml),
-                scan_min=scan,
-                scan_max=scan,
-            )
-            expected_outputs[TARGET].append(comet_outputs.target)
-            if comet_outputs.decoy is not None:
-                expected_outputs[DECOY].append(comet_outputs.decoy)
-
-    if psm_type == "both":
-        expected_outputs = expected_outputs[TARGET] + expected_outputs[DECOY]
-    else:
-        expected_outputs = expected_outputs[psm_type]
-
-    if remove_existing_files:
-        expected_outputs = [out for out in expected_outputs if not out.exists()]
-
-    return [str(out) for out in expected_outputs]
 
 
 class CometOutputs(BaseModel):
@@ -331,76 +299,67 @@ class Crux:
         logger.info("Finished running 'crux assign-confidence'")
 
 
-@dataclass
-class HSConfig:
-    name: str
-    mzml_to_scans: Dict[Path, List[int]]
-    crux_comet_params: Dict
-    fasta: Path
-    decoy_search: int
-    parent_out_dir: Path
-    top_n_proteins: int
-    config_dir: Path = field(init=False)
-    native_run_dir: Path = field(init=False)
-    hybrid_run_dir: Path = field(init=False)
-    hybrid_scan_result_dir: Path = field(init=False)
-    native_run_config: Path = field(init=False)
-    native_assign_confidence_txt: Path = field(init=False)
-    top_prots_txt: Path = field(init=False)
-    db_dir: Path = field(init=False)
-    db_path: Path = field(init=False)
-    kmer_to_prot_json: Path = field(init=False)
+def get_expected_comet_outputs(
+    mzml_to_scans: Dict[str, List[int]],
+    out_dir: Path,
+    decoy_search: Literal[0, 1, 2],
+    psm_type: Literal["both", TARGET, DECOY],
+    remove_existing_files: bool = True,
+) -> List[str]:
+    expected_outputs = {TARGET: [], DECOY: []}
+    for mzml, scans in mzml_to_scans.items():
+        for scan in scans:
+            comet_outputs = CometOutputs.standardized_comet_outputs(
+                out_dir=out_dir,
+                decoy_search=decoy_search,
+                file_root=Mzml.get_mzml_name(mzml=mzml),
+                scan_min=scan,
+                scan_max=scan,
+            )
+            expected_outputs[TARGET].append(comet_outputs.target)
+            if comet_outputs.decoy is not None:
+                expected_outputs[DECOY].append(comet_outputs.decoy)
 
-    def __post_init__(self):
-        # Make directories
-        self.name_dir = self.parent_out_dir / f"{self.name}"
-        self.name_dir.mkdir(parents=True, exist_ok=True)
-        self.config_dir = self.name_dir / "configs"
-        self.config_dir.mkdir(parents=True, exist_ok=True)
-        self.native_run_dir = self.name_dir / "native_run"
-        self.native_run_dir.mkdir(parents=True, exist_ok=True)
-        self.db_dir = self.name_dir / f"top{self.top_n_proteins}prots"
-        self.hybrid_run_dir = self.db_dir / "hybrid_run"
-        self.hybrid_run_dir.mkdir(parents=True, exist_ok=True)
-        self.hybrid_scan_result_dir = self.hybrid_run_dir / f"scan_results"
-        self.hybrid_scan_result_dir.mkdir(parents=True, exist_ok=True)
-        self.native_run_config = self.config_dir / "native_run.yaml"
-        self.native_assign_confidence_txt = (
-            self.native_run_dir / "assign-confidence.txt"
+    if psm_type == "both":
+        expected_outputs = expected_outputs[TARGET] + expected_outputs[DECOY]
+    else:
+        expected_outputs = expected_outputs[psm_type]
+
+    if remove_existing_files:
+        expected_outputs = [out for out in expected_outputs if not out.exists()]
+
+    return [str(out) for out in expected_outputs]
+
+
+def run_comet_on_custom_seqs(
+    seqs: Union[Set[str], List[str]],
+    spectra: List[Spectrum],
+    crux_path: Union[str, Path],
+    comet_params: Union[str, Path],
+) -> Dict[str, Optional[CometPSM]]:
+    seqs = set(seqs)
+    spectrum_to_psms = {}
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        fasta_path = tmp_path / "fasta.fasta"
+        Fasta.write_fasta(
+            peptides=[
+                Peptide(seq=seq, name=f"seq{idx}") for idx, seq in enumerate(seqs)
+            ],
+            out_path=fasta_path,
         )
-        self.top_prots_txt = self.db_dir / f"proteins.txt"
-        self.db_path = self.db_dir / "kmers.db"
-        self.kmer_to_prot_json = self.db_dir / "kmer_to_proteins.json"
-
-    def create_native_run_comet_config(self) -> CometConfig:
-        config = CometConfig(
-            mzml_to_scans=self.mzml_to_scans,
-            crux_comet_params=self.crux_comet_params,
-            fasta=self.fasta,
-            decoy_search=self.decoy_search,
-            out_dir=self.native_run_dir,
-        )
-        config.to_yaml(self.native_run_config)
-
-    def create_hybrid_run_config(self) -> CometConfig:
-        pass
-
-    def create_kmer_database(self):
-        if self.db_path.exists():
-            logger.info(f"Database {self.db_path} already exists. Skipping creation.")
-        else:
-            psms = CometPSM.from_txt(txt=self.native_assign_confidence_txt)
-            prot_counts = get_protein_counts_from_comet_psms(psms=psms)
-            most_common_proteins = get_most_common_proteins(
-                protein_counts=prot_counts, top_n=self.top_n_proteins
+        crux = Crux(path=crux_path)
+        for spectrum in spectra:
+            comet_output = crux.run_comet(
+                mzml=spectrum.mzml,
+                fasta=fasta_path,
+                crux_comet_params=comet_params,
+                decoy_search=0,
+                out_dir=tmp_path,
+                scan_min=spectrum.scan,
+                scan_max=spectrum.scan,
             )
-            logger.info(f"Top {self.top_n_proteins} proteins:\n{most_common_proteins}")
-            _ = write_new_line_separated_file(
-                lines=most_common_proteins, path=self.top_prots_txt
-            )
-            _ = create_kmer_database(
-                kmer_to_proteins_path=self.kmer_to_prot_json,
-                fasta=self.fasta,
-                proteins=most_common_proteins,
-                db_path=self.db_path,
-            )
+            psms = CometPSM.from_txt(txt=comet_output.target)
+            spectrum_to_psms[spectrum.uid] = psms[0] if len(psms) > 0 else None
+
+    return spectrum_to_psms

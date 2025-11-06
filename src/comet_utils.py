@@ -223,12 +223,20 @@ class CometPSM:
             ]
 
     @property
+    def spectrum_uid(self) -> str:
+        return Spectrum.get_uid(sample=self.sample, scan=self.scan)
+
+    @property
     def seq_with_hyphen(self):
         if self.is_hybrid:
             hybrid_peptides = self.get_hybrid_peptides()
             return [f"{pep.b_seq}-{pep.y_seq}" for pep in hybrid_peptides]
         else:
             return self.seq
+
+    @property
+    def prop_ions_matched(self) -> float:
+        return self.ions_matched / self.ions_total
 
     @staticmethod
     def check_if_hybrid_prot(prot: str):

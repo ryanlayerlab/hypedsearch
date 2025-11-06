@@ -610,7 +610,7 @@ def form_spectrum_hybrids_via_clustering(
     logger.info(
         f"Completed forming hybrids for spectrum ({spectrum.sample}, {spectrum.scan})\nIt took {get_time_in_diff_units(duration)}"
     )
-    return seq_to_hybrids
+    return dict(seq_to_hybrids)
 
 
 def serialize_hybrids(seq_to_hybrids: Dict[str, List[HybridPeptide]]) -> Dict:

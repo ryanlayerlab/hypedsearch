@@ -61,7 +61,7 @@ def prep_hybrid_run_on_fiji(
     # Handle files that need to be copied
     logger.info(f"Copying other needed files to {name_dir}...")
     fiji_config = {}
-    for attr in ["kmer_db", "fasta", "crux_comet_params", "kmer_to_protein_map"]:
+    for attr in ["kmer_db", "fasta", "crux_comet_params", "kmer_to_proteins_map"]:
         old_path = Path(getattr(hybrid_run_config, attr))
         new_out_path = str(name_dir / old_path.name)
         fiji_config[attr] = new_out_path
@@ -73,7 +73,7 @@ def prep_hybrid_run_on_fiji(
         out_dir=str(scan_results_dir),
         fasta=fiji_config["fasta"],
         kmer_db=fiji_config["kmer_db"],
-        kmer_to_proteins_map=fiji_config["kmer_to_protein_map"],
+        kmer_to_proteins_map=fiji_config["kmer_to_proteins_map"],
         crux_path=crux_path,
         peak_to_ion_ppm_tol=hybrid_run_config.peak_to_ion_ppm_tol,
         precursor_mz_ppm_tol=hybrid_run_config.precursor_mz_ppm_tol,

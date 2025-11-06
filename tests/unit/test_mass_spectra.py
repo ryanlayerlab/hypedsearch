@@ -16,6 +16,24 @@ class Test_Mzml:
 
 class Test_Spectrum:
     @staticmethod
+    def test_get_uid():
+        sample = "HumanSerum_with_36_humanHIPS_RP_250430"
+        scan = 694390
+        assert (
+            Spectrum.get_uid(sample=sample, scan=scan)
+            == "mzml=HumanSerum_with_36_humanHIPS_RP_250430;scan=694390"
+        )
+
+    @staticmethod
+    def test_parse_uid():
+        sample = "HumanSerum_with_36_humanHIPS_RP_250430"
+        scan = 694390
+        uid = Spectrum.get_uid(sample=sample, scan=scan)
+        obs_sample, obs_scan = Spectrum.parse_uid(uid=uid)
+        assert sample == obs_sample
+        assert scan == obs_scan
+
+    @staticmethod
     def test_parse_spectrum_from_dict():
         spectrum = create_spectrum(scan_num=1)
         expected = Spectrum(

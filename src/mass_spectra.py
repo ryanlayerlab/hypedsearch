@@ -6,12 +6,19 @@ from typing import Annotated, Dict, List, Optional, Tuple, Union
 import click
 import numpy as np
 import pymzml
+import seaborn as sns
 from matplotlib.pyplot import Axes
 from pydantic import BaseModel, BeforeValidator, Field
 from pyteomics import mzml as mzml_reader
 
 from src.constants import SPECTRA_DIR, THOMAS_SAMPLES
-from src.plot_utils import fig_setup, set_title_axes_labels
+from src.plot_utils import (
+    add_counts_to_histogram_boxes,
+    fig_setup,
+    finalize,
+    save_fig,
+    set_title_axes_labels,
+)
 from src.utils import flatten_list_of_lists, to_path
 
 
@@ -41,6 +48,28 @@ class Spectrum:
             return self.mzml.stem
         else:
             return None
+
+    @property
+    def uid(self):
+        if self.sample is None:
+            raise RuntimeError(
+                f"Spectrum scan={self.scan} has no sample associated to it"
+            )
+        return self.get_uid(sample=self.sample, scan=self.scan)
+
+    @staticmethod
+    def get_uid(sample: str, scan: int) -> str:
+        return f"mzml={sample};scan={scan}"
+
+    @staticmethod
+    def parse_uid(uid: str) -> Tuple[str, int]:
+        match = re.match(r"^mzml=(.+);scan=(\d+)$", uid)
+        if match:
+            sample = match.group(1)
+            scan = int(match.group(2))
+            return sample, scan
+        else:
+            raise ValueError(f"Invalid UID format: {uid}")
 
     @property
     def total_intensity(self):
@@ -91,13 +120,13 @@ class Spectrum:
 
     @classmethod
     def parse_ms2_from_mzml(cls, mzml: Union[str, Path]) -> List["Spectrum"]:
-        mzml = Path(mzml).absolute()
+        mzml_path = Path(mzml).absolute()
         ms2_spectra = []
-        with mzml_reader.MzML(str(mzml)) as mzml:
+        with mzml_reader.MzML(str(mzml_path)) as mzml:
             for spectrum in mzml:
                 if spectrum["ms level"] == 1:
                     continue
-                ms2_spectra.append(cls.from_dict(spectrum=spectrum, mzml=mzml))
+                ms2_spectra.append(cls.from_dict(spectrum=spectrum, mzml=mzml_path))
 
             return ms2_spectra
 
@@ -161,6 +190,56 @@ class Spectrum:
         )
         ax.set_ylim(bottom=0)
         return ax
+
+    @staticmethod
+    def plot_charges(
+        spectra: List["Spectrum"],
+        ax: Optional[Axes] = None,
+        title: Optional[str] = None,
+        out_path: Optional[Union[str, Path]] = None,
+    ):
+        if ax is None:
+            _, axs = fig_setup()
+            ax = axs[0]
+        _ = sns.histplot([sp.precursor_charge for sp in spectra], ax=ax)
+        add_counts_to_histogram_boxes(ax=ax)
+        set_title_axes_labels(
+            ax=ax, title=title, xlabel="precursor charge", ylabel="Count"
+        )
+        finalize(axs)
+        if out_path is not None:
+            save_fig(out_path)
+
+    @staticmethod
+    def plot_attr(
+        spectra: List["Spectrum"],
+        attr: str,
+        ax: Optional[Axes] = None,
+        title: Optional[str] = None,
+        out_path: Optional[Union[str, Path]] = None,
+        add_counts: bool = True,
+    ):
+        if ax is None:
+            _, axs = fig_setup()
+            ax = axs[0]
+        values = [getattr(sp, attr) for sp in spectra]
+        _ = sns.histplot(values, ax=ax)
+        if add_counts:
+            add_counts_to_histogram_boxes(ax=ax)
+        set_title_axes_labels(ax=ax, title=title, xlabel=attr, ylabel="Count")
+        if out_path is not None:
+            finalize(ax)
+            save_fig(out_path)
+
+    @staticmethod
+    def plot_spectra_info(
+        spectra: List["Spectrum"],
+        attrs: List[str] = ["precursor_charge", "precursor_mz", "retention_time"],
+    ):
+        _, axs = fig_setup(nrows=1, ncols=len(attrs))
+        for i, attr in enumerate(attrs):
+            Spectrum.plot_attr(spectra=spectra, attr=attr, ax=axs[i])
+        finalize(axs)
 
 
 class Mzml(BaseModel):
@@ -299,11 +378,11 @@ def create_sample_scan_to_spectrum_map(
     if mzmls is not None:
         for mzml in mzmls:
             for spectrum in Mzml(mzml=mzml).ms2_spectra:
-                sample_scan_to_spectrum_map[(spectrum.sample, spectrum.scan)] = spectrum
+                sample_scan_to_spectrum_map[spectrum.uid] = spectrum
     else:
         for mzml in Path(spectra_dir).glob("*.mzML"):
             for spectrum in Mzml(mzml=mzml).ms2_spectra:
-                sample_scan_to_spectrum_map[(spectrum.sample, spectrum.scan)] = spectrum
+                sample_scan_to_spectrum_map[spectrum.uid] = spectrum
     return sample_scan_to_spectrum_map
 
 

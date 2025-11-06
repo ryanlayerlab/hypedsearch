@@ -40,7 +40,6 @@ use_NL_ions = 0                        # 0=no, 1=yes to consider NH3/H2O neutral
 # MISCELLANEOUS PARAMETERS
 #
 
-max_precursor_charge = 3
 max_duplicate_proteins = -1    
 peptide_length_range = 5 50 
 explicit_deltacn = 1

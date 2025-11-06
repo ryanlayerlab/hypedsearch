@@ -18,6 +18,7 @@ COMET_RUN_2_DIR = DATA_DIR / "comet_run_2"
 HS_DIR = DATA_DIR / "hs"
 SPECTRA_DIR = DATA_DIR / "spectra"
 COMET_EXECUTABLE = COMET_DIR / "comet.macos.exe"
+MAC_CRUX_EXECUTABLE = COMET_DIR / "crux-4.3.Darwin.x86_64/bin/crux"
 COMET_PARAMS = COMET_DIR / "comet.params"
 DEFAULT_COMET_PARAMS_FILE = COMET_DIR / "comet.params"
 DEFAULT_COMET_PRECURSOR_MZ_PPM_TOL = 20.0
@@ -27,7 +28,7 @@ DEFAULT_CRUX_PARAMS = COMET_DIR / "crux.comet.params"
 DEFAULT_MIN_CLUSTER_LENGTH = 3
 DEFAULT_MIN_CLUSTER_SUPPORT = 2
 
-FASTAS_DIR = GIT_REPO_DIR / "fastas"
+FASTAS_DIR = (GIT_REPO_DIR / "fastas").relative_to(GIT_REPO_DIR)
 MOUSE_PROTEOME = FASTAS_DIR / "SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
 HUMAN_PROTEOME = FASTAS_DIR / "uniprotkb_proteome_UP000005640_AND_revi_2025_04_29.fasta"
 RUN_COMET_SMK = GIT_REPO_DIR / "snakefiles/run_comet.smk"

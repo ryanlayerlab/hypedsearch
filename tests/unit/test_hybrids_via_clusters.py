@@ -14,23 +14,12 @@ from src.hybrids_via_clusters import (
 )
 from src.kmer_database import create_kmer_database
 from src.mass_spectra import Spectrum
-from src.peptides_and_ions import UnpositionedProductIon, compute_peptide_precursor_mz
-from src.utils import mass_difference_in_ppm
-
-# def test_testing_shit(test_data_dir, tmp_path):
-# Arrange
-# mzml, scan = test_data_dir / "BMEM_AspN_Fxn4.mzML", 7
-# spectrum = Spectrum.get_spectrum(scan=scan, mzml=mzml)
-# db_path = tmp_path / "test.db"
-# fasta = test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
-# kmer_db = create_db(
-#     kmer_to_protein_path=tmp_path / "test.pklz",
-#     fasta=test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta",
-#     proteins=[
-#         "sp|P99027|RLA2_MOUSE"
-#     ],  # using this protein because it's the top Comet PSM for this scan comes from this protein,
-#     db_path=db_path,
-# )
+from src.peptides_and_ions import (
+    Fasta,
+    UnpositionedProductIon,
+    compute_peptide_precursor_mz,
+)
+from src.utils import load_json, mass_difference_in_ppm
 
 
 class Test_PositionedProductIon:
@@ -351,132 +340,64 @@ class Test_Cluster:
             assert seqs == ["EENAD", "ENAD", "NAD", "AD"]
 
 
-class Test_form_extended_clusters_for_spectrum:
-    @staticmethod
-    def test_smoke(test_data_dir, tmp_path, snapshot, snapshot_dir):
-        # Arrange
-        mzml, scan = test_data_dir / "BMEM_AspN_Fxn4.mzML", 7
-        fasta = test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
-        db_path = tmp_path / "test.db"
-        create_kmer_database(
-            kmer_to_proteins_path=tmp_path / "test.pklz",
-            fasta=fasta,
-            proteins=[
-                "sp|P99027|RLA2_MOUSE"
-            ],  # using this protein because the top Comet PSM for this scan comes from this protein,
-            db_path=db_path,
-        )
-        spectrum = Spectrum.get_spectrum(scan=scan, mzml=mzml)
-
-        # Act
-        clusters = form_extended_clusters_for_spectrum(
-            db_path=db_path, spectrum=spectrum, fasta=fasta
-        )
-        # Assert
-        # Remove some information so comparison is more straightforward
-        clusters_for_json = {B_ION_TYPE: [], Y_ION_TYPE: []}
-        keys_to_include = (
-            "protein",
-            "inclusive_start",
-            "exclusive_end",
-            "extended_seq",
-        )
-        for cluster in clusters.b_clusters:
-            d = asdict(cluster)
-            clusters_for_json[B_ION_TYPE].append(
-                {key: d[key] for key in keys_to_include}
-            )
-        for cluster in clusters.y_clusters:
-            d = asdict(cluster)
-            clusters_for_json[Y_ION_TYPE].append(
-                {key: d[key] for key in keys_to_include}
-            )
-        clusters_for_json[B_ION_TYPE] = sorted(
-            clusters_for_json[B_ION_TYPE],
-            key=lambda x: (x["protein"], x["inclusive_start"], x["exclusive_end"]),
-        )
-        clusters_for_json[Y_ION_TYPE] = sorted(
-            clusters_for_json[Y_ION_TYPE],
-            key=lambda x: (x["protein"], x["inclusive_start"], x["exclusive_end"]),
-        )
-        snapshot.snapshot_dir = snapshot_dir
-        snapshot_file = "BMEM_AspN_Fxn4_scan7_clusters.json"
-        snapshot.assert_match(
-            json.dumps(clusters_for_json, indent=2, sort_keys=True),
-            snapshot_file,
-        )
-
-
-class Test_form_hybrids_from_clusters:
-    @staticmethod
-    def test_smoke(test_data_dir, tmp_path, snapshot, snapshot_dir):
-        # Arrange
-        mzml, scan = test_data_dir / "BMEM_AspN_Fxn4.mzML", 7
-        fasta = test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
-        db_path = tmp_path / "test.db"
-        create_kmer_database(
-            kmer_to_proteins_path=tmp_path / "test.pklz",
-            fasta=fasta,
-            proteins=test_data_dir
-            / "mouse_data_top_10_proteins.txt",  # using this protein because the top Comet PSM for this scan comes from this protein,
-            db_path=db_path,
-        )
-        spectrum = Spectrum.get_spectrum(scan=scan, mzml=mzml)
-        clusters = form_extended_clusters_for_spectrum(
-            db_path=db_path, spectrum=spectrum, fasta=fasta
-        )
-        # Act
-        hybrids = form_hybrids_from_clusters(
-            b_clusters=clusters.b_clusters,
-            y_clusters=clusters.y_clusters,
-            precursor_mz=spectrum.precursor_mz,
-            precursor_charge=spectrum.precursor_charge,
-            precursor_mz_ppm_tol=20,
-            scan=spectrum.scan,
-            sample=spectrum.sample,
-        )
-        # Assert
-        # Remove some information so comparison is more straightforward
-        hybrids_for_json = []
-        for hybrid in hybrids:
-            # hybrids_for_json.append(f"{hybrid.left_seq}{hybrid.right_seq}")
-            hybrids_for_json.append(
-                f"{hybrid.left_seq}{hybrid.right_seq}|{'|'.join(sorted(hybrid.left_proteins))}|{'|'.join(sorted(hybrid.right_proteins))}"
-            )
-        hybrids_for_json = sorted(hybrids_for_json)
-        snapshot.snapshot_dir = snapshot_dir
-        snapshot_file = "BMEM_AspN_Fxn4_scan7_hybrids.json"
-        snapshot.assert_match(
-            json.dumps(hybrids_for_json, indent=2, sort_keys=True),
-            snapshot_file,
-        )
-
-
 class Test_form_spectrum_hybrids_via_clustering:
     @staticmethod
     def test_smoke(test_data_dir, tmp_path):
         # Arrange
         mzml, scan = test_data_dir / "BMEM_AspN_Fxn4.mzML", 7
         spectrum = Spectrum.get_spectrum(scan=scan, mzml=mzml)
-        fasta = test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
-        db_path = tmp_path / "test.db"
-        create_kmer_database(
-            kmer_to_proteins_path=tmp_path / "test.json",
-            fasta=fasta,
-            proteins=test_data_dir
-            / "mouse_data_top_10_proteins.txt",  # using this protein because the top Comet PSM for this scan comes from this protein,
-            db_path=db_path,
+        fasta = Fasta(
+            path=test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
         )
+        protein_name_to_seq_map = fasta.protein_name_to_seq_map
+        kmer_to_proteins_path = tmp_path / "kmer_to_proteins.json"
+        kmer_db = create_kmer_database(
+            proteins=fasta.get_proteins_by_name(
+                protein_names=["sp|P99027|RLA2_MOUSE"]
+            ),  # using this protein because the top Comet PSM for this scan comes from this protein,
+            kmer_to_proteins_path=kmer_to_proteins_path,
+            db_path=tmp_path / "test.db",
+        )
+        kmer_to_proteins_map = load_json(path=kmer_to_proteins_path)
         ppm_tol = 20
+
         # Act
         seq_to_hybrids = form_spectrum_hybrids_via_clustering(
-            kmer_db=db_path,
             spectrum=spectrum,
-            fasta=fasta,
+            kmer_db=kmer_db,
+            protein_name_to_seq_map=protein_name_to_seq_map,
+            kmer_to_proteins_map=kmer_to_proteins_map,
             precursor_mz_ppm_tol=ppm_tol,
+            peak_to_ion_ppm_tol=ppm_tol,
+            min_cluster_len=3,
+            min_cluster_support=2,
+            max_allowed_ion_charge=4,
         )
+
         # Assert
-        for seq, hybrids in seq_to_hybrids.items():
+        expected_hybrid_seqs = {
+            "ASSVPAGGAVAVSAAPGSA",
+            "SAAPGSAAPAAAAEEKK",
+            "SAAPGSAAAPAAAEEKK",
+            "SAPAAAGSAPAAAEEKK",
+            "ASAPAAGSAPAAAEEKK",
+            "SASVPAGGAVAVSAAPGSA",
+            "PGSAAPAAGSDDRLNK",
+            "ASASVPAGGAVAVSAAPGS",
+            "SAASVPAGGAVAVSAAPGS",
+            "AAPAAGSSAPAAAEEKK",
+            "AAPGSAASAPAAAEEKK",
+            "SAAPGSAASVPAGGAVAVS",
+            "APAAGSASAPAAAEEKK",
+            "AAGSAPASAPAAAEEKK",
+            "GSAAPAASAPAAAEEKK",
+            "SVPAGGGSAPAAAEEKK",
+            "AGSAPAASAPAAAEEKK",
+            "SAAPAAGSSVPAGGAVAVS",
+            "GSAPAAASAPAAAEEKK",
+        }
+        assert set(seq_to_hybrids.keys()) == expected_hybrid_seqs
+        for seq in seq_to_hybrids.keys():
             assert (
                 mass_difference_in_ppm(
                     mass1=spectrum.precursor_mz,
@@ -486,26 +407,3 @@ class Test_form_spectrum_hybrids_via_clustering:
                 )
                 <= ppm_tol
             )
-
-
-def test_stuff(test_data_dir, tmp_path):
-    mzml, scan = test_data_dir / "BMEM_AspN_Fxn4.mzML", 7
-    spectrum = Spectrum.get_spectrum(scan=scan, mzml=mzml)
-    fasta = test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
-    db_path = tmp_path / "test.db"
-    create_kmer_database(
-        kmer_to_proteins_path=tmp_path / "test.json",
-        fasta=fasta,
-        proteins=test_data_dir
-        / "mouse_data_top_10_proteins.txt",  # using this protein because the top Comet PSM for this scan comes from this protein,
-        db_path=db_path,
-    )
-    ppm_tol = 20
-    # Act
-    seq_to_hybrids = form_spectrum_hybrids_via_clustering(
-        kmer_db=db_path,
-        spectrum=spectrum,
-        fasta=fasta,
-        precursor_mz_ppm_tol=ppm_tol,
-    )
-    pass
