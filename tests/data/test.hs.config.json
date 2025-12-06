@@ -1,0 +1,16 @@
+{
+    "name": "test_hypedsearch",
+    "mzml_to_scans": {
+        "tests/data/spectra/10_mouse_spectra.mzML": "all",
+        "tests/data/spectra/BMEM_AspN_Fxn4_scans1-20.mzML": [1, 2, 3]
+    },
+    "parent_out_dir": "tmp/test_hypedsearch",
+    "hybrid_former": {
+        "kmer_db": "tests/data/sp-P99027-RLA2_MOUSE_mzml=BMEM_AspN_Fxn4;scan=7_kmer_db.db",
+        "fasta": "fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
+    },
+    "psm_scorer": {
+        "comet_params": "tests/data/crux.comet.params",
+        "fasta": "fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
+    }
+}

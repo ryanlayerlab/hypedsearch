@@ -6,6 +6,7 @@ from typing import List, Optional, Union
 import pandas as pd
 
 from src.peptides_and_ions import Fasta, Peptide
+from src.utils import CmdLineRunner
 
 
 def run_blastp(
@@ -34,6 +35,7 @@ def run_blastp(
     # blast_columns = " ".join(blast_columns)
 
     # Set query peptides depending on input type
+    query_peptides = list(query_peptides)  # allow for input being a set
     if isinstance(query_peptides[0], str):
         query_peptides = [Peptide(seq=seq, name=seq) for seq in query_peptides]
 
@@ -41,7 +43,11 @@ def run_blastp(
         tmp_dir = Path(tmp_dir)
         # Create a FASTA consisting of query peptides
         peptide_fasta = tmp_dir / "peptides.faa"
-        Fasta.write_fasta(peptides=query_peptides, out_path=peptide_fasta)
+        Fasta.write_fasta(peptides=query_peptides, path=peptide_fasta)
+        # Run `makeblastdb`
+        cmd = f"makeblastdb -in {fasta} -dbtype prot"
+        result = CmdLineRunner.run_cmd(cmd=cmd)
+
         # Run blastp
         if out_path is None:
             out_path = tmp_dir / "peptides.csv"
@@ -52,15 +58,15 @@ def run_blastp(
             f"-out {out_path}",
             f'-outfmt "10 {" ".join(blast_columns)}"',
         ]
-        cmd = " ".join(cmd_parts)
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            shell=True,
-        )
+        result = CmdLineRunner.run_cmd(cmd=cmd_parts)
         assert result.returncode == 0, f"blastp failed with stderr:\n{result.stderr}"
 
         # Load results
         df = pd.read_csv(out_path, names=blast_columns)
+
+    # By default only the name of the protein in the FASTA file is included, not the
+    # AA sequence. Here we add the sequence for convenience.
+    proteins = {prot.name: prot.seq for prot in Fasta(path=fasta).proteins}
+    df["fasta_seq"] = df["sseqid"].apply(lambda name: proteins[name])
+
     return df

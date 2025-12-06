@@ -86,7 +86,7 @@ class Test_UnpositionedProductIon:
     class Test_generate_product_ions:
         @staticmethod
         def test_default():
-            seq = "AC"
+            seq = "ACD"
             charges = [1, 2]
             ions = UnpositionedProductIon.generate_product_ions(
                 seq=seq, charges=charges
@@ -96,10 +96,10 @@ class Test_UnpositionedProductIon:
                 UnpositionedProductIon(seq="AC", charge=1, ion_type=B_ION_TYPE),
                 UnpositionedProductIon(seq="A", charge=2, ion_type=B_ION_TYPE),
                 UnpositionedProductIon(seq="AC", charge=2, ion_type=B_ION_TYPE),
-                UnpositionedProductIon(seq="C", charge=1, ion_type=Y_ION_TYPE),
-                UnpositionedProductIon(seq="AC", charge=1, ion_type=Y_ION_TYPE),
-                UnpositionedProductIon(seq="C", charge=2, ion_type=Y_ION_TYPE),
-                UnpositionedProductIon(seq="AC", charge=2, ion_type=Y_ION_TYPE),
+                UnpositionedProductIon(seq="D", charge=1, ion_type=Y_ION_TYPE),
+                UnpositionedProductIon(seq="CD", charge=1, ion_type=Y_ION_TYPE),
+                UnpositionedProductIon(seq="D", charge=2, ion_type=Y_ION_TYPE),
+                UnpositionedProductIon(seq="CD", charge=2, ion_type=Y_ION_TYPE),
             ]
             assert len(ions) == len(expected_ions)
             for ion in expected_ions:
@@ -134,7 +134,7 @@ class Test_Fasta:
         ]
         fasta_path = tmp_path / "test.fasta"
         # Act
-        Fasta.write_fasta(peptides=peptides, out_path=fasta_path)
+        Fasta.write_fasta(peptides=peptides, path=fasta_path)
         # Assert
         with open(fasta_path, "r") as f:
             content = f.read()
@@ -149,7 +149,7 @@ def test_get_kmer_counts_by_protein(tmp_path: Path):
         Peptide(seq="ACN", name="protein2"),
     ]
     out_path = tmp_path / "test.fasta"
-    Fasta.write_fasta(peptides=peptides, out_path=out_path)
+    Fasta.write_fasta(peptides=peptides, path=out_path)
     # Act
     kmer_prot_counts = get_kmer_counts_by_protein(fasta=out_path, k=2)
     # Assert
@@ -178,6 +178,6 @@ class Test_get_unique_kmers:
             Peptide(seq="ACN", name="protein2"),
         ]
         out_path = tmp_path / "test.fasta"
-        Fasta.write_fasta(peptides=peptides, out_path=out_path)
+        Fasta.write_fasta(peptides=peptides, path=out_path)
         uniq_kmers = get_unique_kmers(peptides=out_path, min_k=1, max_k=2)
         assert uniq_kmers == {"A", "C", "D", "N", "AC", "CA", "CD", "CN"}

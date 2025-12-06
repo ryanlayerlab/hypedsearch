@@ -8,18 +8,16 @@ from src.hybrids_via_clusters import (
     Cluster,
     PositionedProductIon,
     SpectrumClusters,
-    form_extended_clusters_for_spectrum,
-    form_hybrids_from_clusters,
     form_spectrum_hybrids_via_clustering,
 )
-from src.kmer_database import create_kmer_database
+from src.kmer_database import KmerDatabase
 from src.mass_spectra import Spectrum
 from src.peptides_and_ions import (
     Fasta,
     UnpositionedProductIon,
     compute_peptide_precursor_mz,
 )
-from src.utils import load_json, mass_difference_in_ppm
+from src.utils import mass_difference_in_ppm
 
 
 class Test_PositionedProductIon:
@@ -342,31 +340,25 @@ class Test_Cluster:
 
 class Test_form_spectrum_hybrids_via_clustering:
     @staticmethod
-    def test_smoke(test_data_dir, tmp_path):
+    def test_smoke(test_data_dir, tmp_path, mouse_fasta):
         # Arrange
-        mzml, scan = test_data_dir / "BMEM_AspN_Fxn4.mzML", 7
+        mzml = test_data_dir / "BMEM_AspN_Fxn4/BMEM_AspN_Fxn4.mzML"
+        scan = 7
         spectrum = Spectrum.get_spectrum(scan=scan, mzml=mzml)
         fasta = Fasta(
             path=test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
         )
+        proteins = fasta.get_proteins_by_name(names=["sp|P99027|RLA2_MOUSE"])
         protein_name_to_seq_map = fasta.protein_name_to_seq_map
-        kmer_to_proteins_path = tmp_path / "kmer_to_proteins.json"
-        kmer_db = create_kmer_database(
-            proteins=fasta.get_proteins_by_name(
-                protein_names=["sp|P99027|RLA2_MOUSE"]
-            ),  # using this protein because the top Comet PSM for this scan comes from this protein,
-            kmer_to_proteins_path=kmer_to_proteins_path,
-            db_path=tmp_path / "test.db",
-        )
-        kmer_to_proteins_map = load_json(path=kmer_to_proteins_path)
+        db_path = tmp_path / "test.db"
+        kmer_db = KmerDatabase.create_db(db_path=db_path, proteins=proteins)
         ppm_tol = 20
 
         # Act
         seq_to_hybrids = form_spectrum_hybrids_via_clustering(
             spectrum=spectrum,
             kmer_db=kmer_db,
-            protein_name_to_seq_map=protein_name_to_seq_map,
-            kmer_to_proteins_map=kmer_to_proteins_map,
+            fasta=Fasta(path=mouse_fasta),
             precursor_mz_ppm_tol=ppm_tol,
             peak_to_ion_ppm_tol=ppm_tol,
             min_cluster_len=3,

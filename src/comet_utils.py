@@ -18,6 +18,7 @@ from typing import (
     Union,
 )
 
+import click
 import pandas as pd
 from pydantic import BaseModel
 from scipy.stats import percentileofscore
@@ -33,7 +34,8 @@ from src.constants import (
     NUM,
     PLAIN_PEPTIDE,
     PROTEIN,
-    Q_VALUE,
+    Q_VAL,
+    Q_VAL_THRESH,
     SAMPLE,
     SCAN,
     XCORR,
@@ -42,6 +44,7 @@ from src.kmer_database import KmerToProteinsMap
 from src.mass_spectra import Mzml, Spectrum
 from src.peptides_and_ions import Peptide
 from src.utils import (
+    PathType,
     flatten_list_of_lists,
     get_arg_fcn_of_objects,
     get_fcn_of_objects,
@@ -92,45 +95,6 @@ class CometTxt:
         return [psm for psm in psms if psm.num == 1]
 
 
-class HybridPeptide(BaseModel):
-    left_seq: str
-    right_seq: str
-    left_proteins: List[str]
-    right_proteins: List[str]
-
-    @property
-    def seq(self) -> str:
-        return self.left_seq + self.right_seq
-
-    def get_left_protein_max_percentile(self, protein_counts: Counter) -> float:
-        return max(
-            [
-                percentileofscore(list(protein_counts.values()), protein_counts[prot])
-                for prot in self.left_proteins
-            ],
-        )
-
-    def get_right_protein_max_percentile(self, protein_counts: Counter) -> float:
-        return max(
-            [
-                percentileofscore(list(protein_counts.values()), protein_counts[prot])
-                for prot in self.right_proteins
-            ],
-        )
-
-    def get_left_seq_kmer_percentile(self, kmer_counts: Dict[int, Counter]) -> float:
-        return percentileofscore(
-            list(kmer_counts[len(self.left_seq)].values()),
-            kmer_counts[len(self.left_seq)][self.left_seq],
-        )
-
-    def get_right_seq_kmer_percentile(self, kmer_counts: Dict[int, Counter]) -> float:
-        return percentileofscore(
-            list(kmer_counts[len(self.right_seq)].values()),
-            kmer_counts[len(self.right_seq)][self.right_seq],
-        )
-
-
 def read_comet_psms_from_dir(
     dir_path: Union[str, Path], glob_pattern: Optional[str] = None
 ):
@@ -159,68 +123,6 @@ class CometPSM:
     eval: float
     delta_cn: float
     q_value: Optional[float]
-
-    @classmethod
-    def from_txt(
-        cls,
-        txt: str,
-        as_df: bool = False,
-        sample: str = "",
-    ) -> Union[List["CometPSM"], pd.DataFrame]:
-        """
-        Reads Comet results .txt file to a list of dataclasses or a dataframe
-        """
-        # Check whether TXT is from a direct Comet run or a Comet run via crux
-        comet_txt = CometTxt(path=Path(txt))
-
-        # Set sample if not provided
-        if len(sample) == 0:
-            sample = comet_txt.sample
-        if comet_txt.file_type == CRUX:
-            df = pd.read_csv(comet_txt.path, sep="\t")
-            df[SAMPLE] = sample
-            if "file" in df.columns:
-                # If the 'file' column exists, it means it's the output of `crux assign-confidence`
-                # in which case we need to set the sample differently
-                df[SAMPLE] = df["file"].apply(
-                    lambda file_path: Path(file_path).stem.split(".")[0]
-                )
-            df.rename(
-                columns={
-                    "b/y ions matched": IONS_MATCHED,
-                    "b/y ions total": IONS_TOTAL,
-                    "xcorr score": XCORR,
-                    "xcorr rank": NUM,
-                    "protein id": PROTEIN,
-                    "sequence": PLAIN_PEPTIDE,
-                    "tdc q-value": Q_VALUE,
-                },
-                inplace=True,
-            )
-        elif comet_txt.file_type == COMET:
-            df = pd.read_csv(comet_txt.path, sep="\t", header=1)
-            df[SAMPLE] = sample
-
-        if as_df:
-            return df
-        else:
-            return [
-                cls(
-                    sample=row[SAMPLE],
-                    scan=row[SCAN],
-                    num=row[NUM],
-                    ions_matched=row[IONS_MATCHED],
-                    ions_total=row[IONS_TOTAL],
-                    # protein_count=row[PROTEIN_COUNT],
-                    proteins=row[PROTEIN].split(","),
-                    seq=row[PLAIN_PEPTIDE],
-                    xcorr=row[XCORR],
-                    eval=row[EVAL],
-                    delta_cn=row[DELTA_CN],
-                    q_value=row.get(Q_VALUE, None),  # Handle optional q-value
-                )
-                for _, row in df.iterrows()
-            ]
 
     @property
     def spectrum_uid(self) -> str:
@@ -257,54 +159,111 @@ class CometPSM:
         else:
             return False
 
-    def remake(self) -> "CometPSM":
+    @classmethod
+    def from_txt(
+        cls,
+        txt: str,
+        as_df: bool = False,
+        sample: str = "",
+        only_num_1: bool = False,
+    ) -> Union[List["CometPSM"], pd.DataFrame]:
         """
-        Remakes the CometPSM object from the original PSM
+        Reads Comet results .txt file to a list of dataclasses or a dataframe
         """
-        return CometPSM(
-            sample=self.sample,
-            num=self.num,
-            scan=self.scan,
-            seq=self.seq,
-            ions_matched=self.ions_matched,
-            proteins=self.proteins,
-            protein_count=self.protein_count,
-            xcorr=self.xcorr,
-            eval=self.eval,
-            delta_cn=self.delta_cn,
-        )
+        # Check whether TXT is from a direct Comet run or a Comet run via crux
+        comet_txt = CometTxt(path=Path(txt))
 
-    def to_dict(self):
-        return asdict(self)
-
-    def get_possible_hybrid_peptides(
-        self, kmer_to_proteins_map: Dict[str, List[str]], min_side_len: int
-    ) -> List[HybridPeptide]:
-        return get_possible_hybrid_peptides_for_seq(
-            seq=self.seq,
-            kmer_to_proteins_map=kmer_to_proteins_map,
-            min_side_len=min_side_len,
-        )
-
-    @property
-    def mzml_name(self) -> str:
-        return Mzml.get_mzml_name(mzml=self.sample)
-
-
-def get_possible_hybrid_peptides_for_seq(
-    seq: str, kmer_to_proteins_map: Dict[str, List[str]], min_side_len: int
-) -> List[HybridPeptide]:
-    possible_hybrids = []
-    for breakpoint in range(min_side_len, len(seq) - min_side_len + 1):
-        left = seq[:breakpoint]
-        right = seq[breakpoint:]
-        if (left in kmer_to_proteins_map) and (right in kmer_to_proteins_map):
-            possible_hybrids.append(
-                HybridPeptide(
-                    left_seq=left,
-                    right_seq=right,
-                    left_proteins=kmer_to_proteins_map[left],
-                    right_proteins=kmer_to_proteins_map[right],
+        # Set sample if not provided
+        if len(sample) == 0:
+            sample = comet_txt.sample
+        if comet_txt.file_type == CRUX:
+            df = pd.read_csv(comet_txt.path, sep="\t")
+            df[SAMPLE] = sample
+            if "file" in df.columns:
+                # If the 'file' column exists, it means it's the output of `crux assign-confidence`
+                # in which case we need to set the sample differently
+                df[SAMPLE] = df["file"].apply(
+                    lambda file_path: Path(file_path).stem.split(".")[0]
                 )
+            df.rename(
+                columns={
+                    "b/y ions matched": IONS_MATCHED,
+                    "b/y ions total": IONS_TOTAL,
+                    "xcorr score": XCORR,
+                    "xcorr rank": NUM,
+                    "protein id": PROTEIN,
+                    "sequence": PLAIN_PEPTIDE,
+                    "tdc q-value": Q_VAL,
+                },
+                inplace=True,
             )
-    return possible_hybrids
+        elif comet_txt.file_type == COMET:
+            df = pd.read_csv(comet_txt.path, sep="\t", header=1)
+            df[SAMPLE] = sample
+
+        if as_df:
+            return df
+        else:
+            data = [
+                cls(
+                    sample=row[SAMPLE],
+                    scan=row[SCAN],
+                    num=row[NUM],
+                    ions_matched=row[IONS_MATCHED],
+                    ions_total=row[IONS_TOTAL],
+                    # protein_count=row[PROTEIN_COUNT],
+                    proteins=row[PROTEIN].split(","),
+                    seq=row[PLAIN_PEPTIDE],
+                    xcorr=row[XCORR],
+                    eval=row[EVAL],
+                    delta_cn=row[DELTA_CN],
+                    q_value=row.get(Q_VAL, None),  # Handle optional q-value
+                )
+                for _, row in df.iterrows()
+            ]
+            if only_num_1:
+                data = [psm for psm in data if psm.num == 1]
+            return data
+
+    @classmethod
+    def from_txts(
+        cls, txts: List[Union[str, Path]], by_spectrum: bool = False
+    ) -> List["CometPSM"]:
+        spectrum_to_psms = defaultdict(list)
+        for txt in txts:
+            for psm in cls.from_txt(txt=txt):
+                spectrum_to_psms[psm.spectrum_uid].append(psm)
+        spectrum_to_psms = dict(spectrum_to_psms)
+        if by_spectrum:
+            return spectrum_to_psms
+        else:
+            return flatten_list_of_lists(list(spectrum_to_psms.values()))
+
+    @staticmethod
+    def get_top_psms(psms: List["CometPSM"]) -> List["CometPSM"]:
+        """Get only `num=1` PSMs"""
+        return [psm for psm in psms if psm.num == 1]
+
+    def get_spectrum(self, spectra_dir: Union[str, Path] = Path("data")) -> Spectrum:
+        matching_files = []
+        for file in spectra_dir.rglob("*"):
+            # file.name[-5:]
+            if (
+                file.is_file()
+                and file.name[-5:] == ".mzML"
+                and Mzml(mzml=file).name == self.sample
+            ):
+                matching_files.append(file)
+        assert (
+            len(matching_files) == 1
+        ), f"Expected exactly one matching mzML file for PSM with sample {self.sample}, found {len(matching_files)}"
+        return Mzml(mzml=matching_files[0]).get_spectrum(scan=self.scan)
+
+
+def get_high_confidence_psms(
+    psms: List[CometPSM], score: Literal[Q_VAL] = Q_VAL, threshold: float = Q_VAL_THRESH
+) -> List[CometPSM]:
+    """ """
+    # Get only `num=1` PSMs
+    psms = CometPSM.get_top_psms(psms=psms)
+    return list(filter(lambda psm: getattr(psm, score) <= threshold, psms))

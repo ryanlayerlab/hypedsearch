@@ -25,9 +25,9 @@ from src.utils import (
     Kmer,
     PathType,
     generate_aa_kmers,
-    get_prefixes,
-    get_suffixes,
+    get_b_ion_prefixes,
     get_time_in_diff_units,
+    get_y_ion_suffixes,
     log_params,
     log_time,
     pickle_and_compress,
@@ -37,8 +37,7 @@ from src.utils import (
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class UnpositionedProductIon:
+class UnpositionedProductIon(BaseModel):
     seq: str
     charge: int
     ion_type: Literal[B_ION_TYPE, Y_ION_TYPE]
@@ -108,9 +107,9 @@ class UnpositionedProductIon:
         product_ions = []
         for ion_type in ion_types:
             if ion_type == B_ION_TYPE:
-                seq_generator = get_prefixes
+                seq_generator = get_b_ion_prefixes
             elif ion_type == Y_ION_TYPE:
-                seq_generator = get_suffixes
+                seq_generator = get_y_ion_suffixes
             else:
                 raise ValueError(f"Unsupported ion type: {ion_type}")
             for charge in charges:
@@ -123,8 +122,7 @@ class UnpositionedProductIon:
         return product_ions
 
 
-@dataclass
-class Peptide:
+class Peptide(BaseModel):
     seq: str
     name: Optional[str] = None
     desc: Optional[str] = None
@@ -184,20 +182,18 @@ class Fasta(BaseModel):
     def proteins(self) -> List[Peptide]:
         return Peptide.from_fasta(fasta_path=self.path)
 
-    def get_proteins_by_name(
-        self, protein_names: Union[List[str], str, Path]
-    ) -> List[Peptide]:
-        return get_proteins_by_name(protein_names=protein_names, fasta_path=self.path)
+    def get_proteins_by_name(self, names: Union[List[str], str, Path]) -> List[Peptide]:
+        return get_proteins_by_name(protein_names=names, fasta_path=self.path)
 
     @staticmethod
-    def write_fasta(peptides: List[Peptide], out_path: str) -> None:
+    def write_fasta(peptides: List[Peptide], path: str) -> None:
         """
         Write a list of Peptide objects to a FASTA file.
         Each peptide will get two lines in the FASTA file:
         ><peptide.name> <peptide.desc>
         <peptide.seq>
         """
-        with open(out_path, "w") as f:
+        with open(path, "w") as f:
             for peptide in peptides:
                 header_parts = []
                 if peptide.name:
@@ -209,7 +205,7 @@ class Fasta(BaseModel):
                 f.write(f">{header}\n")
                 f.write(f"{peptide.seq}\n")
 
-    @property
+    @cached_property
     def protein_name_to_seq_map(self):
         return {pep.name: pep.seq for pep in self.proteins}
 
@@ -399,6 +395,23 @@ def cli_get_kmer_counts_by_protein(
     pickle_and_compress(obj=k_map, path=out_path)
     loop_duration = time() - loop_start_time
     logger.info(f"Processed k={k} in {get_time_in_diff_units(loop_duration)}")
+
+
+@click.command(
+    name="create-fasta",
+    help=(""),
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+)
+def cli_create_fasta(
+    fasta: Path,
+    protein_names: Union[List[str], Path],
+    out_path: Path,
+):
+    proteins = get_proteins_by_name(
+        protein_names=protein_names,
+        fasta_path=fasta,
+    )
+    Fasta.write_fasta(peptides=proteins, path=out_path)
 
 
 @click.group(context_settings=dict(help_option_names=["-h", "--help"]))

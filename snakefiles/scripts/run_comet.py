@@ -25,7 +25,7 @@ logger.debug(
     f"Running with params:\n\tmzml={mzml},\n\tscan={scan},\n\tsample={sample},\n\t"
     f"out_dir={out_dir},\n\t Snakemake config: {snakemake.config}"
 )
-crux = Crux(path=snakemake.config.crux_path)
+crux = Crux()
 crux.run_comet(
     mzml=snakemake.input.mzml,
     fasta=snakemake.config.fasta,

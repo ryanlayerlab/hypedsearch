@@ -1,6 +1,8 @@
 from enum import Enum
 from pathlib import Path
 
+import numpy as np
+
 # from src.erik_utils import file_exists
 
 # Paths
@@ -18,7 +20,6 @@ COMET_RUN_2_DIR = DATA_DIR / "comet_run_2"
 HS_DIR = DATA_DIR / "hs"
 SPECTRA_DIR = DATA_DIR / "spectra"
 COMET_EXECUTABLE = COMET_DIR / "comet.macos.exe"
-MAC_CRUX_EXECUTABLE = COMET_DIR / "crux-4.3.Darwin.x86_64/bin/crux"
 COMET_PARAMS = COMET_DIR / "comet.params"
 DEFAULT_COMET_PARAMS_FILE = COMET_DIR / "comet.params"
 DEFAULT_COMET_PRECURSOR_MZ_PPM_TOL = 20.0
@@ -27,11 +28,14 @@ DEFAULT_COMET_SCAN_RANGE = (0, 0)
 DEFAULT_CRUX_PARAMS = COMET_DIR / "crux.comet.params"
 DEFAULT_MIN_CLUSTER_LENGTH = 3
 DEFAULT_MIN_CLUSTER_SUPPORT = 2
+DEFAULT_MAX_PRECURSOR_CHARGE = 4
+DEFAULT_NUM_COMET_THREADS = 0
+DEFAULT_NATIVE_RUN_CONFIG = "native_run.smk.json"
 
 FASTAS_DIR = (GIT_REPO_DIR / "fastas").relative_to(GIT_REPO_DIR)
 MOUSE_PROTEOME = FASTAS_DIR / "SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
 HUMAN_PROTEOME = FASTAS_DIR / "uniprotkb_proteome_UP000005640_AND_revi_2025_04_29.fasta"
-RUN_COMET_SMK = GIT_REPO_DIR / "snakefiles/run_comet.smk"
+RUN_COMET_SMK = (GIT_REPO_DIR / "snakefiles/run_comet.smk").relative_to(GIT_REPO_DIR)
 RUN_HYPEDSEARCH_SMK = GIT_REPO_DIR / "snakefiles/run_hypedsearch.smk"
 
 # Strings
@@ -83,7 +87,8 @@ COMET = "comet"
 CRUX = "crux"
 MZML = "mzml"
 SCAN_HYBRIDS = "scan_hybrids"
-Q_VALUE = "q_value"
+Q_VAL = "q_value"
+Q_VAL_THRESH = 0.01
 PRECURSOR_MZ_PPM_TOL = "precursor_mz_ppm_tol"
 PEAK_TO_ION_PPM_TOL = "peak_to_ion_ppm_tol"
 MZML_EXT = "mzML"
@@ -93,7 +98,9 @@ TARGET = "target"
 DECOY = "decoy"
 FOREGROUND = "foreground"
 BACKGROUND = "background"
-CRUX_PATH_IN_SINGULARITY = "/usr/local/bin/crux"
+LINUX_CRUX_EXECUTABLE = "/usr/local/bin/crux"
+MAC_CRUX_EXECUTABLE = COMET_DIR / "crux-4.3.Darwin.x86_64/bin/crux"
+SPECTRA_PSMS_FILE_NAME = "spectra_psms.pklz"
 
 
 class IonTypes(Enum):
@@ -120,6 +127,7 @@ MAX_PEPTIDE_LEN = 50
 MAX_KMER_LEN = 50
 DEFAULT_MAX_KMER_LEN = 25
 DEFAULT_MIN_KMER_LEN = 1
+DEFAULT_MIN_SIDE_LEN = 5
 DEFAULT_PPM_TOLERANCE = 10
 DEFAULT_PEAK_TO_ION_PPM_TOL = 20
 DEFAULT_PRECURSOR_MZ_PPM_TOL = 20
@@ -129,7 +137,6 @@ DEFAULT_CHARGES = [1, 2, 3]
 B_ION_AS_INT = 0
 Y_ION_AS_INT = 1
 ION_CHARGES_TO_CONSIDER = [1, 2]
-DEFAULT_Q_VALUE_THRESH = 0.01
 
 # For simplicity
 samples = [f"BMEM_AspN_Fxn{val}" for val in [4, 5, 6, 7, 8, 9]]
@@ -174,3 +181,8 @@ OXYGEN_MASS = 15.99491463
 PROTON_MASS = 1.00727646688  # from Scott
 # This is the mass of water. Adding the mass of water to the sum of all the residue masses gives the mass of the peptide.
 WATER_MASS = (2 * HYDROGEN_MASS) + OXYGEN_MASS
+
+
+DEFAULT_FPR = 0.05
+DEFAULT_Q_RANGE = np.linspace(0.001, 0.05, 10)
+DEFAULT_SCORE_CHANGE_RANGE = np.linspace(0.2, 3, 10)

@@ -1,13 +1,16 @@
 import logging
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Union
 
 import click
 import pandas as pd
 import seaborn as sns
+from pydantic import BaseModel
 
-from src.comet_utils import CometPSM
+from src.comet_utils import CometPSM, get_high_confidence_psms
+from src.constants import Q_VAL, Q_VAL_THRESH
 from src.plot_utils import fig_setup, finalize, save_fig, set_title_axes_labels
 from src.utils import PathType, flatten_list_of_lists, setup_logger, to_json
 
@@ -81,56 +84,59 @@ def get_prefix_counts_by_length(
     return prefix_counts_by_length
 
 
-def plot_protein_counts(
-    prot_counts: Dict[str, int],
-    ms: int = 10,
-    top_n_prots: int = 10,
-):
-    df = pd.DataFrame(prot_counts.items(), columns=["prot", "count"])
-    df.sort_values("count", inplace=True, ignore_index=True, ascending=False)
+class ProteinAbundance(BaseModel):
+    protein_counts: Counter
 
-    fig, axs = fig_setup(1, 2)
+    @classmethod
+    def from_comet_psms(
+        cls, psms: List[CometPSM], q_val_thresh: float = Q_VAL_THRESH
+    ) -> "ProteinAbundance":
+        psms = get_high_confidence_psms(psms=psms, score=Q_VAL, threshold=q_val_thresh)
+        all_comet_proteins = flatten_list_of_lists([psm.proteins for psm in psms])
+        protein_counts = Counter(all_comet_proteins)
+        return cls(protein_counts=protein_counts)
 
-    # 1st plot
-    ax = axs[0]
-    _ = ax.plot(
-        df["count"],
-        "bo",
-        ms=1,
-    )
-    set_title_axes_labels(
-        ax=ax,
-        xlabel="protein index",
-        ylabel="count",
-    )
+    def top_n_prots(
+        self, n: int, with_cnts: bool = False
+    ) -> Union[Set[str], Dict[str, int]]:
+        most_common_proteins = {
+            prot: cnt for prot, cnt in self.protein_counts.most_common(n)
+        }
+        if with_cnts:
+            return most_common_proteins
+        else:
+            return set(most_common_proteins.keys())
 
-    # 2nd plot - same as first but only showing the most 100 abundant proteins
-    ax = axs[1]
-    _ = ax.plot(
-        df["count"],
-        "bo",
-        ms=1,
-    )
+    def plot(
+        self,
+        top_n_prots: Optional[int] = None,
+    ):
+        # Define data
+        items = sorted(self.protein_counts.items(), key=lambda x: x[1], reverse=True)
+        if top_n_prots is not None:
+            items = items[:top_n_prots]
+        keys, values = zip(*items)
 
-    # Label the left-most N points
-    colors = sns.color_palette("hsv", top_n_prots)
-    for idx in range(top_n_prots):
-        # _ = ax.text(
-        _ = ax.scatter(
-            idx,
-            df["count"].iloc[idx],
-            label=df["prot"].iloc[idx],
-            color=colors[idx],
-            s=ms,
+        # Plot
+        fig, axs = fig_setup(h=8, w=10)
+        ax = axs[0]
+        ax.scatter(range(len(keys)), values)
+        ax.set_xticks(range(len(keys)), keys, rotation=90, fontsize=8)
+        set_title_axes_labels(
+            ax=ax,
+            # title="Protein counts",
+            xlabel="Protein",
+            ylabel="PSM counts",
         )
+        finalize(axs)
+        return fig, axs
 
-    set_title_axes_labels(
-        ax=ax,
-        xlabel="protein index",
-    )
-    _ = ax.set_xlim(left=-1, right=100)
-    finalize(axs)
-    return fig, axs
+    def get_ab(self, protein: str) -> int:
+        return self.protein_counts[protein]
+
+    def get_rel_ab(self, protein: str) -> float:
+        max_count = max(self.protein_counts.values())
+        return self.protein_counts[protein] / max_count
 
 
 def get_and_plot_most_common_proteins(

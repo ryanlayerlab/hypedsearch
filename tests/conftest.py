@@ -1,3 +1,4 @@
+import subprocess
 import sys
 from pathlib import Path
 
@@ -7,7 +8,10 @@ import pytest
 repo_dir = Path(__file__).parents[1]
 sys.path.append(str(repo_dir / "src"))
 
-from src.constants import GIT_REPO_DIR
+from click.testing import CliRunner
+
+from src.constants import GIT_REPO_DIR, MOUSE_PROTEOME
+from src.hypedsearch import HybridFormer, HybridPSMScorer, HypedsearchRunConfig
 
 
 @pytest.fixture
@@ -65,18 +69,37 @@ def crux_txt(test_data_dir):
     return test_data_dir / "crux.comet.1-10.txt"
 
 
-def normalize(obj):
-    """
-    Recursively convert numpy types to builtin Python types.
-    For snapshot testing to fix 'TypeError: Object of type <some type, e.g., float32>
-    is not JSON serializable'
-    """
-    if isinstance(obj, np.generic):  # e.g. np.float32, np.int64
-        return obj.item()
-    if isinstance(obj, np.ndarray):
-        return obj.tolist()
-    if isinstance(obj, dict):
-        return {k: normalize(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        return [normalize(v) for v in obj]
-    return obj
+def default_config(test_data_dir: Path, out_dir: Path) -> HypedsearchRunConfig:
+    db_path = (
+        test_data_dir / "sp-P99027-RLA2_MOUSE_mzml=BMEM_AspN_Fxn4;scan=7_kmer_db.db"
+    )
+    return HypedsearchRunConfig(
+        mzml_to_scans={test_data_dir / "spectra/BMEM_AspN_Fxn4_scans1-20.mzML": "all"},
+        parent_out_dir=out_dir,
+        hybrid_former=HybridFormer(
+            kmer_db=db_path,
+            fasta=MOUSE_PROTEOME,
+        ),
+        psm_scorer=HybridPSMScorer(
+            comet_params=test_data_dir / "comet.params",
+        ),
+    )
+
+
+def default_hs_run(test_data_dir: Path, out_dir: Path):
+    # Arrange
+    hs_config = default_config(
+        test_data_dir=test_data_dir,
+        out_dir=out_dir,
+    )
+    config_path = out_dir / "config.json"
+    hs_config.to_json(path=config_path)
+    cmd_parts = ["./src/run_hypedsearch.sh", f"--config {config_path}", f"--cores 8"]
+    cmd = " ".join(cmd_parts)
+    _ = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        shell=True,
+    )
+    return hs_config

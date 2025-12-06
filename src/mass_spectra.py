@@ -1,7 +1,8 @@
 import re
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
-from typing import Annotated, Dict, List, Optional, Tuple, Union
+from typing import Annotated, Any, Dict, List, Optional, Tuple, Union
 
 import click
 import numpy as np
@@ -22,15 +23,13 @@ from src.plot_utils import (
 from src.utils import flatten_list_of_lists, to_path
 
 
-@dataclass
-class Peak:
+class Peak(BaseModel):
     mz: float
     intensity: float
     id: Optional[int] = None
 
 
-@dataclass
-class Spectrum:
+class Spectrum(BaseModel):
     precursor_mz: float
     precursor_charge: int
     precursor_abundance: float
@@ -218,7 +217,7 @@ class Spectrum:
         title: Optional[str] = None,
         out_path: Optional[Union[str, Path]] = None,
         add_counts: bool = True,
-    ):
+    ) -> Axes:
         if ax is None:
             _, axs = fig_setup()
             ax = axs[0]
@@ -227,30 +226,82 @@ class Spectrum:
         if add_counts:
             add_counts_to_histogram_boxes(ax=ax)
         set_title_axes_labels(ax=ax, title=title, xlabel=attr, ylabel="Count")
+        finalize(ax)
         if out_path is not None:
-            finalize(ax)
             save_fig(out_path)
+        return ax
 
     @staticmethod
     def plot_spectra_info(
         spectra: List["Spectrum"],
         attrs: List[str] = ["precursor_charge", "precursor_mz", "retention_time"],
-    ):
+    ) -> List[Axes]:
         _, axs = fig_setup(nrows=1, ncols=len(attrs))
         for i, attr in enumerate(attrs):
             Spectrum.plot_attr(spectra=spectra, attr=attr, ax=axs[i])
         finalize(axs)
+        return list(axs)
+
+    @staticmethod
+    def organize_by_spectrum(data: List[Any]):
+        if len(data) == 0:
+            return {}
+        else:
+            spec_id = getattr(data[0], "spectrum_uid", None)
+            if spec_id is not None:
+                return {datum.spectrum_uid: datum for datum in data}
+            else:
+                # So it can work on spectra too
+                return {datum.uid: datum for datum in data}
+
+    @staticmethod
+    def spectra_plots(
+        spectra: List["Spectrum"],
+    ):
+        fig, axs = fig_setup(1, 3)
+        Spectrum.plot_attr(
+            ax=axs[0],
+            spectra=spectra,
+            attr="precursor_charge",
+        )
+        Spectrum.plot_attr(
+            ax=axs[1],
+            spectra=spectra,
+            attr="precursor_mz",
+            add_counts=False,
+        )
+        Spectrum.plot_attr(
+            ax=axs[2],
+            spectra=spectra,
+            attr="retention_time",
+            add_counts=False,
+        )
+        finalize(axs)
+        _ = fig.suptitle(f"MS2 spectra (n={len(spectra)})")
+        return fig, axs
+
+    @classmethod
+    def load_spectra_from_mzmls(cls, mzmls: List[Union[str, Path]]) -> List["Spectrum"]:
+        all_spectra = []
+        for mzml in mzmls:
+            spectra = cls.parse_ms2_from_mzml(mzml=mzml)
+            all_spectra.extend(spectra)
+        return all_spectra
 
 
 class Mzml(BaseModel):
     mzml: Annotated[Path, BeforeValidator(lambda x: to_path(path=x, check_exists=True))]
 
-    @property
+    @cached_property
     def ms2_spectra(self) -> List["Spectrum"]:
         """
         Get all spectra from the mzML file.
         """
         return Spectrum.parse_ms2_from_mzml(mzml=self.mzml)
+
+    @cached_property
+    def id_to_spectrum(self) -> Dict[str, Spectrum]:
+        return {spectrum.uid: spectrum for spectrum in self.ms2_spectra}
 
     @property
     def msn_scan_numbers(self) -> List[int]:
@@ -287,6 +338,7 @@ def plot_peaks(
     peaks: List[Peak],
     annotate: bool = True,
     log_intensity: bool = False,
+    lw: float = 0.5,
     alpha: float = 1,
     color: str = "grey",
     label: str = "",
@@ -298,8 +350,11 @@ def plot_peaks(
         intensities = [np.log(intensity) for intensity in intensities]
 
     ax.vlines(
-        mzs, [0], intensities, color=color, linewidth=0.5, alpha=alpha, label=label
+        mzs, [0], intensities, color=color, linewidth=lw, alpha=alpha, label=label
     )
+    # Plot y=0 line
+    ax.axhline(0, color="black", linestyle="-", linewidth=0.5)
+
     if annotate:
         if log_intensity:
             ylabel = "log(intensity)"
@@ -351,11 +406,12 @@ def get_mzml_for_sample(sample: str) -> Path:
     return mzml_path
 
 
-def load_spectra_from_computer(path: Path) -> List[Spectrum]:
+def load_spectra_from_path(path: Union[str, Path]) -> List[Spectrum]:
     """
     Load spectra from a given path on the computer. If the path is a directory, find all
     mass spectra files in that directory and parse all their spectra
     """
+    path = Path(path)
     if path.is_dir():
         spectra_files = list(path.glob("*.mzML"))
         spectra = [
@@ -367,8 +423,8 @@ def load_spectra_from_computer(path: Path) -> List[Spectrum]:
     elif path.is_file():
         return Spectrum.parse_ms2_from_mzml(mzml=path)
 
-    spectra = Spectrum.parse_ms2_from_mzml(mzml=path)
-    return spectra
+    else:
+        raise RuntimeError(f"Path {path} is neither a file nor a directory.")
 
 
 def create_sample_scan_to_spectrum_map(

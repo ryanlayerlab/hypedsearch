@@ -1,10 +1,13 @@
+import json
 import logging
 import os
 import re
+import tempfile
 import time
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from dataclasses import Field, dataclass, field
+from dataclasses import dataclass, field
+from datetime import datetime
 from functools import cached_property
 from pathlib import Path
 from typing import (
@@ -26,7 +29,7 @@ import pandas as pd
 import seaborn as sns
 import yaml
 from matplotlib import pyplot as plt
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
 from scipy.stats import ecdf
 from typing_extensions import Self
 
@@ -34,29 +37,36 @@ from src.blastp import run_blastp
 from src.comet_utils import CometPSM
 from src.constants import (
     COMET_DIR,
-    CRUX_PATH_IN_SINGULARITY,
     DECOY,
     DEFAULT_CRUX_PARAMS,
     DEFAULT_MAX_ALLOWED_ION_CHARGE,
     DEFAULT_MAX_KMER_LEN,
+    DEFAULT_MAX_PRECURSOR_CHARGE,
     DEFAULT_MIN_CLUSTER_LENGTH,
     DEFAULT_MIN_CLUSTER_SUPPORT,
     DEFAULT_MIN_KMER_LEN,
+    DEFAULT_NATIVE_RUN_CONFIG,
+    DEFAULT_NUM_COMET_THREADS,
     DEFAULT_PEAK_TO_ION_PPM_TOL,
     DEFAULT_PRECURSOR_MZ_PPM_TOL,
-    DEFAULT_Q_VALUE_THRESH,
     GIT_REPO_DIR,
     HS_PREFIX,
     HYBRID,
+    LINUX_CRUX_EXECUTABLE,
     NATIVE,
+    Q_VAL_THRESH,
     RUN_COMET_SMK,
     RUN_HYPEDSEARCH_SMK,
     TARGET,
 )
-from src.crux import CometConfig, CometOutputs, Crux, get_expected_comet_outputs
-from src.dataclasses import CometPSMs, PSMScoring
-from src.hybrids_via_clusters import form_spectrum_hybrids_via_clustering
-from src.kmer_database import KmerDatabase, create_kmer_database
+from src.crux import (
+    CometConfig,
+    CometOutputs,
+    Crux,
+    get_expected_comet_outputs_for_mzml_to_scans,
+)
+from src.hybrids_via_clusters import HybridPeptide, form_spectrum_hybrids_via_clustering
+from src.kmer_database import KmerDatabase
 from src.mass_spectra import Mzml, Spectrum, create_sample_scan_to_spectrum_map
 from src.peptide_spectrum_comparison import PSM
 from src.peptides_and_ions import Fasta, Peptide, get_proteins_by_name
@@ -83,43 +93,18 @@ from src.utils import (
 logger = logging.getLogger(__name__)
 
 
-class HybridPeptide(BaseModel):
-    left_seq: str
-    right_seq: str
-    left_proteins: List[str] = []
-    right_proteins: List[str] = []
-
-    @property
-    def seq(self) -> str:
-        return self.left_seq + self.right_seq
-
-    def mz(self, charge: int) -> float:
-        return Peptide(seq=self.seq).mz(charge=charge)
-
-    @property
-    def hyphen_seq(self) -> str:
-        return f"{self.left_seq}-{self.right_seq}"
-
-    @classmethod
-    def from_hyphen_str(cls, hybrid_str: str) -> "HybridPeptide":
-        left_seq, right_seq = hybrid_str.split("-")
-        return cls(left_seq=left_seq, right_seq=right_seq)
-
-    @staticmethod
-    def hybrid_str_to_seq(hybrid_str: str) -> str:
-        left_seq, right_seq = hybrid_str.split("-")
-        return left_seq + right_seq
-
-
 class TrueHybrid(HybridPeptide):
-    spectra: List[Spectrum] = []
+    spectra: List[Spectrum] = field(default_factory=list)
     rt: Optional[float] = None  # retention time
     id: Optional[Union[str, int]] = None
     precursor_mz: Optional[float] = None
 
     @classmethod
     def from_excel(
-        cls, path: Union[str, Path], hyphen_seq_colm: str = "hyphen_seq"
+        cls,
+        path: Union[str, Path],
+        hyphen_seq_colm: str = "hyphen_seq",
+        min_side_len: Optional[int] = None,
     ) -> List["TrueHybrid"]:
         df = pd.read_excel(path)
 
@@ -129,9 +114,15 @@ class TrueHybrid(HybridPeptide):
                 left_seq, right_seq = row[hyphen_seq_colm].split("-")
             except:
                 logger.info(
-                    f"Skipping row (0-based) {row_idx} because the sequence {row[hyphen_seq_colm]} couldn't be split by `-`"
+                    f"Skipping sequence {row[hyphen_seq_colm]} because it couldn't be split by `-`"
                 )
                 continue
+            if min_side_len is not None:
+                if (len(left_seq) < min_side_len) or (len(right_seq) < min_side_len):
+                    logger.info(
+                        f"Hybrid {left_seq}-{right_seq} because one side is shorter than min_side_len={min_side_len}"
+                    )
+                    continue
             hybrids.append(
                 cls(
                     id=row.id,
@@ -142,21 +133,6 @@ class TrueHybrid(HybridPeptide):
                 )
             )
         return hybrids
-
-    @staticmethod
-    def get_proteins_for_true_hybrids(
-        true_hybrids: List["TrueHybrid"],
-        fasta: Union[Path, str],
-    ):
-
-        fasta_obj = Fasta(path=fasta)
-        seqs = flatten_list_of_lists(
-            [hybrid.left_seq, hybrid.right_seq] for hybrid in true_hybrids
-        )
-        seq_to_protein = fasta_obj.proteins_that_contain_seqs(seqs=seqs)
-        for hybrid in true_hybrids:
-            hybrid.left_proteins = list(seq_to_protein[hybrid.left_seq])
-            hybrid.right_proteins = list(seq_to_protein[hybrid.right_seq])
 
     @staticmethod
     def get_spectra_for_true_hybrids(
@@ -177,630 +153,492 @@ class TrueHybrid(HybridPeptide):
                     continue
                 if ppm_diff <= precursor_mz_ppm_tol and rt_diff <= retention_time_tol:
                     hybrid.spectra.append(spectrum)
-        # return true_hybrids
 
-
-@dataclass
-class TrueHybrids:
-    hybrids: List[TrueHybrid]
-
-    @property
-    def seqs(self) -> Set[str]:
-        return set(hy.seq for hy in self.hybrids)
-
-    @property
-    def hyphen_seqs(self) -> Set[str]:
-        return set(hy.hyphen_seq for hy in self.hybrids)
-
-
-@dataclass
-class HybridPSM:
-    hybrids: List[HybridPeptide]
-    psm: PSM
-    comet_psm: CometPSM
-
-    def to_dicts(self) -> List[Dict]:
-        data = []
-        for hybrid in self.hybrids:
-            data.append(
-                {
-                    "mzml": self.comet_psm.sample,
-                    "scan": self.comet_psm.scan,
-                    "precursor_mz": self.psm.spectrum.precursor_mz,
-                    "precursor_charge": self.psm.spectrum.precursor_charge,
-                    "retention_time": self.psm.spectrum.retention_time,
-                    "seq": hybrid.seq,
-                    "left_seq": hybrid.left_seq,
-                    "right_seq": hybrid.right_seq,
-                    "left_proteins": hybrid.left_proteins,
-                    "right_proteins": hybrid.right_proteins,
-                    "xcorr": self.comet_psm.xcorr,
-                    "q_value": self.comet_psm.q_value,
-                    "ions_matched": self.comet_psm.ions_matched,
-                    "ions_total": self.comet_psm.ions_total,
-                    "prop_ions_matched": self.comet_psm.ions_matched
-                    / self.comet_psm.ions_total,
-                    "prefixes_supported": self.psm.prefixes_supported,
-                    "prop_prefixes_supported": len(self.psm.prefixes_supported)
-                    / len(hybrid.seq),
-                    "suffixes_supported": self.psm.suffixes_supported,
-                    "prop_suffixes_supported": len(self.psm.suffixes_supported)
-                    / len(hybrid.seq),
-                    "prop_intensity_supported": self.psm.prop_intensity_supported,
-                }
+    @staticmethod
+    def add_proteins(
+        true_hybrids: List["TrueHybrid"],
+        fasta: Union[Fasta, Path, str],
+    ) -> List["TrueHybrid"]:
+        if isinstance(fasta, (str, Path)):
+            fasta = Fasta(path=fasta)
+        seq_to_prots = fasta.proteins_that_contain_seqs(
+            seqs=flatten_list_of_lists(
+                [[hy.left_seq, hy.right_seq] for hy in true_hybrids]
             )
-        return data
-
-
-class HybridRunConfig(BaseModel):
-    mzml_to_scans: Dict[Path, List[int]]
-    out_dir: Path
-    fasta: Path
-    kmer_db: Path
-    kmer_to_proteins_map: Path
-    crux_path: Path = COMET_DIR / "crux-4.3.Darwin.x86_64/bin/crux"
-    peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL
-    precursor_mz_ppm_tol: float = DEFAULT_PRECURSOR_MZ_PPM_TOL
-    crux_comet_params: Path = DEFAULT_CRUX_PARAMS
-    min_cluster_len: int = DEFAULT_MIN_CLUSTER_LENGTH
-    min_cluster_support: int = DEFAULT_MIN_CLUSTER_SUPPORT
-    max_allowed_ion_charge: int = DEFAULT_MAX_ALLOWED_ION_CHARGE
-    log_dir: Path = Path("")
-    num_peaks: int = 0
-
-    def save(self, path: Union[str, Path]) -> None:
-        data = self.model_dump(mode="json")  # Converts Paths to strings
-        save_dict(data=data, path=path)
-
-    @classmethod
-    def from_json(cls, path: Path) -> "HybridRunConfig":
-        return cls(**load_json(path=path))
-
-    @property
-    def expected_target_outputs(self):
-        expected_outputs = get_expected_comet_outputs(
-            mzml_to_scans=self.mzml_to_scans,
-            out_dir=Path(self.out_dir),
-            decoy_search=2,
-            psm_type=TARGET,
-            remove_existing_files=False,
         )
-        return expected_outputs
+        for hy in true_hybrids:
+            hy.left_proteins = seq_to_prots[hy.left_seq]
+            hy.right_proteins = seq_to_prots[hy.right_seq]
+        return true_hybrids
+
+
+def proteins_needed_for_true_hybrids(
+    true_hybrids: List[TrueHybrid],
+    fasta: Union[Path, str],
+) -> Set[str]:
+    TrueHybrid.set_proteins_for_true_hybrids(true_hybrids=true_hybrids, fasta=fasta)
+    return set(
+        flatten_list_of_lists(
+            [hybrid.left_proteins + hybrid.right_proteins for hybrid in true_hybrids]
+        )
+    )
 
 
 def combine_comet_scan_results(scan_results_dir: Path, out_dir: Path):
     output_regex = r"^(?P<mzml>(.+?))\.comet\.(?P<scan>\d+)-(?P=scan)\.(?P<psm_type>target|decoy)\.txt$"
-
     # Get Comet outputs for each MZML
     logger.info("Grouping Comet outputs by MZML...")
     mzml_names = set()
     mzml_files = defaultdict(lambda: {TARGET: [], DECOY: []})
-    for hybrid_txt in scan_results_dir.glob("*.txt"):
-        match = re.match(output_regex, hybrid_txt.name)
+    for comet_txt in scan_results_dir.glob("*.txt"):
+        match = re.match(output_regex, comet_txt.name)
+        if match is None:
+            logger.info(
+                f"Skipping file {comet_txt} because it doesn't match expected pattern"
+            )
+            continue
+
         mzml_name = match.groupdict()["mzml"]
         psm_type = match.groupdict()["psm_type"]
-        mzml_files[mzml_name][psm_type].append(hybrid_txt)
+        mzml_files[mzml_name][psm_type].append(comet_txt)
         mzml_names.add(mzml_name)
 
-    target_txts = []
     for mzml_name in mzml_names:
-        # Combine targets
-        logger.info(f"Combining Comet target outputs for {mzml_name}...")
-        out_path = out_dir / f"{mzml_name}.comet.{TARGET}.txt"
-        target_txts.append(out_path)
-        _ = Crux.combine_crux_comet_files(
-            files=mzml_files[mzml_name][TARGET],
-            out_path=out_path,
-        )
-
-        # Combine decoys
-        logger.info(f"Combining Comet decoy outputs for {mzml_name}...")
-        out_path = out_dir / f"{mzml_name}.comet.{DECOY}.txt"
-        _ = Crux.combine_crux_comet_files(
-            files=mzml_files[mzml_name][DECOY],
-            out_path=out_path,
-        )
+        for psm_type in [TARGET, DECOY]:
+            files = mzml_files[mzml_name][psm_type]
+            if len(files) == 0:
+                continue
+            logger.info(f"Combining Comet {psm_type} outputs for {mzml_name}...")
+            out_path = out_dir / f"{mzml_name}.comet.{psm_type}.txt"
+            _ = Crux.combine_crux_comet_files(
+                files=files,
+                out_path=out_path,
+            )
 
 
-class HypedsearchConfig(BaseModel):
-    name: str
-    mzml_to_scans: Dict[Path, List[int]]
-    out_dir: Path
-    fasta: Path
-    crux_path: Path = COMET_DIR / "crux-4.3.Darwin.x86_64/bin/crux"
-    peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL
-    precursor_mz_ppm_tol: float = DEFAULT_PRECURSOR_MZ_PPM_TOL
-    crux_comet_params: Path = DEFAULT_CRUX_PARAMS
-    min_cluster_len: int = DEFAULT_MIN_CLUSTER_LENGTH
-    min_cluster_support: int = DEFAULT_MIN_CLUSTER_SUPPORT
-    max_allowed_ion_charge: int = DEFAULT_MAX_ALLOWED_ION_CHARGE
-    log_dir: Path = Path("")
-    num_peaks: int = 0
-    max_precursor_charge: Optional[int] = None
+class MzmlToScans(BaseModel):
+    mzml_to_scans: Dict[Path, Union[Set[int], str]]
 
     @property
-    def name_dir(self) -> Path:
-        return self.out_dir / self.name
+    def _mzml_to_scans(self):
+        pass
+
+
+class HybridPSMScorer(BaseModel):
+    fasta: Optional[Path] = None
+    comet_params: Path
+
+    @field_validator("comet_params", mode="after")
+    def ensure_paths_exist(cls, v: Path) -> Path:
+        if not v.exists():
+            raise ValueError(f"Path does not exist: {v}")
+        return v
 
     @property
-    def native_run_dir(self) -> Path:
-        return self.name_dir / "native_run"
+    def decoy_search(self) -> Literal[0, 1, 2]:
+        if self.fasta is None:
+            return 0
+        else:
+            return 2
 
-    @property
-    def hybrid_run_dir(self) -> Path:
-        return self.name_dir / "hybrid_run"
+    def score_hybrids(
+        self,
+        seq_to_hybrids: Dict[str, List[HybridPeptide]],
+        spectrum: Spectrum,
+        out_dir: Path,
+    ) -> CometOutputs:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # Create FASTA containing hybrids and run Comet
+            tmp_path = Path(tmp_dir)
+            mzml_name = Mzml.get_mzml_name(mzml=spectrum.mzml)
+            hybrids_fasta = tmp_path / f"{mzml_name}.{spectrum.scan}.fasta"
+            create_hybrids_fasta(
+                hybrid_seqs=seq_to_hybrids.keys(),
+                output_fasta_path=hybrids_fasta,
+                fasta_to_include=self.fasta,
+            )
+            # Run Comet
+            outputs = Crux().run_comet(
+                mzml=spectrum.mzml,
+                fasta=hybrids_fasta,
+                crux_comet_params=self.comet_params,
+                decoy_search=self.decoy_search,
+                out_dir=out_dir,
+                file_root=mzml_name,
+                scan_min=spectrum.scan,
+                scan_max=spectrum.scan,
+                num_threads=1,
+            )
+        return outputs
 
-    @property
-    def kmer_db(self) -> Path:
-        return self.name_dir / "kmers.db"
-
-    @property
-    def kmer_to_proteins_map_path(self) -> Path:
-        return self.name_dir / "kmer_to_proteins_map.json"
-
-    @property
-    def kmer_to_proteins_map(self) -> Dict[str, List[str]]:
-        return load_json(self.kmer_to_proteins_map_path)
-
-    @property
-    def native_run_smk_config(self) -> Path:
-        return self.native_run_dir / "native_run_config.json"
-
-    @property
-    def native_assign_confidence_txt(self) -> Path:
-        return self.native_run_dir / "assign-confidence.txt"
-
-    @property
-    def hybrid_scan_results_dir(self) -> Path:
-        return self.hybrid_run_dir / "scan_results"
-
-    @property
-    def hybrid_assign_confidence_txt(self) -> Path:
-        return self.hybrid_run_dir / "assign-confidence.txt"
-
-    @property
-    def hybrid_run_smk_config(self) -> Path:
-        return self.hybrid_run_dir / "hybrid_run_config.json"
-
-    def missing_hybrid_outputs(self) -> List[str]:
-        missing_target_outputs = get_expected_comet_outputs(
-            mzml_to_scans=self.mzml_to_scans,
-            out_dir=Path(self.hybrid_scan_results_dir),
-            decoy_search=2,
+    def expected_hybrid_target_outputs(
+        self, mzml_to_scans: Dict[str, Set[int]], out_dir: Union[Path, str]
+    ):
+        return get_expected_comet_outputs_for_mzml_to_scans(
+            mzml_to_scans=mzml_to_scans,
+            out_dir=out_dir,
+            decoy_search=self.decoy_search,
             psm_type=TARGET,
         )
 
-        logger.info(
-            f"Looking in {self.hybrid_scan_results_dir}... Missing results for {len(missing_target_outputs)} scans"
-        )
-        return missing_target_outputs
 
-    def top_proteins_txt(self, top_n: int) -> Path:
-        return self.name_dir / f"top_{top_n}_proteins.txt"
+class HybridFormer(BaseModel):
+    kmer_db: Path
+    fasta: Path
+    peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL
+    precursor_mz_ppm_tol: float = DEFAULT_PRECURSOR_MZ_PPM_TOL
+    min_cluster_len: int = DEFAULT_MIN_CLUSTER_LENGTH
+    min_cluster_support: int = DEFAULT_MIN_CLUSTER_SUPPORT
+    max_allowed_ion_charge: int = DEFAULT_MAX_ALLOWED_ION_CHARGE
+
+    def form_hybrids(self, spectrum: Spectrum) -> Dict[str, List[HybridPeptide]]:
+        seq_to_hybrids = form_spectrum_hybrids_via_clustering(
+            spectrum=spectrum,
+            kmer_db=KmerDatabase(db_path=self.kmer_db),
+            fasta=Fasta(path=self.fasta),
+            precursor_mz_ppm_tol=self.precursor_mz_ppm_tol,
+            peak_to_ion_ppm_tol=self.peak_to_ion_ppm_tol,
+            min_cluster_len=self.min_cluster_len,
+            min_cluster_support=self.min_cluster_support,
+            max_allowed_ion_charge=self.max_allowed_ion_charge,
+        )
+        return seq_to_hybrids
+
+
+class SpectrumSelector(BaseModel):
+    max_precursor_charge: int = DEFAULT_MAX_PRECURSOR_CHARGE
+
+    def select_spectra(self, spectra: List[Spectrum]) -> List[Spectrum]:
+        return [
+            spectrum
+            for spectrum in spectra
+            if spectrum.precursor_charge <= self.max_precursor_charge
+        ]
+
+    def get_scan_numbers_of_selected_spectra_from_mzml(self, mzml: Path) -> Set[int]:
+        logger.info(f"Getting spectra from {mzml.name}")
+        spectra = self.select_spectra(spectra=Spectrum.parse_ms2_from_mzml(mzml=mzml))
+        return {spectrum.scan for spectrum in spectra}
+
+
+class SpectrumPreprocessor(BaseModel):
+    num_peaks: int = 0
+
+    def preprocess_spectrum(self, spectrum: Spectrum) -> Spectrum:
+        if self.num_peaks > 0:
+            logger.info(f"Filtering to top {self.num_peaks} peaks...")
+            spectrum.filter_to_top_n_peaks(n=self.num_peaks)
+        return spectrum
+
+
+class HypedsearchRunConfig(BaseModel):
+    mzml_to_scans: Dict[Path, Union[Set[int], Literal["all"]]]
+    hybrid_former: HybridFormer
+    psm_scorer: HybridPSMScorer
+    name: str = Field(
+        default_factory=lambda: f"autoGeneratedName_time={datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+    )
+    native_run_dir: Optional[Path] = None
+    hybrid_run_dir: Optional[Path] = None
+    parent_out_dir: Optional[Path] = None
+    spectrum_selector: SpectrumSelector = SpectrumSelector()
+    spectrum_preprocessor: SpectrumPreprocessor = SpectrumPreprocessor()
+
+    @field_validator("mzml_to_scans", mode="after")
+    def ensure_mzmls_exist(
+        cls, mzml_to_scans: Dict[Path, Union[List[int], Literal["all"]]]
+    ):
+        for mzml in mzml_to_scans.keys():
+            if not mzml.exists():
+                raise ValueError(f"MZML file does not exist: {mzml}")
+        return mzml_to_scans
 
     @model_validator(mode="after")
     def post_init(self) -> Self:
-        # Create required directories if they don't exist
-        self.name_dir.mkdir(parents=True, exist_ok=True)
-        self.native_run_dir.mkdir(parents=True, exist_ok=True)
-        self.hybrid_run_dir.mkdir(parents=True, exist_ok=True)
-        self.hybrid_scan_results_dir.mkdir(parents=True, exist_ok=True)
-
-        # Set scans
-        self.set_scans()
+        # Handle native run and hybrid run directories
+        if self.parent_out_dir is None:
+            self.native_run_dir.mkdir(parents=True, exist_ok=True)
+            self.hybrid_run_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            self.native_run_dir = self.parent_out_dir / f"native_run"
+            self.native_run_dir.mkdir(parents=True, exist_ok=True)
+            self.hybrid_run_dir = self.parent_out_dir / f"hybrid_run"
+            self.hybrid_run_dir.mkdir(parents=True, exist_ok=True)
+        self.hybrid_run_scan_results_dir.mkdir(parents=True, exist_ok=True)
+        self.native_run_scan_results_dir.mkdir(parents=True, exist_ok=True)
         return self
 
-    def set_scans(self):
-        if self.max_precursor_charge is None:
-            for mzml, scans in self.mzml_to_scans.items():
-                if scans == [0]:
-                    logger.info(
-                        f"Updating scans for {mzml} from [0] to all of its scans..."
+    @cached_property
+    def _mzml_to_scans(self) -> Dict[Path, List[int]]:
+        mzml_to_scans = self.mzml_to_scans.copy()
+        for mzml, scans in self.mzml_to_scans.items():
+            if isinstance(scans, str):
+                logger.info
+                mzml_to_scans[mzml] = (
+                    self.spectrum_selector.get_scan_numbers_of_selected_spectra_from_mzml(
+                        mzml=mzml
                     )
-                    self.mzml_to_scans[mzml] = Mzml(mzml=mzml).msn_scan_numbers
-        else:
-            for mzml, scans in self.mzml_to_scans.items():
-                if scans == [0]:
-                    logger.info(
-                        f"Updating scans for {mzml} from [0] to all of its scans with precursor charge <= {self.max_precursor_charge}..."
-                    )
-                    spectra = list(
-                        filter(
-                            lambda spectrum: spectrum.precursor_charge
-                            <= self.max_precursor_charge,
-                            Mzml(mzml=mzml).ms2_spectra,
-                        )
-                    )
-                    self.mzml_to_scans[mzml] = [s.scan for s in spectra]
+                )
+        return mzml_to_scans
+
+    @cached_property
+    def hybrid_run_scan_results_dir(self) -> Path:
+        return self.hybrid_run_dir / "scan_results"
+
+    @cached_property
+    def native_run_scan_results_dir(self) -> Path:
+        return self.native_run_dir / "scan_results"
 
     def to_json(self, path: Union[str, Path]) -> None:
-        data = self.model_dump(mode="json")
-        to_json(data=data, path=path)
+        data_as_json_str = self.model_dump_json()
+        to_json(data=json.loads(data_as_json_str), path=path)
 
     @classmethod
-    def from_json(cls, path: Union[str, Path]) -> "HypedsearchConfig":
-        return cls(**load_json(path))
+    def from_json(cls, path: Union[Path, str]):
+        data = load_json(path=path)
+        return cls(**data)
 
-    def create_native_run_comet_via_snakemake_config(
+    def create_native_run_comet_config(
         self,
-        out_path: Union[Path, str],
-        num_threads_4_comet: int,
+        out_path: Optional[Union[Path, str]] = None,
+        num_threads_4_comet: int = DEFAULT_NUM_COMET_THREADS,
+        decoy_search: Literal[0, 1, 2] = 2,
     ) -> CometConfig:
-        # Create config for snakemake
-        logger.debug(
-            f"Creating and saving native Comet run snakemake config to {out_path}..."
-        )
-        mzml_to_scans = {mzml: [0] for mzml in self.mzml_to_scans.keys()}
-        config = CometConfig(
-            mzml_to_scans=mzml_to_scans,
-            crux_comet_params=self.crux_comet_params,
-            decoy_search=2,
-            fasta=self.fasta,
-            out_dir=self.native_run_dir,
-            crux_path=self.crux_path,
+        comet_config = CometConfig(
+            mzml_to_scans={
+                mzml: [0]
+                # if scans == "all" else scans
+                # for mzml, scans in self.mzml_to_scans.items()
+                for mzml in self.mzml_to_scans.keys()
+            },
+            crux_comet_params=self.psm_scorer.comet_params,
+            decoy_search=decoy_search,
+            fasta=self.hybrid_former.fasta,
+            out_dir=self.native_run_scan_results_dir,
             num_threads=num_threads_4_comet,
         )
-        config.save(path=out_path)
-        return config
-
-    def create_native_run_comet_via_snakemake_config_and_print_run_cmd(
-        self, num_threads_4_comet: int = 0
-    ) -> CometConfig:
-        comet_config = self.create_native_run_comet_via_snakemake_config(
-            num_threads_4_comet=num_threads_4_comet, out_path=self.native_run_smk_config
-        )
-        print(
-            f"Here's the Snakemake command for the native Comet run:\n"
-            f"{comet_config.get_cmd_2_run_comet_via_snakemake(config_path=self.native_run_smk_config)}"
-        )
+        if out_path is not None:
+            comet_config.save(path=out_path)
         return comet_config
 
-    def native_comet_run(self):
-        # Run Comet
-        crux = Crux(path=self.crux_path)
-        for mzml in self.mzml_to_scans.keys():
-            _ = crux.run_comet(
-                mzml=mzml,
-                fasta=self.fasta,
-                crux_comet_params=self.crux_comet_params,
-                decoy_search=2,
-                out_dir=self.native_run_dir,
-                file_root=Mzml.get_mzml_name(mzml=mzml),
+    def native_run(
+        self,
+        method: Literal["direct", "snakemake"],
+        native_config: Optional[Path] = None,
+    ):
+        if method == "direct":
+            comet_outputs = self.native_run_via_comet()
+            return
+        elif method == "snakemake":
+            if native_config is None:
+                native_config = self.native_run_dir / DEFAULT_NATIVE_RUN_CONFIG
+            self.create_native_run_comet_config(
+                out_path=native_config,
+            )
+            logger.info(
+                f"To run Comet via snakemake, use the following command:\n"
+                + f"snakemake -s {RUN_COMET_SMK} --configfile {native_config} --scheduler greedy"
             )
 
-    def run_native_assign_confidence(self):
-        # Assign confidence
-        target_txts = [
-            CometOutputs.standardized_comet_outputs(
-                out_dir=self.native_run_dir,
-                file_root=Mzml.get_mzml_name(mzml=mzml),
-                decoy_search=2,
-            ).target
-            for mzml in self.mzml_to_scans.keys()
-        ]
-        crux = Crux(path=self.crux_path)
+    def native_run_via_comet(self) -> List[CometOutputs]:
+        crux = Crux()
+        outputs = []
+        mzmls = list(self.mzml_to_scans.keys())
+        for idx, mzml in enumerate(mzmls):
+            logger.info(f"Processing MZML: {mzml.name} ({idx+1}/{len(mzmls)})")
+            outputs.append(
+                crux.run_comet(
+                    mzml=mzml,
+                    fasta=self.hybrid_former.fasta,
+                    crux_comet_params=self.psm_scorer.comet_params,
+                    decoy_search=2,
+                    out_dir=self.native_run_dir,
+                    file_root=Mzml.get_mzml_name(mzml=mzml),
+                )
+            )
+        return outputs
+
+    @cached_property
+    def native_psms(self) -> List[CometPSM]:
+        psms = flatten_list_of_lists(
+            CometPSM.from_txt(txt=txt)
+            for txt in self.native_run_dir.glob("*.target.txt")
+        )
+        return [psm for psm in psms if psm.num == 1]
+
+    def native_protein_counts(
+        self, q_value_threshold: Optional[float] = None
+    ) -> Counter:
+        if q_value_threshold is None:
+            return get_protein_counts_from_comet_psms(psms=self.native_psms)
+        else:
+            psms = CometPSM.from_txt(txt=self.native_assign_confidence_path)
+            psms = [psm for psm in psms if psm.q_value <= q_value_threshold]
+            return get_protein_counts_from_comet_psms(psms=psms)
+
+    @property
+    def native_assign_confidence_path(self):
+        return self.native_run_dir / "native-assign-confidence.txt"
+
+    @property
+    def hybrid_assign_confidence_path(self):
+        return self.hybrid_run_dir / "hybrid-assign-confidence.txt"
+
+    def run_assign_confidence(self, run_type: Literal[NATIVE, HYBRID]):
+        if run_type == NATIVE:
+            out_dir = self.native_run_dir
+            out_path = self.native_assign_confidence_path
+        elif run_type == HYBRID:
+            out_dir = self.hybrid_run_dir
+            out_path = self.hybrid_assign_confidence_path
+        else:
+            raise ValueError(
+                f"Invalid run_type: {run_type}. Allowed: {NATIVE}, {HYBRID}"
+            )
+        target_txts = list(out_dir.glob(f"*.{TARGET}.txt"))
+        decoy_txts = list(out_dir.glob(f"*.{DECOY}.txt"))
+        crux = Crux()
+        if len(decoy_txts) == 0:
+            logger.info(f"No decoy txt files found in {out_dir}. Skipping.")
+            return
         crux.run_assign_confidence(
             target_txts=target_txts,
-            out_path=self.native_assign_confidence_txt,
+            out_path=out_path,
         )
 
-    def create_hybrid_run_snakemake_config_and_cmd(
-        self, out_path: Optional[Union[str, Path]] = None
-    ) -> HybridRunConfig:
-        hybrid_run_config = HybridRunConfig(
-            mzml_to_scans=self.mzml_to_scans,
-            out_dir=self.hybrid_scan_results_dir,
-            fasta=self.fasta,
-            kmer_db=self.kmer_db,
-            kmer_to_proteins_map=self.kmer_to_proteins_map_path,
-            crux_path=self.crux_path,
-            peak_to_ion_ppm_tol=self.peak_to_ion_ppm_tol,
-            precursor_mz_ppm_tol=self.precursor_mz_ppm_tol,
-            crux_comet_params=self.crux_comet_params,
-            min_cluster_len=self.min_cluster_len,
-            min_cluster_support=self.min_cluster_support,
-            log_dir=self.log_dir,
-            num_peaks=self.num_peaks,
-            max_allowed_ion_charge=self.max_allowed_ion_charge,
+    @cached_property
+    def spectra(self) -> List[Spectrum]:
+        spectra = []
+        for mzml, scans in self._mzml_to_scans.items():
+            mzml_spectra = Spectrum.parse_ms2_from_mzml(mzml=mzml)
+            spectra_from_mzml = [
+                spectrum for spectrum in mzml_spectra if spectrum.scan in scans
+            ]
+            spectra.extend(spectra_from_mzml)
+        return spectra
+
+    def spectra_plots(self):
+        fig, _ = Spectrum.spectra_plots(spectra=self.spectra)
+        # Plot precursor charges
+        _ = fig.suptitle(
+            f"{self.name} MS2 spectra (n={len(self.spectra)})", fontsize=16
         )
-        if out_path is None:
-            out_path = self.hybrid_run_smk_config
-        hybrid_run_config.save(path=out_path)
-        logger.info(
-            f"Saved hybrid Comet run snakemake config to {self.hybrid_run_smk_config}. To run snakemake, use this command:\n"
-            f"snakemake -s {RUN_HYPEDSEARCH_SMK.relative_to(GIT_REPO_DIR)} --configfile {out_path} ..."
+        save_fig(path=self.parent_out_dir / "spectra.png")
+
+    def native_run_on_spectrum(
+        self, spectrum: Spectrum, num_threads_4_comet: int = DEFAULT_NUM_COMET_THREADS
+    ) -> CometOutputs:
+        comet_config = self.create_native_run_comet_config(
+            num_threads_4_comet=num_threads_4_comet, decoy_search=2
         )
-        return hybrid_run_config
+        outputs = native_run_on_spectrum(spectrum=spectrum, comet_config=comet_config)
+        return outputs
 
-    def psms(self, psm_type: Literal[NATIVE, HYBRID]) -> CometPSMs:
-        if psm_type == NATIVE:
-            psms = CometPSMs(
-                psms=CometPSM.from_txt(txt=self.native_assign_confidence_txt)
-            )
-        elif psm_type == HYBRID:
-            psms = CometPSMs(
-                psms=CometPSM.from_txt(txt=self.hybrid_assign_confidence_txt)
-            )
-
-            # Remove those PSMs that aren't hybrids
-            psms = remove_non_hybrid_psms(psms=psms.psms)
-            psms = CometPSMs(psms=psms)
-        else:
-            raise ValueError(
-                f"Invalid psm_type: {psm_type}. Should be either {NATIVE} or {HYBRID}."
-            )
-        return psms
-
-    def high_confidence_native_psms(self, q_value_threshold: float) -> CometPSMs:
-        return self.native_psms.get_high_confidence_psms(
-            q_value_threshold=q_value_threshold
+    def hybrid_run_on_spectrum(self, spectrum: Spectrum):
+        return hybrid_run_on_spectrum(
+            spectrum=spectrum,
+            out_dir=self.hybrid_run_scan_results_dir,
+            spectrum_preprocessor=self.spectrum_preprocessor,
+            hybrid_former=self.hybrid_former,
+            psm_scorer=self.psm_scorer,
         )
 
-    def high_confidence_hybrid_psms(
-        self, q_value_threshold: float, remove_high_confidence_natives: bool = True
-    ) -> CometPSMs:
-        psms = self.hybrid_psms
-        if remove_high_confidence_natives:
-            logger.info(
-                "Removing hybrid PSMs for which there's a high-confidence native PSM..."
-            )
-            high_conf_native_psms = self.high_confidence_native_psms(
-                q_value_threshold=q_value_threshold
-            )
-            native_scans = set(
-                (psm.sample, psm.scan) for psm in high_conf_native_psms.psms
-            )
-            psms = CometPSMs(
-                psms=[
-                    psm
-                    for psm in psms.psms
-                    if (psm.sample, psm.scan) not in native_scans
-                ]
-            )
-        else:
-            logger.info(
-                "NOT removing hybrid PSMs for which there's a high-confidence native PSM..."
-            )
-        return psms.get_high_confidence_psms(q_value_threshold=q_value_threshold)
-
-    def create_kmer_database_from_top_n_proteins(
-        self,
-        top_n_proteins: int,
-        q_value_threshold: float = DEFAULT_Q_VALUE_THRESH,
-        min_k: int = DEFAULT_MIN_KMER_LEN,
-        max_k: int = DEFAULT_MAX_KMER_LEN,
-    ):
-        # Get PSMs and filter to those that pass the q-value threshold
-        psms = self.high_confidence_psms(
-            q_value_threshold=q_value_threshold, psm_type=NATIVE
-        ).psms
-
-        # Get most abundant proteins
-        prot_counts = get_protein_counts_from_comet_psms(psms=psms)
-        most_common_proteins = get_most_common_proteins(
-            protein_counts=prot_counts, top_n=top_n_proteins
+    def run_hypedsearch_on_spectrum(
+        self, spectrum: Spectrum, num_threads_4_comet: int = DEFAULT_NUM_COMET_THREADS
+    ) -> CometOutputs:
+        native_outputs = self.native_run_on_spectrum(
+            spectrum=spectrum, num_threads_4_comet=num_threads_4_comet
         )
-        logger.info(f"Top {top_n_proteins} proteins:\n{most_common_proteins}")
-        _ = write_new_line_separated_file(
-            lines=most_common_proteins, path=self.top_proteins_txt(top_n=top_n_proteins)
-        )
-        _ = create_kmer_database(
-            proteins=Fasta(path=self.fasta).get_proteins_by_name(
-                protein_names=most_common_proteins
-            ),
-            kmer_to_proteins_path=self.kmer_to_proteins_map_path,
-            db_path=self.kmer_db,
-            min_k=min_k,
-            max_k=max_k,
+        hybrid_outputs = self.hybrid_run_on_spectrum(spectrum=spectrum)
+        return native_outputs, hybrid_outputs
+
+    @property
+    def expected_native_scan_target_outputs(self) -> List[str]:
+        return get_expected_comet_outputs_for_mzml_to_scans(
+            mzml_to_scans=self._mzml_to_scans,
+            out_dir=self.native_run_scan_results_dir,
+            decoy_search=2,  # this value doesn't matter
+            psm_type=TARGET,
         )
 
-    def combine_hybrid_comet_scan_results(self):
+    @property
+    def missing_native_target_outputs(self) -> List[str]:
+        actual = set([txt for txt in self.native_run_scan_results_dir.glob("*.txt")])
+        expected = set(self.expected_native_scan_target_outputs)
+        return [str(txt) for txt in (expected - actual)]
+
+    @property
+    def expected_hybrid_scan_target_outputs(self) -> List[str]:
+        return self.psm_scorer.expected_hybrid_target_outputs(
+            mzml_to_scans=self._mzml_to_scans,
+            out_dir=self.hybrid_run_scan_results_dir,
+        )
+
+    @property
+    def missing_hybrid_target_outputs(self) -> List[str]:
+        actual = set([txt for txt in self.hybrid_run_scan_results_dir.glob("*.txt")])
+        expected = set(self.expected_hybrid_scan_target_outputs)
+        return [str(txt) for txt in (expected - actual)]
+
+    def print_missing_scan_info(self) -> Tuple[List[str], List[str]]:
+        missing_hybrid_targets = self.missing_hybrid_target_outputs
+        missing_native_targets = self.missing_native_target_outputs
+        print(
+            f"There are\n- {len(missing_hybrid_targets)} missing hybrid scan (target) outputs and\n- {len(missing_native_targets)} missing native scan (target) outputs."
+        )
+        return missing_native_targets, missing_hybrid_targets
+
+    def combine_comet_scan_results(self):
+        num_missing_natives = len(self.missing_native_target_outputs)
+        num_missin_hybrids = len(self.missing_hybrid_target_outputs)
+        assert (num_missing_natives == 0) and (num_missin_hybrids == 0), (
+            f"There are {num_missing_natives} missing native scan results and {num_missin_hybrids} missing hybrids! "
+            "Aborting because you probably want to have every spectrum's results before combining them by MZML."
+        )
+        # Combine native results
+        logger.info("Combining native scan results...")
         combine_comet_scan_results(
-            scan_results_dir=self.hybrid_scan_results_dir, out_dir=self.hybrid_run_dir
+            scan_results_dir=self.native_run_scan_results_dir,
+            out_dir=self.native_run_dir,
         )
 
-    def hybrid_assign_confidence(self):
-        # Get target txts
-        target_txts = [
-            self.hybrid_run_dir / f"{Mzml.get_mzml_name(mzml=mzml)}.comet.{TARGET}.txt"
-            for mzml in self.mzml_to_scans.keys()
-        ]
-        # Run assign-confidence
-        _ = Crux(path=self.crux_path).run_assign_confidence(
-            target_txts=target_txts, out_path=self.hybrid_assign_confidence_txt
+        # Combine hybrid results
+        logger.info("Combining hybrid scan results...")
+        combine_comet_scan_results(
+            scan_results_dir=self.hybrid_run_scan_results_dir,
+            out_dir=self.hybrid_run_dir,
         )
 
-    def protein_counts(
-        self, q_value_threshold: float = DEFAULT_Q_VALUE_THRESH
-    ) -> Dict[str, int]:
-        psms = self.native_psms.get_high_confidence_psms(
-            q_value_threshold=q_value_threshold
-        )
-        return get_protein_counts_from_comet_psms(psms=psms.psms)
 
-    def protein_count_plot(
-        self,
-        ax: plt.Axes,
-        q_value_threshold: float = DEFAULT_Q_VALUE_THRESH,
-        top_n_most_common: Optional[int] = None,
-    ):
-        protein_counts = self.protein_counts(q_value_threshold=q_value_threshold)
+def native_run_on_spectrum(
+    spectrum: Spectrum, comet_config: CometConfig
+) -> CometOutputs:
+    return comet_config.run_comet_on_mzml(
+        mzml=spectrum.mzml, scan_min=spectrum.scan, scan_max=spectrum.scan
+    )
 
-        # Plot
-        items = sorted(protein_counts.items(), key=lambda x: x[1], reverse=True)
-        if top_n_most_common is not None:
-            items = items[:top_n_most_common]
-        keys, values = zip(*items)
 
-        ax.scatter(range(len(keys)), values)
-        ax.set_xticks(range(len(keys)), keys, rotation=90, fontsize=8)
-        set_title_axes_labels(
-            ax=ax,
-            # title="Protein counts",
-            xlabel="Protein",
-            ylabel="PSM counts",
-        )
-
-    def get_hybrids(
-        self,
-        min_side_len: int,
-        q_value_threshold: float,
-    ) -> pd.DataFrame:
-        psms = self.psms(psm_type="hybrid").psms
-        psms = [psm for psm in psms if psm.q_value <= q_value_threshold]
-        return get_hybrids_for_comet_psms(
-            psms=psms,
-            min_side_len=min_side_len,
-            kmer_to_proteins_map=self.kmer_to_proteins_map,
-        )
-
-    def decoy_psms(self, psm_type: Literal[NATIVE, HYBRID]) -> CometPSMs:
-        if psm_type == NATIVE:
-            folder = self.native_run_dir
-        elif psm_type == HYBRID:
-            folder = self.hybrid_run_dir
-        else:
-            raise ValueError(
-                f"Invalid psm_type: {psm_type}. Should be either {NATIVE} or {HYBRID}."
-            )
-        psms = flatten_list_of_lists(
-            [CometPSM.from_txt(txt=txt) for txt in folder.glob(f"*{DECOY}.txt")]
-        )
-        psms = list(filter(lambda psm: psm.num == 1, psms))
-        return CometPSMs(psms=psms)
-
-    @cached_property
-    def native_decoy_psms(self) -> CometPSMs:
-        return self.decoy_psms(psm_type=NATIVE)
-
-    @cached_property
-    def hybrid_decoy_psms(self) -> CometPSMs:
-        return self.decoy_psms(psm_type=HYBRID)
-
-    @cached_property
-    def native_psms(self) -> CometPSMs:
-        return self.psms(psm_type=NATIVE)
-
-    @cached_property
-    def hybrid_psms(self) -> CometPSMs:
-        return self.psms(psm_type=HYBRID)
+def hybrid_run_on_spectrum(
+    spectrum: Spectrum,
+    out_dir: Path,
+    spectrum_preprocessor: SpectrumPreprocessor,
+    hybrid_former: HybridFormer,
+    psm_scorer: HybridPSMScorer,
+) -> CometOutputs:
+    spectrum = spectrum_preprocessor.preprocess_spectrum(spectrum=spectrum)
+    seq_to_hybrids = hybrid_former.form_hybrids(spectrum=spectrum)
+    comet_outputs = psm_scorer.score_hybrids(
+        seq_to_hybrids=seq_to_hybrids,
+        spectrum=spectrum,
+        out_dir=out_dir,
+    )
+    return comet_outputs
 
 
 @dataclass
 class HypedsearchOutputs:
     target: Path
     decoy: Path
-
-
-def remove_non_hybrid_psms(psms: List[CometPSM]) -> List[CometPSM]:
-    logger.debug("Remove non-hybrid PSMs...")
-    return [psm for psm in psms if psm.is_hybrid]
-
-
-def get_hybrids_for_comet_psms(
-    psms: List[CometPSM],
-    min_side_len: int,
-    kmer_to_proteins_map: Dict[str, List[str]],
-) -> List[HybridPSM]:
-    data = []
-    for psm in psms:
-        hybrids = find_possible_hybrids(
-            seq=psm.seq,
-            kmer_to_proteins_map=kmer_to_proteins_map,
-            min_side_len=min_side_len,
-        )
-        if len(hybrids) > 0:
-            data.append(HybridPSM(hybrids=hybrids, psm=psm))
-    return data
-
-
-def create_and_score_hybrids_for_spectrum(
-    spectrum: Spectrum,
-    kmer_db: KmerDatabase,
-    protein_name_to_seq_map: Dict[str, str],
-    kmer_to_proteins_map: Dict[str, List[str]],
-    precursor_mz_ppm_tol: float,
-    peak_to_ion_ppm_tol: float,
-    min_cluster_len: int,
-    min_cluster_support: int,
-    max_allowed_ion_charge: int,
-    crux_comet_params: Path,
-    out_dir: Path,
-    fasta: Union[str, Path],
-    crux_path: Path,
-    num_peaks: int = 0,
-) -> CometOutputs:
-    start_time = time.perf_counter()
-    # Peak filtering
-    if num_peaks > 0:
-        logger.info(f"Filtering to top {num_peaks} peaks...")
-        spectrum.filter_to_top_n_peaks(n=num_peaks)
-    # Form hybrids
-    seq_to_hybrids = form_spectrum_hybrids_via_clustering(
-        spectrum=spectrum,
-        kmer_db=kmer_db,
-        protein_name_to_seq_map=protein_name_to_seq_map,
-        kmer_to_proteins_map=kmer_to_proteins_map,
-        precursor_mz_ppm_tol=precursor_mz_ppm_tol,
-        peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
-        min_cluster_len=min_cluster_len,
-        min_cluster_support=min_cluster_support,
-        max_allowed_ion_charge=max_allowed_ion_charge,
-    )
-    # Create FASTA containing hybrids and run Comet
-    mzml_name = Mzml.get_mzml_name(mzml=spectrum.mzml)
-    fasta_containing_hybrids_path = out_dir / f"{mzml_name}.{spectrum.scan}.fasta"
-    create_hybrids_fasta(
-        hybrid_seqs=seq_to_hybrids.keys(),
-        output_fasta_path=fasta_containing_hybrids_path,
-        fasta_to_include=fasta,
-    )
-
-    # Run Comet
-    outputs = Crux(path=crux_path).run_comet(
-        mzml=spectrum.mzml,
-        fasta=fasta_containing_hybrids_path,
-        crux_comet_params=crux_comet_params,
-        decoy_search=2,  # always want to run this with decoy search on
-        out_dir=out_dir,
-        file_root=mzml_name,
-        scan_min=spectrum.scan,
-        scan_max=spectrum.scan,
-        num_threads=1,
-    )
-    # Comet run complete. Deleting hybrid-containing FASTA...
-    fasta_containing_hybrids_path.unlink()
-    duration = time.perf_counter() - start_time
-    logger.info(
-        f"Running HS on spectrum ({spectrum.sample}, {spectrum.scan}) took {get_time_in_diff_units(duration)}"
-    )
-    return HypedsearchOutputs(target=outputs.target, decoy=outputs.decoy)
-
-
-def create_kmer_database_from_top_n_proteins(
-    psms: List[CometPSM],
-    top_n_proteins: int,
-    fasta: Path,
-    db_path: Path,
-    top_proteins_txt: Path,
-    kmer_to_protein_map_path: Path,
-    min_k: int,
-    max_k: int,
-):
-    prot_counts = get_protein_counts_from_comet_psms(psms=psms)
-    most_common_proteins = get_most_common_proteins(
-        protein_counts=prot_counts, top_n=top_n_proteins
-    )
-    logger.info(f"Top {top_n_proteins} proteins:\n{most_common_proteins}")
-    _ = write_new_line_separated_file(lines=most_common_proteins, path=top_proteins_txt)
-    _ = create_kmer_database(
-        kmer_to_proteins_path=kmer_to_protein_map_path,
-        fasta=fasta,
-        proteins=most_common_proteins,
-        db_path=db_path,
-        min_k=min_k,
-        max_k=max_k,
-    )
 
 
 def hybrid_fasta_name(hybrid_seq: str) -> str:
@@ -837,985 +675,8 @@ def create_hybrids_fasta(
 
         prots.append(new_peptide)
 
-    Fasta.write_fasta(peptides=prots, out_path=output_fasta_path)
+    Fasta.write_fasta(peptides=prots, path=output_fasta_path)
     return prots
-
-
-def create_native_comet_run_config(
-    out_dir: Path,
-    mzmls: List[Path],
-    crux_comet_params: Path,
-    fasta: Path,
-    crux_path: Path,
-    out_path: Path,
-    num_threads: int = 0,
-):
-    out_dir.mkdir(parents=True, exist_ok=True)
-    config = CometConfig(
-        mzml_to_scans={mzml: [0] for mzml in mzmls},
-        crux_comet_params=crux_comet_params,
-        decoy_search=2,
-        fasta=fasta,
-        out_dir=out_dir,
-        num_threads=num_threads,
-    ).to_dict()
-    config["crux_path"] = str(crux_path)
-    to_json(
-        data=config,
-        path=out_path,
-    )
-    logger.info(f"Saved native Comet run config to {out_path}")
-    logger.info(
-        "To run Comet via snakemake, use the following command:\n"
-        f"snakemake -s snakefiles/run_comet.smk --configfile {out_path} ..."
-    )
-
-
-def find_possible_hybrids(
-    seq: str, kmer_to_proteins_map: Dict[str, List[str]], min_side_len: int
-) -> List[HybridPeptide]:
-    possible_hybrids = []
-    for breakpoint in range(min_side_len, len(seq) - min_side_len + 1):
-        left = seq[:breakpoint]
-        right = seq[breakpoint:]
-        if (left in kmer_to_proteins_map) and (right in kmer_to_proteins_map):
-            possible_hybrids.append(
-                HybridPeptide(
-                    left_seq=left,
-                    right_seq=right,
-                    left_proteins=kmer_to_proteins_map[left],
-                    right_proteins=kmer_to_proteins_map[right],
-                )
-            )
-    return possible_hybrids
-
-
-@dataclass
-class HSRunAnalysis:
-    native_targets: List[CometPSM]
-    native_assign_confidence: List[CometPSM]
-    native_decoys: List[CometPSM]
-    hybrid_targets: List[CometPSM]
-    # hybrid_assign_confidence: List[CometPSM]
-    hybrid_decoys: List[CometPSM]
-    kmer_to_proteins_map: Dict[str, List[str]]
-    sample_scan_to_spectrum_map: Dict[Tuple[str, int], Spectrum]
-
-    def __post_init__(self):
-        self.hybrid_targets = remove_non_hybrid_psms(psms=self.hybrid_targets)
-        # self.hybrid_assign_confidence = remove_non_hybrid_psms(
-        #     psms=self.hybrid_assign_confidence
-        # )
-        assert all([psm.is_hybrid for psm in self.hybrid_targets])
-        # assert all([psm.is_hybrid for psm in self.hybrid_assign_confidence])
-        assert all([psm.num == 1 for psm in self.native_targets])
-        assert all([psm.num == 1 for psm in self.native_decoys])
-        assert all([psm.num == 1 for psm in self.hybrid_targets])
-        assert all([psm.num == 1 for psm in self.hybrid_decoys])
-        assert all([psm.num == 1 for psm in self.native_assign_confidence])
-        # assert all([psm.num == 1 for psm in self.hybrid_assign_confidence])
-
-    @classmethod
-    def from_hypedsearch_config(
-        cls, config: Union[str, Path, HypedsearchConfig]
-    ) -> "HSRunAnalysis":
-        if not isinstance(config, HypedsearchConfig):
-            hs_config = HypedsearchConfig.from_json(path=config)
-
-        logger.info("Loading PSMs...")
-        native_targets = flatten_list_of_lists(
-            [
-                CometPSM.from_txt(txt=txt)
-                for txt in hs_config.native_run_dir.glob("*target.txt")
-            ]
-        )
-        native_decoys = flatten_list_of_lists(
-            [
-                CometPSM.from_txt(txt=txt)
-                for txt in hs_config.native_run_dir.glob("*decoy.txt")
-            ]
-        )
-        native_assign_confidene = CometPSM.from_txt(
-            txt=hs_config.native_assign_confidence_txt
-        )
-        hybrid_targets = flatten_list_of_lists(
-            [
-                CometPSM.from_txt(txt=txt)
-                for txt in hs_config.hybrid_run_dir.glob("*target.txt")
-            ]
-        )
-        hybrid_decoys = flatten_list_of_lists(
-            [
-                CometPSM.from_txt(txt=txt)
-                for txt in hs_config.hybrid_run_dir.glob("*decoy.txt")
-            ]
-        )
-        logger.info(
-            "Loading kmer-to-proteins map and creating (sample, scan) to spectrum map..."
-        )
-        kmer_to_proteins_map = load_json(path=hs_config.kmer_to_proteins_map_path)
-        sample_scan_to_spectrum_map = create_sample_scan_to_spectrum_map(
-            mzmls=list(hs_config.mzml_to_scans.keys())
-        )
-        return cls(
-            native_targets=native_targets,
-            native_assign_confidence=native_assign_confidene,
-            native_decoys=native_decoys,
-            hybrid_targets=hybrid_targets,
-            hybrid_decoys=hybrid_decoys,
-            kmer_to_proteins_map=kmer_to_proteins_map,
-            sample_scan_to_spectrum_map=sample_scan_to_spectrum_map,
-        )
-
-    def protein_counts(self, native_q_value_threshold: float):
-        return get_protein_counts_from_comet_psms(
-            psms=list(
-                filter(
-                    lambda psm: psm.q_value <= native_q_value_threshold,
-                    self.native_assign_confidence,
-                )
-            )
-        )
-
-    def xcorr_distributions(self):
-        fig, axs = fig_setup(nrows=1, ncols=2)
-        ax = axs[0]
-        data = [psm.xcorr for psm in self.native_targets]
-        _ = sns.histplot(
-            data,
-            element="step",
-            stat="density",
-            common_norm=False,
-            ax=ax,
-            label=f"Native run targets (n={len(data)})",
-            fill=False,
-        )
-        data = [psm.xcorr for psm in self.native_decoys]
-        _ = sns.histplot(
-            data,
-            element="step",
-            stat="density",
-            common_norm=False,
-            ax=ax,
-            label=f"Native run decoys (n={len(data)})",
-            fill=False,
-        )
-        max_native_decoy_xcorr = max(psm.xcorr for psm in self.native_decoys)
-        ax.axvline(
-            x=max_native_decoy_xcorr,
-            color="black",
-            linestyle="--",
-            label=f"Max native decoy xcorr (={max_native_decoy_xcorr:.2f})",
-        )
-
-        ax = axs[1]
-        data = [psm.xcorr for psm in self.hybrid_targets]
-        _ = sns.histplot(
-            data,
-            element="step",
-            stat="density",
-            common_norm=False,
-            ax=ax,
-            label=f"Hybrid run targets (only hybrids) (n={len(data)})",
-            fill=False,
-        )
-        data = [psm.xcorr for psm in self.hybrid_decoys]
-        _ = sns.histplot(
-            data,
-            element="step",
-            stat="density",
-            common_norm=False,
-            ax=ax,
-            label=f"Hybrid run decoys (n={len(data)})",
-            fill=False,
-        )
-        max_hybrid_decoy_xcorr = max(psm.xcorr for psm in self.hybrid_decoys)
-        ax.axvline(
-            x=max_hybrid_decoy_xcorr,
-            color="grey",
-            linestyle="--",
-            label=f"Max hybrid decoy xcorr (={max_hybrid_decoy_xcorr:.2f})",
-        )
-
-        for ax in axs:
-            set_title_axes_labels(
-                ax=ax,
-                ylabel="Density",
-                xlabel="xcorr",
-            )
-        finalize(axs)
-        return fig, axs
-
-    def q_value_counter(self, psm_type: Literal[NATIVE, HYBRID]):
-        if psm_type == NATIVE:
-            return Counter(psm.q_value for psm in self.native_assign_confidence)
-        elif psm_type == HYBRID:
-            return Counter(psm.q_value for psm in self.hybrid_assign_confidence)
-        else:
-            raise ValueError(f"Invalid psm_type: {psm_type}.")
-
-    def xcorr_change(self, q_value_threshold: Optional[float] = None):
-        # Get the spectra that have both a native and hybrid target PSM
-        if q_value_threshold is None:
-            native_spectra = set((psm.sample, psm.scan) for psm in self.native_targets)
-            hybrid_spectra = set((psm.sample, psm.scan) for psm in self.hybrid_targets)
-        else:
-            native_spectra = set(
-                (psm.sample, psm.scan)
-                for psm in self.native_assign_confidence
-                if psm.q_value <= q_value_threshold
-            )
-            hybrid_spectra = set(
-                (psm.sample, psm.scan)
-                for psm in self.hybrid_assign_confidence
-                if psm.q_value <= q_value_threshold
-            )
-        shared_spectra = native_spectra.intersection(hybrid_spectra)
-
-        # TODO: finish
-
-    def set_decoy_scores(
-        self, peak_to_ion_ppm_threshold: float, spectra_dir: Union[str, Path]
-    ) -> List[PSMScoring]:
-        logger.info("Getting 'PSM' objects for all decoys...")
-        decoy_psms = PSM.from_comet_psms(
-            comet_psms=self.native_decoys + self.hybrid_decoys,
-            spectra_dir=spectra_dir,
-            peak_to_ion_ppm_threshold=peak_to_ion_ppm_threshold,
-        )
-
-        logger.info("Calculating decoy scores and setting ECDFs...")
-        ions_score = PSMScoring(name="prop_ions_matched")
-        prefix_score = PSMScoring(name="prop_prefixes_supported")
-        suffix_score = PSMScoring(name="prop_suffixes_supported")
-        intensity_score = PSMScoring(name="prop_intensity_supported")
-        for psm in decoy_psms:
-            charge = psm.spectrum.precursor_charge
-            ions_score.add_value(
-                charge=charge,
-                value=psm.prop_ions_matched,
-            )
-            prefix_score.add_value(charge=charge, value=psm.prop_prefixes_supported)
-            suffix_score.add_value(charge=charge, value=psm.prop_suffixes_supported)
-            intensity_score.add_value(charge=charge, value=psm.prop_intensity_supported)
-        decoy_scores = [ions_score, prefix_score, suffix_score, intensity_score]
-        for psm_score in decoy_scores:
-            psm_score.set_ecdfs()
-        self.decoy_scores = decoy_scores
-        return decoy_scores
-
-    @cached_property
-    def max_decoy_xcorr(self) -> float:
-        return max(psm.xcorr for psm in self.native_decoys + self.hybrid_decoys)
-
-    def set_df(
-        self,
-        native_psm_q_value_threshold: float,
-        min_side_len: int,
-        peak_to_ion_ppm_tolerance: float,
-        fasta: Union[str, Path],
-    ) -> pd.DataFrame:
-        # Remove hybrid PSMs that are also found as high-confidence native PSMs
-        logger.info(
-            f"Removing hybrid PSMs that have a high-confidence (q<={native_psm_q_value_threshold}) native PSM..."
-        )
-        native_psm_to_remove = set(
-            (psm.sample, psm.scan)
-            for psm in self.native_assign_confidence
-            if psm.q_value <= native_psm_q_value_threshold
-        )
-        hybrid_comet_psms = self.hybrid_targets
-        hybrid_comet_psms = [
-            psm
-            for psm in hybrid_comet_psms
-            if (psm.sample, psm.scan) not in native_psm_to_remove
-        ]
-
-        # Get hybrid peptides for each hybrid PSM and create a HybridPSM object for each PSM
-        logger.info(
-            "For each hybrid PSM, get the PSMs possible explanatory hybrid sequences that might have produced it..."
-        )
-        hybrid_psms = []
-        for comet_psm in hybrid_comet_psms:
-            hybrids = find_possible_hybrids(
-                seq=comet_psm.seq,
-                kmer_to_proteins_map=self.kmer_to_proteins_map,
-                min_side_len=min_side_len,
-            )
-            if len(hybrids) > 0:
-                psm = PSM(
-                    spectrum=self.sample_scan_to_spectrum_map[
-                        (comet_psm.sample, comet_psm.scan)
-                    ],
-                    peptide=comet_psm.seq,
-                    peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
-                )
-
-                hybrid_psms.append(
-                    HybridPSM(hybrids=hybrids, psm=psm, comet_psm=comet_psm)
-                )
-
-        df = pd.DataFrame(
-            flatten_list_of_lists(list_of_lists=[psm.to_dicts() for psm in hybrid_psms])
-        )
-
-        # Add BLASTP results
-        logger.info("Add BLASTP info...")
-        blast_df = run_blastp(
-            query_peptides=list(set(df["seq"].to_list())),
-            fasta=fasta,
-        )
-        seq_to_blast_df = {}
-        for seq, seq_df in blast_df.groupby("qseqid"):
-            seq_to_blast_df[seq] = seq_df
-
-        blast_coverages = []
-        blast_percent_identities = []
-        blast_num_mismatches = []
-        for row_idx, row in df.iterrows():
-            try:
-                seq_df = seq_to_blast_df[row.seq]
-                blast_row = seq_df.loc[seq_df["qcovhsp"].idxmax()]
-                blast_coverages.append(blast_row["qcovhsp"])
-                blast_percent_identities.append(blast_row["pident"])
-                blast_num_mismatches.append(blast_row["mismatch"])
-            except:
-                blast_coverages.append(0)
-                blast_percent_identities.append(0)
-                blast_num_mismatches.append(len(row.seq))
-
-        df["blast_coverage"] = blast_coverages
-        df["blast_percent_identity"] = blast_percent_identities
-        df["blast_num_mismatches"] = blast_num_mismatches
-
-        self.df = df
-        return df
-
-    def add_protein_abundance_and_decoy_based_scores_to_df(
-        self,
-        native_psm_q_value_threshold: float,
-        peak_to_ion_ppm_tolerance: float,
-        spectra_dir: Union[str, Path],
-    ):
-        # Get ECDFs for each decoy score
-        logger.info("Getting decoy-based score ECDFs...")
-        self.set_decoy_scores(
-            peak_to_ion_ppm_threshold=peak_to_ion_ppm_tolerance, spectra_dir=spectra_dir
-        )
-
-        # Add protein abundance and decoy-based scores to df
-        protein_counts = self.protein_counts(
-            native_q_value_threshold=native_psm_q_value_threshold
-        )
-        left_abs = []
-        right_abs = []
-        ion_probs = []
-        prefix_probs = []
-        suffix_probs = []
-        intensity_probs = []
-
-        ion_score = list(
-            filter(lambda score: score.name == "prop_ions_matched", self.decoy_scores)
-        )[0]
-        prefix_score = list(
-            filter(
-                lambda score: score.name == "prop_prefixes_supported", self.decoy_scores
-            )
-        )[0]
-        suffix_score = list(
-            filter(
-                lambda score: score.name == "prop_suffixes_supported", self.decoy_scores
-            )
-        )[0]
-        intensity_score = list(
-            filter(
-                lambda score: score.name == "prop_intensity_supported",
-                self.decoy_scores,
-            )
-        )[0]
-
-        for row_idx, row in self.df.iterrows():
-            # Protein abundances
-            left_abs.append(max([protein_counts[prot] for prot in row.left_proteins]))
-            right_abs.append(max([protein_counts[prot] for prot in row.right_proteins]))
-
-            # Score probabilities (1-pvalue)
-            ion_probs.append(
-                float(
-                    ion_score.ecdfs_by_charge[row.precursor_charge].cdf.evaluate(
-                        row.prop_ions_matched
-                    )
-                )
-            )
-            prefix_probs.append(
-                float(
-                    prefix_score.ecdfs_by_charge[row.precursor_charge].cdf.evaluate(
-                        row.prop_prefixes_supported
-                    )
-                )
-            )
-            suffix_probs.append(
-                float(
-                    suffix_score.ecdfs_by_charge[row.precursor_charge].cdf.evaluate(
-                        row.prop_suffixes_supported
-                    )
-                )
-            )
-            intensity_probs.append(
-                float(
-                    intensity_score.ecdfs_by_charge[row.precursor_charge].cdf.evaluate(
-                        row.prop_intensity_supported
-                    )
-                )
-            )
-
-        self.df["ion_prob"] = ion_probs
-        self.df["prefix_prob"] = prefix_probs
-        self.df["suffix_prob"] = suffix_probs
-        self.df["intensity_prob"] = intensity_probs
-        self.df["left_protein_ab_count"] = left_abs
-        self.df["right_protein_ab_count"] = right_abs
-
-        # Derived columns
-        self.df["left_protein_ab"] = self.df["left_protein_ab_count"] / max(
-            protein_counts.values()
-        )
-        self.df["right_protein_ab"] = self.df["right_protein_ab_count"] / max(
-            protein_counts.values()
-        )
-        self.df["protein_ab_score"] = (
-            self.df["left_protein_ab"] * self.df["right_protein_ab"]
-        )
-        self.df["min_prob"] = self.df.apply(
-            lambda row: min(
-                row["ion_prob"],
-                row["prefix_prob"],
-                row["suffix_prob"],
-                row["intensity_prob"],
-            ),
-            axis=1,
-        )
-
-    def seq_to_hybrids(self, min_side_len: int):
-        seq_to_hybrids = {}
-        for psm in self.hybrid_targets:
-            hybrids = find_possible_hybrids(
-                seq=psm.seq,
-                kmer_to_proteins_map=self.kmer_to_proteins_map,
-                min_side_len=min_side_len,
-            )
-            if len(hybrids) > 0:
-                seq_to_hybrids[psm.seq] = hybrids
-        return seq_to_hybrids
-
-
-@dataclass
-class SpectrumPSMs:
-    spectrum: Spectrum
-    native_target: Optional[PSM] = None
-    native_decoy: Optional[PSM] = None
-    hybrid_target: Optional[PSM] = None
-    hybrid_decoy: Optional[PSM] = None
-    native_assign_confidence: Optional[PSM] = None
-
-    psm_types = [
-        "native_target",
-        "native_decoy",
-        "hybrid_target",
-        "hybrid_decoy",
-        "native_assign_confidence",
-    ]
-    scores = [
-        "xcorr",
-        "prop_ions_matched",
-        "prop_prefixes_supported",
-        "prop_suffixes_supported",
-        "prop_intensity_supported",
-    ]
-
-    def __post_init__(self):
-        # Make sure all the PSMs correspond to the same spectrum
-        for psm_type in self.psm_types:
-            psm = getattr(self, psm_type)
-            if psm is not None:
-                assert (
-                    psm.spectrum_id == self.spectrum.uid
-                ), f"PSM spectrum ID ({psm.spectrum_id}) does not match spectrum's ID ({self.spectrum.uid}) for {psm_type}."
-
-    @classmethod
-    def from_hs_run(
-        cls,
-        hs_run: HSRunAnalysis,
-        peak_to_ion_ppm_tolerance: float,
-    ) -> Dict[Tuple[str, int], "SpectrumPSMs"]:
-        spectrum_to_native_target = {
-            comet_psm.spectrum_uid: comet_psm for comet_psm in hs_run.native_targets
-        }
-        spectrum_to_native_decoy = {
-            comet_psm.spectrum_uid: comet_psm for comet_psm in hs_run.native_decoys
-        }
-        spectrum_to_hybrid_target = {
-            comet_psm.spectrum_uid: comet_psm for comet_psm in hs_run.hybrid_targets
-        }
-        spectrum_to_hybrid_decoy = {
-            comet_psm.spectrum_uid: comet_psm for comet_psm in hs_run.hybrid_decoys
-        }
-        spectrum_to_native_assign_confidence = {
-            comet_psm.spectrum_uid: comet_psm
-            for comet_psm in hs_run.native_assign_confidence
-        }
-        logger.info(
-            "There are:\n"
-            + f"\t - {len(set(spectrum_to_native_target.keys()))} native target PSMs\n"
-            + f"\t - {len(set(spectrum_to_native_decoy.keys()))} native decoy PSMs\n"
-            + f"\t - {len(set(spectrum_to_native_assign_confidence.keys()))} native assign-confidence PSMs\n"
-            + f"\t - {len(set(spectrum_to_hybrid_target.keys()))} hybrid target PSMs\n"
-            + f"\t - {len(set(spectrum_to_hybrid_decoy.keys()))} hybrid decoy PSMs\n"
-        )
-        spectra_with_results = set().union(
-            *[
-                set(spectrum_to_native_target.keys()),
-                set(spectrum_to_native_decoy.keys()),
-                set(spectrum_to_hybrid_target.keys()),
-                set(spectrum_to_hybrid_decoy.keys()),
-            ]
-        )
-        logger.info(
-            f"Number of spectra with any PSM results: {len(spectra_with_results)}"
-        )
-        data = []
-        logger.info(f"Creating SpectrumPSMs for {len(spectra_with_results)} spectra...")
-        for idx, spectrum_id in enumerate(spectra_with_results):
-            if idx % 1000 == 0:
-                logger.info(
-                    f"Processing spectrum {idx + 1}/{len(spectra_with_results)}"
-                )
-            spectrum = hs_run.sample_scan_to_spectrum_map[spectrum_id]
-            native_target = spectrum_to_native_target.get(spectrum_id, None)
-            if native_target is not None:
-                native_target = PSM.from_spectrum_and_comet_psm(
-                    comet_psm=native_target,
-                    spectrum=spectrum,
-                    peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
-                )
-            native_decoy = spectrum_to_native_decoy.get(spectrum_id, None)
-            if native_decoy is not None:
-                native_decoy = PSM.from_spectrum_and_comet_psm(
-                    comet_psm=native_decoy,
-                    spectrum=spectrum,
-                    peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
-                )
-            hybrid_target = spectrum_to_hybrid_target.get(spectrum_id, None)
-            if hybrid_target is not None:
-                hybrid_target = PSM.from_spectrum_and_comet_psm(
-                    comet_psm=hybrid_target,
-                    spectrum=spectrum,
-                    peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
-                )
-            hybrid_decoy = spectrum_to_hybrid_decoy.get(spectrum_id, None)
-            if hybrid_decoy is not None:
-                hybrid_decoy = PSM.from_spectrum_and_comet_psm(
-                    comet_psm=hybrid_decoy,
-                    spectrum=spectrum,
-                    peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
-                )
-            native_assign_confidence = spectrum_to_native_assign_confidence.get(
-                spectrum_id, None
-            )
-            if native_assign_confidence is not None:
-                native_assign_confidence = PSM.from_spectrum_and_comet_psm(
-                    comet_psm=native_assign_confidence,
-                    spectrum=spectrum,
-                    peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
-                )
-            data.append(
-                cls(
-                    spectrum=spectrum,
-                    native_target=native_target,
-                    native_decoy=native_decoy,
-                    hybrid_target=hybrid_target,
-                    hybrid_decoy=hybrid_decoy,
-                    native_assign_confidence=native_assign_confidence,
-                )
-            )
-        return data
-
-    @property
-    def top_target_psm(self) -> Tuple[Literal[NATIVE, HYBRID], PSM]:
-        if self.native_target is not None:
-            native_xcorr = self.native_target.xcorr
-        else:
-            native_xcorr = -100
-        if self.hybrid_target is not None:
-            hybrid_xcorr = self.hybrid_target.xcorr
-        else:
-            hybrid_xcorr = native_xcorr - 1
-
-        if native_xcorr >= hybrid_xcorr:
-            return NATIVE, self.native_target
-        else:
-            return HYBRID, self.hybrid_target
-
-    @property
-    def top_decoy_psm(self) -> PSM:
-        if self.native_decoy is not None:
-            native_xcorr = self.native_decoy.xcorr
-        else:
-            native_xcorr = -100
-        if self.hybrid_decoy is not None:
-            hybrid_xcorr = self.hybrid_decoy.xcorr
-        else:
-            hybrid_xcorr = native_xcorr - 1
-
-        if native_xcorr >= hybrid_xcorr:
-            return NATIVE, self.native_decoy
-        else:
-            return HYBRID, self.hybrid_decoy
-
-    def to_dict(self):
-        row = {
-            "spectrum": self.spectrum.uid,
-            "precursor_mz": self.spectrum.precursor_mz,
-            "precursor_charge": self.spectrum.precursor_charge,
-            "retention_time": self.spectrum.retention_time,
-        }
-        for psm_type in [
-            "native_target",
-            "native_decoy",
-            "hybrid_target",
-            "hybrid_decoy",
-        ]:
-            for score_name in [
-                "xcorr",
-                "prop_intensity_supported",
-                "prop_ions_matched",
-                "prop_prefixes_supported",
-                "prop_suffixes_supported",
-                "seq",
-            ]:
-                psm = getattr(self, psm_type)
-                row[f"{psm_type}_{score_name}"] = (
-                    getattr(psm, score_name) if psm is not None else None
-                )
-
-        # Add information from assign-confidence PSM
-        psm = getattr(self, "native_assign_confidence")
-        row["native_target_q_value"] = psm.q_value if psm is not None else None
-
-        return row
-
-    @staticmethod
-    def to_df(spectra_psms: List["SpectrumPSMs"]) -> pd.DataFrame:
-        data = [spectrum_psms.to_dict() for spectrum_psms in spectra_psms]
-        return pd.DataFrame(data)
-
-    @property
-    def spectrum_id(self):
-        return self.spectrum.uid
-
-    @staticmethod
-    def plot_info(spectra_psms: List["SpectrumPSMs"]) -> pd.DataFrame:
-        pass
-
-
-def psm_score_histogram(ax, data, label):
-    _ = sns.histplot(
-        data,
-        # element="step",
-        kde=True,
-        stat="density",
-        common_norm=False,
-        ax=ax,
-        label=f"{label} (n={len(data)})",
-        # fill=False,
-        alpha=0.4,
-    )
-
-
-@dataclass
-class PSMAcceptanceResult:
-    accepted_targets: List[SpectrumPSMs]
-    accepted_decoys: List[SpectrumPSMs]
-
-    @property
-    def accepted_hybrids(self) -> List[SpectrumPSMs]:
-        return [
-            psms for psms in self.accepted_targets if psms.top_target_psm[0] == HYBRID
-        ]
-
-    @property
-    def fdr(self):
-        return len(self.accepted_decoys) / max(len(self.accepted_targets), 1)
-
-    @property
-    def hybrid_seq_to_spectrum_map(self) -> Dict[str, List[str]]:
-        hybrid_seq_to_spectrum = defaultdict(list)
-        for hy in self.accepted_hybrids:
-            assert hy.top_target_psm[0] == HYBRID
-            psm = hy.top_target_psm[1]
-            hybrid_seq_to_spectrum[psm.seq].append(psm.spectrum_id)
-        return dict(hybrid_seq_to_spectrum)
-
-    @property
-    def hybrid_seqs(self) -> Set[str]:
-        return set(self.hybrid_seq_to_spectrum_map.keys())
-
-    def log_info(self):
-        logger.info(f"Number of accepted target PSMs: {len(self.accepted_targets)}")
-        logger.info(f"Number of accepted decoy PSMs: {len(self.accepted_decoys)}")
-        logger.info(f"Estimated FDR: {self.fdr:.4f}")
-        logger.info(f"Number of accepted hybrid PSMs: {len(self.accepted_hybrids)}")
-
-    def compare_to_true_hybrids(self, true_hybrids: TrueHybrids):
-        logger.info(
-            f"True hybrid sequences (n={len(true_hybrids.seqs)}):\n{true_hybrids.seqs}"
-        )
-        shared_seqs = self.hybrid_seqs.intersection(true_hybrids.seqs)
-        logger.info(
-            f"True hybrid sequences amongst accepted hybrids (n={len(shared_seqs)}):\n{shared_seqs}"
-        )
-
-
-@dataclass
-class Threshold:
-    score_name: str
-    operator: Literal[">", "<", ">=", "<="]
-    threshold: float
-
-    def accept_psm(self, psm: PSM) -> bool:
-        if self.operator == ">":
-            return getattr(psm, self.score_name) > self.threshold
-        elif self.operator == "<":
-            return getattr(psm, self.score_name) < self.threshold
-        elif self.operator == ">=":
-            return getattr(psm, self.score_name) >= self.threshold
-        elif self.operator == "<=":
-            return getattr(psm, self.score_name) <= self.threshold
-        else:
-            raise ValueError(f"Invalid operator: {self.operator}")
-
-
-def scores_above_thresholds(
-    psm: PSM,
-    thresholds: List[Threshold],
-):
-    return all([threshold.accept_psm(psm=psm) for threshold in thresholds])
-
-
-def accept_psms(
-    spectra_psms: List[SpectrumPSMs],
-    acceptance_fcn: Callable,
-) -> PSMAcceptanceResult:
-    accepted_targets = [
-        psms for psms in spectra_psms if acceptance_fcn(psms.top_target_psm[1])
-    ]
-    accepted_decoys = [
-        psms for psms in spectra_psms if acceptance_fcn(psms.top_decoy_psm[1])
-    ]
-    return PSMAcceptanceResult(
-        accepted_targets=accepted_targets,
-        accepted_decoys=accepted_decoys,
-    )
-
-
-def plot_scores(
-    df: pd.DataFrame, by_charge: bool = True, out_path: Optional[Path] = None
-):
-    column_to_label = {
-        "native_target": "Native targets",
-        "native_decoy": "Native decoys",
-        "hybrid_target": "Hybrid targets",
-        # "hybrid_decoy": "Hybrid run decoys",
-    }
-    scores = SpectrumPSMs.scores
-
-    if by_charge:
-        charge_to_plot_idx = {
-            charge: idx for idx, charge in enumerate(df.precursor_charge.unique())
-        }
-        ncols = len(charge_to_plot_idx)
-    else:
-        ncols = 1
-
-    # Plotting
-    _, axs = fig_setup(nrows=len(scores), ncols=ncols)
-    for score_idx, score in enumerate(scores):
-        for colm, label in column_to_label.items():
-            colm = f"{colm}_{score}"
-            if by_charge:
-                for charge, group_df in df.groupby("precursor_charge"):
-                    ax = axs[score_idx * ncols + charge_to_plot_idx[charge]]
-                    data = group_df[colm].dropna()
-                    psm_score_histogram(ax=ax, data=data, label=f"{label}, z={charge}")
-                    if "decoy" in colm:
-                        ecdf(data).cdf.plot(ax=ax, label=f"{label} z={charge}, ECDF")
-                    set_title_axes_labels(
-                        ax=ax,
-                        xlabel=score,
-                        ylabel="Density",
-                    )
-            else:
-                ax = axs[score_idx * ncols]
-                data = df[colm].dropna()
-                psm_score_histogram(ax=ax, data=data, label=label)
-                if "decoy" in colm:
-                    ecdf(data).cdf.plot(ax=ax, label=f"{label}, ECDF")
-                set_title_axes_labels(
-                    ax=ax,
-                    xlabel=score,
-                    ylabel="Density",
-                )
-    finalize(axs)
-    if out_path is not None:
-        save_fig(path=out_path)
-
-
-def get_seq_to_psms_map(
-    seqs: List[str], psms: List[CometPSM]
-) -> Dict[str, List[CometPSM]]:
-    seqs = set(seqs)
-    seq_to_psms = {seq: list(filter(lambda psm: psm.seq == seq, psms)) for seq in seqs}
-    return seq_to_psms
-
-
-@dataclass
-class PSMScore(ABC):
-    name: str
-
-    @abstractmethod
-    def set(self):
-        pass
-
-    @abstractmethod
-    def plot(self):
-        pass
-
-    @abstractmethod
-    def score_psm(self):
-        pass
-
-
-@dataclass
-class ScoreByCharge(PSMScore):
-    target_values_by_charge: Dict[int, List[float]] = field(
-        init=False, default_factory=lambda: defaultdict(list)
-    )
-    decoy_values_by_charge: Dict[int, List[float]] = field(
-        init=False, default_factory=lambda: defaultdict(list)
-    )
-    target_ecdfs_by_charge: Dict[int, Any] = field(init=False)
-
-    @classmethod
-    def set(
-        cls,
-        run: HSRunAnalysis,
-        peak_to_ion_ppm_tolerance: float,
-        scores_by_charge: List[str],
-    ) -> Dict[str, "ScoreByCharge"]:
-        scores = {}
-        for score_name in scores_by_charge:
-            scores[score_name] = cls(name=score_name)
-
-        logger.info("Processing decoy PSMs...")
-        decoy_psms = run.native_decoys  # + run.hybrid_decoys
-        for decoy_psm in decoy_psms:
-            spectrum = run.sample_scan_to_spectrum_map[
-                (decoy_psm.sample, decoy_psm.scan)
-            ]
-            psm = PSM(
-                spectrum=spectrum,
-                peptide=decoy_psm.seq,
-                comet_psm=decoy_psm,
-                peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
-            )
-            for score_name in scores_by_charge:
-                scores[score_name].decoy_values_by_charge[
-                    spectrum.precursor_charge
-                ].append(getattr(psm, score_name))
-
-        logger.info("Processing target PSMs...")
-        target_psms = run.native_targets
-        for target_psm in target_psms:
-            spectrum = run.sample_scan_to_spectrum_map[
-                (target_psm.sample, target_psm.scan)
-            ]
-            psm = PSM(
-                spectrum=spectrum,
-                peptide=target_psm.seq,
-                comet_psm=target_psm,
-                peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
-            )
-            for score_name in scores_by_charge:
-                scores[score_name].target_values_by_charge[
-                    spectrum.precursor_charge
-                ].append(getattr(psm, score_name))
-
-        # Set ECDFs
-        logger.info("Setting ECDFs...")
-        for score_name in scores_by_charge:
-            score = scores[score_name]
-            score.target_ecdfs_by_charge = dict()
-            score.decoy_ecdfs_by_charge = dict()
-            for charge, values in score.target_values_by_charge.items():
-                score.target_ecdfs_by_charge[charge] = ecdf(values)
-            for charge, values in score.decoy_values_by_charge.items():
-                score.decoy_ecdfs_by_charge[charge] = ecdf(values)
-
-        return scores
-
-    def plot(self):
-        _, axs = fig_setup(1, 2)
-        ax = axs[0]
-        for charge, vals in self.target_values_by_charge.items():
-            _ = sns.histplot(
-                vals,
-                stat="density",
-                common_norm=False,
-                ax=ax,
-                label=f"z={charge} (n={len(vals)})",
-                alpha=0.5,
-                # fill=False,
-            )
-            _ = self.target_ecdfs_by_charge[charge].cdf.plot(
-                ax=ax,
-                label=f"z={charge} ECDF",
-            )
-        set_title_axes_labels(
-            ax=ax,
-            title=f"Score: {self.name} on target PSMs",
-            xlabel=self.name,
-            ylabel="Density",
-        )
-        ax = axs[1]
-        for charge, vals in self.decoy_values_by_charge.items():
-            _ = sns.histplot(
-                vals,
-                stat="density",
-                common_norm=False,
-                ax=ax,
-                label=f"z={charge} (n={len(vals)})",
-                alpha=0.5,
-                # fill=False,
-            )
-            _ = self.decoy_ecdfs_by_charge[charge].cdf.plot(
-                ax=ax,
-                label=f"z={charge} ECDF",
-            )
-        set_title_axes_labels(
-            ax=ax,
-            title=f"Score: {self.name} on decoy PSMs",
-            xlabel=self.name,
-            ylabel="Density",
-        )
-        finalize(axs)
-
-    def score_psm(self, psm: PSM) -> float:
-        score = getattr(psm, self.name)
-        return float(
-            self.decoy_ecdfs_by_charge[psm.spectrum.precursor_charge].cdf.evaluate(
-                score
-            )
-        )
 
 
 @click.command(
@@ -1832,52 +693,149 @@ class ScoreByCharge(PSMScore):
     "--scan_results_dir",
     "-srd",
     type=PathType(),
-    required=True,
+    required=False,
     help="Path to the directory containing scan results",
 )
 @click.option(
     "--out_dir",
     "-od",
     type=PathType(),
-    required=True,
+    required=False,
     help="Path to the output directory where the combined results for each mzML will be saved",
 )
-def cli_combine_comet_scan_results(scan_results_dir: Path, out_dir: Path):
-    combine_comet_scan_results(scan_results_dir=scan_results_dir, out_dir=out_dir)
+@click.option(
+    "--config",
+    "-c",
+    type=PathType(),
+    required=False,
+    help="Path to the Hypedsearch config JSON",
+)
+def cli_combine_comet_scan_results(
+    scan_results_dir: Optional[Path], out_dir: Optional[Path], config: Optional[Path]
+):
+    if config is None:
+        combine_comet_scan_results(scan_results_dir=scan_results_dir, out_dir=out_dir)
+    else:
+        hs_config = HypedsearchRunConfig.from_json(path=config)
+        hs_config.combine_comet_scan_results()
+    logger.info("Finished combining Comet scan results")
+
+
+@click.command(
+    name="create-native-run-snakemake-config",
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+    help="""
+    Create the native run snakemake config
+    """,
+)
+@click.option(
+    "--config",
+    "-c",
+    type=PathType(),
+    required=True,
+    help="Path to the Hypedsearch config JSON",
+)
+@click.option(
+    "--out_path",
+    "-o",
+    type=PathType(),
+    required=False,
+    help=f"Path to where the native run snakemake config will be saved. Default is <native_run_dir>/{DEFAULT_NATIVE_RUN_CONFIG}",
+)
+@click.option(
+    "--num_threads",
+    "-n",
+    type=int,
+    required=False,
+    default=DEFAULT_NUM_COMET_THREADS,
+    show_default=True,
+    help="Number of threads to use for Comet in the native run",
+)
+def cli_create_native_run_snakemake_config(
+    config: Path, out_path: Optional[Path], num_threads: int
+):
+    hs_config = HypedsearchRunConfig.from_json(path=config)
+    if out_path is None:
+        out_path = hs_config.native_run_dir / DEFAULT_NATIVE_RUN_CONFIG
+    hs_config.create_native_run_comet_config(
+        out_path=out_path, num_threads_4_comet=num_threads
+    )
 
 
 @click.command(
     name="check-for-missing-scans",
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
     help="""
-    Given a directory containing the Comet output for each scan and a hybrid run config,
-    check which scans were and were not processed.
+    Check which scans were and were not processed.
     """,
 )
 @click.option(
-    "--scan_results_dir",
-    "-srd",
+    "--config",
+    "-c",
     type=PathType(),
     required=True,
-    help="Path to the directory containing scan results",
+    help="Path to the Hypedsearch config JSON",
+)
+def cli_check_for_missing_scans(config: Path):
+    hs_config = HypedsearchRunConfig.from_json(path=config)
+    hs_config.print_missing_scan_info()
+
+
+@click.command(
+    name="run-hypedsearch",
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+    help="""
+    Run HypedSearch on a single scan from an mzML file.
+    """,
 )
 @click.option(
-    "--hybrid_config",
-    "-hc",
+    "--config",
+    "-c",
     type=PathType(),
     required=True,
-    help="Path to the hybrid run config file",
+    help="Path to Hypedsearch JSON config",
 )
-def cli_check_for_missing_scans(scan_results_dir: Path, hybrid_config: Path):
-    hy_config = HybridRunConfig.from_json(path=hybrid_config)
-    expected_target_outputs = set(
-        [Path(txt).name for txt in hy_config.expected_target_outputs]
-    )
-    actual_target_outputs = set(
-        [txt.name for txt in scan_results_dir.glob(f"*{TARGET}*")]
-    )
-    missing_scans = expected_target_outputs - actual_target_outputs
-    logger.info(f"There are {len(missing_scans)} scans missing")
+@click.option(
+    "--mzml",
+    "-m",
+    type=PathType(),
+    required=False,
+    help="Path to MZML",
+)
+@click.option(
+    "--scan",
+    "-s",
+    type=int,
+    required=False,
+    help="Scan in MZML on which to run HypedSearch",
+)
+@click.option(
+    "--num_threads",
+    "-n",
+    type=int,
+    required=False,
+    default=1,
+    show_default=True,
+    help="Number of threads for Comet",
+)
+def cli_run_hypedsearch(
+    mzml: Optional[Path], scan: Optional[int], config: Path, num_threads: int
+):
+    hs_config = HypedsearchRunConfig.from_json(path=config)
+    # Run on one spectrum
+    if scan is not None:
+        mzml_obj = Mzml(mzml=mzml)
+        return hs_config.run_hypedsearch_on_spectrum(
+            spectrum=mzml_obj.get_spectrum(scan=scan), num_threads_4_comet=num_threads
+        )
+    # Run on all spectra specified in config
+    for mzml, scans in hs_config._mzml_to_scans.items():
+        mzml_obj = Mzml(mzml=mzml)
+        for scan in scans:
+            _ = hs_config.run_hypedsearch_on_spectrum(
+                spectrum=mzml_obj.get_spectrum(scan=scan),
+                num_threads_4_comet=num_threads,
+            )
 
 
 @click.group(
@@ -1891,4 +849,6 @@ if __name__ == "__main__":
     setup_logger()
     cli.add_command(cli_combine_comet_scan_results)
     cli.add_command(cli_check_for_missing_scans)
+    cli.add_command(cli_run_hypedsearch)
+    cli.add_command(cli_create_native_run_snakemake_config)
     cli()

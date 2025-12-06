@@ -1,0 +1,15 @@
+{
+  "mzml_to_scans": {
+    "tests/data/spectra/10_mouse_spectra.mzML": [
+      0
+    ],
+    "tests/data/spectra/BMEM_AspN_Fxn4_scans1-20.mzML": [
+      0
+    ]
+  },
+  "crux_comet_params": "tests/data/comet.params",
+  "decoy_search": 2,
+  "fasta": "fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta",
+  "out_dir": "tmp/tutorial/native_run",
+  "num_threads": 0
+}

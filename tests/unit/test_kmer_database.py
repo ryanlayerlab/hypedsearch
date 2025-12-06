@@ -1,10 +1,19 @@
 import json
 from dataclasses import asdict
 
-from src.kmer_database import KmerDatabase, KmerToProteinsMap, create_kmer_database
+from src.kmer_database import DbKmer, KmerDatabase, KmerToProteinsMap
 from src.mass_spectra import Spectrum
 from src.peptides_and_ions import Fasta, Peptide, UnpositionedProductIon
-from src.utils import flatten_list_of_lists, read_new_line_separated_file
+from src.utils import flatten_list_of_lists, load_json, read_new_line_separated_file
+
+
+class Test_DbKmer:
+    @staticmethod
+    def test_check_proteins_are_sorted():
+        db_kmer = DbKmer.from_seq_and_proteins(
+            seq="ACD", proteins=["protB", "protA", "protB"]
+        )
+        assert db_kmer.proteins_as_set == {"protA", "protB"}
 
 
 class Test_KmerToProteinMap:
@@ -14,15 +23,15 @@ class Test_KmerToProteinMap:
             proteins = [Peptide(seq="ACD", id=0), Peptide(seq="CDE", id=1)]
             min_k, max_k = 1, 3
             expected = {
-                "A": [0],
-                "AC": [0],
-                "ACD": [0],
-                "C": [0, 1],
-                "CD": [0, 1],
-                "CDE": [1],
-                "D": [0, 1],
-                "DE": [1],
-                "E": [1],
+                "A": {0},
+                "AC": {0},
+                "ACD": {0},
+                "C": {0, 1},
+                "CD": {0, 1},
+                "CDE": {1},
+                "D": {0, 1},
+                "DE": {1},
+                "E": {1},
             }
             actual = KmerToProteinsMap.get_uniq_kmer_to_protein_map(
                 min_k=min_k, max_k=max_k, proteins=proteins
@@ -38,15 +47,15 @@ class Test_KmerToProteinMap:
             ]
             min_k, max_k = 1, 3
             expected = {
-                "A": ["prot 1"],
-                "AC": ["prot 1"],
-                "ACD": ["prot 1"],
-                "C": ["prot 1", "prot 2"],
-                "CD": ["prot 1", "prot 2"],
-                "CDE": ["prot 2"],
-                "D": ["prot 1", "prot 2"],
-                "DE": ["prot 2"],
-                "E": ["prot 2"],
+                "A": {"prot 1"},
+                "AC": {"prot 1"},
+                "ACD": {"prot 1"},
+                "C": {"prot 1", "prot 2"},
+                "CD": {"prot 1", "prot 2"},
+                "CDE": {"prot 2"},
+                "D": {"prot 1", "prot 2"},
+                "DE": {"prot 2"},
+                "E": {"prot 2"},
             }
             actual = KmerToProteinsMap.get_uniq_kmer_to_protein_map(
                 min_k=min_k, max_k=max_k, proteins=proteins, protein_attr="name"
@@ -60,7 +69,7 @@ class Test_KmerToProteinMap:
                 Peptide(seq="AAA", id=0, name="prot 1"),
             ]
             min_k, max_k = 1, 1
-            expected = {"A": ["prot 1"]}
+            expected = {"A": {"prot 1"}}
             actual = KmerToProteinsMap.get_uniq_kmer_to_protein_map(
                 min_k=min_k, max_k=max_k, proteins=proteins, protein_attr="name"
             )
@@ -107,58 +116,79 @@ class Test_KmerToProteinMap:
             # for protein in kmer_to_prot_map.kmer_to_protein_map.values():
             #     assert protein[0].startswith("test_")
 
-    class Test_save:
-        @staticmethod
-        def test_pklz(tmp_path, test_data_dir):
-            fasta_path = test_data_dir / "three_proteins.fasta"
-            kmer_to_prot_map = KmerToProteinsMap.create(
-                fasta=fasta_path, min_k=1, max_k=3
-            )
-            out_path = tmp_path / "out.pklz"
-            kmer_to_prot_map.save(out_path=out_path)
-            assert out_path.exists()
-            assert len(KmerToProteinsMap.load(out_path).kmer_to_protein_map) > 0
+    @staticmethod
+    def test_save_and_load_pklz(tmp_path, test_data_dir):
+        fasta_path = test_data_dir / "three_proteins.fasta"
+        kmer_to_prot_map = KmerToProteinsMap.create(fasta=fasta_path, min_k=1, max_k=3)
+        out_path = tmp_path / "out.pklz"
+        kmer_to_prot_map.save(out_path=out_path)
+        loaded_map = KmerToProteinsMap.load(path=out_path)
+        assert kmer_to_prot_map == loaded_map
 
-        @staticmethod
-        def test_json(tmp_path, test_data_dir):
-            fasta_path = test_data_dir / "three_proteins.fasta"
-            kmer_to_prot_map = KmerToProteinsMap.create(
-                fasta=fasta_path, min_k=1, max_k=3
-            )
-            out_path = tmp_path / "out.json"
-            kmer_to_prot_map.save(out_path=out_path)
-            assert out_path.exists()
-            assert len(KmerToProteinsMap.load(out_path).kmer_to_protein_map) > 0
+    @staticmethod
+    def test_save_and_load_json(tmp_path, test_data_dir):
+        fasta_path = test_data_dir / "three_proteins.fasta"
+        kmer_to_prot_map = KmerToProteinsMap.create(
+            fasta=fasta_path, min_k=1, max_k=3, protein_attr="name"
+        )
+        out_path = tmp_path / "out.json"
+        kmer_to_prot_map.save(out_path=out_path)
+        loaded_map = KmerToProteinsMap.load(path=out_path)
+        assert kmer_to_prot_map == loaded_map
 
 
 class Test_KmerDatabase:
+    @staticmethod
+    def test_get_kmer_to_proteins_map_from_db(test_data_dir):
+        # Arrange
+        db_path = (
+            test_data_dir / "sp-P99027-RLA2_MOUSE_mzml=BMEM_AspN_Fxn4;scan=7_kmer_db.db"
+        )
+        kmer_db = KmerDatabase(db_path=db_path)
+        true_kmer_to_proteins = KmerToProteinsMap.load(
+            path=test_data_dir
+            / "sp-P99027-RLA2_MOUSE_mzml=BMEM_AspN_Fxn4;scan=7_kmer_to_proteins.json"
+        )
+        # Act
+        computed_kmer_to_proteins = kmer_db.kmer_to_proteins_map
+        assert computed_kmer_to_proteins == true_kmer_to_proteins
+
     class Test_create_db:
         @staticmethod
         def test_smoke(test_data_dir, tmp_path, snapshot, snapshot_dir):
             # Arrange
             fasta_path = test_data_dir / "three_proteins.fasta"
-            kmer_to_prot_map = KmerToProteinsMap.create(
-                fasta=fasta_path, min_k=1, max_k=25, protein_attr="name"
-            )
-
+            min_k, max_k = 1, 3
             # Act
             kmer_db = KmerDatabase.create_db(
                 db_path=tmp_path / "three_proteins.db",
-                kmer_to_protein_map=kmer_to_prot_map.kmer_to_protein_map,
+                proteins=Fasta(path=fasta_path).proteins,
+                min_k=min_k,
+                max_k=max_k,
             )
 
-            # Arrange
+            # Assert
+            kmer_to_prot_map = KmerToProteinsMap.create(
+                fasta=fasta_path, min_k=min_k, max_k=max_k
+            )
             assert kmer_db.db.indices() == [kmer_db.index_name]
-            db_rows = kmer_db.db.all_table_rows(kmer_db.table_name)
+            db_rows = kmer_db.get_all_rows(as_dicts=True)
             assert len(db_rows) == len(kmer_to_prot_map.kmer_to_protein_map)
             # Since we grab the unique kmers in the FASTA, sorting by sequence should
             # produce a unique, reproducible order
+
+            db_rows = sorted(db_rows, key=lambda row: row["seq"])
             snapshot.snapshot_dir = snapshot_dir
             snapshot_file = "three_proteins.fasta.db.rows"
-            db_rows = sorted(db_rows, key=lambda row: row["seq"])
-            snapshot.assert_match(
-                json.dumps(db_rows, indent=2, sort_keys=True), snapshot_file
-            )
+            snapshot_data = load_json(path=snapshot_dir / snapshot_file)
+            for row_idx, row in enumerate(db_rows):
+                snapshot_row = snapshot_data[row_idx]
+                assert row["seq"] == snapshot_row["seq"]
+                assert row["aa_mass"] == snapshot_row["aa_mass"]
+                assert (
+                    DbKmer(**row).proteins_as_set
+                    == DbKmer(**snapshot_row).proteins_as_set
+                )
 
     class Test_get_matching_product_ions:
         @staticmethod
@@ -167,12 +197,9 @@ class Test_KmerDatabase:
             peak_mz = 720.3775024414062
             # Create DB
             fasta = test_data_dir / "three_proteins.fasta"
-            kmer_to_prot_map = KmerToProteinsMap.create(
-                fasta=fasta, min_k=1, max_k=25, protein_attr="name"
-            )
             kmer_db = KmerDatabase.create_db(
                 db_path=tmp_path / "three_proteins.db",
-                kmer_to_protein_map=kmer_to_prot_map.kmer_to_protein_map,
+                proteins=Fasta(path=fasta).proteins,
             )
 
             # Act
@@ -197,23 +224,17 @@ class Test_KmerDatabase:
         @staticmethod
         def test_smoke(test_data_dir, tmp_path, snapshot, snapshot_dir):
             # Arrange
-            mzml, scan = test_data_dir / "BMEM_AspN_Fxn4.mzML", 7
+            mzml, scan = test_data_dir / "BMEM_AspN_Fxn4/BMEM_AspN_Fxn4.mzML", 7
             spectrum = Spectrum.get_spectrum(scan=scan, mzml=mzml)
             fasta = (
                 test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
             )
-            kmer_to_prot_map = KmerToProteinsMap.create(
-                fasta=fasta,
-                min_k=1,
-                max_k=25,
-                protein_attr="name",
-                protein_names=[
-                    "sp|P99027|RLA2_MOUSE"
-                ],  # using this protein because it's the top Comet PSM for this scan comes from this protein
-            )
+            protein_names = ["sp|P99027|RLA2_MOUSE"]
             kmer_db = KmerDatabase.create_db(
                 db_path=tmp_path / "test.db",
-                kmer_to_protein_map=kmer_to_prot_map.kmer_to_protein_map,
+                proteins=Fasta(path=fasta).get_proteins_by_name(names=protein_names),
+                min_k=1,
+                max_k=25,
             )
 
             # Act
@@ -224,7 +245,7 @@ class Test_KmerDatabase:
             # Assert
             # Doing a snapshot test because there are 142 peak-ion matches which is too
             # many to individually test
-            peak_ion_matches = [asdict(p) for p in peak_ion_matches]
+            peak_ion_matches = [p.model_dump() for p in peak_ion_matches]
             peak_ion_matches_sorted = sorted(
                 peak_ion_matches,
                 key=lambda x: (
@@ -240,42 +261,3 @@ class Test_KmerDatabase:
                 json.dumps(peak_ion_matches_sorted, indent=2, sort_keys=True),
                 snapshot_file,
             )
-
-
-class Test_create_db:
-    @staticmethod
-    def test_smoke(test_data_dir, tmp_path, snapshot, snapshot_dir):
-        # Arrange
-        fasta = Fasta(
-            path=test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
-        )
-        protein_names = [
-            "sp|P01326|INS2_MOUSE",
-            "sp|P01325|INS1_MOUSE",
-            "sp|P12968B|IAPP_MOUSE",
-            "sp|P12968|IAPP_MOUSE",
-            "sp|P26339|CMGA_MOUSE",
-            "sp|Q03517|SCG2_MOUSE",
-            "sp|P16014|SCG1_MOUSE",
-            "sp|P99027|RLA2_MOUSE",
-            "sp|P01942|HBA_MOUSE",
-            "sp|Q9QXV0|PCSK1_MOUSE",
-        ]
-        # Act
-        kmer_db = create_kmer_database(
-            kmer_to_proteins_path=tmp_path / "test.pklz",
-            db_path=tmp_path / "test.db",
-            proteins=fasta.get_proteins_by_name(protein_names=protein_names),
-        )
-
-        # Arrange
-        assert kmer_db.db.indices() == [kmer_db.index_name]
-        snapshot.snapshot_dir = snapshot_dir
-        snapshot_file = "create_db_smoke_test.json"
-        # Since we grab the unique kmers in the FASTA, sorting by sequence should
-        # produce a unique, reproducible order
-        db_rows = kmer_db.db.all_table_rows(kmer_db.table_name)
-        db_rows = sorted(db_rows, key=lambda row: row["seq"])
-        snapshot.assert_match(
-            json.dumps(db_rows, indent=2, sort_keys=True), snapshot_file
-        )

@@ -21,7 +21,7 @@ from typing import Annotated, Any, Callable, Dict, List, Literal, Optional, Unio
 import click
 import pandas as pd
 import yaml
-from pydantic import BeforeValidator
+from pydantic import BaseModel, BeforeValidator
 from scipy.stats import percentileofscore
 
 from src.constants import COMET_DIR
@@ -31,6 +31,22 @@ LINUX_OS = "linux"
 StrOrPath = Union[str, Path]
 
 logger = logging.getLogger(__name__)
+
+
+class CmdLineRunner(BaseModel):
+    @staticmethod
+    def run_cmd(cmd: Union[str, List[str]]):
+        if isinstance(cmd, list):
+            cmd = " ".join(cmd)
+        logger.info(f"Running command line command: {cmd}")
+        result = subprocess.run(
+            cmd,
+            shell=True,  # runs command thru shell (e.g., /bin/bash)
+            stdout=subprocess.PIPE,  # capture command’s stdout in result.stdout
+            stderr=subprocess.PIPE,  # capture command’s stderr in result.stderr
+            text=True,  # decode output as text (str) instead of raw bytes so results.stdout and stderr are str
+        )
+        return result
 
 
 @dataclass
@@ -52,12 +68,13 @@ class Kmer:
     position: Position
 
 
-def get_prefixes(seq: str) -> List[str]:
-    return [seq[:i] for i in range(1, len(seq) + 1)]
+def get_b_ion_prefixes(seq: str) -> List[str]:
+    """Given ABC, should return [A, AB]"""
+    return [seq[:i] for i in range(1, len(seq))]
 
 
-def get_suffixes(seq: str) -> List[str]:
-    return [seq[i:] for i in range(0, len(seq))]
+def get_y_ion_suffixes(seq: str) -> List[str]:
+    return [seq[i:] for i in range(1, len(seq))]
 
 
 def remove_gene_name(protein_name: str) -> str:
@@ -270,23 +287,28 @@ def run_command_line_cmd(cmd: Union[str, List[str]], env=Dict) -> CmdLineResult:
 
 # function that takes in a list of any one kind dataclass and spits out a dataframe with one row per dataclass list element.
 # Optionally take a list of the dataclass's fields/attributes to include in the dataframe.
-def dataclass_list_to_df(
-    dataclass_list: List[Any], fields: Optional[List[str]] = None
+def list_to_df(
+    dataclass_list: Optional[List[Any]] = None,
+    fields: Optional[List[str]] = None,
+    pydantic_list: Optional[List[Any]] = None,
 ) -> pd.DataFrame:
     """
     Function that takes in a list of any one kind dataclass and spits out a dataframe
     with one row per dataclass list element. Optionally take a list of the dataclass's
     fields/attributes to include in the dataframe.
     """
-    if fields is None:
-        fields = [
-            field.name for field in dataclass_list[0].__dataclass_fields__.values()
-        ]
-    data = {field: [] for field in fields}
-    for item in dataclass_list:
-        for field in fields:
-            data[field].append(getattr(item, field))
-    return pd.DataFrame(data)
+    if dataclass_list:
+        if fields is None:
+            fields = [
+                field.name for field in dataclass_list[0].__dataclass_fields__.values()
+            ]
+        data = {field: [] for field in fields}
+        for item in dataclass_list:
+            for field in fields:
+                data[field].append(getattr(item, field))
+        return pd.DataFrame(data)
+    elif pydantic_list:
+        return pd.DataFrame([item.model_dump() for item in pydantic_list])
 
 
 def lowercase_and_underscore(in_str: str):

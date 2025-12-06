@@ -188,15 +188,5 @@
     "peak_mz": 469.23992919921875,
     "sample": "BMEM_AspN_Fxn4_scans1-20",
     "scan": 7
-  },
-  {
-    "ion_charge": 3,
-    "ion_mz": 509.59848833354664,
-    "ion_seq": "SAAPAAGSAPAAAEEKK",
-    "ion_type": "y",
-    "peak_intensity": 252.41346740722656,
-    "peak_mz": 509.59942626953125,
-    "sample": "BMEM_AspN_Fxn4_scans1-20",
-    "scan": 7
   }
 ]

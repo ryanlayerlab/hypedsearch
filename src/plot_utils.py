@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,6 +8,8 @@ import pandas as pd
 import plotly.express as px
 import seaborn as sns
 from matplotlib import rcParams
+from matplotlib.axes import Axes
+from scipy.stats import linregress
 
 # Constants
 SINGLE_FIG_SIZE = (6, 4)
@@ -106,26 +108,25 @@ def hide_right_top_axis(ax):
 
 def finalize(axs, fontsize=LABEL_SIZE, labelpad=7, ignore_legend=False, add_grid=True):
     """Apply final adjustments"""
-    try:
-        ax = axs[0]
-        for ax in axs:
-            ax.tick_params(direction="out")
-            hide_right_top_axis(ax)
-            ax.yaxis.label.set_size(fontsize)
-            ax.xaxis.label.set_size(fontsize)
-            if ignore_legend == False:
-                ax.legend(frameon=False)
-            ax.tick_params(axis="both", which="major", labelsize=fontsize, pad=labelpad)
-            if add_grid:
-                ax.grid(True, linestyle="--", alpha=0.7)
-    except:
-        axs.tick_params(direction="out")
-        hide_right_top_axis(axs)
-        axs.yaxis.label.set_size(fontsize)
-        axs.xaxis.label.set_size(fontsize)
+
+    def finalize_one_subplot(ax):
+        ax.tick_params(direction="out")
+        hide_right_top_axis(ax)
+        ax.yaxis.label.set_size(fontsize)
+        ax.xaxis.label.set_size(fontsize)
         if ignore_legend == False:
-            axs.legend(frameon=False)
-        axs.tick_params(axis="both", which="major", labelsize=fontsize, pad=labelpad)
+            _, labels = ax.get_legend_handles_labels()
+            if labels:
+                ax.legend(frameon=False)
+        ax.tick_params(axis="both", which="major", labelsize=fontsize, pad=labelpad)
+        if add_grid:
+            ax.grid(True, linestyle="--", alpha=0.7)
+
+    try:
+        for ax in axs:
+            finalize_one_subplot(ax)
+    except TypeError:
+        finalize_one_subplot(axs)
 
 
 def lineswap_axis(fig, ax, zorder=-1000, lw=1, alpha=0.2, skip_zero=False):
@@ -250,23 +251,30 @@ def best_fit_line(x, y):
     Returns the slope and intercept of the line of best fit for the given x and y values.
     """
     # Calculate the slope and intercept using numpy's polyfit function
-    slope, intercept = np.polyfit(x, y, 1)
-    return slope, intercept
+    result = linregress(x, y)
+    slope = result.slope
+    intercept = result.intercept
+    r_value = result.rvalue
+    r_squared = r_value**2
+
+    return slope, intercept, r_squared
 
 
 # Write me a function that (1) has a basic docstring that just describes what the function does
 # in a few sentences, (2) computes the
-def plot_best_fit_line(ax, x, y, label=None):
+def plot_best_fit_line(ax, x, y):
     """
     Plot the line of best fit for the given x and y values.
     """
-    slope, intercept = best_fit_line(x, y)
+    slope, intercept, r_squared = best_fit_line(x, y)
     xlim = ax.get_xlim()
-    ax.get_ylim()
     # min_val = min(xlim[0], ylim[0])
     # max_val = max(xlim[1], ylim[1])
     x = np.linspace(xlim[0], xlim[1], 1000)
     y = slope * x + intercept
+    label = (
+        f"Best fit line:\ny = {slope:.2f}x + {intercept:.2f} ($R^2$ = {r_squared:.2f})"
+    )
     ax.plot(x, y, label=label)
 
 
@@ -378,3 +386,49 @@ def add_counts_to_histogram_boxes(
                 va="bottom",
                 fontsize=9,
             )
+
+
+def plot_sorted_1d_data(
+    data: Dict[Union[str, float], float],
+    pt_labels: Optional[Dict[str, str]] = None,
+    ax_labels: Union[Dict[str, str], bool] = False,
+    ax: Optional[Axes] = None,
+    sort_idx: int = 1,
+):
+    """
+    Plot 1D data sorted from largest to smallest.
+    """
+    if ax is None:
+        fig, axs = fig_setup()
+        ax = axs[0]
+
+    # Sort data (largest value first)
+    if sort_idx == 1:
+        items = sorted(data.items(), key=lambda x: x[sort_idx], reverse=True)
+    elif sort_idx == 0:
+        items = sorted(data.items(), key=lambda x: x[sort_idx], reverse=False)
+    else:
+        raise ValueError("sort_idx must be 0 or 1")
+    ax_labels = [k for k, _ in items]
+    values = [v for _, v in items]
+
+    # Scatter plot
+    x = list(range(1, len(values) + 1))  # 1, 2, 3, ...
+    sns.scatterplot(x=x, y=values, s=7)
+
+    # Optionally label points
+    if pt_labels is not None:
+        for xi, key, val in zip(x, ax_labels, values):
+            if key in pt_labels:
+                ax.text(xi, val, pt_labels[key], ha="center", va="bottom", fontsize=8)
+
+    # Optionally add x-axis tick labels
+    if ax_labels is not False:
+        ax.set_xticks(x)
+        if isinstance(ax_labels, dict):
+            ax_labels = [ax_labels[k] for k in ax_labels]
+            ax.set_xticklabels(ax_labels, rotation=90, ha="center")
+        else:
+            ax.set_xticklabels(ax_labels, rotation=90, ha="center")
+
+    return ax

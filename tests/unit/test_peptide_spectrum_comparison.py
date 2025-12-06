@@ -4,7 +4,6 @@ from dataclasses import asdict
 from src.mass_spectra import Spectrum
 from src.peptide_spectrum_comparison import PSM, get_peak_product_ion_matches
 from src.utils import mass_difference_in_ppm
-from tests.conftest import normalize
 
 
 class Test_get_peak_product_ion_matches:
@@ -30,7 +29,7 @@ class Test_get_peak_product_ion_matches:
                 )
                 <= peak_to_ion_ppm_tolerance
             )
-        peak_ion_matches = normalize([asdict(p) for p in peak_ion_matches])
+        peak_ion_matches = [p.model_dump() for p in peak_ion_matches]
         peak_ion_matches = sorted(
             peak_ion_matches,
             key=lambda x: (x["ion_seq"], x["ion_charge"], x["peak_mz"]),
@@ -67,5 +66,4 @@ class Test_PSM:
             "PAAAEEKK",
             "PAAGSAPAAAEEKK",
             "AAEEKK",
-            "SAAPAAGSAPAAAEEKK",
         }

@@ -1,10 +1,12 @@
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Set, Union
 
 import click
+from pydantic import BaseModel
 
 from src.constants import (
     AMINO_ACID_MASSES,
@@ -37,11 +39,10 @@ from src.utils import (
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class KmerToProteinsMap:
+class KmerToProteinsMap(BaseModel):
     """A class for the mapping from kmers to the proteins those kmers are found in"""
 
-    kmer_to_protein_map: Dict[str, List[Union[int, str]]]
+    kmer_to_protein_map: Dict[str, Set[Union[int, str]]]
 
     @classmethod
     def create(
@@ -81,11 +82,11 @@ class KmerToProteinsMap:
         max_k: int = DEFAULT_MAX_KMER_LEN,
         protein_attr: str = "id",
         verbose: bool = True,
-    ) -> Dict[str, List[Union[int, str]]]:
+    ) -> Dict[str, Set[Union[int, str]]]:
         """
         Given a list of proteins get a dictionary mapping kmers to proteins
         """
-        uniq_kmer_to_protein_map = defaultdict(list)
+        uniq_kmer_to_protein_map = defaultdict(set)
         num_proteins = len(proteins)
         for p_idx, protein in enumerate(proteins):
             if verbose and (p_idx % 10 == 0):
@@ -94,23 +95,22 @@ class KmerToProteinsMap:
                 kmer.seq for kmer in protein.kmers(min_k=min_k, max_k=max_k)
             )
             for kmer in uniq_kmers:
-                uniq_kmer_to_protein_map[kmer].append(getattr(protein, protein_attr))
+                uniq_kmer_to_protein_map[kmer].add(getattr(protein, protein_attr))
         logger.info(f"Number of unique kmers {len(uniq_kmer_to_protein_map)}")
         return dict(uniq_kmer_to_protein_map)
 
-    @log_time(level=logging.DEBUG)
     def save(self, out_path: Union[str, Path]) -> None:
         """Save the kmer-to-protein map to a file."""
         out_path = Path(out_path)
         if out_path.suffix == ".pklz":
             pickle_and_compress(obj=self.kmer_to_protein_map, path=out_path)
         elif out_path.suffix == ".json":
-            to_json(data=self.kmer_to_protein_map, path=out_path)
+            data = {key: list(value) for key, value in self.kmer_to_protein_map.items()}
+            to_json(data=data, path=out_path)
         else:
             raise ValueError("Output path must be a .pklz or .json file.")
 
     @classmethod
-    @log_time(level=logging.DEBUG)
     def load(cls, path: Union[str, Path]) -> "KmerToProteinsMap":
         """Load a saved kmer-to-protein map from a file."""
         path = Path(path)
@@ -131,6 +131,11 @@ class DbKmer(SqlTableRow):
     aa_mass: float
     proteins: str
 
+    def __post_init__(self):
+        # Sort proteins alphabetically/numerically for consistency
+        proteins = self.proteins_as_set
+        self.proteins = ",".join(sorted(proteins))
+
     @classmethod
     def from_seq_and_proteins(
         cls,
@@ -142,9 +147,12 @@ class DbKmer(SqlTableRow):
         aa_mass = sum([amino_acid_mass_lookup[aa] for aa in seq])
         return cls(seq=seq, aa_mass=aa_mass, proteins=",".join(map(str, proteins)))
 
+    @property
+    def proteins_as_set(self) -> Set[str]:
+        return set(self.proteins.split(","))
 
-@dataclass
-class PeakIonMatch:
+
+class PeakIonMatch(BaseModel):
     ion: UnpositionedProductIon
     peak: Peak
 
@@ -218,19 +226,42 @@ class KmerDatabase:
                 "Database path does not exist. Please create the database first."
             )
 
+    def get_all_rows(self, as_dicts: bool = False) -> List[Union[DbKmer, Dict]]:
+        """Get all rows in the kmer database"""
+        rows = self.db.all_table_rows(table_name=self.table_name)
+        if as_dicts:
+            return rows
+        else:
+            return [self.row_object(**row) for row in rows]
+
     @classmethod
     def create_db(
         cls,
-        db_path: Path,
-        kmer_to_protein_map: Dict[str, List],
-        overwrite: bool = True,
+        db_path: Union[Literal[MEMORY], Path],
+        proteins: List[Peptide],
+        min_k: int = DEFAULT_MIN_KMER_LEN,
+        max_k: int = DEFAULT_MAX_KMER_LEN,
+        overwrite: bool = False,
     ) -> "KmerDatabase":
+        if isinstance(db_path, Path):
+            if db_path.exists() and not overwrite:
+                logger.info(
+                    f"Database already exists at {db_path} and overwriting=False. So skipping creating database."
+                )
+                return KmerDatabase(db_path=db_path)
+        kmer_to_protein_map = KmerToProteinsMap.create(
+            proteins=proteins,
+            min_k=min_k,
+            max_k=max_k,
+            protein_attr="name",
+        )
+
         db = Sqlite3Database(db_path=db_path, overwrite=overwrite)
         db.create_table_from_dataclass(table_name=cls.table_name, obj=cls.row_object)
         logger.info("Adding 'DbKmer' objects to the database...")
         rows = [
             DbKmer.from_seq_and_proteins(seq=seq, proteins=proteins)
-            for seq, proteins in kmer_to_protein_map.items()
+            for seq, proteins in kmer_to_protein_map.kmer_to_protein_map.items()
         ]
         if len(rows) > 0:
             db.insert_dataclasses(
@@ -364,48 +395,69 @@ class KmerDatabase:
             )
         return peak_ion_matches
 
+    @cached_property
+    def kmer_to_proteins_map(self) -> KmerToProteinsMap:
+        kmer_to_proteins = defaultdict(set)
+        for row in self.get_all_rows():
+            kmer_to_proteins[row.seq].update(row.proteins_as_set)
+        return KmerToProteinsMap(kmer_to_protein_map=dict(kmer_to_proteins))
 
-def create_kmer_database(
-    proteins: List[Peptide],
-    kmer_to_proteins_path: Path,
-    db_path: Union[Path, str] = MEMORY,
-    min_k: int = DEFAULT_MIN_KMER_LEN,
-    max_k: int = DEFAULT_MAX_KMER_LEN,
-) -> KmerDatabase:
-    """
-    Create the kmer database.
-    If the kmer-to-protein map does not exist at the given path, it will be created.
-    If it does exist, it is loaded.
-    If the database does not exist at the given path, it will be created.
-    If it does exist it is loaded and returned.
-    """
-    if not kmer_to_proteins_path.exists():
-        logger.info(
-            f"kmer-to-protein map doesn't exist at {kmer_to_proteins_path}. "
-            "Creating it now..."
-        )
-        kmer_to_protein_map = KmerToProteinsMap.create(
-            proteins=proteins,
-            min_k=min_k,
-            max_k=max_k,
-            protein_attr="name",
-        )
-        kmer_to_proteins_path.parent.mkdir(parents=True, exist_ok=True)
-        kmer_to_protein_map.save(kmer_to_proteins_path)
-    else:
-        kmer_to_protein_map = KmerToProteinsMap.load(kmer_to_proteins_path)
-        logger.info("kmer-to-protein map already exists... Skipping creation")
-    if not db_path.exists():
-        logger.info(f"Database does not exist at {db_path}. Creating it now...")
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        kmer_db = KmerDatabase.create_db(
-            db_path=db_path,
-            kmer_to_protein_map=kmer_to_protein_map.kmer_to_protein_map,
-        )
-    else:
-        logger.info("Database already exists... Skipping creation")
-        kmer_db = KmerDatabase(db_path=db_path)
-    return kmer_db
+    @cached_property
+    def min_k(self):
+        return min(len(row.seq) for row in self.get_all_rows())
+
+    @cached_property
+    def max_k(self):
+        return max(len(row.seq) for row in self.get_all_rows())
+
+    @cached_property
+    def proteins(self):
+        proteins = set()
+        for row in self.get_all_rows():
+            proteins.update(row.proteins_as_set)
+        return proteins
+
+    @cached_property
+    def kmers(self) -> Set[str]:
+        return set(row.seq for row in self.get_all_rows())
+
+
+# def create_kmer_database(
+#     proteins: List[Peptide],
+#     kmer_to_proteins_path: Path,
+#     db_path: Union[Path, str] = MEMORY,
+#     min_k: int = DEFAULT_MIN_KMER_LEN,
+#     max_k: int = DEFAULT_MAX_KMER_LEN,
+# ) -> KmerDatabase:
+#     """
+#     Create the kmer database.
+#     If the kmer-to-protein map does not exist at the given path, it will be created.
+#     If it does exist, it is loaded.
+#     If the database does not exist at the given path, it will be created.
+#     If it does exist it is loaded and returned.
+#     """
+#     kmer_to_protein_map = KmerToProteinsMap.create(
+#         proteins=proteins,
+#         min_k=min_k,
+#         max_k=max_k,
+#         protein_attr="name",
+#     )
+#     kmer_to_proteins_path.parent.mkdir(parents=True, exist_ok=True)
+#     kmer_to_protein_map.save(kmer_to_proteins_path)
+#     else:
+#         kmer_to_protein_map = KmerToProteinsMap.load(kmer_to_proteins_path)
+#         logger.info("kmer-to-protein map already exists... Skipping creation")
+#     if not db_path.exists():
+#         logger.info(f"Database does not exist at {db_path}. Creating it now...")
+#         db_path.parent.mkdir(parents=True, exist_ok=True)
+#         kmer_db = KmerDatabase.create_db(
+#             db_path=db_path,
+#             kmer_to_protein_map=kmer_to_protein_map.kmer_to_protein_map,
+#         )
+#     else:
+#         logger.info("Database already exists... Skipping creation")
+#         kmer_db = KmerDatabase(db_path=db_path)
+#     return kmer_db
 
 
 @click.command(

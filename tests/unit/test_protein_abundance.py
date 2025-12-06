@@ -1,4 +1,6 @@
+from src.comet_utils import CometPSM
 from src.protein_abundance import (
+    ProteinAbundance,
     get_and_plot_most_common_proteins,
     get_prefix_counts_by_length,
     get_protein_counts_from_comet_psms,
@@ -42,15 +44,11 @@ class Test_get_prefix_counts_by_length:
         assert prefix_counts_by_length == expected
 
 
-class Test_get_and_plot_most_common_proteins:
-    @staticmethod
-    def test_smoke(tmp_path, test_data_dir):
-        comet_results_dir = test_data_dir / "comet_results"
-        q_value_threshold = 0.5
-        get_and_plot_most_common_proteins(
-            comet_results_dir=comet_results_dir,
-            q_value_threshold=q_value_threshold,
-            out_path=tmp_path / "top_10_proteins.txt",
-        )
-        assert (tmp_path / "top_10_proteins.txt").exists()
-        assert (tmp_path / "protein_abundances.png").exists()
+class Test_ProteinAbundance:
+    class Test_from_comet_psms:
+        @staticmethod
+        def test_smoke(test_data_dir):
+            psms = CometPSM.from_txt(
+                txt=test_data_dir / "BMEM_AspN_Fxn4/assign-confidence.target.txt"
+            )
+            prot_ab = ProteinAbundance.from_comet_psms(psms=psms)

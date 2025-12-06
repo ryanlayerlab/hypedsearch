@@ -9,6 +9,7 @@ from venv import logger
 
 import click
 import numpy as np
+from pydantic import BaseModel
 
 from src.constants import (
     B_ION_TYPE,
@@ -33,6 +34,7 @@ from src.peptides_and_ions import (
 from src.sql_database import Sqlite3Database, SqlTableRow
 from src.utils import (
     Position,
+    flatten_list_of_lists,
     get_positions_of_subseq_in_seq,
     get_time_in_diff_units,
     load_json,
@@ -370,18 +372,17 @@ def form_extended_clusters_for_spectrum(
     return clusters
 
 
-@dataclass
-class HybridPeptide:
+class HybridPeptide(BaseModel):
     left_seq: str
     right_seq: str
-    left_proteins: Set[str]
-    right_proteins: Set[str]
-    fasta_description: str = field(init=False)
-    scan: Optional[int] = None
-    sample: Optional[str] = None
+    left_proteins: Set[str] = field(default_factory=set)
+    right_proteins: Set[str] = field(default_factory=set)
+    # fasta_description: str = field(init=False)
+    # scan: Optional[int] = None
+    # sample: Optional[str] = None
 
-    def __post_init__(self):
-        self.fasta_description = f"left-prots:{','.join(self.left_proteins)};right-prots:{','.join(self.right_proteins)}"
+    # def __post_init__(self):
+    #     self.fasta_description = f"left-prots:{','.join(self.left_proteins)};right-prots:{','.join(self.right_proteins)}"
 
     def serialize(self):
         return {
@@ -389,8 +390,8 @@ class HybridPeptide:
             "right_seq": self.right_seq,
             "left_proteins": list(self.left_proteins),
             "right_proteins": list(self.right_proteins),
-            "scan": self.scan,
-            "sample": self.sample,
+            # "scan": self.scan,
+            # "sample": self.sample,
         }
 
     @property
@@ -432,25 +433,41 @@ class HybridPeptide:
         b_seq, y_seq = name.split("-")
         return b_seq, y_seq
 
-    def set_protein_names(self, prot_id_to_name_map: Dict[int, str]):
-        self.left_proteins = set(
-            prot_id_to_name_map[prot_id] for prot_id in self.b_prot_ids
-        )
-        self.right_proteins = set(
-            prot_id_to_name_map[prot_id] for prot_id in self.y_prot_ids
-        )
-
-    def set_fasta_info(
-        self,
-        prot_id_to_name_map: Optional[Dict[int, str]],
+    @staticmethod
+    def set_proteins(
+        hybrids: List["HybridPeptide"],
+        fasta: Optional[Union[Path, str]] = None,
+        seq_to_proteins: Optional[Dict[str, Set[str]]] = None,
     ):
-        self.set_protein_names(prot_id_to_name_map=prot_id_to_name_map)
-        self.fasta_description = f"b-prots:{','.join(self.left_proteins)} y-prots:{','.join(self.right_proteins)}"
+        """
+        This is a staticmethod instead of instance method because we have to process
+        """
+        if fasta is not None:
+            fasta_obj = Fasta(path=fasta)
+            seqs = flatten_list_of_lists(
+                [hybrid.left_seq, hybrid.right_seq] for hybrid in hybrids
+            )
+            seq_to_proteins = fasta_obj.proteins_that_contain_seqs(seqs=seqs)
+        for hybrid in hybrids:
+            hybrid.left_proteins = set(seq_to_proteins[hybrid.left_seq])
+            hybrid.right_proteins = set(seq_to_proteins[hybrid.right_seq])
 
     def mz(self, charge: int):
-        return compute_peptide_precursor_mz(
-            seq=self.left_seq + self.right_seq, charge=charge
-        )
+        return Peptide(seq=self.seq).mz(charge=charge)
+
+    @property
+    def hyphen_seq(self) -> str:
+        return f"{self.left_seq}-{self.right_seq}"
+
+    @classmethod
+    def from_hyphen_str(cls, hybrid_str: str) -> "HybridPeptide":
+        left_seq, right_seq = hybrid_str.split("-")
+        return cls(left_seq=left_seq, right_seq=right_seq)
+
+    @staticmethod
+    def hybrid_str_to_seq(hybrid_str: str) -> str:
+        left_seq, right_seq = hybrid_str.split("-")
+        return left_seq + right_seq
 
 
 @log_time(level=logging.DEBUG)
@@ -460,8 +477,6 @@ def form_hybrids_from_clusters(
     precursor_charge: int,
     precursor_mz: float,
     precursor_mz_ppm_tol: float,
-    scan: int,
-    sample: str,
 ) -> List[HybridPeptide]:
     """
     Given b- and y-clusters, form hybrids.
@@ -494,8 +509,8 @@ def form_hybrids_from_clusters(
                 right_seq=right_seq,
                 left_proteins=seq_protein_map[B_ION_TYPE].get(left_seq),
                 right_proteins=seq_protein_map[Y_ION_TYPE].get(right_seq),
-                scan=scan,
-                sample=sample,
+                # scan=scan,
+                # sample=sample,
             )
         )
     return hybrids
@@ -558,8 +573,7 @@ def form_hybrids_from_left_and_right_seqs(
 def form_spectrum_hybrids_via_clustering(
     spectrum: Spectrum,
     kmer_db: KmerDatabase,
-    protein_name_to_seq_map: Dict[str, str],
-    kmer_to_proteins_map: Dict[str, List[str]],
+    fasta: Fasta,
     precursor_mz_ppm_tol: float = DEFAULT_PRECURSOR_MZ_PPM_TOL,
     peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
     min_cluster_len: int = DEFAULT_MIN_CLUSTER_LENGTH,
@@ -578,7 +592,7 @@ def form_spectrum_hybrids_via_clustering(
     clusters = form_extended_clusters_for_spectrum(
         kmer_db=kmer_db,
         spectrum=spectrum,
-        protein_name_to_seq_map=protein_name_to_seq_map,
+        protein_name_to_seq_map=fasta.protein_name_to_seq_map,
         peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
         precursor_mz_ppm_tol=precursor_mz_ppm_tol,
         min_cluster_len=min_cluster_len,
@@ -591,8 +605,6 @@ def form_spectrum_hybrids_via_clustering(
         precursor_charge=spectrum.precursor_charge,
         precursor_mz=spectrum.precursor_mz,
         precursor_mz_ppm_tol=precursor_mz_ppm_tol,
-        scan=spectrum.scan,
-        sample=spectrum.sample,
     )
     # Remove hybrids that are native sequences and
     # group hybrids by sequence (e.g., group A-BC with AB-C)
@@ -602,7 +614,7 @@ def form_spectrum_hybrids_via_clustering(
     )
     seq_to_hybrids = defaultdict(list)
     for hybrid in hybrids:
-        if hybrid.seq in kmer_to_proteins_map:
+        if hybrid.seq in kmer_db.kmer_to_proteins_map.kmer_to_protein_map:
             continue
         seq_to_hybrids[hybrid.seq].append(hybrid)
 

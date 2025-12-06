@@ -1,4 +1,5 @@
 # Hypedsearch <!-- omit in toc -->
+
 - [Installation via Conda](#installation-via-conda)
 - [Overview](#overview)
 - [Code organization](#code-organization)

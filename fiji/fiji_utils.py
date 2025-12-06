@@ -2,17 +2,22 @@ import datetime
 import logging
 import re
 import shutil
+from copy import deepcopy
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Union
 
 import click
 import pandas as pd
+from pydantic import BaseModel, field_validator
 
-from src.constants import CRUX_PATH_IN_SINGULARITY
-from src.hypedsearch import HybridRunConfig, HypedsearchConfig
+from src.constants import LINUX_CRUX_EXECUTABLE, MAC_CRUX_EXECUTABLE
+from src.hypedsearch import HybridPSMScorer, HypedsearchRunConfig
 from src.utils import PathType, copy_file, log_params, setup_logger
 
 logger = logging.getLogger(__name__)
+
+node_to_data_dir_map = {"": "/localscratch"}
 
 
 def collect_benchmarking_data(dir: Path) -> pd.DataFrame:
@@ -34,76 +39,104 @@ def collect_benchmarking_data(dir: Path) -> pd.DataFrame:
     return df
 
 
-def prep_hybrid_run_on_fiji(
-    hybrid_run_config_path: Union[str, Path],
-    node_data_dir: Path,
-    crux_path: Path = CRUX_PATH_IN_SINGULARITY,
-) -> HybridRunConfig:
-    hybrid_run_config = HybridRunConfig.from_json(path=hybrid_run_config_path)
+@dataclass
+class HypedsearchOnFijiConfig:
+    hs_config: HypedsearchRunConfig
 
-    # The out directory is path/to/<name>/hybrid_run/scan_results. We want to preserve
-    # this except replace "path/to" with node_data_dir
-    scan_results_dir = node_data_dir / hybrid_run_config.out_dir.relative_to(
-        hybrid_run_config.out_dir.parents[2]
-    )
-    scan_results_dir.mkdir(parents=True, exist_ok=True)
-    hybrid_run_dir = scan_results_dir.parents[0]
-    name_dir = scan_results_dir.parents[1]
+    @classmethod
+    def from_json(cls, path: Union[str, Path]):
+        hs_config = HypedsearchRunConfig.from_json(path=path)
+        return cls(hs_config=hs_config)
 
-    # Handle MZMLs
-    logger.info(f"Copying MZMLs to {name_dir}...")
-    new_mzml_to_scans = {}
-    for mzml, scans in hybrid_run_config.mzml_to_scans.items():
-        new_mzml_path = str(name_dir / Path(mzml).name)
-        new_mzml_to_scans[new_mzml_path] = scans
-        copy_file(src=mzml, dest=new_mzml_path)
+    def prepare_files_for_hybrid_run(
+        self,
+        node: Optional[str] = None,
+        node_data_dir: Optional[Path] = None,
+        out_path: Optional[Union[str, Path]] = None,
+    ) -> HypedsearchRunConfig:
+        if node_data_dir is None:
+            node_data_dir = node_to_data_dir_map[node]
 
-    # Handle files that need to be copied
-    logger.info(f"Copying other needed files to {name_dir}...")
-    fiji_config = {}
-    for attr in ["kmer_db", "fasta", "crux_comet_params", "kmer_to_proteins_map"]:
-        old_path = Path(getattr(hybrid_run_config, attr))
-        new_out_path = str(name_dir / old_path.name)
-        fiji_config[attr] = new_out_path
-        copy_file(src=old_path, dest=new_out_path)
+        # Create directories that need to exist
+        name_dir = node_data_dir / self.hs_config.name
+        name_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create the new config
-    fiji_node_config = hybrid_run_config.__class__(
-        mzml_to_scans=new_mzml_to_scans,
-        out_dir=str(scan_results_dir),
-        fasta=fiji_config["fasta"],
-        kmer_db=fiji_config["kmer_db"],
-        kmer_to_proteins_map=fiji_config["kmer_to_proteins_map"],
-        crux_path=crux_path,
-        peak_to_ion_ppm_tol=hybrid_run_config.peak_to_ion_ppm_tol,
-        precursor_mz_ppm_tol=hybrid_run_config.precursor_mz_ppm_tol,
-        crux_comet_params=fiji_config["crux_comet_params"],
-        min_cluster_len=hybrid_run_config.min_cluster_len,
-        min_cluster_support=hybrid_run_config.min_cluster_support,
-        max_allowed_ion_charge=hybrid_run_config.max_allowed_ion_charge,
-        log_dir=hybrid_run_config.log_dir,
-    )
+        # Copy MZMLs
+        new_mzml_to_scans = {}
+        for mzml, scans in self.hs_config.mzml_to_scans.items():
+            new_mzml_path = str(name_dir / Path(mzml).name)
+            new_mzml_to_scans[new_mzml_path] = scans
+            copy_file(src=mzml, dest=new_mzml_path)
 
-    # Save new config
-    out_path = hybrid_run_dir / hybrid_run_config_path.name
-    logger.info(f"Saving config to {out_path}...")
-    fiji_node_config.save(path=out_path)
-    return fiji_node_config
+        # Copy other files
+        # comet.params
+        old_comet_params = self.hs_config.psm_scorer.comet_params
+        new_comet_params = name_dir / old_comet_params.name
+        copy_file(src=old_comet_params, dest=new_comet_params)
+
+        # k-mer database
+        old_kmer_db = self.hs_config.hybrid_former.kmer_db
+        new_kmer_db = name_dir / old_kmer_db.name
+        copy_file(src=old_kmer_db, dest=new_kmer_db)
+
+        # FASTA
+        old_fasta = self.hs_config.hybrid_former.fasta
+        new_fasta = name_dir / old_fasta.name
+        copy_file(src=old_fasta, dest=new_fasta)
+
+        # Create new config
+        hybrid_former = deepcopy(self.hs_config.hybrid_former)
+        hybrid_former.kmer_db = new_kmer_db
+        hybrid_former.fasta = new_fasta
+
+        psm_scorer = deepcopy(self.hs_config.psm_scorer)
+        if psm_scorer.fasta is not None:
+            psm_scorer.fasta = new_fasta
+        psm_scorer.comet_params = new_comet_params
+
+        fiji_config = HypedsearchRunConfig(
+            mzml_to_scans=new_mzml_to_scans,
+            parent_out_dir=name_dir,
+            name=self.hs_config.name,
+            spectrum_selector=self.hs_config.spectrum_selector,
+            spectrum_preprocessor=self.hs_config.spectrum_preprocessor,
+            psm_scorer=psm_scorer,
+            hybrid_former=hybrid_former,
+        )
+        if out_path is None:
+            out_path = name_dir / f"hs.fiji.config.json"
+        fiji_config.to_json(path=out_path)
+        return fiji_config
+
+    def move_scan_results(
+        self,
+        node_data_dir: Path,
+    ):
+        fiji_config = self.prepare_files_for_hybrid_run(node_data_dir=node_data_dir)
+        # Move native scan results
+        src = fiji_config.native_run_scan_results_dir
+        dest = self.hs_config.native_run_scan_results_dir
+        logger.info(f"Copying native scan results from {src} to {dest}...")
+        shutil.copytree(src, dest, dirs_exist_ok=True)
+
+        # Move hybrid scan results
+        src = fiji_config.hybrid_run_scan_results_dir
+        dest = self.hs_config.hybrid_run_scan_results_dir
+        logger.info(f"Copying hybrid scan results from {src} to {dest}...")
+        shutil.copytree(src, dest, dirs_exist_ok=True)
 
 
 @click.command(
-    name="prep-hybrid-run",
+    name="prep-files-on-fiji",
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-    help=(
-        "Run Hypedsearch via snakemake on a Fiji node using the given snakemake config"
-    ),
+    help=("Prepare files on Fiji node for Hypedsearch run"),
 )
 @click.option(
     "--config",
     "-c",
     type=PathType(),
     required=True,
-    help="Path to the snakemake config file",
+    help="Path to the Hypedsearch JSON config",
 )
 @click.option(
     "--data_dir",
@@ -117,54 +150,30 @@ def prep_hybrid_run_on_fiji(
     ),
 )
 @log_params
-def cli_prep_hybrid_run_on_fiji(
+def cli_prep_files_on_fiji(
     config: Path,
     data_dir: Path,
 ):
     logger = setup_logger()
     logger.info("Setting up files on Fiji node...")
-    prep_hybrid_run_on_fiji(hybrid_run_config_path=config, node_data_dir=data_dir)
+    fiji_runner = HypedsearchOnFijiConfig.from_json(path=config)
+    _ = fiji_runner.prepare_files_for_hybrid_run(node_data_dir=data_dir)
     logger.info("Finished preparing files on Fiji node")
 
 
-def prep_native_run_on_fiji(
-    hypedsearch_config: Union[HypedsearchConfig, str, Path],
-    data_dir: Path,
-):
-    if isinstance(hypedsearch_config, (str, Path)):
-        hypedsearch_config = HypedsearchConfig.from_json(path=hypedsearch_config)
-
-    # Create output directory
-    out_dir = data_dir / hypedsearch_config.name
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    # Move files that need to be moved to the output directory
-    fiji_config = {}
-    for attr in ["fasta", "crux_comet_params"]:
-        old_path = Path(getattr(hypedsearch_config, attr))
-        new_out_path = str(out_dir / old_path.name)
-        fiji_config[attr] = new_out_path
-        copy_file(src=old_path, dest=new_out_path)
-
-    # Handle MZMLs
-    new_mzml_to_scans = {}
-    for mzml, scans in old_config.mzml_to_scans.items():
-        new_mzml_path = str(node_data_dir / Path(mzml).name)
-        new_mzml_to_scans[new_mzml_path] = scans
-        copy_file(src=mzml, dest=new_mzml_path)
-
-
 @click.command(
-    name="prep-native-run-on-fiji",
+    name="move-scan-results",
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-    help=("Native run via snakemake on a Fiji node"),
+    help=(
+        "Move scan results files from a Fiji node data directory back to the main output directory"
+    ),
 )
 @click.option(
     "--config",
     "-c",
     type=PathType(),
     required=True,
-    help="Path to the HypedSearch JSON config file",
+    help="Path to the Hypedsearch JSON config",
 )
 @click.option(
     "--data_dir",
@@ -172,17 +181,19 @@ def prep_native_run_on_fiji(
     type=PathType(),
     default=Path("/localscratch"),
     show_default=True,
-    help=("Path to the data directory on the Fiji node. "),
+    help=(
+        "Path to the data directory on the Fiji node. "
+        "A Hypedsearch config file will be created here: <data_dir>/<config.name>"
+    ),
 )
 @log_params
-def cli_prep_native_run_on_fiji(
-    hypedsearch_config: Path,
+def cli_move_scan_results(
+    config: Path,
     data_dir: Path,
 ):
     logger = setup_logger()
-    logger.info("Setting up files on Fiji node")
-    original_config = HypedsearchConfig.from_json(path=hypedsearch_config)
-    logger.info("Finished preparing files on Fiji node")
+    fiji_runner = HypedsearchOnFijiConfig.from_json(path=config)
+    fiji_runner.move_scan_results(node_data_dir=data_dir)
 
 
 @click.command(
@@ -212,36 +223,6 @@ def cli_collect_benchmark_data(
     df.to_csv(out_path, index=False)
 
 
-# @click.command(
-#     name="cleanup",
-#     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-#     help=(
-#         "Cleanup the files on the Fiji node (moving outputs to /scratch and deleting temporary others)"
-#     ),
-# )
-# @click.option(
-#     "--config",
-#     "-c",
-#     type=PathType(),
-#     required=True,
-#     help="Path to the snakemake config file",
-# )
-# def cli_cleanup(
-#     config: Path,
-# ):
-#     setup_logger()
-#     hs_on_fiji_config = HypedsearchOnFijiConfig.prepare_files_on_fiji_node(
-#         run_config=config,
-#         copy_files=False,
-#     )
-#     # Copy results directory to original output directory
-#     shutil.copytree(
-#         hs_on_fiji_config.fiji_config.out_dir,
-#         hs_on_fiji_config.original_config.out_dir,
-#         dirs_exist_ok=True,
-#     )
-
-
 @click.group(
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200}
 )
@@ -250,7 +231,7 @@ def cli():
 
 
 if __name__ == "__main__":
-    cli.add_command(cli_prep_hybrid_run_on_fiji)
+    cli.add_command(cli_prep_files_on_fiji)
     cli.add_command(cli_collect_benchmark_data)
-    # cli.add_command(cli_cleanup)
+    cli.add_command(cli_move_scan_results)
     cli()
