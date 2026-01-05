@@ -11,7 +11,7 @@ ROOT_DIR = Path(__file__).parents[2]
 TEST_DIR = GIT_REPO_DIR / "tests"
 LOGS_DIR = GIT_REPO_DIR / "logs"
 PLOTS_DIR = GIT_REPO_DIR / "plots"
-DATA_DIR = GIT_REPO_DIR / "data"
+DATA_DIR = (GIT_REPO_DIR / "data").relative_to(GIT_REPO_DIR)
 COMET_DIR = (GIT_REPO_DIR / "comet").relative_to(GIT_REPO_DIR)
 RESULTS_DIR = GIT_REPO_DIR / "results"
 SLURM_DIR = GIT_REPO_DIR / "slurm"
@@ -31,6 +31,7 @@ DEFAULT_MIN_CLUSTER_SUPPORT = 2
 DEFAULT_MAX_PRECURSOR_CHARGE = 4
 DEFAULT_NUM_COMET_THREADS = 0
 DEFAULT_NATIVE_RUN_CONFIG = "native_run.smk.json"
+TRUE_HYBRIDS_PATH = DATA_DIR / "true_hybrids/true_hybrids.json"
 
 FASTAS_DIR = (GIT_REPO_DIR / "fastas").relative_to(GIT_REPO_DIR)
 MOUSE_PROTEOME = FASTAS_DIR / "SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
@@ -88,7 +89,8 @@ CRUX = "crux"
 MZML = "mzml"
 SCAN_HYBRIDS = "scan_hybrids"
 Q_VAL = "q_value"
-Q_VAL_THRESH = 0.01
+NEOFUSION = "neofusion"
+DEFAULT_Q_VAL_THRESH = 0.01
 PRECURSOR_MZ_PPM_TOL = "precursor_mz_ppm_tol"
 PEAK_TO_ION_PPM_TOL = "peak_to_ion_ppm_tol"
 MZML_EXT = "mzML"
@@ -101,6 +103,10 @@ BACKGROUND = "background"
 LINUX_CRUX_EXECUTABLE = "/usr/local/bin/crux"
 MAC_CRUX_EXECUTABLE = COMET_DIR / "crux-4.3.Darwin.x86_64/bin/crux"
 SPECTRA_PSMS_FILE_NAME = "spectra_psms.pklz"
+NAT_TARGET = "Native target"
+NAT_DECOY = "Native decoy"
+HY_TARGET = "Hybrid target"
+HY_DECOY = "Hybrid decoy"
 
 
 class IonTypes(Enum):
@@ -137,11 +143,11 @@ DEFAULT_CHARGES = [1, 2, 3]
 B_ION_AS_INT = 0
 Y_ION_AS_INT = 1
 ION_CHARGES_TO_CONSIDER = [1, 2]
-
+ASSIGN_CONFIDENCE = "assign-confidence"
 # For simplicity
 samples = [f"BMEM_AspN_Fxn{val}" for val in [4, 5, 6, 7, 8, 9]]
 THOMAS_SAMPLES = [f"BMEM_AspN_Fxn{val}" for val in [4, 5, 6, 7, 8, 9]]
-
+COMMON_SPECTRA_ATTRS = ["precursor_charge", "precursor_mz", "retention_time"]
 
 # ## Asserts
 # assert file_exists(COMET_PARAMS) == True, "Comet executable not found!"
@@ -184,5 +190,5 @@ WATER_MASS = (2 * HYDROGEN_MASS) + OXYGEN_MASS
 
 
 DEFAULT_FPR = 0.05
-DEFAULT_Q_RANGE = np.linspace(0.001, 0.05, 10)
-DEFAULT_SCORE_CHANGE_RANGE = np.linspace(0.2, 3, 10)
+DEFAULT_Q_RANGE = list(np.linspace(0.001, 0.05, 10))
+DEFAULT_SCORE_CHANGE_RANGE = list(np.linspace(0.2, 3, 10))

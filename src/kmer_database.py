@@ -19,6 +19,7 @@ from src.constants import (
 )
 from src.mass_spectra import Peak, Spectrum
 from src.peptides_and_ions import (
+    Fasta,
     Peptide,
     UnpositionedProductIon,
     compute_peptide_precursor_mz,
@@ -31,6 +32,7 @@ from src.utils import (
     load_json,
     log_time,
     pickle_and_compress,
+    read_new_line_separated_file,
     relative_ppm_tolerance_in_daltons,
     setup_logger,
     to_json,
@@ -226,13 +228,31 @@ class KmerDatabase:
                 "Database path does not exist. Please create the database first."
             )
 
-    def get_all_rows(self, as_dicts: bool = False) -> List[Union[DbKmer, Dict]]:
-        """Get all rows in the kmer database"""
-        rows = self.db.all_table_rows(table_name=self.table_name)
-        if as_dicts:
-            return rows
-        else:
-            return [self.row_object(**row) for row in rows]
+    @cached_property
+    def kmer_to_proteins_map(self) -> KmerToProteinsMap:
+        kmer_to_proteins = defaultdict(set)
+        for row in self.get_all_rows():
+            kmer_to_proteins[row.seq].update(row.proteins_as_set)
+        return KmerToProteinsMap(kmer_to_protein_map=dict(kmer_to_proteins))
+
+    @cached_property
+    def min_k(self):
+        return min(len(row.seq) for row in self.get_all_rows())
+
+    @cached_property
+    def max_k(self):
+        return max(len(row.seq) for row in self.get_all_rows())
+
+    @cached_property
+    def proteins(self):
+        proteins = set()
+        for row in self.get_all_rows():
+            proteins.update(row.proteins_as_set)
+        return proteins
+
+    @cached_property
+    def kmers(self) -> Set[str]:
+        return set(row.seq for row in self.get_all_rows())
 
     @classmethod
     def create_db(
@@ -277,6 +297,14 @@ class KmerDatabase:
         return cls(
             db_path=db_path,
         )
+
+    def get_all_rows(self, as_dicts: bool = False) -> List[Union[DbKmer, Dict]]:
+        """Get all rows in the kmer database"""
+        rows = self.db.all_table_rows(table_name=self.table_name)
+        if as_dicts:
+            return rows
+        else:
+            return [self.row_object(**row) for row in rows]
 
     def get_matching_product_ions(
         self,
@@ -395,80 +423,11 @@ class KmerDatabase:
             )
         return peak_ion_matches
 
-    @cached_property
-    def kmer_to_proteins_map(self) -> KmerToProteinsMap:
-        kmer_to_proteins = defaultdict(set)
-        for row in self.get_all_rows():
-            kmer_to_proteins[row.seq].update(row.proteins_as_set)
-        return KmerToProteinsMap(kmer_to_protein_map=dict(kmer_to_proteins))
-
-    @cached_property
-    def min_k(self):
-        return min(len(row.seq) for row in self.get_all_rows())
-
-    @cached_property
-    def max_k(self):
-        return max(len(row.seq) for row in self.get_all_rows())
-
-    @cached_property
-    def proteins(self):
-        proteins = set()
-        for row in self.get_all_rows():
-            proteins.update(row.proteins_as_set)
-        return proteins
-
-    @cached_property
-    def kmers(self) -> Set[str]:
-        return set(row.seq for row in self.get_all_rows())
-
-
-# def create_kmer_database(
-#     proteins: List[Peptide],
-#     kmer_to_proteins_path: Path,
-#     db_path: Union[Path, str] = MEMORY,
-#     min_k: int = DEFAULT_MIN_KMER_LEN,
-#     max_k: int = DEFAULT_MAX_KMER_LEN,
-# ) -> KmerDatabase:
-#     """
-#     Create the kmer database.
-#     If the kmer-to-protein map does not exist at the given path, it will be created.
-#     If it does exist, it is loaded.
-#     If the database does not exist at the given path, it will be created.
-#     If it does exist it is loaded and returned.
-#     """
-#     kmer_to_protein_map = KmerToProteinsMap.create(
-#         proteins=proteins,
-#         min_k=min_k,
-#         max_k=max_k,
-#         protein_attr="name",
-#     )
-#     kmer_to_proteins_path.parent.mkdir(parents=True, exist_ok=True)
-#     kmer_to_protein_map.save(kmer_to_proteins_path)
-#     else:
-#         kmer_to_protein_map = KmerToProteinsMap.load(kmer_to_proteins_path)
-#         logger.info("kmer-to-protein map already exists... Skipping creation")
-#     if not db_path.exists():
-#         logger.info(f"Database does not exist at {db_path}. Creating it now...")
-#         db_path.parent.mkdir(parents=True, exist_ok=True)
-#         kmer_db = KmerDatabase.create_db(
-#             db_path=db_path,
-#             kmer_to_protein_map=kmer_to_protein_map.kmer_to_protein_map,
-#         )
-#     else:
-#         logger.info("Database already exists... Skipping creation")
-#         kmer_db = KmerDatabase(db_path=db_path)
-#     return kmer_db
-
 
 @click.command(
     name="create-db",
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-    help=(
-        "Create the kmer database. If the kmer-to-protein map does not exist at the given path, "
-        "it will be created. If it does exist, it WILL NOT be re-created. "
-        "If the database does not exist at the given path, it will be created. "
-        "If it does exist, it WILL NOT be re-created."
-    ),
+    help=("Create the kmer database from the given proteins"),
 )
 @click.option(
     "--db_path",
@@ -519,20 +478,19 @@ class KmerDatabase:
 )
 @log_time(level=logging.DEBUG)
 def cli_create_db(
-    kmer_to_protein: Path,
     protein_names: Path,
     fasta: Path,
     db_path: Path,
     min_k: int,
     max_k: int,
 ):
-    create_kmer_database(
-        fasta=fasta,
-        kmer_to_proteins_path=kmer_to_protein,
+    KmerDatabase.create_db(
         db_path=db_path,
+        proteins=Fasta(path=fasta).get_proteins_by_name(
+            names=read_new_line_separated_file(protein_names)
+        ),
         min_k=min_k,
         max_k=max_k,
-        proteins=protein_names,
     )
 
 

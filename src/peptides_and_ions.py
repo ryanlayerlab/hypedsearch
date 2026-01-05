@@ -15,6 +15,7 @@ from src.constants import (
     B_ION_TYPE,
     DEFAULT_MAX_KMER_LEN,
     DEFAULT_MIN_KMER_LEN,
+    HUMAN_PROTEOME,
     PROTON_MASS,
     WATER_MASS,
     Y_ION_TYPE,
@@ -24,6 +25,7 @@ from src.utils import (
     ExistingPath,
     Kmer,
     PathType,
+    Position,
     generate_aa_kmers,
     get_b_ion_prefixes,
     get_time_in_diff_units,
@@ -35,6 +37,19 @@ from src.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ProteinRange(Position):
+    protein: str
+
+    @classmethod
+    def from_pos(cls, protein: str, pos: Position):
+        return cls(
+            protein=protein,
+            inclusive_start=pos.inclusive_start,
+            exclusive_end=pos.exclusive_end,
+        )
 
 
 class UnpositionedProductIon(BaseModel):
@@ -155,7 +170,7 @@ class Peptide(BaseModel):
 
 
 class Fasta(BaseModel):
-    path: ExistingPath
+    path: ExistingPath = HUMAN_PROTEOME
 
     @cached_property
     def seqs(self):
@@ -208,6 +223,10 @@ class Fasta(BaseModel):
     @cached_property
     def protein_name_to_seq_map(self):
         return {pep.name: pep.seq for pep in self.proteins}
+
+    @cached_property
+    def protein_name_to_peptide(self):
+        return {pep.name: pep for pep in self.proteins}
 
 
 def compute_peptide_precursor_mz(seq: str, charge: int):

@@ -1,0 +1,15 @@
+{
+  "sample": "BMEM_AspN_Fxn4",
+  "num": 1,
+  "scan": 2376,
+  "seq": "DVIAQGVGKLASVPAGGAVAVSAAPGSAAPAAGSAPAAAEEKK",
+  "ions_matched": 68,
+  "ions_total": 252,
+  "proteins": [
+    "sp|P99027|RLA2_MOUSE"
+  ],
+  "xcorr": 8.2189999,
+  "eval": 6.94e-11,
+  "delta_cn": 0.68379998,
+  "q_value": 0.001447178
+}

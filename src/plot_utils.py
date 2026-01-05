@@ -394,6 +394,9 @@ def plot_sorted_1d_data(
     ax_labels: Union[Dict[str, str], bool] = False,
     ax: Optional[Axes] = None,
     sort_idx: int = 1,
+    label: Optional[str] = None,
+    color: str = "blue",
+    marker: str = "o",
 ):
     """
     Plot 1D data sorted from largest to smallest.
@@ -409,15 +412,16 @@ def plot_sorted_1d_data(
         items = sorted(data.items(), key=lambda x: x[sort_idx], reverse=False)
     else:
         raise ValueError("sort_idx must be 0 or 1")
-    ax_labels = [k for k, _ in items]
     values = [v for _, v in items]
 
     # Scatter plot
     x = list(range(1, len(values) + 1))  # 1, 2, 3, ...
-    sns.scatterplot(x=x, y=values, s=7)
+    sns.scatterplot(x=x, y=values, s=7, label=label, color=color, marker=marker)
 
     # Optionally label points
     if pt_labels is not None:
+        for key, label in pt_labels.items():
+            ax.text(xi, val, label, ha="center", va="bottom", fontsize=8)
         for xi, key, val in zip(x, ax_labels, values):
             if key in pt_labels:
                 ax.text(xi, val, pt_labels[key], ha="center", va="bottom", fontsize=8)
@@ -432,3 +436,7 @@ def plot_sorted_1d_data(
             ax.set_xticklabels(ax_labels, rotation=90, ha="center")
 
     return ax
+
+
+def pairplot(df: pd.DataFrame, ax: Optional[Axes] = None):
+    sns.pairplot(df, corner=True)

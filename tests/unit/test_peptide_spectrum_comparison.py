@@ -1,7 +1,10 @@
 import json
 from dataclasses import asdict
 
-from src.mass_spectra import Spectrum
+import numpy as np
+
+from src.comet_utils import CometPSM
+from src.mass_spectra import Mzml, Spectrum
 from src.peptide_spectrum_comparison import PSM, get_peak_product_ion_matches
 from src.utils import mass_difference_in_ppm
 
@@ -44,13 +47,22 @@ class Test_get_peak_product_ion_matches:
 
 class Test_PSM:
     @staticmethod
-    def test_smoke(test_data_dir):
-        spectrum = Spectrum.get_spectrum(
-            mzml=test_data_dir / "spectra/BMEM_AspN_Fxn4_scans1-20.mzML", scan=7
-        )
-        peptide = "SAAPAAGSAPAAAEEKK"
-        psm = PSM.from_spectrum_and_seq(
-            spectrum=spectrum, seq=peptide, peak_to_ion_ppm_tolerance=20
+    def test_from_comet_psm(test_data_dir):
+        # Arrange
+        scan = 7
+        mzml = Mzml(mzml=test_data_dir / "BMEM_AspN_Fxn4/BMEM_AspN_Fxn4.mzML")
+        comet_psm = [
+            psm
+            for psm in CometPSM.from_txt(
+                txt=test_data_dir / "BMEM_AspN_Fxn4/assign-confidence.target.txt"
+            )
+            if psm.scan == scan
+        ][0]
+        # Act
+        psm = PSM.from_spectrum_and_comet_psm(
+            spectrum=mzml.get_spectrum(scan=scan),
+            comet_psm=comet_psm,
+            peak_to_ion_ppm_tolerance=20,
         )
         # Assert
         assert psm.prefixes_supported == {"SA", "SAA", "SAAPA", "SAAP", "SAAPAA"}
@@ -67,3 +79,4 @@ class Test_PSM:
             "PAAGSAPAAAEEKK",
             "AAEEKK",
         }
+        assert np.isclose(0.325092, psm.mz_ppm_diff)

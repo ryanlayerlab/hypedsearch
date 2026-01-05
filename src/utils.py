@@ -402,6 +402,11 @@ def get_default_comet_executable_path():
         )
 
 
+def save_pydantic_objects(objects: List[BaseModel], out: Union[str, Path]):
+    data = [obj.model_dump(mode="json") for obj in objects]
+    to_json(data=data, path=out)
+
+
 def to_json(data: Any, path: Union[str, Path]):
     with open(path, "w") as f:
         json.dump(data, f, indent=2)

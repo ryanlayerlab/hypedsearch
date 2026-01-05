@@ -5,6 +5,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from src.comet_utils import CometPSM
+
 repo_dir = Path(__file__).parents[1]
 sys.path.append(str(repo_dir / "src"))
 
@@ -69,7 +71,19 @@ def crux_txt(test_data_dir):
     return test_data_dir / "crux.comet.1-10.txt"
 
 
-def default_config(test_data_dir: Path, out_dir: Path) -> HypedsearchRunConfig:
+@pytest.fixture
+def comet_psm(test_data_dir):
+    path = test_data_dir / "example_comet_psm.json"
+    psms = CometPSM.from_txt(
+        txt="tests/data/BMEM_AspN_Fxn4/assign-confidence.target.txt"
+    )
+    psms = [psm for psm in psms if "sp|P99027|RLA2_MOUSE" in psm.proteins]
+    psms[0].save(path=path)
+
+    return CometPSM.load(path=path)
+
+
+def default_test_config(test_data_dir: Path, out_dir: Path) -> HypedsearchRunConfig:
     db_path = (
         test_data_dir / "sp-P99027-RLA2_MOUSE_mzml=BMEM_AspN_Fxn4;scan=7_kmer_db.db"
     )
@@ -88,7 +102,7 @@ def default_config(test_data_dir: Path, out_dir: Path) -> HypedsearchRunConfig:
 
 def default_hs_run(test_data_dir: Path, out_dir: Path):
     # Arrange
-    hs_config = default_config(
+    hs_config = default_test_config(
         test_data_dir=test_data_dir,
         out_dir=out_dir,
     )
@@ -103,3 +117,11 @@ def default_hs_run(test_data_dir: Path, out_dir: Path):
         shell=True,
     )
     return hs_config
+
+
+def create_comet_psm(test_data_dir):
+    psms = CometPSM.from_txt(
+        txt="results/hs_mouse_samples/native_run/assign-confidence.txt"
+    )
+    best_psm = max(psms, key=lambda obj: obj.xcorr)
+    best_psm.save()

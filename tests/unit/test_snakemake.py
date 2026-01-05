@@ -2,13 +2,13 @@ import subprocess
 import sys
 
 from src.constants import RUN_HYPEDSEARCH_SMK
-from tests.unit.test_hypedsearch import default_config
+from tests.unit.test_hypedsearch import default_test_config
 
 
 class Test_run_via_snakemake:
     @staticmethod
     def test_smoke(tmp_path, test_data_dir):
-        hs_config = default_config(
+        hs_config = default_test_config(
             test_data_dir=test_data_dir,
             out_dir=tmp_path,
         )

@@ -26,6 +26,7 @@ from scipy.stats import percentileofscore
 from src.constants import (
     COMET,
     CRUX,
+    DEFAULT_Q_VAL_THRESH,
     DELTA_CN,
     EVAL,
     HS_PREFIX,
@@ -35,13 +36,12 @@ from src.constants import (
     PLAIN_PEPTIDE,
     PROTEIN,
     Q_VAL,
-    Q_VAL_THRESH,
     SAMPLE,
     SCAN,
     XCORR,
 )
 from src.kmer_database import KmerToProteinsMap
-from src.mass_spectra import Mzml, Spectrum
+from src.mass_spectra import Mzml, Spectrum, organize_by_spectrum_uid
 from src.peptides_and_ions import Peptide
 from src.utils import (
     PathType,
@@ -49,6 +49,7 @@ from src.utils import (
     get_arg_fcn_of_objects,
     get_fcn_of_objects,
     load_json,
+    to_json,
 )
 
 logger = logging.getLogger(__name__)
@@ -129,12 +130,16 @@ class CometPSM:
         return Spectrum.get_uid(sample=self.sample, scan=self.scan)
 
     @property
-    def seq_with_hyphen(self):
-        if self.is_hybrid:
-            hybrid_peptides = self.get_hybrid_peptides()
-            return [f"{pep.b_seq}-{pep.y_seq}" for pep in hybrid_peptides]
+    def is_hybrid(self):
+        """
+        A Comet PSM is a hybrid if the only proteins it appears in are hybrid proteins.
+        If a PSM is in both a hybrid protein and a native protein, that means that the "hybrid"
+        is a native sequence.
+        """
+        if all(self.check_if_hybrid_prot(prot=prot) for prot in self.proteins):
+            return True
         else:
-            return self.seq
+            return False
 
     @property
     def prop_ions_matched(self) -> float:
@@ -147,18 +152,6 @@ class CometPSM:
         else:
             return False
 
-    @property
-    def is_hybrid(self):
-        """
-        A Comet PSM is a hybrid if the only proteins it appears in are hybrid proteins.
-        If a PSM is in both a hybrid protein and a native protein, that means that the "hybrid"
-        is a native sequence.
-        """
-        if all(self.check_if_hybrid_prot(prot=prot) for prot in self.proteins):
-            return True
-        else:
-            return False
-
     @classmethod
     def from_txt(
         cls,
@@ -166,6 +159,7 @@ class CometPSM:
         as_df: bool = False,
         sample: str = "",
         only_num_1: bool = False,
+        by_spectrum: bool = False,
     ) -> Union[List["CometPSM"], pd.DataFrame]:
         """
         Reads Comet results .txt file to a list of dataclasses or a dataframe
@@ -223,7 +217,10 @@ class CometPSM:
             ]
             if only_num_1:
                 data = [psm for psm in data if psm.num == 1]
-            return data
+            if by_spectrum:
+                return organize_by_spectrum_uid(data=data)
+            else:
+                return data
 
     @classmethod
     def from_txts(
@@ -259,11 +256,44 @@ class CometPSM:
         ), f"Expected exactly one matching mzML file for PSM with sample {self.sample}, found {len(matching_files)}"
         return Mzml(mzml=matching_files[0]).get_spectrum(scan=self.scan)
 
+    @classmethod
+    def load(cls, path: Union[str, Path]):
+        data = load_json(path=path)
+        if isinstance(data, list):
+            return [cls(**psm_dict) for psm_dict in data]
+        elif isinstance(data, dict):
+            return cls(**data)
+
+    @staticmethod
+    def save_psms(psms: List["CometPSM"], path: Path):
+        to_json(
+            data=[asdict(psm) for psm in psms],
+            path=path,
+        )
+
+    def save(self, path: Path):
+        to_json(
+            data=asdict(self),
+            path=path,
+        )
+
 
 def get_high_confidence_psms(
-    psms: List[CometPSM], score: Literal[Q_VAL] = Q_VAL, threshold: float = Q_VAL_THRESH
+    psms: List[CometPSM],
+    score: Literal[Q_VAL] = Q_VAL,
+    threshold: float = DEFAULT_Q_VAL_THRESH,
 ) -> List[CometPSM]:
     """ """
     # Get only `num=1` PSMs
     psms = CometPSM.get_top_psms(psms=psms)
     return list(filter(lambda psm: getattr(psm, score) <= threshold, psms))
+
+
+def compare_comet_psm_to_spectra(
+    comet_psms: List[CometPSM], spectra: List[Spectrum]
+) -> pd.DataFrame:
+    """Compare Comet PSMs to spectra to ensure they match"""
+    uid_to_spectrum = organize_by_spectrum_uid(data=spectra)
+    uid_to_comet_psm = organize_by_spectrum_uid(data=comet_psms)
+    for psm in comet_psms:
+        spectrum = uid_to_spectrum[psm.spectrum_uid]

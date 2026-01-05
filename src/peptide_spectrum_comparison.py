@@ -77,103 +77,22 @@ class PeakIonMatch(BaseModel):
 
 
 class PSM(BaseModel):
-    peptide: str
+    seq: str
     peak_ion_matches: List[PeakIonMatch]
     peak_to_ion_ppm_tolerance: float
     prop_intensity_supported: float
     prop_ions_matched: float
-    spectrum: Optional[Spectrum] = None
-    spectrum_id: Optional[str] = None
+    spectrum_uid: str
+    spectrum_ab: float
+    spectrum_rt: float
+    spectrum_mz: float
+    spectrum_z: int
     xcorr: Optional[float] = None
     q_value: Optional[float] = None
 
-    @classmethod
-    def from_spectrum_and_seq(
-        cls,
-        spectrum: Spectrum,
-        seq: str,
-        peak_to_ion_ppm_tolerance: float,
-    ):
-        peak_to_ion_matches = get_peak_product_ion_matches(
-            spectrum=spectrum,
-            peptide=seq,
-            peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
-        )
-        intensity_supported = sum(
-            [peak_ion_match.peak_intensity for peak_ion_match in peak_to_ion_matches]
-        )
-        # Compute the proportion of ions matched
-        num_product_ions = len(
-            Peptide(seq=seq).product_ions(
-                charges=list(range(1, spectrum.precursor_charge + 1))
-            )
-        )
-        num_found_ions = len(set(x.ion_id for x in peak_to_ion_matches))
-        return cls(
-            peptide=seq,
-            peak_ion_matches=peak_to_ion_matches,
-            peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
-            spectrum_id=spectrum.uid,
-            prop_intensity_supported=intensity_supported / spectrum.total_intensity,
-            prop_ions_matched=num_found_ions / num_product_ions,
-        )
-
-    @classmethod
-    def from_spectrum_and_comet_psm(
-        cls,
-        comet_psm: Optional[CometPSM],
-        spectrum: Spectrum,
-        peak_to_ion_ppm_tolerance: float,
-    ) -> Optional["PSM"]:
-        if comet_psm is None:
-            return None
-        peptide = comet_psm.seq
-        peak_to_ion_matches = get_peak_product_ion_matches(
-            spectrum=spectrum,
-            peptide=peptide,
-            peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
-        )
-        intensity_supported = sum(
-            [peak_ion_match.peak_intensity for peak_ion_match in peak_to_ion_matches]
-        )
-        return cls(
-            peptide=peptide,
-            peak_ion_matches=peak_to_ion_matches,
-            peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
-            spectrum_id=spectrum.uid,
-            xcorr=comet_psm.xcorr,
-            q_value=comet_psm.q_value,
-            prop_intensity_supported=intensity_supported / spectrum.total_intensity,
-            prop_ions_matched=comet_psm.prop_ions_matched,
-        )
-
-    @classmethod
-    def from_comet_psms(
-        cls,
-        comet_psms: List[CometPSM],
-        spectra_dir: Union[str, Path],
-        peak_to_ion_ppm_threshold: float,
-    ) -> List["PSM"]:
-        psms = []
-        mzml_names = set(psm.sample for psm in comet_psms)
-        mzmls = [Path(spectra_dir) / f"{name}.mzML" for name in mzml_names]
-        sample_scan_to_spectrum_map = create_sample_scan_to_spectrum_map(mzmls=mzmls)
-        for comet_psm in comet_psms:
-            psms.append(
-                cls(
-                    spectrum=sample_scan_to_spectrum_map[
-                        (comet_psm.sample, comet_psm.scan)
-                    ],
-                    peptide=comet_psm.seq,
-                    peak_to_ion_ppm_tolerance=peak_to_ion_ppm_threshold,
-                    comet_psm=comet_psm,
-                )
-            )
-        return psms
-
     @property
     def seq(self):
-        return self.peptide
+        return self.seq
 
     @property
     def df(self):
@@ -199,43 +118,13 @@ class PSM(BaseModel):
             )
         )
 
-    def sequences_supported(
-        self,
-        ion_type: Literal[B_ION_TYPE, Y_ION_TYPE],
-    ):
-        if len(self.peak_ion_matches) == 0:
-            return set()
-        return set(self.df.loc[self.df.ion_type == ion_type, "ion_seq"].unique())
+    @property
+    def prefixes_supported(self) -> List[str]:
+        return list(self.sequences_supported(ion_type=B_ION_TYPE))
 
     @property
-    def prefixes_supported(self):
-        return self.sequences_supported(ion_type=B_ION_TYPE)
-
-    @property
-    def suffixes_supported(self):
-        return self.sequences_supported(ion_type=Y_ION_TYPE)
-
-    def left_seq_support(self, left_seq: str):
-        assert (
-            self.peptide[: len(left_seq)] == left_seq
-        ), f"{self.peptide} does not start with {left_seq}"
-        prefixes = get_b_ion_prefixes(seq=left_seq)
-        return len(
-            self.df[
-                (self.df.ion_type == B_ION_TYPE) & (self.df.ion_seq.isin(prefixes))
-            ].groupby(by=["ion_seq"])
-        )
-
-    def right_seq_support(self, right_seq: str):
-        assert (
-            self.peptide[-len(right_seq) :] == right_seq
-        ), f"{self.peptide} does not end with {right_seq}"
-        suffixes = get_y_ion_suffixes(seq=right_seq)
-        return len(
-            self.df[
-                (self.df.ion_type == Y_ION_TYPE) & (self.df.ion_seq.isin(suffixes))
-            ].groupby(by=["ion_seq"])
-        )
+    def suffixes_supported(self) -> List[str]:
+        return list(self.sequences_supported(ion_type=Y_ION_TYPE))
 
     @property
     def intensity_supported(self):
@@ -245,11 +134,89 @@ class PSM(BaseModel):
 
     @property
     def prop_prefixes_supported(self):
-        return len(self.prefixes_supported) / len(self.peptide)
+        return len(self.prefixes_supported) / len(self.seq)
 
     @property
     def prop_suffixes_supported(self):
-        return len(self.suffixes_supported) / len(self.peptide)
+        return len(self.suffixes_supported) / len(self.seq)
+
+    @property
+    def mz_ppm_diff(self):
+        seq_mz = compute_peptide_precursor_mz(seq=self.seq, charge=self.spectrum_z)
+        return mass_difference_in_ppm(mass1=seq_mz, mass2=self.spectrum_mz)
+
+    @classmethod
+    def from_spectrum_and_comet_psm(
+        cls,
+        comet_psm: CometPSM,
+        spectrum: Spectrum,
+        peak_to_ion_ppm_tolerance: float,
+    ) -> Optional["PSM"]:
+        peak_to_ion_matches = get_peak_product_ion_matches(
+            spectrum=spectrum,
+            peptide=comet_psm.seq,
+            peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
+        )
+        intensity_supported = sum(
+            [peak_ion_match.peak_intensity for peak_ion_match in peak_to_ion_matches]
+        )
+        return cls(
+            seq=comet_psm.seq,
+            peak_ion_matches=peak_to_ion_matches,
+            peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
+            prop_intensity_supported=intensity_supported / spectrum.total_intensity,
+            prop_ions_matched=comet_psm.prop_ions_matched,
+            spectrum_uid=spectrum.uid,
+            spectrum_ab=spectrum.precursor_abundance,
+            spectrum_rt=spectrum.retention_time,
+            spectrum_mz=spectrum.precursor_mz,
+            spectrum_z=spectrum.precursor_charge,
+            xcorr=comet_psm.xcorr,
+            q_value=comet_psm.q_value,
+        )
+
+    def sequences_supported(
+        self,
+        ion_type: Literal[B_ION_TYPE, Y_ION_TYPE],
+    ) -> Set[str]:
+        if len(self.peak_ion_matches) == 0:
+            return set()
+        return set(self.df.loc[self.df.ion_type == ion_type, "ion_seq"].unique())
+
+    def left_seq_support(self, left_seq: str):
+        assert (
+            self.seq[: len(left_seq)] == left_seq
+        ), f"{self.seq} does not start with {left_seq}"
+        prefixes = get_b_ion_prefixes(seq=left_seq)
+        return len(
+            self.df[
+                (self.df.ion_type == B_ION_TYPE) & (self.df.ion_seq.isin(prefixes))
+            ].groupby(by=["ion_seq"])
+        )
+
+    def right_seq_support(self, right_seq: str):
+        assert (
+            self.seq[-len(right_seq) :] == right_seq
+        ), f"{self.seq} does not end with {right_seq}"
+        suffixes = get_y_ion_suffixes(seq=right_seq)
+        return len(
+            self.df[
+                (self.df.ion_type == Y_ION_TYPE) & (self.df.ion_seq.isin(suffixes))
+            ].groupby(by=["ion_seq"])
+        )
+
+    def to_dict(self):
+        data = self.model_dump(exclude=["peak_ion_matches"])
+        attrs = [
+            "prefixes_supported",
+            "prop_prefixes_supported",
+            "suffixes_supported",
+            "prop_suffixes_supported",
+            "mz_ppm_diff",
+        ]
+        for attr in attrs:
+            data[attr] = getattr(self, attr)
+        return data
 
 
 @dataclass
@@ -264,8 +231,10 @@ def spectrum_peptide_plot(
     peak_to_ion_ppm_tolerance: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
 ):
     ion_intensity = max(peak.intensity for peak in spectrum.peaks) / 2
-    psm = PSM.from_spectrum_and_seq(
-        spectrum=spectrum, seq=seq, peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance
+    peak_ion_matches = get_peak_product_ion_matches(
+        spectrum=spectrum,
+        peptide=seq,
+        peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
     )
     peptide = Peptide(seq=seq)
     product_ions = peptide.product_ions(
@@ -288,7 +257,7 @@ def spectrum_peptide_plot(
         ax=ax,
         peaks=[
             Peak(mz=match.ion_mz, intensity=-1 * ion_intensity)
-            for match in psm.peak_ion_matches
+            for match in peak_ion_matches
         ],
         color="red",
     )
@@ -297,7 +266,7 @@ def spectrum_peptide_plot(
         ax=ax,
         peaks=[
             Peak(mz=match.peak_mz, intensity=match.peak_intensity)
-            for match in psm.peak_ion_matches
+            for match in peak_ion_matches
         ],
         color="red",
         label="peak-to-ion matches",

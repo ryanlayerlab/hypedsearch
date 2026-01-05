@@ -7,10 +7,11 @@ from typing import Dict, List, Optional, Set, Union
 import click
 import pandas as pd
 import seaborn as sns
+from matplotlib.axes import Axes
 from pydantic import BaseModel
 
 from src.comet_utils import CometPSM, get_high_confidence_psms
-from src.constants import Q_VAL, Q_VAL_THRESH
+from src.constants import DEFAULT_Q_VAL_THRESH, Q_VAL
 from src.plot_utils import fig_setup, finalize, save_fig, set_title_axes_labels
 from src.utils import PathType, flatten_list_of_lists, setup_logger, to_json
 
@@ -88,8 +89,15 @@ class ProteinAbundance(BaseModel):
     protein_counts: Counter
 
     @classmethod
+    def from_comet_txt(
+        cls, txt: Union[str, Path], q_val_thresh: float = DEFAULT_Q_VAL_THRESH
+    ):
+        psms = CometPSM.from_txt(txt=txt)
+        return cls.from_comet_psms(psms=psms, q_val_thresh=q_val_thresh)
+
+    @classmethod
     def from_comet_psms(
-        cls, psms: List[CometPSM], q_val_thresh: float = Q_VAL_THRESH
+        cls, psms: List[CometPSM], q_val_thresh: float = DEFAULT_Q_VAL_THRESH
     ) -> "ProteinAbundance":
         psms = get_high_confidence_psms(psms=psms, score=Q_VAL, threshold=q_val_thresh)
         all_comet_proteins = flatten_list_of_lists([psm.proteins for psm in psms])
@@ -108,9 +116,8 @@ class ProteinAbundance(BaseModel):
             return set(most_common_proteins.keys())
 
     def plot(
-        self,
-        top_n_prots: Optional[int] = None,
-    ):
+        self, top_n_prots: Optional[int] = None, ax: Optional[Axes] = None
+    ) -> Axes:
         # Define data
         items = sorted(self.protein_counts.items(), key=lambda x: x[1], reverse=True)
         if top_n_prots is not None:
@@ -118,8 +125,9 @@ class ProteinAbundance(BaseModel):
         keys, values = zip(*items)
 
         # Plot
-        fig, axs = fig_setup(h=8, w=10)
-        ax = axs[0]
+        if ax is None:
+            fig, axs = fig_setup(h=8, w=10)
+            ax = axs[0]
         ax.scatter(range(len(keys)), values)
         ax.set_xticks(range(len(keys)), keys, rotation=90, fontsize=8)
         set_title_axes_labels(
@@ -128,8 +136,8 @@ class ProteinAbundance(BaseModel):
             xlabel="Protein",
             ylabel="PSM counts",
         )
-        finalize(axs)
-        return fig, axs
+        finalize(ax)
+        return ax
 
     def get_ab(self, protein: str) -> int:
         return self.protein_counts[protein]

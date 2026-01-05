@@ -36,6 +36,7 @@ from typing_extensions import Self
 from src.blastp import run_blastp
 from src.comet_utils import CometPSM
 from src.constants import (
+    ASSIGN_CONFIDENCE,
     COMET_DIR,
     DECOY,
     DEFAULT_CRUX_PARAMS,
@@ -45,19 +46,22 @@ from src.constants import (
     DEFAULT_MIN_CLUSTER_LENGTH,
     DEFAULT_MIN_CLUSTER_SUPPORT,
     DEFAULT_MIN_KMER_LEN,
+    DEFAULT_MIN_SIDE_LEN,
     DEFAULT_NATIVE_RUN_CONFIG,
     DEFAULT_NUM_COMET_THREADS,
     DEFAULT_PEAK_TO_ION_PPM_TOL,
     DEFAULT_PRECURSOR_MZ_PPM_TOL,
+    DEFAULT_Q_VAL_THRESH,
     GIT_REPO_DIR,
     HS_PREFIX,
+    HUMAN_PROTEOME,
     HYBRID,
     LINUX_CRUX_EXECUTABLE,
     NATIVE,
-    Q_VAL_THRESH,
     RUN_COMET_SMK,
     RUN_HYPEDSEARCH_SMK,
     TARGET,
+    TRUE_HYBRIDS_PATH,
 )
 from src.crux import (
     CometConfig,
@@ -67,7 +71,12 @@ from src.crux import (
 )
 from src.hybrids_via_clusters import HybridPeptide, form_spectrum_hybrids_via_clustering
 from src.kmer_database import KmerDatabase
-from src.mass_spectra import Mzml, Spectrum, create_sample_scan_to_spectrum_map
+from src.mass_spectra import (
+    Mzml,
+    Spectrum,
+    create_sample_scan_to_spectrum_map,
+    organize_by_spectrum_uid,
+)
 from src.peptide_spectrum_comparison import PSM
 from src.peptides_and_ions import Fasta, Peptide, get_proteins_by_name
 from src.plot_utils import fig_setup, finalize, save_fig, set_title_axes_labels
@@ -85,6 +94,7 @@ from src.utils import (
     log_time,
     mass_difference_in_ppm,
     save_dict,
+    save_pydantic_objects,
     setup_logger,
     to_json,
     write_new_line_separated_file,
@@ -133,6 +143,18 @@ class TrueHybrid(HybridPeptide):
                 )
             )
         return hybrids
+
+    @staticmethod
+    def save(
+        true_hybrids: List["TrueHybrid"],
+        out: Union[Path, str] = TRUE_HYBRIDS_PATH,
+    ):
+        save_pydantic_objects(objects=true_hybrids, out=out)
+
+    @classmethod
+    def load(cls, path: Union[Path, str] = TRUE_HYBRIDS_PATH) -> List["TrueHybrid"]:
+        data = load_json(path=path)
+        return [cls.model_validate(item) for item in data]
 
     @staticmethod
     def get_spectra_for_true_hybrids(
@@ -331,6 +353,48 @@ class SpectrumPreprocessor(BaseModel):
         return spectrum
 
 
+def get_seq_to_hybrids_map(
+    seqs: Union[Set[str], List[str]],
+    db_path: Path,
+    min_side_len: int = DEFAULT_MIN_SIDE_LEN,
+    remove_carbamidomethylation: bool = True,
+) -> Dict[str, List[HybridPeptide]]:
+    kmer_to_proteins_map = KmerDatabase(
+        db_path=db_path
+    ).kmer_to_proteins_map.kmer_to_protein_map
+    seq_to_hybrids = {}
+    for seq in set(seqs):
+        hybrids = find_possible_hybrids_for_seq(
+            seq=seq,
+            kmer_to_proteins_map=kmer_to_proteins_map,
+            min_side_len=min_side_len,
+        )
+        if remove_carbamidomethylation:
+            hybrids = [hy for hy in hybrids if not hy.evidence_of_carbamidomethylation]
+        if len(hybrids) > 0:
+            seq_to_hybrids[seq] = hybrids
+    return seq_to_hybrids
+
+
+def find_possible_hybrids_for_seq(
+    seq: str, kmer_to_proteins_map: Dict[str, List[str]], min_side_len: int
+) -> List[HybridPeptide]:
+    possible_hybrids = []
+    for breakpoint in range(min_side_len, len(seq) - min_side_len + 1):
+        left = seq[:breakpoint]
+        right = seq[breakpoint:]
+        if (left in kmer_to_proteins_map) and (right in kmer_to_proteins_map):
+            possible_hybrids.append(
+                HybridPeptide(
+                    left_seq=left,
+                    right_seq=right,
+                    left_proteins=kmer_to_proteins_map[left],
+                    right_proteins=kmer_to_proteins_map[right],
+                )
+            )
+    return possible_hybrids
+
+
 class HypedsearchRunConfig(BaseModel):
     mzml_to_scans: Dict[Path, Union[Set[int], Literal["all"]]]
     hybrid_former: HybridFormer
@@ -389,14 +453,51 @@ class HypedsearchRunConfig(BaseModel):
     def native_run_scan_results_dir(self) -> Path:
         return self.native_run_dir / "scan_results"
 
-    def to_json(self, path: Union[str, Path]) -> None:
-        data_as_json_str = self.model_dump_json()
-        to_json(data=json.loads(data_as_json_str), path=path)
-
     @classmethod
     def from_json(cls, path: Union[Path, str]):
         data = load_json(path=path)
         return cls(**data)
+
+    @classmethod
+    def from_data_and_results_dir(
+        cls,
+        data_dir: Union[Path, str],
+        results_dir: Union[Path, str],
+        fasta: Union[Path, str] = HUMAN_PROTEOME,
+        hybrid_native_competition: bool = False,
+    ):
+        data_dir = Path(data_dir)
+        results_dir = Path(results_dir)
+        inputs_dir = results_dir / "inputs"
+        assert inputs_dir.exists(), f"Inputs directory does not exist: {inputs_dir}"
+        comet_params = list(inputs_dir.glob("*comet.params"))
+        assert (
+            len(comet_params) == 1
+        ), f"Expected exactly one comet.params file in {inputs_dir}, found {len(comet_params)}"
+        comet_params = comet_params[0]
+        psm_scorer = {
+            "comet_params": str(comet_params),
+        }
+        if hybrid_native_competition:
+            psm_scorer["fasta"] = str(fasta)
+        hybrid_former = {
+            "kmer_db": str(inputs_dir / "kmers.db"),
+            "fasta": str(fasta),
+        }
+        hs_config = {
+            "name": data_dir.name,
+            "parent_out_dir": str(results_dir),
+            "mzml_to_scans": {
+                str(mzml): "all" for mzml in list(Path(data_dir).glob("*.mzML"))
+            },
+            "psm_scorer": psm_scorer,
+            "hybrid_former": hybrid_former,
+        }
+        to_json(data=hs_config, path=Path(inputs_dir) / "hs.config.json")
+
+    def to_json(self, path: Union[str, Path]) -> None:
+        data_as_json_str = self.model_dump_json()
+        to_json(data=json.loads(data_as_json_str), path=path)
 
     def create_native_run_comet_config(
         self,
@@ -458,6 +559,18 @@ class HypedsearchRunConfig(BaseModel):
             )
         return outputs
 
+    @property
+    def kmer_db_path(self):
+        return self.hybrid_former.kmer_db
+
+    @property
+    def fasta_path(self):
+        return self.hybrid_former.fasta
+
+    @property
+    def comet_params_path(self):
+        return self.psm_scorer.comet_params
+
     @cached_property
     def native_psms(self) -> List[CometPSM]:
         psms = flatten_list_of_lists(
@@ -476,13 +589,17 @@ class HypedsearchRunConfig(BaseModel):
             psms = [psm for psm in psms if psm.q_value <= q_value_threshold]
             return get_protein_counts_from_comet_psms(psms=psms)
 
-    @property
-    def native_assign_confidence_path(self):
-        return self.native_run_dir / "native-assign-confidence.txt"
+    @staticmethod
+    def assign_confidence_name(run_type: Literal[NATIVE, HYBRID]) -> str:
+        return f"{run_type}-assign-confidence.txt"
 
     @property
-    def hybrid_assign_confidence_path(self):
-        return self.hybrid_run_dir / "hybrid-assign-confidence.txt"
+    def native_assign_confidence_path(self) -> Path:
+        return self.native_run_dir / self.assign_confidence_name(run_type=NATIVE)
+
+    @property
+    def hybrid_assign_confidence_path(self) -> Path:
+        return self.hybrid_run_dir / self.assign_confidence_name(run_type=HYBRID)
 
     def run_assign_confidence(self, run_type: Literal[NATIVE, HYBRID]):
         if run_type == NATIVE:
@@ -534,8 +651,13 @@ class HypedsearchRunConfig(BaseModel):
         outputs = native_run_on_spectrum(spectrum=spectrum, comet_config=comet_config)
         return outputs
 
-    def hybrid_run_on_spectrum(self, spectrum: Spectrum):
-        return hybrid_run_on_spectrum(
+    def run_hypedsearch_on_spectrum(
+        self, spectrum: Spectrum, num_threads_4_comet: int = DEFAULT_NUM_COMET_THREADS
+    ) -> Tuple[CometOutputs, CometOutputs, Dict[str, List[HybridPeptide]]]:
+        native_outputs = self.native_run_on_spectrum(
+            spectrum=spectrum, num_threads_4_comet=num_threads_4_comet
+        )
+        seq_to_hybrids, hybrid_outputs = hybrid_run_on_spectrum(
             spectrum=spectrum,
             out_dir=self.hybrid_run_scan_results_dir,
             spectrum_preprocessor=self.spectrum_preprocessor,
@@ -543,14 +665,7 @@ class HypedsearchRunConfig(BaseModel):
             psm_scorer=self.psm_scorer,
         )
 
-    def run_hypedsearch_on_spectrum(
-        self, spectrum: Spectrum, num_threads_4_comet: int = DEFAULT_NUM_COMET_THREADS
-    ) -> CometOutputs:
-        native_outputs = self.native_run_on_spectrum(
-            spectrum=spectrum, num_threads_4_comet=num_threads_4_comet
-        )
-        hybrid_outputs = self.hybrid_run_on_spectrum(spectrum=spectrum)
-        return native_outputs, hybrid_outputs
+        return native_outputs, hybrid_outputs, seq_to_hybrids
 
     @property
     def expected_native_scan_target_outputs(self) -> List[str]:
@@ -609,6 +724,106 @@ class HypedsearchRunConfig(BaseModel):
             out_dir=self.hybrid_run_dir,
         )
 
+    def get_output_txts(
+        self,
+        run_type: Literal[NATIVE, HYBRID],
+        psm_type: Literal[TARGET, DECOY, ASSIGN_CONFIDENCE],
+    ) -> List:
+        def file_to_load(run_type, psm_type):
+            if psm_type == TARGET:
+                return f"*.comet.{TARGET}.txt"
+            elif psm_type == DECOY:
+                return f"*.comet.{DECOY}.txt"
+            elif psm_type == ASSIGN_CONFIDENCE:
+                return self.assign_confidence_name(run_type=run_type)
+            else:
+                raise ValueError(
+                    f"Invalid psm_type: {psm_type}. Allowed: {TARGET}, {DECOY}, {ASSIGN_CONFIDENCE}"
+                )
+
+        if run_type == NATIVE:
+            return list(self.native_run_dir.glob(file_to_load(run_type, psm_type)))
+        elif run_type == HYBRID:
+            return list(self.hybrid_run_dir.glob(file_to_load(run_type, psm_type)))
+        else:
+            raise ValueError(
+                f"Invalid run_type: {run_type}. Allowed: {NATIVE}, {HYBRID}"
+            )
+
+
+class SpectrumCometRunResults(BaseModel):
+    targets: List[CometPSM] = Field(default_factory=list)
+    decoys: List[CometPSM] = Field(default_factory=list)
+    assign_conf: Optional[CometPSM] = None
+
+    @model_validator(mode="after")
+    def check_consistent_spectrum_uid(self):
+        # Collect UIDs from targets and decoys
+        uids = {psm.spectrum_uid for psm in self.targets + self.decoys}
+        if len(uids) != 1:
+            raise ValueError(f"Inconsistent spectrum_uid values found: {uids}")
+        return self
+
+    @property
+    def spectrum_uid(self) -> str:
+        if len(self.targets) > 0:
+            return self.targets[0].spectrum_uid
+        elif len(self.decoys) > 0:
+            return self.decoys[0].spectrum_uid
+        else:
+            raise ValueError("No targets or decoys to get spectrum_uid from.")
+
+    @cached_property
+    def target(self) -> Optional[CometPSM]:
+        if len(self.targets) == 0:
+            return None
+        else:
+            top_psms = CometPSM.get_top_psms(psms=self.targets)
+            assert (
+                len(top_psms) == 1
+            ), f"Expected 1 top target PSM, found {len(top_psms)}"
+            return top_psms[0]
+
+    @cached_property
+    def decoy(self) -> CometPSM:
+        if len(self.decoys) == 0:
+            return None
+        else:
+            top_psms = CometPSM.get_top_psms(psms=self.decoys)
+            assert (
+                len(top_psms) == 1
+            ), f"Expected 1 top decoy PSM, found {len(top_psms)}"
+            return top_psms[0]
+
+    def target_psm(
+        self,
+        spectrum: Spectrum,
+        peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
+    ) -> PSM:
+        if self.assign_conf is not None:
+            return PSM.from_spectrum_and_comet_psm(
+                spectrum=spectrum,
+                comet_psm=self.assign_conf,
+                peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tol,
+            )
+        else:
+            return PSM.from_spectrum_and_comet_psm(
+                spectrum=spectrum,
+                comet_psm=self.target,
+                peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tol,
+            )
+
+    def decoy_psm(
+        self,
+        spectrum: Spectrum,
+        peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
+    ) -> PSM:
+        return PSM.from_spectrum_and_comet_psm(
+            spectrum=spectrum,
+            comet_psm=self.decoy,
+            peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tol,
+        )
+
 
 def native_run_on_spectrum(
     spectrum: Spectrum, comet_config: CometConfig
@@ -624,7 +839,7 @@ def hybrid_run_on_spectrum(
     spectrum_preprocessor: SpectrumPreprocessor,
     hybrid_former: HybridFormer,
     psm_scorer: HybridPSMScorer,
-) -> CometOutputs:
+) -> Tuple[Dict[str, List[HybridPeptide]], List[CometOutputs]]:
     spectrum = spectrum_preprocessor.preprocess_spectrum(spectrum=spectrum)
     seq_to_hybrids = hybrid_former.form_hybrids(spectrum=spectrum)
     comet_outputs = psm_scorer.score_hybrids(
@@ -632,13 +847,7 @@ def hybrid_run_on_spectrum(
         spectrum=spectrum,
         out_dir=out_dir,
     )
-    return comet_outputs
-
-
-@dataclass
-class HypedsearchOutputs:
-    target: Path
-    decoy: Path
+    return seq_to_hybrids, comet_outputs
 
 
 def hybrid_fasta_name(hybrid_seq: str) -> str:
@@ -847,6 +1056,11 @@ def cli():
 
 if __name__ == "__main__":
     setup_logger()
+    cli.add_command(cli_combine_comet_scan_results)
+    cli.add_command(cli_check_for_missing_scans)
+    cli.add_command(cli_run_hypedsearch)
+    cli.add_command(cli_create_native_run_snakemake_config)
+    cli()
     cli.add_command(cli_combine_comet_scan_results)
     cli.add_command(cli_check_for_missing_scans)
     cli.add_command(cli_run_hypedsearch)

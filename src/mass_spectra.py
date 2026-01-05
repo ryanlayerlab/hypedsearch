@@ -1,4 +1,5 @@
 import re
+from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
@@ -8,11 +9,12 @@ import click
 import numpy as np
 import pymzml
 import seaborn as sns
+from matplotlib.figure import Figure
 from matplotlib.pyplot import Axes
 from pydantic import BaseModel, BeforeValidator, Field
 from pyteomics import mzml as mzml_reader
 
-from src.constants import SPECTRA_DIR, THOMAS_SAMPLES
+from src.constants import COMMON_SPECTRA_ATTRS, DATA_DIR, SPECTRA_DIR, THOMAS_SAMPLES
 from src.plot_utils import (
     add_counts_to_histogram_boxes,
     fig_setup,
@@ -38,6 +40,7 @@ class Spectrum(BaseModel):
     peaks: List[Peak] = field(default_factory=list, repr=False)
     mzml: Optional[Path] = None
     scan: Optional[int] = None
+    mzml_index: Optional[int] = None
     # For keeping track of whether the peaks have been processed:
     peaks_preprocessed: bool = False
 
@@ -56,6 +59,22 @@ class Spectrum(BaseModel):
             )
         return self.get_uid(sample=self.sample, scan=self.scan)
 
+    @property
+    def total_intensity(self):
+        return sum([peak.intensity for peak in self.peaks])
+
+    @property
+    def mz(self):
+        return self.precursor_mz
+
+    @property
+    def z(self):
+        return self.precursor_charge
+
+    @property
+    def charge(self):
+        return self.precursor_charge
+
     @staticmethod
     def get_uid(sample: str, scan: int) -> str:
         return f"mzml={sample};scan={scan}"
@@ -69,10 +88,6 @@ class Spectrum(BaseModel):
             return sample, scan
         else:
             raise ValueError(f"Invalid UID format: {uid}")
-
-    @property
-    def total_intensity(self):
-        return sum([peak.intensity for peak in self.peaks])
 
     @staticmethod
     def get_scan_number_from_id(spectrum_id: str) -> int:
@@ -102,6 +117,7 @@ class Spectrum(BaseModel):
         ]
         return cls(
             scan=scan_num,
+            mzml_index=spectrum.get("index"),
             peaks=peaks,
             spectrum_id=spectrum_id,
             mzml=mzml,
@@ -125,7 +141,8 @@ class Spectrum(BaseModel):
             for spectrum in mzml:
                 if spectrum["ms level"] == 1:
                     continue
-                ms2_spectra.append(cls.from_dict(spectrum=spectrum, mzml=mzml_path))
+                spectrum = cls.from_dict(spectrum=spectrum, mzml=mzml_path)
+                ms2_spectra.append(spectrum)
 
             return ms2_spectra
 
@@ -143,7 +160,7 @@ class Spectrum(BaseModel):
     def load_spectra_from_path(cls, path: Union[Path, str]) -> List["Spectrum"]:
         """
         Load spectra from a given path on the computer. If the path is a directory, find all
-        mass spectra files in that directory and parse all their spectra
+        `*.mzML` files in that directory and parses their spectra
         """
         path = Path(path).absolute()
         if path.is_dir():
@@ -234,50 +251,15 @@ class Spectrum(BaseModel):
     @staticmethod
     def plot_spectra_info(
         spectra: List["Spectrum"],
-        attrs: List[str] = ["precursor_charge", "precursor_mz", "retention_time"],
-    ) -> List[Axes]:
-        _, axs = fig_setup(nrows=1, ncols=len(attrs))
+        attrs: List[str] = COMMON_SPECTRA_ATTRS,
+        add_counts: bool = True,
+    ) -> Tuple[Figure, List[Axes]]:
+        fig, axs = fig_setup(nrows=len(attrs), ncols=1)
         for i, attr in enumerate(attrs):
-            Spectrum.plot_attr(spectra=spectra, attr=attr, ax=axs[i])
+            Spectrum.plot_attr(
+                spectra=spectra, attr=attr, ax=axs[i], add_counts=add_counts
+            )
         finalize(axs)
-        return list(axs)
-
-    @staticmethod
-    def organize_by_spectrum(data: List[Any]):
-        if len(data) == 0:
-            return {}
-        else:
-            spec_id = getattr(data[0], "spectrum_uid", None)
-            if spec_id is not None:
-                return {datum.spectrum_uid: datum for datum in data}
-            else:
-                # So it can work on spectra too
-                return {datum.uid: datum for datum in data}
-
-    @staticmethod
-    def spectra_plots(
-        spectra: List["Spectrum"],
-    ):
-        fig, axs = fig_setup(1, 3)
-        Spectrum.plot_attr(
-            ax=axs[0],
-            spectra=spectra,
-            attr="precursor_charge",
-        )
-        Spectrum.plot_attr(
-            ax=axs[1],
-            spectra=spectra,
-            attr="precursor_mz",
-            add_counts=False,
-        )
-        Spectrum.plot_attr(
-            ax=axs[2],
-            spectra=spectra,
-            attr="retention_time",
-            add_counts=False,
-        )
-        finalize(axs)
-        _ = fig.suptitle(f"MS2 spectra (n={len(spectra)})")
         return fig, axs
 
     @classmethod
@@ -287,6 +269,21 @@ class Spectrum(BaseModel):
             spectra = cls.parse_ms2_from_mzml(mzml=mzml)
             all_spectra.extend(spectra)
         return all_spectra
+
+
+def organize_by_spectrum_uid(data: List[Any]):
+    if len(data) == 0:
+        return {}
+    else:
+        spec_id = getattr(data[0], "spectrum_uid", None)
+        if spec_id is not None:
+            uid_to_objs = defaultdict(list)
+            for datum in data:
+                uid_to_objs[datum.spectrum_uid].append(datum)
+            return dict(uid_to_objs)
+        else:
+            # So it can work on spectra too
+            return {datum.uid: datum for datum in data}
 
 
 class Mzml(BaseModel):

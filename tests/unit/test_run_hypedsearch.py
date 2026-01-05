@@ -3,14 +3,14 @@ Tests for run_hypedsearch.sh
 """
 
 from src.utils import CmdLineRunner
-from tests.conftest import default_config
+from tests.conftest import default_test_config
 
 
 @staticmethod
 def test_smoke(tmp_path, test_data_dir):
     # Arrange
     config_path = tmp_path / "hs_config.json"
-    hs_config = default_config(test_data_dir=test_data_dir, out_dir=tmp_path)
+    hs_config = default_test_config(test_data_dir=test_data_dir, out_dir=tmp_path)
     expected_native_txt = (
         hs_config.native_run_dir / "BMEM_AspN_Fxn4_scans1-20.comet.target.txt"
     )
