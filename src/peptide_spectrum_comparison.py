@@ -3,7 +3,7 @@ import math
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import List, Literal, Optional, Set, Union
+from typing import Dict, List, Literal, Optional, Set, Union
 
 import pandas as pd
 import seaborn as sns
@@ -87,6 +87,7 @@ class PSM(BaseModel):
     spectrum_rt: float
     spectrum_mz: float
     spectrum_z: int
+    spectrum_tot_intensity: float
     xcorr: Optional[float] = None
     q_value: Optional[float] = None
 
@@ -105,6 +106,10 @@ class PSM(BaseModel):
                 by=["ion_charge", "ion_seq"]
             )
         )
+
+    @property
+    def uid(self):
+        return self.spectrum_uid
 
     @property
     def num_ions_supported(self):
@@ -146,6 +151,23 @@ class PSM(BaseModel):
         return mass_difference_in_ppm(mass1=seq_mz, mass2=self.spectrum_mz)
 
     @classmethod
+    def convert_comet_psms_to_psms(
+        cls,
+        comet_psms: List[CometPSM],
+        uid_to_spectrum_map: Dict[str, Spectrum],
+        peak_to_ion_ppm_tolerance: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
+    ) -> List["PSM"]:
+        logger.info(f"Converting {len(comet_psms)} CometPSM objects to PSM objects")
+        return [
+            cls.from_spectrum_and_comet_psm(
+                comet_psm=comet_psm,
+                spectrum=uid_to_spectrum_map[comet_psm.uid],
+                peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
+            )
+            for comet_psm in comet_psms
+        ]
+
+    @classmethod
     def from_spectrum_and_comet_psm(
         cls,
         comet_psm: CometPSM,
@@ -167,7 +189,8 @@ class PSM(BaseModel):
             prop_intensity_supported=intensity_supported / spectrum.total_intensity,
             prop_ions_matched=comet_psm.prop_ions_matched,
             spectrum_uid=spectrum.uid,
-            spectrum_ab=spectrum.precursor_abundance,
+            spectrum_tot_intensity=spectrum.total_intensity,
+            spectrum_ab=spectrum.precursor_intensity,
             spectrum_rt=spectrum.retention_time,
             spectrum_mz=spectrum.precursor_mz,
             spectrum_z=spectrum.precursor_charge,
@@ -214,6 +237,7 @@ class PSM(BaseModel):
             "prop_suffixes_supported",
             "mz_ppm_diff",
         ]
+
         for attr in attrs:
             data[attr] = getattr(self, attr)
         return data

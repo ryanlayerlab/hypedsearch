@@ -3,7 +3,7 @@
 
 # Default values
 MEM="500GB"
-CORES=80
+CORES=180
 # FIJI_NODE="fijinode-68"
 DATA_DIR="/localscratch"
 LOG_DIR="logs/hypedsearch"
@@ -80,7 +80,7 @@ sbatch <<EOT
 
 ./src/run_hypedsearch.sh \
     --config $HS_CONFIG \
-    --cores $CORES \
+    --cores 80 \
     --data $DATA_DIR \
     --singularity
 

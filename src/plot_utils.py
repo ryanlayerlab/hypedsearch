@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -360,7 +360,7 @@ def interactive_scatter_plot(
         hover_data=info_colms,  # what to show on hover
     )
     _ = fig.update_traces(
-        marker=dict(size=6, opacity=0.7, line=dict(width=0))
+        marker=dict(size=4, opacity=0.7, line=dict(width=0))
     )  # improve visual clarity
     _ = fig.update_layout(
         title=title,
@@ -378,13 +378,16 @@ def add_counts_to_histogram_boxes(
     for p in ax.patches:
         height = p.get_height()
         if height > 0:  # Only label non-empty bars
+            y_offset = ax.get_ylim()[1] * 0.01
             _ = ax.text(
                 p.get_x() + p.get_width() / 2,  # x position (center of bar)
-                height,  # y position (top of bar)
+                height + y_offset,  # y position (top of bar)
                 f"{int(height)}",  # text (integer count)
                 ha="center",
                 va="bottom",
                 fontsize=9,
+                rotation=90,
+                # rotation_mode="anchor",  # anchor rotation at text start
             )
 
 
@@ -438,5 +441,31 @@ def plot_sorted_1d_data(
     return ax
 
 
-def pairplot(df: pd.DataFrame, ax: Optional[Axes] = None):
-    sns.pairplot(df, corner=True)
+def plot_histogram(
+    attr: Optional[str] = None,
+    objects: Optional[List[Any]] = None,
+    values: Optional[List[float]] = None,
+    ax: Optional[Axes] = None,
+    title: Optional[str] = None,
+    out_path: Optional[Union[str, Path]] = None,
+    add_counts: bool = True,
+    rug_plot: bool = False,
+) -> Axes:
+    if ax is None:
+        _, axs = fig_setup()
+        ax = axs[0]
+    if objects is not None:
+        values = [getattr(obj, attr) for obj in objects]
+    else:
+        assert values is not None, "Either objects or values must be provided"
+    _ = sns.histplot(values, ax=ax)
+    if add_counts:
+        add_counts_to_histogram_boxes(ax=ax)
+    if rug_plot:
+        sns.rugplot(values, ax=ax, color="black")
+    if attr is not None:
+        set_title_axes_labels(ax=ax, title=title, xlabel=attr, ylabel="Count")
+    finalize(ax)
+    if out_path is not None:
+        save_fig(out_path)
+    return ax

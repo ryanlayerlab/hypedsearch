@@ -38,6 +38,7 @@ from src.comet_utils import CometPSM
 from src.constants import (
     ASSIGN_CONFIDENCE,
     COMET_DIR,
+    COMMON_SPECTRA_ATTRS,
     DECOY,
     DEFAULT_CRUX_PARAMS,
     DEFAULT_MAX_ALLOWED_ION_CHARGE,
@@ -52,6 +53,7 @@ from src.constants import (
     DEFAULT_PEAK_TO_ION_PPM_TOL,
     DEFAULT_PRECURSOR_MZ_PPM_TOL,
     DEFAULT_Q_VAL_THRESH,
+    DEFAULT_RESULTS_DIR_NAME,
     GIT_REPO_DIR,
     HS_PREFIX,
     HUMAN_PROTEOME,
@@ -94,7 +96,7 @@ from src.utils import (
     log_time,
     mass_difference_in_ppm,
     save_dict,
-    save_pydantic_objects,
+    save_pydantic_objects_to_json,
     setup_logger,
     to_json,
     write_new_line_separated_file,
@@ -149,7 +151,7 @@ class TrueHybrid(HybridPeptide):
         true_hybrids: List["TrueHybrid"],
         out: Union[Path, str] = TRUE_HYBRIDS_PATH,
     ):
-        save_pydantic_objects(objects=true_hybrids, out=out)
+        save_pydantic_objects_to_json(objects=true_hybrids, path=out)
 
     @classmethod
     def load(cls, path: Union[Path, str] = TRUE_HYBRIDS_PATH) -> List["TrueHybrid"]:
@@ -206,7 +208,50 @@ def proteins_needed_for_true_hybrids(
     )
 
 
-def combine_comet_scan_results(scan_results_dir: Path, out_dir: Path):
+def get_combined_comet_output_name(mzml_name: str, psm_type: str) -> str:
+    return f"{mzml_name}.comet.{psm_type}.txt"
+
+
+def parse_combined_comet_output_name(filename: str):
+    output_regex = r"^(?P<mzml>(.+?))\.comet\.(?P<psm_type>target|decoy)\.txt$"
+    match = re.match(output_regex, filename)
+    if match is not None:
+        mzml_name = match.groupdict()["mzml"]
+        psm_type = match.groupdict()["psm_type"]
+        return mzml_name, psm_type
+
+    output_regex = r"^(?P<name>(.+?))-assign-confidence.txt"
+    match = re.match(output_regex, filename)
+    if match is not None:
+        mzml_name = match.groupdict()["name"]
+        psm_type = ASSIGN_CONFIDENCE
+        return mzml_name, psm_type
+
+    else:
+        raise ValueError(
+            f"Filename {filename} does not match expected combined comet output pattern: {output_regex}"
+        )
+
+
+def get_matching_output_txt(out_dir: Path, mzml_name: str, psm_type: str) -> Path:
+    for path in out_dir.iterdir():
+        if path.is_file():
+            try:
+                found_mzml_name, found_psm_type = parse_combined_comet_output_name(
+                    filename=path.name
+                )
+                if found_mzml_name == mzml_name and found_psm_type == psm_type:
+                    return path
+            except:
+                continue
+    raise RuntimeError(
+        f"No matching output txt found for MZML={mzml_name}, PSM_TYPE={psm_type} in directory {out_dir}"
+    )
+
+
+def get_combine_comet_outputs_in_scan_results_dir(
+    scan_results_dir: Path, out_dir: Path
+) -> Dict[str, Dict[str, Path]]:
     output_regex = r"^(?P<mzml>(.+?))\.comet\.(?P<scan>\d+)-(?P=scan)\.(?P<psm_type>target|decoy)\.txt$"
     # Get Comet outputs for each MZML
     logger.info("Grouping Comet outputs by MZML...")
@@ -225,17 +270,33 @@ def combine_comet_scan_results(scan_results_dir: Path, out_dir: Path):
         mzml_files[mzml_name][psm_type].append(comet_txt)
         mzml_names.add(mzml_name)
 
+    outputs = defaultdict(dict)
     for mzml_name in mzml_names:
         for psm_type in [TARGET, DECOY]:
-            files = mzml_files[mzml_name][psm_type]
+            outputs[mzml_name][psm_type] = out_dir / get_combined_comet_output_name(
+                mzml_name=mzml_name, psm_type=psm_type
+            )
+    return outputs
+
+
+def combine_comet_scan_results(
+    scan_results_dir: Path, out_dir: Path
+) -> Dict[str, Dict[str, Path]]:
+    # Get Comet outputs for each MZML
+    outputs = get_combine_comet_outputs_in_scan_results_dir(
+        scan_results_dir=scan_results_dir, out_dir=out_dir
+    )
+    for mzml_name in outputs.keys():
+        for psm_type in [TARGET, DECOY]:
+            files = outputs[mzml_name].get(psm_type, [])
             if len(files) == 0:
                 continue
             logger.info(f"Combining Comet {psm_type} outputs for {mzml_name}...")
-            out_path = out_dir / f"{mzml_name}.comet.{psm_type}.txt"
             _ = Crux.combine_crux_comet_files(
                 files=files,
-                out_path=out_path,
+                out_path=outputs[mzml_name][psm_type],
             )
+    return outputs
 
 
 class MzmlToScans(BaseModel):
@@ -446,6 +507,14 @@ class HypedsearchRunConfig(BaseModel):
         return mzml_to_scans
 
     @cached_property
+    def spectrum_uid_to_spectrum(self) -> Dict[str, Spectrum]:
+        spectrum_uid_to_spectrum = {}
+        for mzml in self.mzml_to_scans.keys():
+            mzml = Mzml(mzml=mzml)
+            spectrum_uid_to_spectrum.update(mzml.id_to_spectrum)
+        return spectrum_uid_to_spectrum
+
+    @cached_property
     def hybrid_run_scan_results_dir(self) -> Path:
         return self.hybrid_run_dir / "scan_results"
 
@@ -590,16 +659,16 @@ class HypedsearchRunConfig(BaseModel):
             return get_protein_counts_from_comet_psms(psms=psms)
 
     @staticmethod
-    def assign_confidence_name(run_type: Literal[NATIVE, HYBRID]) -> str:
-        return f"{run_type}-assign-confidence.txt"
+    def assign_confidence_name(prefix: Literal[NATIVE, HYBRID]) -> str:
+        return f"{prefix}-assign-confidence.txt"
 
     @property
     def native_assign_confidence_path(self) -> Path:
-        return self.native_run_dir / self.assign_confidence_name(run_type=NATIVE)
+        return self.native_run_dir / self.assign_confidence_name(prefix=NATIVE)
 
     @property
     def hybrid_assign_confidence_path(self) -> Path:
-        return self.hybrid_run_dir / self.assign_confidence_name(run_type=HYBRID)
+        return self.hybrid_run_dir / self.assign_confidence_name(prefix=HYBRID)
 
     def run_assign_confidence(self, run_type: Literal[NATIVE, HYBRID]):
         if run_type == NATIVE:
@@ -633,14 +702,6 @@ class HypedsearchRunConfig(BaseModel):
             ]
             spectra.extend(spectra_from_mzml)
         return spectra
-
-    def spectra_plots(self):
-        fig, _ = Spectrum.spectra_plots(spectra=self.spectra)
-        # Plot precursor charges
-        _ = fig.suptitle(
-            f"{self.name} MS2 spectra (n={len(self.spectra)})", fontsize=16
-        )
-        save_fig(path=self.parent_out_dir / "spectra.png")
 
     def native_run_on_spectrum(
         self, spectrum: Spectrum, num_threads_4_comet: int = DEFAULT_NUM_COMET_THREADS
@@ -735,20 +796,43 @@ class HypedsearchRunConfig(BaseModel):
             elif psm_type == DECOY:
                 return f"*.comet.{DECOY}.txt"
             elif psm_type == ASSIGN_CONFIDENCE:
-                return self.assign_confidence_name(run_type=run_type)
+                return self.assign_confidence_name(prefix=run_type)
             else:
                 raise ValueError(
                     f"Invalid psm_type: {psm_type}. Allowed: {TARGET}, {DECOY}, {ASSIGN_CONFIDENCE}"
                 )
 
         if run_type == NATIVE:
-            return list(self.native_run_dir.glob(file_to_load(run_type, psm_type)))
+            out_dir = self.native_run_dir
         elif run_type == HYBRID:
-            return list(self.hybrid_run_dir.glob(file_to_load(run_type, psm_type)))
+            out_dir = self.hybrid_run_dir
         else:
             raise ValueError(
                 f"Invalid run_type: {run_type}. Allowed: {NATIVE}, {HYBRID}"
             )
+        output_txts = []
+        for mzml in self.mzml_to_scans.keys():
+            mzml_name = Mzml.get_mzml_name(mzml=mzml)
+            try:
+                output_txts.append(
+                    get_matching_output_txt(
+                        out_dir=out_dir,
+                        mzml_name=mzml_name,
+                        psm_type=psm_type,
+                    )
+                )
+            except:
+                logger.info(
+                    f"Wasn't able to find output txt for MZML={mzml_name}, run_type={run_type}, psm_type={psm_type}"
+                )
+
+        return output_txts
+
+    @property
+    def _results_dir(self) -> Path:
+        results_dir = self.parent_out_dir / DEFAULT_RESULTS_DIR_NAME
+        results_dir.mkdir(parents=True, exist_ok=True)
+        return results_dir
 
 
 class SpectrumCometRunResults(BaseModel):

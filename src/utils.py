@@ -19,6 +19,7 @@ from time import time
 from typing import Annotated, Any, Callable, Dict, List, Literal, Optional, Union
 
 import click
+import numpy as np
 import pandas as pd
 import yaml
 from pydantic import BaseModel, BeforeValidator
@@ -274,6 +275,20 @@ def log_time(level=logging.INFO):
     return decorator
 
 
+def compute_gini_coefficient(values: List[float]):
+    """Calculate the Gini coefficient of a list of values"""
+    # based on bottom eq: http://www.statsdirect.com/help/content/image/stat0206_wmf.gif
+    # from: http://www.statsdirect.com/help/default.htm#nonparametric_methods/gini.htm
+    # array = array.flatten() #all values are treated equally, arrays must be 1d
+    # if np.amin(array) < 0:
+    #     array -= np.amin(array) #values cannot be negative
+    # array += 0.0000001 #values cannot be 0
+    values = np.sort(values)  # values must be sorted
+    index = np.arange(1, values.shape[0] + 1)  # index per array element
+    n = values.shape[0]  # number of array elements
+    return (np.sum((2 * index - n - 1) * values)) / (n * np.sum(values))
+
+
 def run_command_line_cmd(cmd: Union[str, List[str]], env=Dict) -> CmdLineResult:
     result = subprocess.run(
         cmd, capture_output=True, text=True, shell=True, env=self.env
@@ -402,9 +417,9 @@ def get_default_comet_executable_path():
         )
 
 
-def save_pydantic_objects(objects: List[BaseModel], out: Union[str, Path]):
+def save_pydantic_objects_to_json(objects: List[BaseModel], path: Union[str, Path]):
     data = [obj.model_dump(mode="json") for obj in objects]
-    to_json(data=data, path=out)
+    to_json(data=data, path=path)
 
 
 def to_json(data: Any, path: Union[str, Path]):

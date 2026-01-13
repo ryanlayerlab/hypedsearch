@@ -44,7 +44,7 @@ class Test_Spectrum:
             ],
             precursor_mz=100,
             precursor_charge=2,
-            precursor_abundance=200,
+            precursor_intensity=200,
             spectrum_id="scan=1",
             retention_time=600,
             scan=1,

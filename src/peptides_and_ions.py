@@ -51,6 +51,11 @@ class ProteinRange(Position):
             exclusive_end=pos.exclusive_end,
         )
 
+    def get_aa_seq(self, protein_name_to_seq_map: Dict[str, str]):
+        return protein_name_to_seq_map[self.protein][
+            self.inclusive_start : self.exclusive_end
+        ]
+
 
 class UnpositionedProductIon(BaseModel):
     seq: str

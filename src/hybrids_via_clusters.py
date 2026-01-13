@@ -1,5 +1,6 @@
 import itertools
 import logging
+import re
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -14,6 +15,7 @@ from pydantic import BaseModel
 
 from src.constants import (
     B_ION_TYPE,
+    DEFAULT_JCT_LEN,
     DEFAULT_MAX_ALLOWED_ION_CHARGE,
     DEFAULT_MIN_CLUSTER_LENGTH,
     DEFAULT_MIN_CLUSTER_SUPPORT,
@@ -379,25 +381,35 @@ class HybridPosition:
     left: ProteinRange
     right: ProteinRange
 
+    def get_left_seq(self, protein_name_to_seq_map: Dict[str, str]) -> str:
+        return self.left.get_aa_seq(protein_name_to_seq_map=protein_name_to_seq_map)
 
-@dataclass
-class HybridJunction:
-    right_prot: str
-    right_in_start: int
-    left_prot: str
-    left_ex_end: int
+    def get_right_seq(self, protein_name_to_seq_map: Dict[str, str]) -> str:
+        return self.right.get_aa_seq(protein_name_to_seq_map=protein_name_to_seq_map)
 
-    @classmethod
-    def from_hybrid_position(cls, pos: HybridPosition) -> "HybridJunction":
-        return cls(
-            right_prot=pos.right.protein,
-            right_in_start=pos.right.inclusive_start,
-            left_prot=pos.left.protein,
-            left_ex_end=pos.left.exclusive_end,
-        )
+    def get_aa_seq(self, protein_name_to_seq_map: Dict[str, str]) -> str:
+        left_seq = self.get_left_seq(protein_name_to_seq_map=protein_name_to_seq_map)
+        right_seq = self.get_right_seq(protein_name_to_seq_map=protein_name_to_seq_map)
+        return f"{self.left.protein}:{left_seq}-{right_seq}:{self.right.protein}"
 
-    def __str__(self):
-        return f"{self.left_prot}:{self.left_ex_end}-{self.right_prot}:{self.right_in_start}"
+    def get_junction_str(self, protein_name_to_seq_map: Dict[str, str], jct_len: int):
+        left_seq = self.get_left_seq(protein_name_to_seq_map=protein_name_to_seq_map)
+        right_seq = self.get_right_seq(protein_name_to_seq_map=protein_name_to_seq_map)
+        return f"{self.left.protein}|end={self.left.exclusive_end} : {left_seq[-jct_len:]}-{right_seq[:jct_len]} : {self.right.protein}|start={self.right.inclusive_start}"
+
+    def to_str(self, protein_name_to_seq_map: Dict[str, str]) -> str:
+        left_seq = self.get_left_seq(protein_name_to_seq_map=protein_name_to_seq_map)
+        right_seq = self.get_right_seq(protein_name_to_seq_map=protein_name_to_seq_map)
+        return f"{self.left.protein}|end={self.left.exclusive_end} : {left_seq}-{right_seq} : {self.right.protein}|start={self.right.inclusive_start}"
+
+
+def create_junction_str(
+    left_seq: str,
+    right_seq: str,
+    left_prots: str,
+    right_prots: str,
+):
+    return f"({left_prots}) {left_seq}-{right_seq} ({right_prots})"
 
 
 class HybridPeptide(BaseModel):
@@ -406,10 +418,29 @@ class HybridPeptide(BaseModel):
     left_proteins: Set[str] = field(default_factory=set)
     right_proteins: Set[str] = field(default_factory=set)
 
-    def to_str(self, protein_name_to_seq_map: Dict[str, str]):
-        jcts = self.get_junctions(protein_name_to_seq_map=protein_name_to_seq_map)
-        jcts_str = ";".join([str(jct) for jct in jcts])
-        return f"{self.hyphen_seq} ({jcts_str})"
+    def __str__(self):
+        return create_junction_str(
+            left_seq=self.left_seq,
+            right_seq=self.right_seq,
+            left_prots=self.left_prot_str,
+            right_prots=self.right_prot_str,
+        )
+
+    @classmethod
+    def parse_hybrid_peptide_str(cls, hybrid_str: str) -> "HybridPeptide":
+        ouput_regex = r"^\((?P<left_prots>[^)]*)\)\s+(?P<left_seq>[^-\s]+)-(?P<right_seq>[^\s]+)\s+\((?P<right_prots>[^)]*)\)$"
+        match = re.match(ouput_regex, hybrid_str)
+        if not match:
+            raise ValueError(f"Invalid HybridPeptide string: {hybrid_str}")
+        left_proteins = {p for p in match.group("left_prots").split(";") if p}
+        right_proteins = {p for p in match.group("right_prots").split(";") if p}
+
+        return cls(
+            left_seq=match.group("left_seq"),
+            right_seq=match.group("right_seq"),
+            left_proteins=left_proteins,
+            right_proteins=right_proteins,
+        )
 
     @property
     def left_prot_str(self):
@@ -521,25 +552,48 @@ class HybridPeptide(BaseModel):
                 )
         return positions
 
-    def get_junctions(
-        self, protein_name_to_seq_map: Dict[str, str]
-    ) -> List[HybridJunction]:
+    def get_positions_str(self, protein_name_to_seq_map: Dict[str, str]) -> str:
         positions = self.get_positions(protein_name_to_seq_map=protein_name_to_seq_map)
-        junctions = [HybridJunction.from_hybrid_position(pos=pos) for pos in positions]
-        return junctions
+        return "; ".join(
+            [
+                pos.to_str(protein_name_to_seq_map=protein_name_to_seq_map)
+                for pos in positions
+            ]
+        )
 
-    def get_junction_str(self, min_side_len: int = 1, with_hyphen: bool = False) -> str:
-        left_seq = self.left_seq[-min_side_len:]
-        right_seq = self.right_seq[:min_side_len]
+    def get_junction_str(self, jct_len: int = DEFAULT_JCT_LEN) -> str:
+        return create_junction_str(
+            left_seq=self.left_seq[-jct_len:],
+            right_seq=self.right_seq[:jct_len],
+            left_prots=self.left_prot_str,
+            right_prots=self.right_prot_str,
+        )
 
-        if with_hyphen:
-            return f"{left_seq}-{right_seq}"
-        else:
-            return f"{left_seq}{right_seq}"
+    def get_junctions(
+        self, protein_name_to_seq_map: Dict[str, str], jct_len: int
+    ) -> List[str]:
+        jcts = []
+        for pos in self.get_positions(protein_name_to_seq_map=protein_name_to_seq_map):
+            jcts.append(
+                pos.get_junction_str(
+                    protein_name_to_seq_map=protein_name_to_seq_map,
+                    jct_len=jct_len,
+                )
+            )
+        return jcts
+
+    # def get_junction_str(self, jct_len: int = 1, with_hyphen: bool = False) -> str:
+    #     left_seq = self.left_seq[-jct_len:]
+    #     right_seq = self.right_seq[:jct_len]
+
+    #     if with_hyphen:
+    #         return f"{left_seq}-{right_seq}"
+    #     else:
+    #         return f"{left_seq}{right_seq}"
 
     @property
     def evidence_of_carbamidomethylation(self):
-        if "CG-G" in self.get_junction_str(min_side_len=2, with_hyphen=True):
+        if "CG-G" in self.hyphen_seq:
             return True
         else:
             return False
@@ -643,6 +697,15 @@ def form_hybrids_from_left_and_right_seqs(
             [f"{left_seq}-{match['seq']}" for match in db.read_query(query=query)]
         )
     return hybrids
+
+
+def remove_native_hybrids(
+    hybrids: List[HybridPeptide], fasta: Fasta
+) -> List[HybridPeptide]:
+    native_seqs = fasta.proteins_that_contain_seqs(
+        seqs=[hy.seq for hy in hybrids]
+    ).keys()
+    return [hy for hy in hybrids if hy.seq not in native_seqs]
 
 
 def form_spectrum_hybrids_via_clustering(

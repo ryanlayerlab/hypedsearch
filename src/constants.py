@@ -30,6 +30,7 @@ DEFAULT_MIN_CLUSTER_LENGTH = 3
 DEFAULT_MIN_CLUSTER_SUPPORT = 2
 DEFAULT_MAX_PRECURSOR_CHARGE = 4
 DEFAULT_NUM_COMET_THREADS = 0
+DEFAULT_JCT_LEN = 3
 DEFAULT_NATIVE_RUN_CONFIG = "native_run.smk.json"
 TRUE_HYBRIDS_PATH = DATA_DIR / "true_hybrids/true_hybrids.json"
 
@@ -147,7 +148,17 @@ ASSIGN_CONFIDENCE = "assign-confidence"
 # For simplicity
 samples = [f"BMEM_AspN_Fxn{val}" for val in [4, 5, 6, 7, 8, 9]]
 THOMAS_SAMPLES = [f"BMEM_AspN_Fxn{val}" for val in [4, 5, 6, 7, 8, 9]]
-COMMON_SPECTRA_ATTRS = ["precursor_charge", "precursor_mz", "retention_time"]
+PRECURSOR_CHARGE = "precursor_charge"
+PRECURSOR_MZ = "precursor_mz"
+RETENTION_TIME = "retention_time"
+PRECURSOR_INTENSITY = "precursor_intensity"
+DEFAULT_RESULTS_DIR_NAME = "analysis"
+COMMON_SPECTRA_ATTRS = [
+    PRECURSOR_CHARGE,
+    PRECURSOR_MZ,
+    RETENTION_TIME,
+    PRECURSOR_INTENSITY,
+]
 
 # ## Asserts
 # assert file_exists(COMET_PARAMS) == True, "Comet executable not found!"

@@ -12,13 +12,14 @@ from src.constants import (
     HUMAN_PROTEOME,
     MAC_CRUX_EXECUTABLE,
     MOUSE_PROTEOME,
+    NATIVE,
     RUN_HYPEDSEARCH_SMK,
+    TARGET,
 )
 from src.hybrids_via_clusters import HybridPeptide
 from src.hypedsearch import (
     HybridFormer,
     HybridPSMScorer,
-    HypedsearchOutputs,
     HypedsearchRunConfig,
     SpectrumPreprocessor,
     SpectrumSelector,
@@ -33,26 +34,6 @@ from src.mass_spectra import Mzml, Spectrum
 from src.peptides_and_ions import Fasta
 from src.utils import flatten_list_of_lists, load_json, mass_difference_in_ppm
 from tests.conftest import default_hs_run, default_test_config
-
-
-class Test_HypedsearchOutputs:
-    @staticmethod
-    def test_remove_methylation():
-        config_path = "results/251028_RP_Islet_Spikes_Crashout/no_native_hybrid_comp/3_6_Meoh_RAT_Islet_B35spike/hs.config.json"
-        hs_config = HypedsearchRunConfig.from_json(config_path)
-        outs = HypedsearchOutputs(hs_config=hs_config, remove_carbamidomethylation=True)
-        for hybrid in flatten_list_of_lists(outs.seq_to_hybrids_map.values()):
-            assert not hybrid.evidence_of_carbamidomethylation
-
-    @staticmethod
-    def test_get_native_and_hybrid_results():
-        config_path = "results/251028_RP_Islet_Spikes_Crashout/no_native_hybrid_comp/3_6_Meoh_RAT_Islet_B35spike/hs.config.json"
-        hs_config = HypedsearchRunConfig.from_json(config_path)
-        outs = HypedsearchOutputs(hs_config=hs_config, remove_carbamidomethylation=True)
-        spectrum_uid = list(outs._get_hybrid_targets.keys())[0]
-        # Assert
-        outs.get_native_results_for_spectrum(spectrum_uid=spectrum_uid)
-        outs.get_hybrid_results_for_spectrum(spectrum_uid=spectrum_uid)
 
 
 class Test_TrueHybrid:
@@ -241,6 +222,13 @@ class Test_HypedsearchRunConfig:
                     )
                 )[0]
                 assert ~wo_fasta_psm.is_hybrid
+
+        @staticmethod
+        def test_get_output_txts():
+            hs_config = HypedsearchRunConfig.from_json(
+                path="results/251219_Stressed_Human_Islets_vs_No_Stress/inputs/mzml_configs/HuIslet_01_NormalGlucose_01_Only_AspN_Fxn5.hs.config.json"
+            )
+            hs_config.get_output_txts(run_type=NATIVE, psm_type=TARGET)
 
 
 class Test_hybrid_run_on_spectrum:

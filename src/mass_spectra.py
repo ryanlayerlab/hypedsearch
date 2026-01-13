@@ -1,5 +1,6 @@
+import logging
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
@@ -7,6 +8,7 @@ from typing import Annotated, Any, Dict, List, Optional, Tuple, Union
 
 import click
 import numpy as np
+import pandas as pd
 import pymzml
 import seaborn as sns
 from matplotlib.figure import Figure
@@ -14,15 +16,32 @@ from matplotlib.pyplot import Axes
 from pydantic import BaseModel, BeforeValidator, Field
 from pyteomics import mzml as mzml_reader
 
-from src.constants import COMMON_SPECTRA_ATTRS, DATA_DIR, SPECTRA_DIR, THOMAS_SAMPLES
+from src.constants import (
+    COMMON_SPECTRA_ATTRS,
+    DATA_DIR,
+    DEFAULT_MAX_PRECURSOR_CHARGE,
+    PRECURSOR_INTENSITY,
+    SPECTRA_DIR,
+    THOMAS_SAMPLES,
+)
 from src.plot_utils import (
     add_counts_to_histogram_boxes,
     fig_setup,
     finalize,
+    interactive_scatter_plot,
+    plot_histogram,
     save_fig,
     set_title_axes_labels,
 )
-from src.utils import flatten_list_of_lists, to_path
+from src.utils import (
+    compute_gini_coefficient,
+    flatten_list_of_lists,
+    load_json,
+    save_pydantic_objects_to_json,
+    to_path,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class Peak(BaseModel):
@@ -34,7 +53,7 @@ class Peak(BaseModel):
 class Spectrum(BaseModel):
     precursor_mz: float
     precursor_charge: int
-    precursor_abundance: float
+    precursor_intensity: float
     spectrum_id: str
     retention_time: float
     peaks: List[Peak] = field(default_factory=list, repr=False)
@@ -127,7 +146,7 @@ class Spectrum(BaseModel):
             precursor_charge=spectrum["precursorList"]["precursor"][0][
                 "selectedIonList"
             ]["selectedIon"][0]["charge state"],
-            precursor_abundance=spectrum["precursorList"]["precursor"][0][
+            precursor_intensity=spectrum["precursorList"]["precursor"][0][
                 "selectedIonList"
             ]["selectedIon"][0]["peak intensity"],
             retention_time=spectrum["scanList"]["scan"][0]["scan start time"],
@@ -227,28 +246,6 @@ class Spectrum(BaseModel):
             save_fig(out_path)
 
     @staticmethod
-    def plot_attr(
-        spectra: List["Spectrum"],
-        attr: str,
-        ax: Optional[Axes] = None,
-        title: Optional[str] = None,
-        out_path: Optional[Union[str, Path]] = None,
-        add_counts: bool = True,
-    ) -> Axes:
-        if ax is None:
-            _, axs = fig_setup()
-            ax = axs[0]
-        values = [getattr(sp, attr) for sp in spectra]
-        _ = sns.histplot(values, ax=ax)
-        if add_counts:
-            add_counts_to_histogram_boxes(ax=ax)
-        set_title_axes_labels(ax=ax, title=title, xlabel=attr, ylabel="Count")
-        finalize(ax)
-        if out_path is not None:
-            save_fig(out_path)
-        return ax
-
-    @staticmethod
     def plot_spectra_info(
         spectra: List["Spectrum"],
         attrs: List[str] = COMMON_SPECTRA_ATTRS,
@@ -256,9 +253,18 @@ class Spectrum(BaseModel):
     ) -> Tuple[Figure, List[Axes]]:
         fig, axs = fig_setup(nrows=len(attrs), ncols=1)
         for i, attr in enumerate(attrs):
-            Spectrum.plot_attr(
-                spectra=spectra, attr=attr, ax=axs[i], add_counts=add_counts
-            )
+            if attr == "precursor_intensity":
+                plot_histogram(
+                    objects=spectra,
+                    attr=attr,
+                    ax=axs[i],
+                    add_counts=add_counts,
+                    rug_plot=True,
+                )
+            else:
+                plot_histogram(
+                    objects=spectra, attr=attr, ax=axs[i], add_counts=add_counts
+                )
         finalize(axs)
         return fig, axs
 
@@ -269,6 +275,65 @@ class Spectrum(BaseModel):
             spectra = cls.parse_ms2_from_mzml(mzml=mzml)
             all_spectra.extend(spectra)
         return all_spectra
+
+    @staticmethod
+    def save_to_json(spectra: List["Spectrum"], path: Path):
+        save_pydantic_objects_to_json(
+            objects=spectra,
+            path=path,
+        )
+
+    @classmethod
+    def load_from_json(
+        cls, json: Union[str, Path], by_uid: bool = False
+    ) -> List["Spectrum"]:
+        data = load_json(path=json)
+        spectra = [cls(**d) for d in data]  # took 14s
+        if by_uid:
+            return organize_by_spectrum_uid(data=spectra)
+        else:
+            return spectra
+
+    def number_of_peaks_needed_to_capture_percent_of_total_intensity(
+        self, percent: float
+    ) -> int:
+        """
+        Get the number of peaks needed to capture the given percent of total intensity.
+        """
+        prop_of_tot_intensity = (
+            np.cumsum(sorted([peak.intensity for peak in self.peaks], reverse=True))
+            / self.total_intensity
+        )
+        num_peaks = np.searchsorted(prop_of_tot_intensity, percent, side="right") + 1
+        return num_peaks
+
+    @property
+    def gini(self) -> float:
+        return compute_gini_coefficient(values=[peak.intensity for peak in self.peaks])
+
+    def info(self, percent: float = 0.75) -> Dict:
+        return {
+            "uid": self.uid,
+            "mz": self.precursor_mz,
+            "z": self.precursor_charge,
+            "intensity": self.precursor_intensity,
+            "rt": self.retention_time,
+            "num_peaks": len(self.peaks),
+            "total_intensity": self.total_intensity,
+            "sample": self.sample,
+            "scan": self.scan,
+            "gini": self.gini,
+            f"num_peaks_to_capture{percent}": self.number_of_peaks_needed_to_capture_percent_of_total_intensity(
+                percent=percent
+            ),
+        }
+
+    @staticmethod
+    def create_spectra_df(spectra: List["Spectrum"]):
+        df = pd.DataFrame(
+            data=[spectrum.info() for spectrum in spectra],
+        )
+        return df
 
 
 def organize_by_spectrum_uid(data: List[Any]):
@@ -365,6 +430,17 @@ def plot_peaks(
         )
 
 
+def spectra_pairplot(spectra: List[Spectrum]):
+    spec_df = pd.DataFrame(
+        data=[
+            (sp.precursor_mz, sp.charge, sp.precursor_intensity, sp.retention_time)
+            for sp in spectra
+        ],
+        columns=["precursor_mz", "charge", "precursor_abundance", "retention_time"],
+    )
+    return sns.pairplot(data=spec_df, corner=True, plot_kws={"s": 7})
+
+
 def get_indices_of_largest_elements(array: List[float], top_n: int):
     if top_n >= len(array):
         return np.arange(0, len(array))
@@ -422,6 +498,187 @@ def load_spectra_from_path(path: Union[str, Path]) -> List[Spectrum]:
 
     else:
         raise RuntimeError(f"Path {path} is neither a file nor a directory.")
+
+
+def precursor_mz_plot(
+    spectra: List[Spectrum],
+    title: str,
+) -> Figure:
+    # Create data to plot
+    mz_to_spectra = defaultdict(list)
+    for spectrum in spectra:
+        mz_to_spectra[spectrum.precursor_mz].append(spectrum)
+    mz_to_spectra = dict(mz_to_spectra)
+    df = pd.DataFrame(
+        {
+            "precursor_mz": mz,
+            "num_spectra": len(spectra),
+        }
+        for mz, spectra in mz_to_spectra.items()
+    )
+
+    # Plot
+    fig, axs = fig_setup()
+    _ = sns.scatterplot(data=df, x="precursor_mz", y="num_spectra", ax=axs[0], s=7)
+    set_title_axes_labels(
+        ax=axs[0],
+        xlabel="precursor m/z",
+        ylabel="Number of spectra",
+    )
+    finalize(axs)
+    # fig = interactive_scatter_plot(
+    #     df=df, x_colm="precursor_mz", y_colm="num_spectra", title=title
+    # )
+    return fig
+
+
+def plot_spectra_histograms(spectra: List[Spectrum], add_cnts: bool = False):
+    df = create_spectra_df(spectra=spectra)
+    attrs = COMMON_SPECTRA_ATTRS + ["gini"]
+    fig, axs = fig_setup(nrows=len(attrs), ncols=1)
+    for i, attr in enumerate(attrs):
+        if attr == PRECURSOR_INTENSITY:
+            # Include rug plot for precursor_intensity
+            plot_histogram(
+                values=df[attr], ax=axs[i], rug_plot=True, add_counts=add_cnts
+            )
+        else:
+            plot_histogram(values=df[attr], ax=axs[i], add_counts=add_cnts)
+    finalize(axs)
+    return df, fig, axs
+
+
+def create_spectra_df(
+    spectra: List[Spectrum],
+):
+    rows = []
+    for spectrum in spectra:
+        data = {"uid": spectrum.uid}
+        for attr in COMMON_SPECTRA_ATTRS:
+            data[attr] = getattr(spectrum, attr)
+            data["gini"] = compute_gini_coefficient(
+                values=[peak.intensity for peak in spectrum.peaks]
+            )
+        rows.append(data)
+    df = pd.DataFrame(rows)
+    return df
+
+
+def create_spectra_plots(
+    spectra: List[Spectrum],
+    sample: str,
+    out_dir: Optional[Path] = None,
+    max_precursor_charge: int = DEFAULT_MAX_PRECURSOR_CHARGE,
+) -> pd.DataFrame:
+    spectrum_df = Spectrum.create_spectra_df(spectra=spectra)
+    if out_dir is not None:
+        spectrum_df.to_csv(out_dir / "spectra.csv", index=False)
+    charge_cnter = dict(
+        sorted(Counter(spectrum_df.z).items(), key=lambda item: item[1], reverse=True)
+    )
+    subset_spectrum_df = spectrum_df[spectrum_df.z <= max_precursor_charge]
+
+    fig_title = f"{sample} spectra w/z<={max_precursor_charge}\n Num spectra per charge counter:\n{charge_cnter}"
+
+    # Plot of peak intensity captured vs number of peaks
+    fig, axs = peak_intensity_captured_plot(
+        spectra=[
+            spectrum
+            for spectrum in spectra
+            if spectrum.precursor_charge <= max_precursor_charge
+        ]
+    )
+    if out_dir is not None:
+        save_fig(
+            path=out_dir / "spectra_peak_intensity_captured.png",
+            fig=fig,
+            title=fig_title,
+        )
+
+    # Pairplots
+    colms = [
+        "mz",
+        "z",
+        "intensity",
+        "rt",
+        "num_peaks",
+        "total_intensity",
+        "gini",
+        "num_peaks_to_capture0.75",
+    ]
+    g = sns.pairplot(data=subset_spectrum_df[colms], corner=True, plot_kws={"s": 7})
+    g.figure.suptitle(fig_title, fontsize=16, fontweight="bold")
+    if out_dir is not None:
+        save_fig(
+            path=out_dir / "spectra_pairplot.png",
+        )
+    g = sns.pairplot(
+        data=subset_spectrum_df[colms],
+        hue="z",
+        corner=True,
+        plot_kws={"s": 7},
+    )
+    g.figure.suptitle(fig_title, fontsize=16, fontweight="bold")
+    if out_dir is not None:
+        save_fig(
+            path=out_dir / "spectra_pairplot_by_charge.png",
+        )
+
+    # # Histograms
+    # df, fig, axs = plot_spectra_histograms(spectra=spectra)
+    # fig.suptitle(fig_title, fontsize=16, fontweight="bold")
+    # if out_dir is not None:
+    #     save_fig(
+    #         path=out_dir / "spectra_histograms.png",
+    #     )
+
+    # Number of spectra per precursor-m/z plot
+    fig = precursor_mz_plot(spectra=spectra, title=fig_title)
+    # fig.update_layout(title=fig_title)
+    if out_dir is not None:
+        save_fig(
+            path=out_dir / "num_spectra_per_mz.png",
+            title=fig_title,
+            fig=fig,
+        )
+        # fig.write_html(out_dir / "num_spectra_per_mz.html")
+
+    return spectrum_df
+
+
+def peak_intensity_captured_plot(spectra: List[Spectrum]):
+    fig, axs = fig_setup(ncols=2)
+    for spectrum in spectra:
+        prop_of_tot_intensity = (
+            np.cumsum(sorted([peak.intensity for peak in spectrum.peaks], reverse=True))
+            / spectrum.total_intensity
+        )
+        x = np.array(range(1, len(prop_of_tot_intensity) + 1))
+        _ = axs[0].plot(
+            x,
+            prop_of_tot_intensity,
+            # "k-"
+        )
+        x = np.array(range(1, len(prop_of_tot_intensity) + 1)) / len(
+            prop_of_tot_intensity
+        )
+        _ = axs[1].plot(
+            x,
+            prop_of_tot_intensity,
+            # "k-"
+        )
+    set_title_axes_labels(
+        ax=axs[0],
+        xlabel="Number of peaks",
+        ylabel="Proportion of total\nintensity captured",
+    )
+    set_title_axes_labels(
+        ax=axs[1],
+        xlabel="Proportion of peaks",
+        ylabel="Proportion of total\nintensity captured",
+    )
+    finalize(axs)
+    return fig, axs
 
 
 def create_sample_scan_to_spectrum_map(

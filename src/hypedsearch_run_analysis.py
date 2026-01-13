@@ -6,7 +6,18 @@ from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Literal, Optional, Set, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 from venv import logger
 
 import click
@@ -17,21 +28,22 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from pydantic import BaseModel, Field, model_validator
 from scipy.interpolate import PchipInterpolator
-from scipy.stats import ecdf
 from statsmodels.distributions.empirical_distribution import ECDF
 
-from src.comet_utils import CometPSM
+from src.comet_utils import CometPSM, get_comet_psm_to_spectrum_comparison_df
 from src.constants import (
     ASSIGN_CONFIDENCE,
     DATA_DIR,
     DECOY,
     DEFAULT_FPR,
+    DEFAULT_JCT_LEN,
     DEFAULT_MIN_SIDE_LEN,
     DEFAULT_PEAK_TO_ION_PPM_TOL,
     DEFAULT_Q_RANGE,
     DEFAULT_Q_VAL_THRESH,
     DEFAULT_SCORE_CHANGE_RANGE,
     HUMAN_PROTEOME,
+    HY_DECOY,
     HY_TARGET,
     HYBRID,
     NAT_DECOY,
@@ -44,7 +56,7 @@ from src.constants import (
     TRUE_HYBRIDS_PATH,
     XCORR,
 )
-from src.hybrids_via_clusters import HybridJunction, HybridPeptide, HybridPosition
+from src.hybrids_via_clusters import HybridPeptide, HybridPosition
 from src.hypedsearch import (
     HypedsearchRunConfig,
     SpectrumCometRunResults,
@@ -53,12 +65,13 @@ from src.hypedsearch import (
     get_seq_to_hybrids_map,
 )
 from src.kmer_database import KmerDatabase
-from src.mass_spectra import Mzml, Spectrum, organize_by_spectrum_uid
+from src.mass_spectra import Mzml, Spectrum, organize_by_spectrum_uid, spectra_pairplot
 from src.peptide_spectrum_comparison import PSM
 from src.peptides_and_ions import Fasta, ProteinRange
 from src.plot_utils import (
     fig_setup,
     finalize,
+    interactive_scatter_plot,
     plot_line,
     plot_sorted_1d_data,
     save_fig,
@@ -71,6 +84,7 @@ from src.utils import (
     decompress_and_depickle,
     flatten_list_of_lists,
     get_positions_of_subseq_in_seq,
+    log_time,
     pickle_and_compress,
     setup_logger,
     to_json,
@@ -87,9 +101,70 @@ NONXCORR_PSM_SCORES = [
 PSM_SCORES = NONXCORR_PSM_SCORES + ["xcorr"]
 
 
+def group_hybrid_psms_by_junction(
+    jct_len: int,
+    hybrid_psms: List[CometPSM],
+    seq_to_hybrids_map: Dict[str, List[HybridPeptide]],
+    protein_name_to_seq_map: Dict[str, str],
+) -> Dict[str, List[CometPSM]]:
+    jct_to_psms = defaultdict(list)
+    for psm in hybrid_psms:
+        for hybrid in seq_to_hybrids_map[psm.seq]:
+            for jct in hybrid.get_junctions(
+                protein_name_to_seq_map=protein_name_to_seq_map,
+                jct_len=jct_len,
+            ):
+                jct_to_psms[jct].append(psm)
+    return dict(jct_to_psms)
+
+
+def group_hybrid_psms_by_hybrid_str(
+    hybrid_psms: List[CometPSM],
+    seq_to_hybrids_map: Dict[str, List[HybridPeptide]],
+) -> Dict[str, List[CometPSM]]:
+    hybrid_to_psms = defaultdict(list)
+    for psm in hybrid_psms:
+        for hybrid in seq_to_hybrids_map[psm.seq]:
+            hybrid_to_psms[hybrid.to_str()].append(psm)
+    return dict(hybrid_to_psms)
+
+
+def get_top_psm_per_spectrum(
+    psms: List[CometPSM],
+) -> Dict[str, CometPSM]:
+    top_psms = organize_by_spectrum_uid([psm for psm in psms if psm.num == 1])
+    for spectrum_uid, psms in top_psms.items():
+        assert len(psms) == 1, f"More than one top hybrid PSM for {spectrum_uid}"
+        top_psms[spectrum_uid] = psms[0]
+    return top_psms
+
+
+@log_time()
+def remove_native_psms(
+    hybrid_psms: List[CometPSM],
+    fasta: Union[str, Path, Fasta],
+) -> List[CometPSM]:
+    if isinstance(fasta, (str, Path)):
+        fasta = Fasta(path=fasta)
+    psm_seqs = set([psm.seq for psm in hybrid_psms])
+    native_seqs = [seq for seq in psm_seqs if fasta.contains_seq(query_seq=seq)]
+    return [psm for psm in hybrid_psms if psm.seq not in native_seqs]
+
+
+@dataclass
+class SpectrumPSMs:
+    spectrum: Spectrum
+    native_target: Optional[Union[CometPSM, PSM]] = None
+    native_decoy: Optional[Union[CometPSM, PSM]] = None
+    hybrid_target: Optional[Union[CometPSM, PSM]] = None
+
+    def to_psm(self):
+        PSM.from
+
+
 @dataclass
 class HypedsearchOutputs:
-    hs_config: HypedsearchRunConfig
+    hs_config: Union[str, Path, HypedsearchRunConfig]
     min_side_len: int = DEFAULT_MIN_SIDE_LEN
     remove_carbamidomethylation: bool = True
     native_targets: Dict[str, List[CometPSM]] = field(init=False)
@@ -99,11 +174,12 @@ class HypedsearchOutputs:
     hybrid_decoys: Dict[str, List[CometPSM]] = field(init=False)
 
     def __post_init__(self):
-        self.native_targets = self._get_native_targets()
-        self.native_assign_conf = self._get_native_assign_conf()
-        self.native_decoys = self._get_native_decoys()
-        self.hybrid_targets = self._get_hybrid_targets()
-        self.hybrid_decoys = self._get_hybrid_decoys()
+        if isinstance(self.hs_config, (str, Path)):
+            self.hs_config = HypedsearchRunConfig.from_json(path=self.hs_config)
+
+    @property
+    def name(self) -> str:
+        return self.hs_config.name
 
     @cached_property
     def hybrid_seqs(self) -> Set[str]:
@@ -125,11 +201,7 @@ class HypedsearchOutputs:
 
     @cached_property
     def spectrum_uid_to_spectrum(self) -> Dict[str, Spectrum]:
-        spectrum_uid_to_spectrum = {}
-        for mzml in self.hs_config.mzml_to_scans.keys():
-            mzml = Mzml(mzml=mzml)
-            spectrum_uid_to_spectrum.update(mzml.id_to_spectrum)
-        return spectrum_uid_to_spectrum
+        return self.hs_config.spectrum_uid_to_spectrum
 
     @cached_property
     def all_spectrum_uids(self) -> List[str]:
@@ -138,18 +210,59 @@ class HypedsearchOutputs:
         )
 
     @property
-    def top_hybrid_targets(self):
-        top_hybrid_targets = organize_by_spectrum_uid(
-            [
-                psm
-                for psm in flatten_list_of_lists(self.hybrid_targets.values())
-                if psm.num == 1
-            ]
+    def top_native_targets(self) -> Dict[str, CometPSM]:
+        return get_top_psm_per_spectrum(
+            psms=flatten_list_of_lists(self.native_targets.values())
         )
-        for spectrum_uid, psms in top_hybrid_targets.items():
-            assert len(psms) == 1, f"More than one top hybrid PSM for {spectrum_uid}"
-            top_hybrid_targets[spectrum_uid] = psms[0]
-        return top_hybrid_targets
+
+    @property
+    def top_hybrid_targets(self) -> Dict[str, CometPSM]:
+        return get_top_psm_per_spectrum(
+            psms=flatten_list_of_lists(self.hybrid_targets.values())
+        )
+
+    @property
+    def top_native_decoys(self) -> Dict[str, CometPSM]:
+        return get_top_psm_per_spectrum(
+            psms=flatten_list_of_lists(self.native_decoys.values())
+        )
+
+    @cached_property
+    def protein_name_to_seq_map(self) -> Dict[str, str]:
+        fasta = Fasta(path=self.hs_config.fasta_path)
+        return fasta.protein_name_to_seq_map
+
+    def collect_outputs(self):
+        self.native_targets = self._get_native_targets()
+        self.native_assign_conf = self._get_native_assign_conf()
+        self.native_decoys = self._get_native_decoys()
+        self.hybrid_targets = self._get_hybrid_targets()
+        self.hybrid_decoys = self._get_hybrid_decoys()
+        logger.info("Loading spectra so they're quickly available...")
+        _ = self.spectrum_uid_to_spectrum  # force loading spectra
+
+    def get_spectrum_psms(self, spectrum_uid: str):
+        if len(self.native_targets.get(spectrum_uid, [])) > 0:
+            nat_target = [
+                psm for psm in self.native_targets[spectrum_uid] if psm.num == 1
+            ][0]
+        else:
+            nat_target = None
+        if len(self.hybrid_targets.get(spectrum_uid, [])) > 0:
+            hy_target = [
+                psm for psm in self.hybrid_targets[spectrum_uid] if psm.num == 1
+            ][0]
+            hybrids = self.seq_to_hybrids_map[hy_target.seq]
+        else:
+            hy_target = None
+            hybrids = None
+        data = {
+            "spectrum": self.spectrum_uid_to_spectrum[spectrum_uid],
+            NAT_TARGET: nat_target,
+            HY_TARGET: hy_target,
+            "hybrids": hybrids,
+        }
+        return data
 
     def get_native_beating_low_q_value_hybrids(
         self, q_value_threshold: float
@@ -165,12 +278,14 @@ class HypedsearchOutputs:
         return psms
 
     def _get_native_targets(self) -> Dict[str, List[CometPSM]]:
+        logger.info("Getting native target PSMs...")
         return CometPSM.from_txts(
             txts=self.hs_config.get_output_txts(run_type=NATIVE, psm_type=TARGET),
             by_spectrum=True,
         )
 
     def _get_native_assign_conf(self) -> Dict[str, List[CometPSM]]:
+        logger.info("Getting native assign confidence PSMs...")
         spectrum_to_psm = CometPSM.from_txts(
             txts=self.hs_config.get_output_txts(
                 run_type=NATIVE, psm_type=ASSIGN_CONFIDENCE
@@ -183,12 +298,14 @@ class HypedsearchOutputs:
         return spectrum_to_psm
 
     def _get_native_decoys(self) -> Dict[str, List[CometPSM]]:
+        logger.info("Getting native decoy PSMs...")
         return CometPSM.from_txts(
             txts=self.hs_config.get_output_txts(run_type=NATIVE, psm_type=DECOY),
             by_spectrum=True,
         )
 
     def _get_hybrid_targets(self) -> Dict[str, List[CometPSM]]:
+        logger.info("Getting hybrid target PSMs...")
         psms = [
             psm
             for psm in CometPSM.from_txts(
@@ -197,6 +314,15 @@ class HypedsearchOutputs:
             )
             if psm.is_hybrid
         ]
+        # Remove natives mistakenly labeled as hybrids. This can happen if the peptide
+        # length is longer than the longest kmer in the kmer database.
+        # Sadly, this takes a while: ~1.75 minutes for ~16,000 sequences
+        logger.info("Removing native PSMs from hybrid PSMs...")
+        psms = remove_native_psms(
+            hybrid_psms=psms,
+            fasta=self.hs_config.fasta_path,
+        )
+
         seq_to_hybrids = get_seq_to_hybrids_map(
             seqs=set(psm.seq for psm in psms),
             db_path=self.hs_config.kmer_db_path,
@@ -212,26 +338,14 @@ class HypedsearchOutputs:
             by_spectrum=True,
         )
 
-    def get_native_results_for_spectrum(
-        self, spectrum_uid: str
-    ) -> SpectrumCometRunResults:
-        return SpectrumCometRunResults(
-            targets=self.native_targets.get(spectrum_uid, []),
-            decoys=self.native_decoys.get(spectrum_uid, []),
-            assign_conf=self.native_assign_conf.get(spectrum_uid, [None])[0],
+    def set_q_values(self):
+        logger.info(
+            "Setting interpolated q-values for hybrid targets and native targets..."
         )
-
-    def get_hybrid_results_for_spectrum(
-        self, spectrum_uid: str
-    ) -> SpectrumCometRunResults:
-        return SpectrumCometRunResults(
-            targets=self._get_hybrid_targets.get(spectrum_uid, []),
-            decoys=self._get_hybrid_decoys.get(spectrum_uid, []),
-            assign_conf=None,
-        )
-
-    def set_hybrid_target_q_values(self):
         for psms in self.hybrid_targets.values():
+            for psm in psms:
+                psm.q_value = float(self.q_value_interpolator(psm.xcorr))
+        for psms in self.native_targets.values():
             for psm in psms:
                 psm.q_value = float(self.q_value_interpolator(psm.xcorr))
 
@@ -284,10 +398,8 @@ class HypedsearchOutputs:
 
     def get_psm_results(
         self, peak_to_ion_ppm_tol: int = DEFAULT_PEAK_TO_ION_PPM_TOL
-    ) -> List[Dict]:
+    ) -> List[Dict[str, PSM]]:
         """
-
-
         For ~15,000 spectra, this took ~5m to run locally in a Jupyter notebook
         """
         results = []
@@ -315,6 +427,25 @@ class HypedsearchOutputs:
                 data["type"] = NAT_DECOY
                 results.append(data)
         return results
+
+    def create_xcorr_plot(self, q_threshold: Optional[float] = None):
+        fig, axs = fig_setup()
+        score_histogram(
+            psms_by_type={
+                NAT_TARGET: list(self.top_native_targets.values()),
+                NAT_DECOY: list(self.top_native_decoys.values()),
+                HY_TARGET: list(self.top_hybrid_targets.values()),
+            },
+            score="xcorr",
+            ax=axs[0],
+        )
+        add_qvalue_interpolator_to_xcorr_plot(
+            native_psms=list(self.native_assign_conf.values()),
+            ax=axs[0],
+            q_threshold=q_threshold,
+        )
+        set_title_axes_labels(ax=axs[0], xlabel="xcorr", ylabel="Density")
+        finalize(axs)
 
 
 @dataclass
@@ -547,6 +678,41 @@ def get_native_pileup(psms: List[CometPSM], fasta: Path):
             fasta=fasta,
         )
     )
+
+
+def plot_num_hybrid_explanations_per_psm(
+    psms: List[CometPSM],
+    seq_to_hybrids_map: Dict[str, List[HybridPeptide]],
+    title: Optional[str] = None,
+):
+    df = pd.DataFrame(
+        [
+            [len(psm.seq), len(seq_to_hybrids_map[psm.seq]), psm.spectrum_uid]
+            for psm in psms
+        ],
+        columns=["seq_len", "num_hybrid_explanations", "spectrum_uid"],
+    )
+    fig, axs = fig_setup(ncols=2)
+    ax = axs[0]
+    _ = sns.scatterplot(x=df.seq_len, y=df.num_hybrid_explanations, ax=ax, s=7)
+    set_title_axes_labels(
+        ax=ax,
+        xlabel="PSM sequence length",
+        ylabel="Number of possible\nhybrid explanations per PSM",
+    )
+    ax = axs[1]
+    _ = sns.histplot(
+        data=df.num_hybrid_explanations,
+    )
+    set_title_axes_labels(
+        ax=ax,
+        xlabel="Number of possible\nhybrid explanations per PSM",
+        ylabel="Count",
+    )
+    if title is not None:
+        fig.suptitle(title)
+    finalize(axs)
+    return df
 
 
 def plot_psm_pileup(
@@ -804,383 +970,6 @@ class NeoFusionRunner:
         ]
         return best_iteration, accepted_hybrids
 
-
-@dataclass
-class AcceptedHybridPSMs:
-    accepted_psms: List[SpectrumPSMs]
-
-    @property
-    def seq_to_accepted_psms(self) -> Dict[str, List[SpectrumPSMs]]:
-        seq_to_psms = defaultdict(list)
-        for psm in self.accepted_psms:
-            seq_to_psms[psm.hybrid_seq].append(psm)
-        return dict(seq_to_psms)
-
-    @property
-    def summary_dict(self):
-        return {
-            "num_accepted_hybrid_psms": len(self.accepted_psms),
-            "num_accepted_unique_hybrid_seqs": len(self.seq_to_accepted_psms),
-            "accepted_hybrid_psms": [psm.spectrum_uid for psm in self.accepted_psms],
-        }
-
-
-@dataclass
-class TrueHybridSpectrumPSMsComparison:
-    true_hybrid_seqs: Set[str]
-    supported_true_seqs: List[Dict]
-
-    @property
-    def num_spectra_supporting_true_hybrids(self) -> int:
-        return sum(
-            seq_data["num_supporting_hybrid_psms"]
-            for seq_data in self.supported_true_seqs
-        )
-
-    @classmethod
-    def from_accepted_psms(
-        cls, accepted_psms: AcceptedHybridPSMs, true_hybrid_seqs: Set[str]
-    ) -> Dict:
-        supported_true_seqs = []
-        for seq in set(accepted_psms.seq_to_accepted_psms.keys()).intersection(
-            true_hybrid_seqs
-        ):
-            seq_psms = accepted_psms.seq_to_accepted_psms[seq]
-            data = {
-                "seq": seq,
-                "num_supporting_hybrid_psms": len(seq_psms),
-                "spectra_uids": [psm.spectrum_uid for psm in seq_psms],
-            }
-            supported_true_seqs.append(data)
-        return cls(
-            true_hybrid_seqs=true_hybrid_seqs,
-            supported_true_seqs=supported_true_seqs,
-        )
-
-    @property
-    def summary_dict(self):
-        return {
-            "num_true_hybrid_seqs": len(self.true_hybrid_seqs),
-            "num_supported_true_hybrid_seqs": len(self.supported_true_seqs),
-            "num_spectra_supporting_true_hybrids": self.num_spectra_supporting_true_hybrids,
-            "supported_true_hybrid_seqs": self.supported_true_seqs,
-        }
-
-
-@dataclass
-class PositionedHybrid:
-    pos: HybridPosition
-    hybrid: HybridPeptide
-    spectrum_uid: str
-
-    @property
-    def junction(self):
-        return HybridJunction.from_hybrid_position(pos=self.pos)
-
-    @property
-    def seq(self):
-        return self.hybrid.seq
-
-    @property
-    def hyphen_seq(self):
-        return self.hybrid.hyphen_seq
-
-    def to_dict(self):
-        return {
-            "spectrum_uid": self.spectrum_uid,
-            "hybrid_seq": self.seq,
-            "hybrid_hyphen_seq": self.hyphen_seq,
-            "position": asdict(self.pos),
-        }
-
-
-def get_junction_matching_hybrid(
-    spectrum_uid: str,
-    spectrum_psms: SpectrumPSMs,
-    target_junction: str,
-    protein_name_to_seq_map: Dict[str, str],
-):
-    found_hybrid = None
-    for hy in spectrum_psms.hybrids:
-        if found_hybrid is not None:
-            break
-        for pos in get_positions_of_hybrid(
-            hybrid=hy,
-            protein_name_to_seq_map=protein_name_to_seq_map,
-        ):
-            if str(HybridJunction.from_hybrid_position(pos=pos)) == target_junction:
-                found_hybrid = PositionedHybrid(
-                    pos=pos, hybrid=hy, spectrum_uid=spectrum_uid
-                )
-                break
-    return found_hybrid
-
-
-@dataclass
-class Experiment:
-    name: str
-    results_dir: Path
-    hs_config: Path
-    psms_path: Path
-
-    def __post_init__(self):
-        assert self.hs_config.exists(), f"HS config does not exist at {self.hs_config}"
-        assert self.psms_path.exists(), f"PSMs path does not exist at {self.psms_path}"
-        self.results_dir.mkdir(parents=True, exist_ok=True)
-
-    @cached_property
-    def psms(self):
-        return SpectrumPSMs.load(path=self.psms_path)
-
-    @property
-    def _hs_config(self):
-        return HypedsearchRunConfig.from_json(path=self.hs_config)
-
-    @property
-    def native_assign_confidence_txt(self) -> Path:
-        return self._hs_config.native_assign_confidence_path
-
-    @property
-    def fasta_path(self) -> Path:
-        return self._hs_config.hybrid_former.fasta
-
-    def get_pileups(
-        self,
-        accepted_hybrid_psms: List[SpectrumPSMs],
-        q_thresh: float = DEFAULT_Q_VAL_THRESH,
-    ) -> Tuple[Dict, Dict, Dict]:
-        left_pileup, right_pileup = get_hybrid_psm_pileups(
-            psms=accepted_hybrid_psms, fasta=self.fasta_path
-        )
-        native_psms = [
-            psm
-            for psm in CometPSM.from_txt(txt=self.native_assign_confidence_txt)
-            if psm.q_value <= q_thresh
-        ]
-        native_pileup = get_native_pileup(psms=native_psms, fasta=self.fasta_path)
-        return left_pileup, right_pileup, native_pileup
-
-    def xcorr_plot(self) -> Axes:
-        _, axs = fig_setup(w=8)
-        ax = axs[0]
-        _ = xcorr_plot(psms=self.psms, ax=ax)
-        # Add true-hybrid-containing hPSMs rugplot
-        true_hybrid_containing_psms = compare_psms_to_true_hybrids(
-            psms=self.psms, results_dir=self.results_dir
-        )
-        ymin, ymax = ax.get_ylim()
-        rug_height = 0.1 * (ymax - ymin)  # small line height
-        lw = 0.2
-        data = [psm.hybrid_xcorr for psm in true_hybrid_containing_psms]
-        _ = ax.vlines(
-            data[0],
-            ymax,
-            ymax + rug_height,
-            color="black",
-            linewidth=lw,
-            label=f"true-hybrid-containing hPSMs (n={len(data)})",
-        )
-        for datum in data[1:]:
-            _ = ax.vlines(datum, ymax - rug_height, ymax, color="black", linewidth=lw)
-        _ = ax.legend(loc="center left", bbox_to_anchor=(1.1, 0.9), frameon=False)
-        _ = ax.set_ylim(0, ymax)
-        _ = ax.set_title(self.name)
-        return ax
-
-    def nonxcorr_score_plots(self) -> List[Axes]:
-        _, axs = fig_setup(nrows=len(NONXCORR_PSM_SCORES))
-        for idx, score in enumerate(NONXCORR_PSM_SCORES):
-            logger.info(f"Plotting score: {score}")
-            ax = score_plot(psms=self.psms, score=score, ax=axs[idx])
-            _ = ax.set_title(self.name)
-        finalize(axs)
-        return axs
-
-    def process_experiment(
-        self,
-        acceptance_method: str = Literal[NEOFUSION, Q_VAL],
-        q_thresh: float = DEFAULT_Q_VAL_THRESH,
-    ):
-        # Score plots
-        ax = self.xcorr_plot()
-        save_fig(self.xcorr_plot_path)
-        _ = self.nonxcorr_score_plots()
-        save_fig(self.nonxcorr_score_plot_path)
-
-        # Protein abundance
-        prot_ab = ProteinAbundance.from_comet_psms(
-            psms=CometPSM.from_txt(txt=self.native_assign_confidence_txt),
-            q_val_thresh=q_thresh,
-        )
-        ax = prot_ab.plot()
-        _ = ax.set_title(f"{self.name}\nq <= {q_thresh}")
-        save_fig(self.prot_ab_plot_path)
-
-        # Accept hybrids
-        acceptance_method_to_fcn = {
-            NEOFUSION: lambda psms: accept_hybrid_psms_via_neo_fusion(psms=psms),
-            Q_VAL: lambda psms: accept_hybrid_psms_via_interpolated_q_value(
-                psms=psms, q_val_threshold=q_thresh
-            ),
-        }
-        acceptance_fcn = acceptance_method_to_fcn[acceptance_method]
-        accepted_hybrid_psms = acceptance_fcn(psms=self.psms)
-
-        # PSM pileups
-        left_hybrid_pileup, right_hybrid_pileup, native_pileup = self.get_pileups(
-            accepted_hybrid_psms=accepted_hybrid_psms, q_thresh=q_thresh
-        )
-        fig, axs = plot_psm_pileup(
-            left_hybrid_pileup=left_hybrid_pileup,
-            right_hybrid_pileup=right_hybrid_pileup,
-            fasta=self.fasta_path,
-            native_pileup=native_pileup,
-        )
-        save_fig(
-            self.psm_plot_path(acceptance_method=acceptance_method),
-        )
-        psm_df = create_psm_pileup_evidene_df(
-            psms=self.psms,
-            left_hybrid_pileup=left_hybrid_pileup,
-            right_hybrid_pileup=right_hybrid_pileup,
-            native_pileup=native_pileup,
-            protein_name_to_seq_map=Fasta(path=self.fasta_path).protein_name_to_seq_map,
-        )
-        accepted_hy_psm_spectra = set(psm.spectrum_uid for psm in accepted_hybrid_psms)
-        psm_df["accepted"] = psm_df["spectrum_uid"].apply(
-            lambda uid: uid in accepted_hy_psm_spectra
-        )
-        psm_df["left_prot_ab"] = psm_df["left_prot"].apply(
-            lambda prot: prot_ab.get_ab(protein=prot)
-        )
-        psm_df["right_prot_ab"] = psm_df["right_prot"].apply(
-            lambda prot: prot_ab.get_ab(protein=prot)
-        )
-        psm_df.to_csv(
-            self.pileup_df_path(acceptance_method=acceptance_method),
-            index=False,
-        )
-
-        # Junction analysis
-        # Get true hybrid junctions
-        true_hybrid_jcts = get_true_hybrid_junctions(fasta=self.fasta_path)
-        true_hybrid_jct_strs = set(str(jct) for jct in true_hybrid_jcts)
-        jct_to_pos_hybrids = get_junction_to_positioned_hybrids_map(
-            accepted_hybrid_psms=accepted_hybrid_psms, fasta=self.fasta_path
-        )
-        df = self.create_junction_df(
-            jct_to_positioned_hybrids=jct_to_pos_hybrids,
-            true_hybrid_jct_strs=true_hybrid_jct_strs,
-        )
-        df.to_csv(
-            self.junction_df_path(acceptance_method=acceptance_method),
-            index=False,
-        )
-        ax = self.junction_plot(
-            df=df,
-            acceptance_method=acceptance_method,
-        )
-        save_fig(self.junction_plot_path(acceptance_method=acceptance_method))
-
-    def junction_df_path(self, acceptance_method: str) -> Path:
-        return self.results_dir / f"{acceptance_method}_hybrid_junctions.csv"
-
-    def load_junction_df(self, acceptance_method: str) -> pd.DataFrame:
-        return pd.read_csv(self.junction_df_path(acceptance_method=acceptance_method))
-
-    @staticmethod
-    def create_junction_df(
-        jct_to_positioned_hybrids: Dict[str, List[PositionedHybrid]],
-        true_hybrid_jct_strs: Set[str],
-    ):
-        df = []
-        for jct, hybrids in jct_to_positioned_hybrids.items():
-            spectra = [hy.spectrum_uid for hy in hybrids]
-            df.append(
-                [
-                    jct,
-                    len(hybrids),
-                    jct in true_hybrid_jct_strs,
-                    list(set([hy.hyphen_seq for hy in hybrids])),
-                    spectra,
-                    len(spectra),
-                ]
-            )
-        df = pd.DataFrame(
-            df,
-            columns=[
-                "junction",
-                "support_count",
-                "true_jct",
-                "hybrid_seqs",
-                "spectra",
-                "num_spectra",
-            ],
-        )
-        df.sort_values(by="support_count", ascending=False, inplace=True)
-        return df
-
-    def junction_plot(
-        self,
-        df: pd.DataFrame,
-        acceptance_method: str,
-    ) -> Axes:
-        # Create dataframe
-        _, axs = fig_setup()
-        ax = axs[0]
-        _ = sns.histplot(
-            data=df,
-            x="support_count",
-            kde=True,
-            ax=ax,
-        )
-        _ = sns.rugplot(
-            df[df.true_jct].support_count,
-            ax=ax,
-            height=0.05,
-            color="red",
-            label="Found true hybrid junctions",
-        )
-
-        finalize(ax)
-        set_title_axes_labels(
-            ax=ax,
-            xlabel="Hybrid junctions",
-            ylabel="Number accepted hybrids\nsupporting junction",
-            title=self.plot_title(acceptance_method=acceptance_method),
-        )
-        return ax
-
-    def plot_title(self, acceptance_method: str) -> Path:
-        return f"{self.name}\nAccept={acceptance_method}"
-
-    def pileup_df_path(self, acceptance_method: str) -> Path:
-        return (
-            self.results_dir
-            / f"{acceptance_method}_accepted_hybrids_pileup_evidence.csv"
-        )
-
-    def psm_plot_path(self, acceptance_method: str) -> Path:
-        return self.results_dir / f"{acceptance_method}_accepted_hybrids_psm_plot.png"
-
-    @property
-    def prot_ab_plot_path(self):
-        return self.results_dir / "protein_abundance.png"
-
-    @property
-    def nonxcorr_score_plot_path(self):
-        return self.results_dir / "non_xcorr_score_plots.png"
-
-    @property
-    def xcorr_plot_path(self):
-        return self.results_dir / "xcorr_plot.png"
-
-    def junction_plot_path(self, acceptance_method: str):
-        return (
-            self.results_dir / f"{acceptance_method}_hybrid_junction_support_plot.png"
-        )
-
-
 def psm_score_plots(
     df: pd.DataFrame, title: str, ppm_tol: Optional[float] = None
 ) -> Tuple[Figure, List[Axes]]:
@@ -1250,6 +1039,7 @@ def get_true_hybrid_containing_psms(
 def add_qvalue_interpolator_to_xcorr_plot(
     native_psms: Union[List[CometPSM], pd.DataFrame],
     ax: Axes,
+    q_threshold: Optional[float] = None,
 ):
     native_q_interpolator = fit_xcorr_to_qval_interpolator(
         psms=native_psms,
@@ -1258,43 +1048,25 @@ def add_qvalue_interpolator_to_xcorr_plot(
     xmin, xmax = ax.get_xlim()
     x_new = np.linspace(xmin, xmax, 500)
     _ = ax_copy.plot(x_new, native_q_interpolator(x_new), "r--", label="Native q-value")
+    if q_threshold is not None:
+        _ = ax_copy.axhline(
+            y=q_threshold, color="red", linestyle="--", label=f"q={q_threshold}"
+        )
     ax_copy.set_yscale("log")  # set y-axis to log10 scale
     ax_copy.set_ylabel("Native log10(q-value)", color="tab:red")
     ax_copy.tick_params(axis="y", labelcolor="tab:red")
 
 
-def xcorr_plot(xcorr_by_type: Dict[str, List[float]], ax: Axes) -> Axes:
-    # _, axs = fig_setup()
-    # ax = axs[0]
-
-    # Hybrid targets
-    _ = score_histogram(psms_by_type=xcorr_by_type, score="xcorr", ax=ax)
-
-    # Add q-value
-    if NAT_TARGET in xcorr_by_type:
-        native_q_interpolator = fit_xcorr_to_qval_interpolator(
-            psms=xcorr_by_type[NAT_TARGET]
+def xcorr_plot(psms_by_type: Dict[str, List[CometPSM]], ax: Axes) -> Axes:
+    _ = score_histogram(psms_by_type=psms_by_type, score=XCORR, ax=ax)
+    if NAT_TARGET in psms_by_type:
+        add_qvalue_interpolator_to_xcorr_plot(
+            native_psms=psms_by_type[NAT_TARGET],
+            ax=ax,
         )
-        ax_copy = ax.twinx()
-        xmin, xmax = ax.get_xlim()
-        x_new = np.linspace(xmin, xmax, 500)
-        _ = ax_copy.plot(
-            x_new, native_q_interpolator(x_new), "r--", label="Native q-value"
-        )
-        ax_copy.set_yscale("log")  # set y-axis to log10 scale
-        ax_copy.set_ylabel("Native log10(q-value)", color="tab:red")
-        ax_copy.tick_params(axis="y", labelcolor="tab:red")
     set_title_axes_labels(ax=ax, xlabel="xcorr", ylabel="Density")
     finalize(ax)
     return ax
-
-
-def accept_hybrids_that_beat_natives(psms: List[SpectrumPSMs]) -> List[SpectrumPSMs]:
-    accepted_psms = SpectrumPSMs.get_winners_by_xcorr(psms=psms, psm_type=HYBRID)
-    logger.info(
-        f"Number of accepted hybrid PSMs that beat natives by XCorr: {len(accepted_psms)}"
-    )
-    return accepted_psms
 
 
 def accept_hybrid_psms_via_neo_fusion(
@@ -1312,48 +1084,196 @@ def accept_hybrid_psms_via_neo_fusion(
     return accepted_psms
 
 
-def hybrid_support_plot(df: pd.DataFrame, title: str) -> Axes:
-    assert "support" in df.columns
-    assert "true" in df.columns
-    fig, axs = fig_setup(w=8)
-    ax = axs[0]
-    s = 7
-    tmp = df[~df.true]
-    _ = sns.scatterplot(
-        x=tmp.index.to_list(),
-        y=tmp.support.to_list(),
-        color="blue",
-        s=s,
-        ax=ax,
+def junction_support_plot(
+    ax: Axes, df: pd.DataFrame, x_colm: str, y_colm: str, label_trues: bool = True
+):
+    if label_trues and "true" in df.columns:
+        tmp = df[~df.true]
+        _ = sns.scatterplot(
+            data=tmp,
+            x=x_colm,
+            y=y_colm,
+            color="blue",
+            s=7,
+            ax=ax,
+        )
+        tmp = df[df.true]
+        _ = sns.scatterplot(
+            x=tmp[x_colm].to_list(),
+            y=tmp[y_colm].to_list(),
+            color="red",
+            marker="X",
+            s=14,
+            label="'Trues'",
+            ax=ax,
+        )
+    else:
+        sns.scatterplot(
+            x=df[x_colm],
+            y=df[y_colm],
+            color="blue",
+            s=7,
+            ax=ax,
+        )
+    if y_colm == "min_q_value":
+        ax.set_yscale("log")  # set y-axis to log10 scale
+        set_title_axes_labels(ax=ax, xlabel=x_colm, ylabel=f"log10({y_colm})")
+    else:
+        set_title_axes_labels(
+            ax=ax,
+            xlabel=x_colm,
+            ylabel=y_colm,
+        )
+
+
+def mean_precursor_abundance(
+    psms: List[CometPSM], spectrum_uid_to_spectrum: Dict[str, Spectrum]
+):
+    abundances = []
+    for psm in psms:
+        spectrum = spectrum_uid_to_spectrum[psm.spectrum_uid]
+        abundances.append(spectrum.precursor_intensity)
+    return np.mean(abundances)
+
+
+def max_precursor_abundance(
+    psms: List[CometPSM], spectrum_uid_to_spectrum: Dict[str, Spectrum]
+):
+    abundances = []
+    for psm in psms:
+        spectrum = spectrum_uid_to_spectrum[psm.spectrum_uid]
+        abundances.append(spectrum.precursor_intensity)
+    return max(abundances)
+
+
+def get_junction_positions(jct_str: str, protein_name_to_seq_map: Dict[str, str]):
+    hy = HybridPeptide.parse_hybrid_peptide_str(hybrid_str=jct_str)
+    return hy.get_positions(protein_name_to_seq_map=protein_name_to_seq_map)
+
+
+def get_junction_df(
+    hybrid_psms: List[CometPSM],
+    protein_name_to_seq_map: Dict[str, str],
+    min_aa_jct_len: int,
+    seq_to_hybrids_map: Dict[str, List[HybridPeptide]],
+    spectrum_uid_to_spectrum_map: Dict[str, Spectrum],
+):
+    jct_to_psms = group_hybrid_psms_by_junction(
+        hybrid_psms=hybrid_psms,
+        protein_name_to_seq_map=protein_name_to_seq_map,
+        jct_len=min_aa_jct_len,
+        seq_to_hybrids_map=seq_to_hybrids_map,
     )
-    tmp = df[df.true]
-    _ = sns.scatterplot(
-        x=tmp.index.to_list(),
-        y=tmp.support.to_list(),
-        color="red",
-        marker="X",
-        s=2 * s,
-        label="'True' hybrids",
-        ax=ax,
+    rows = []
+    for jct, psms in jct_to_psms.items():
+        rows.append(
+            (
+                jct,
+                len(psms),
+                list(set(psm.spectrum_uid for psm in psms)),
+                mean_precursor_abundance(
+                    psms=psms, spectrum_uid_to_spectrum=spectrum_uid_to_spectrum_map
+                ),
+                max_precursor_abundance(
+                    psms=psms, spectrum_uid_to_spectrum=spectrum_uid_to_spectrum_map
+                ),
+                np.mean([psm.xcorr for psm in psms]),
+                max([psm.xcorr for psm in psms]),
+                min([psm.q_value for psm in psms]),
+            )
+        )
+    df = pd.DataFrame(
+        rows,
+        columns=[
+            "jct",
+            "num_psm_supporting",
+            "spectra_supporting",
+            "mean_precursor_abundance",
+            "max_precursor_abundance",
+            "mean_xcorr",
+            "max_xcorr",
+            "min_q_value",
+        ],
     )
-    set_title_axes_labels(
-        ax=ax,
-        title=title,
-        xlabel="Accepted hybrids (sorted by support)",
-        ylabel="Num spectra supporting hybrid",
+    df["num_spectra_supporting"] = df.spectra_supporting.apply(len)
+    return df
+    # if true_hybrids is not None:
+    #     true_jcts = list(
+    #         set(
+    #             flatten_list_of_lists(
+    #                 true.get_junctions(
+    #                     protein_name_to_seq_map=protein_name_to_seq_map,
+    #                     min_aa_side_len=min_aa_jct_len,
+    #                 )
+    #                 for true in true_hybrids
+    #             )
+    #         )
+    #     )
+
+
+def junction_plots(
+    df: pd.DataFrame,
+):
+    fig, axs = fig_setup(nrows=2, ncols=3)
+    x_colm = "num_spectra_supporting"
+    for idx, y_colm in enumerate(
+        [
+            "max_precursor_abundance",
+            "mean_precursor_abundance",
+            "mean_xcorr",
+            "max_xcorr",
+            "min_q_value",
+        ]
+    ):
+        junction_support_plot(
+            ax=axs[idx],
+            df=df,
+            x_colm=x_colm,
+            y_colm=y_colm,
+        )
+    # if true_jcts is not None:
+    #     found_trues_str = "\n".join(set(df[df.true].jct))
+    #     _ = fig.text(
+    #         0.1,
+    #         -0.05,
+    #         f"Found trues:\n{found_trues_str}",
+    #         va="center",
+    #         ha="left",
+    #         bbox=dict(boxstyle="round", facecolor="white"),
+    #     )
+    finalize(axs=axs)
+    return fig, axs
+
+
+def create_junction_support_df(
+    hybrid_psms: List[CometPSM],
+    protein_name_to_seq_map: Dict[str, str],
+    min_aa_jct_len: int,
+    seq_to_hybrids_map: Dict[str, List[HybridPeptide]],
+    spectrum_uid_to_spectrum_map: Dict[str, Spectrum],
+    true_hybrids: Optional[List[TrueHybrid]] = None,
+) -> pd.DataFrame:
+    df = get_junction_df(
+        hybrid_psms=hybrid_psms,
+        protein_name_to_seq_map=protein_name_to_seq_map,
+        min_aa_jct_len=min_aa_jct_len,
+        seq_to_hybrids_map=seq_to_hybrids_map,
+        spectrum_uid_to_spectrum_map=spectrum_uid_to_spectrum_map,
     )
-    found_trues_str = "\n".join(set(df[df.true].seq))
-    ax.text(
-        1.02,
-        0.5,
-        f"Found trues:\n{found_trues_str}",
-        transform=ax.transAxes,
-        va="center",
-        ha="left",
-        bbox=dict(boxstyle="round", facecolor="white"),
-    )
-    finalize(axs)
-    return ax
+    if true_hybrids is not None:
+        true_jcts = list(
+            set(
+                flatten_list_of_lists(
+                    true.get_junctions(
+                        protein_name_to_seq_map=protein_name_to_seq_map,
+                        jct_len=min_aa_jct_len,
+                    )
+                    for true in true_hybrids
+                )
+            )
+        )
+        df["true"] = df.jct.apply(lambda x: x in true_jcts)
+    return df
 
 
 def psm_score_histogram(ax, data, label):
@@ -1476,120 +1396,18 @@ def filter_to_top_n_highest_precursor_intensity_psms_per_mz(
     return filtered_psms
 
 
-def precursor_mz_plots(
-    psms: List[SpectrumPSMs],
-    sample: str,
-    # plot_dir: Path
-):
-    mz_to_psms = defaultdict(list)
-    for psm in psms:
-        mz_to_psms[psm.spectrum.precursor_mz].append(psm)
-    mz_to_psms = dict(mz_to_psms)
+@dataclass
+class HybridPSM:
+    psm: CometPSM
+    hybrids: List[HybridPeptide]
 
-    num_supporting_spectra = Counter(len(psms) for mz, psms in mz_to_psms.items())
-    _, axs = fig_setup(
-        # nrows=1, ncols=2,
-        w=10
-    )
-    ax = axs[0]
-    _ = plot_sorted_1d_data(
-        data=num_supporting_spectra,
-        ax=ax,
-        sort_idx=0,
-        pt_labels=num_supporting_spectra,
-        ax_labels=True,
-    )
-    set_title_axes_labels(
-        ax=ax,
-        xlabel="x = num supporting spectra",
-        ylabel="Number of m/z's with num\nsupporting spectra = x",
-        title=(
-            f"sample = {sample}\n" + f"Num unique m/z values = {len(mz_to_psms)}\n"
-            f"Num spectra = {sum(len(psms) for psms in mz_to_psms.values())}"
-        ),
-    )
-    finalize(axs)
-    # save_fig(
-    #     path=plot_dir / f"number_spectra_supporting_each_uniq_mz.png",
-    # )
+    @classmethod
+    def create(cls, psm: CometPSM, seq_to_hybrids_map: Dict[str, List[HybridPeptide]]):
+        hybrids = seq_to_hybrids_map[psm.seq]
+        return cls(psm=psm, hybrids=hybrids)
 
-    _, axs = fig_setup()
-    cdf = ECDF(list(num_supporting_spectra.values()))
-    ax = axs[0]
-    _ = ax.plot(
-        cdf.x,
-        1 - cdf.y,
-        "o-",
-        ms=2,
-    )
-    set_title_axes_labels(
-        ax=ax,
-        xlabel="x = num supporting spectra",
-        ylabel="Proportion of m/z's with\nnum supporting spectra >= x",
-        title=(
-            f"sample = {sample}\n" + f"Num unique m/z values = {len(mz_to_psms)}\n"
-            f"num spectra = {sum(len(psms) for psms in mz_to_psms.values())}"
-        ),
-    )
-    finalize(axs)
-
-
-def create_psm_pileup_evidene_df(
-    psms: List[SpectrumPSMs],
-    left_hybrid_pileup: Dict,
-    right_hybrid_pileup: Dict,
-    native_pileup: Dict,
-    protein_name_to_seq_map: Dict[str, str],
-):
-    df = []
-    for psm in psms:
-        if not psm.has_hybrid:
-            continue
-        for hy in psm.hybrids:
-            # A single hybrid A-B can appear in multiple places if either A or B appears in multiple places
-            hy_positions = get_positions_of_hybrid(
-                hybrid=hy,
-                protein_name_to_seq_map=protein_name_to_seq_map,
-            )
-            for hy_pos in hy_positions:
-                left_hybrid_support = get_support_in_pileup(
-                    pos=hy_pos.left, pileup=left_hybrid_pileup
-                )
-                right_hybrid_support = get_support_in_pileup(
-                    pos=hy_pos.right, pileup=right_hybrid_pileup
-                )
-                left_native_support = get_support_in_pileup(
-                    pos=hy_pos.left, pileup=native_pileup
-                )
-                right_native_support = get_support_in_pileup(
-                    pos=hy_pos.right, pileup=native_pileup
-                )
-                df.append(
-                    [
-                        psm.spectrum_uid,
-                        hy.hyphen_seq,
-                        hy_pos.left.protein,
-                        hy_pos.right.protein,
-                        np.mean(left_hybrid_support),
-                        np.mean(right_hybrid_support),
-                        np.mean(left_native_support),
-                        np.mean(right_native_support),
-                    ]
-                )
-    df = pd.DataFrame(
-        df,
-        columns=[
-            "spectrum_uid",
-            "hybrid_seq",
-            "left_prot",
-            "right_prot",
-            "left_hybrid_mean_support",
-            "right_hybrid_mean_support",
-            "left_native_mean_support",
-            "right_native_mean_support",
-        ],
-    )
-    return df
+    def get_junctions(self, jct_len: int = DEFAULT_JCT_LEN):
+        return [hy.get_junction_str(jct_len=jct_len) for hy in self.hybrids]
 
 
 def get_hybrids_for_hybrid_psms(
@@ -1602,135 +1420,44 @@ def get_hybrids_for_hybrid_psms(
     return hybrids
 
 
-def get_hybrid_psm_to_junctions_map(
-    hybrid_psms: List[CometPSM], protein_name_to_seq_map: Dict[str, str]
-) -> pd.DataFrame:
-    # Get support by junction point
-    hy_psm_uid_to_jcts = defaultdict(list)
-    for psm in hybrid_psms:
-        if not psm.has_hybrid:
-            continue
-        for hy in psm.hybrids:
-            # A single hybrid A-B can appear in multiple places if either A or B appears in multiple places
-            for pos in get_positions_of_hybrid(
-                hybrid=hy,
-                protein_name_to_seq_map=protein_name_to_seq_map,
-            ):
-                hy_psm_uid_to_jcts[psm.spectrum_uid].append(
-                    HybridJunction.from_hybrid_position(pos=pos)
-                )
-    return hy_psm_uid_to_jcts
+# def get_hybrid_psm_to_junctions_map(
+#     hybrid_psms: List[CometPSM], protein_name_to_seq_map: Dict[str, str]
+# ) -> pd.DataFrame:
+#     # Get support by junction point
+#     hy_psm_uid_to_jcts = defaultdict(list)
+#     for psm in hybrid_psms:
+#         if not psm.has_hybrid:
+#             continue
+#         for hy in psm.hybrids:
+#             # A single hybrid A-B can appear in multiple places if either A or B appears in multiple places
+#             for pos in get_positions_of_hybrid(
+#                 hybrid=hy,
+#                 protein_name_to_seq_map=protein_name_to_seq_map,
+#             ):
+#                 hy_psm_uid_to_jcts[psm.spectrum_uid].append(
+#                     HybridJunction.from_hybrid_position(pos=pos)
+#                 )
+#     return hy_psm_uid_to_jcts
 
 
-def get_hybrid_junctions(
-    hybrids: List[HybridPeptide],
-    protein_name_to_seq_map: Dict[str, str],
-) -> List[HybridJunction]:
-    jcts = flatten_list_of_lists(
-        hybrid.get_junctions(protein_name_to_seq_map=protein_name_to_seq_map)
-        for hybrid in hybrids
-    )
-    return jcts
+# def get_hybrid_junctions(
+#     hybrids: List[HybridPeptide],
+#     protein_name_to_seq_map: Dict[str, str],
+# ) -> List[HybridJunction]:
+#     jcts = flatten_list_of_lists(
+#         hybrid.get_junctions(protein_name_to_seq_map=protein_name_to_seq_map)
+#         for hybrid in hybrids
+#     )
+#     return jcts
 
 
-def get_true_hybrid_junctions(
-    protein_name_to_seq_map: Dict[str, str], true_hybrids: Path = TRUE_HYBRIDS_PATH
-) -> List[HybridJunction]:
-    true_hybrids = TrueHybrid.load(path=true_hybrids)
-    return get_hybrid_junctions(
-        hybrids=true_hybrids, protein_name_to_seq_map=protein_name_to_seq_map
-    )
-
-
-def hybrid_support_analysis(
-    hybrid_psms: List[CometPSM],
-    results_dir: Path,
-    sample_name: str,
-    seq_to_hybrids_map: Dict[str, List[HybridPeptide]],
-    true_seqs: Set[str],
-    acceptance_method: str,
-    protein_name_to_seq_map: Dict[str, str],
-):
-    prefix = f"{sample_name}_{acceptance_method}_hpsms"
-    CometPSM.save_psms(
-        psms=hybrid_psms,
-        path=results_dir / f"{prefix}_n{len(hybrid_psms)}.json",
-    )
-    df = get_hybrid_support_df(
-        hybrid_psms=hybrid_psms,
-        seq_to_hybrids_map=seq_to_hybrids_map,
-        protein_name_to_seq_map=protein_name_to_seq_map,
-    )
-    df["true"] = df.seq.apply(lambda seq: seq in true_seqs)
-    df.to_csv(
-        results_dir / f"{prefix}_support_df.csv",
-        index=False,
-    )
-    ax = hybrid_support_plot(df=df, title=f"{sample_name}\n{acceptance_method}")
-    save_fig(path=results_dir / f"{prefix}_support_plot.png")
-
-
-def get_hybrid_support_df(
-    hybrid_psms: List[CometPSM],
-    seq_to_hybrids_map: Dict[str, List[HybridPeptide]],
-    protein_name_to_seq_map: Dict[str, str],
-) -> pd.DataFrame:
-    hybrid_to_psms = defaultdict(list)
-    for psm in hybrid_psms:
-        hybrids = seq_to_hybrids_map[psm.seq]
-        for hybrid in hybrids:
-            hybrid_to_psms[
-                hybrid.to_str(protein_name_to_seq_map=protein_name_to_seq_map)
-            ].append(psm)
-
-    df = []
-    for hybrid, psms in hybrid_to_psms.items():
-        assert all(psm.seq == psms[0].seq for psm in psms)
-        data = {
-            "hybrid": hybrid,
-            "supporting_spectra": [psm.spectrum_uid for psm in psms],
-            "seq": psms[0].seq,
-        }
-        df.append(data)
-    df = pd.DataFrame(df)
-    df["support"] = df.supporting_spectra.apply(lambda x: len(x))
-    df.sort_values("support", ascending=False, inplace=True, ignore_index=True)
-    return df
-
-
-def get_junction_to_positioned_hybrids_map(
-    accepted_hybrid_psms: List[SpectrumPSMs], fasta: Path
-) -> Dict[str, List[PositionedHybrid]]:
-    spectrum_to_psms = {psm.spectrum_uid: psm for psm in accepted_hybrid_psms}
-    prot_name_to_seq = Fasta(path=fasta).protein_name_to_seq_map
-    accepted_hybrid_psms = accept_hybrid_psms_via_neo_fusion(psms=accepted_hybrid_psms)
-
-    scan_to_hybrid_jcts = get_hybrid_psm_to_junctions_map(
-        hybrid_psms=accepted_hybrid_psms, fasta=fasta
-    )
-    logger.info(
-        f"<number of possible hybrid junctions explaining scan> : <num scans>\n{dict(Counter(len(jcts) for jcts in scan_to_hybrid_jcts.values()))}"
-    )
-    # Get <junction> : <scans supporting junction>
-    jct_to_scans = defaultdict(list)
-    for scan, jcts in scan_to_hybrid_jcts.items():
-        for jct in jcts:
-            jct_to_scans[str(jct)].append(scan)
-
-    # Get <junction> : <positioned hybrid>
-    jct_to_positioned_hybrids = defaultdict(list)
-    for jct, spectrum_uids in jct_to_scans.items():
-        for spectrum_uid in spectrum_uids:
-            found_hybrid = get_junction_matching_hybrid(
-                spectrum_uid=spectrum_uid,
-                spectrum_psms=spectrum_to_psms[spectrum_uid],
-                protein_name_to_seq_map=prot_name_to_seq,
-                target_junction=jct,
-            )
-            assert found_hybrid is not None
-            jct_to_positioned_hybrids[jct].append(found_hybrid)
-
-    return jct_to_positioned_hybrids
+# def get_true_hybrid_junctions(
+#     protein_name_to_seq_map: Dict[str, str], true_hybrids: Path = TRUE_HYBRIDS_PATH
+# ) -> List[HybridJunction]:
+#     true_hybrids = TrueHybrid.load(path=true_hybrids)
+#     return get_hybrid_junctions(
+#         hybrids=true_hybrids, protein_name_to_seq_map=protein_name_to_seq_map
+#     )
 
 
 def extract_spectrum_command(
@@ -1753,6 +1480,277 @@ def extract_spectrum_command(
     mzml = Mzml(mzml=local_mzml_path)
     file_name = f"mzml{mzml.name}_seq{seq}_idx{spectrum_idx}_scan{spectrum_scan}.mgf"
     return f'wine msconvert {local_mzml_path} --filter "index {spectrum_idx}" --outfile {file_name} -o {out_dir} --mgf'
+
+
+def get_acceptance_identifier(
+    acceptance_method_name: str,
+    min_hybrid_side_len: int,
+    min_jct_len: int,
+) -> str:
+    return f"acceptanceMethod={acceptance_method_name}_minHySideLen={min_hybrid_side_len}_minJctLen{min_jct_len}"
+
+
+def get_accepted_hybrids_file_path(
+    hs_config: Union[HypedsearchRunConfig, Path, str],
+    acceptance_method_name: str,
+    min_hybrid_side_len: int,
+    min_jct_len: int,
+):
+    if isinstance(hs_config, (str, Path)):
+        hs_config = HypedsearchRunConfig.from_json(path=hs_config)
+    results_dir = get_results_dir(hs_config=hs_config)
+    method = get_acceptance_identifier(
+        acceptance_method_name=acceptance_method_name,
+        min_hybrid_side_len=min_hybrid_side_len,
+        min_jct_len=min_jct_len,
+    )
+    return results_dir / f"acceptedHybrids_{hs_config.name}_{method}.json"
+
+
+def load_accepted_hybrid_psms(
+    hs_config: Union[HypedsearchRunConfig, Path, str],
+    acceptance_method_name: str,
+    min_hybrid_side_len: int,
+    min_jct_len: int,
+) -> List[CometPSM]:
+    return CometPSM.load(
+        path=get_accepted_hybrids_file_path(
+            hs_config=hs_config,
+            acceptance_method_name=acceptance_method_name,
+            min_hybrid_side_len=min_hybrid_side_len,
+            min_jct_len=min_jct_len,
+        )
+    )
+
+
+def accept_all_hybrids(hs_out: HypedsearchOutputs) -> List[CometPSM]:
+    return list(hs_out.top_hybrid_targets.values())
+
+
+def accept_hybrids_that_beat_native(hs_out: HypedsearchOutputs) -> List[CometPSM]:
+    accepted_hybrid_psms = []
+    for spectrum_uid, hybrid_psm in hs_out.top_hybrid_targets.items():
+        native_psm = hs_out.native_assign_conf.get(spectrum_uid, None)
+        if native_psm is None:
+            accepted_hybrid_psms.append(hybrid_psm)
+            continue
+        if hybrid_psm.xcorr > native_psm.xcorr:
+            accepted_hybrid_psms.append(hybrid_psm)
+    return accepted_hybrid_psms
+
+
+def accept_hybrids_by_q_value(hs_out: HypedsearchOutputs, q_threshold: float):
+    accepted_hybrid_psms = accept_hybrids_that_beat_native(hs_out=hs_out)
+    accepted_hybrid_psms = [
+        psm for psm in accepted_hybrid_psms if psm.q_value <= q_threshold
+    ]
+    return accepted_hybrid_psms
+
+
+def get_jct_file_name(
+    hs_config: Union[HypedsearchRunConfig, Path, str],
+    acceptance_method_name: str,
+    min_hybrid_side_len: int,
+    min_jct_len: int,
+):
+    if isinstance(hs_config, (str, Path)):
+        hs_config = HypedsearchRunConfig.from_json(path=hs_config)
+    method = get_acceptance_identifier(
+        acceptance_method_name=acceptance_method_name,
+        min_hybrid_side_len=min_hybrid_side_len,
+        min_jct_len=min_jct_len,
+    )
+    return f"junctionSupport_name={hs_config.name}_{method}"
+
+
+def get_jct_df_path(
+    hs_config: Union[HypedsearchRunConfig, Path, str],
+    acceptance_method_name: str,
+    min_hybrid_side_len: int,
+    min_jct_len: int,
+):
+    results_dir = get_results_dir(hs_config=hs_config)
+    file_name = get_jct_file_name(
+        hs_config=hs_config,
+        acceptance_method_name=acceptance_method_name,
+        min_hybrid_side_len=min_hybrid_side_len,
+        min_jct_len=min_jct_len,
+    )
+    return results_dir / f"{file_name}.csv"
+
+
+def get_jct_plot_path(
+    hs_config: Union[HypedsearchRunConfig, Path, str],
+    acceptance_method_name: str,
+    min_hybrid_side_len: int,
+    min_jct_len: int,
+):
+    results_dir = get_results_dir(hs_config=hs_config)
+    file_name = get_jct_file_name(
+        hs_config=hs_config,
+        acceptance_method_name=acceptance_method_name,
+        min_hybrid_side_len=min_hybrid_side_len,
+        min_jct_len=min_jct_len,
+    )
+    return results_dir / f"{file_name}.png"
+
+
+def get_results_dir(
+    hs_config: Union[HypedsearchRunConfig, Path, str],
+):
+    if isinstance(hs_config, (str, Path)):
+        hs_config = HypedsearchRunConfig.from_json(path=hs_config)
+    return hs_config.parent_out_dir / "analysis"
+
+
+def get_jct_df(
+    hs_config: Union[HypedsearchRunConfig, Path, str],
+    acceptance_method_name: str,
+    min_hybrid_side_len: int,
+    min_jct_len: int,
+) -> pd.DataFrame:
+    jct_df_path = get_jct_df_path(
+        hs_config=hs_config,
+        acceptance_method_name=acceptance_method_name,
+        min_hybrid_side_len=min_hybrid_side_len,
+        min_jct_len=min_jct_len,
+    )
+    if not jct_df_path.exists():
+        raise FileNotFoundError(
+            f"Junction support dataframe not found at {jct_df_path}"
+        )
+    return pd.read_csv(jct_df_path)
+
+
+def process_hs_config_results(
+    hs_config: Union[HypedsearchRunConfig, Path, str],
+    min_hybrid_side_len: int,
+    min_jct_len: int,
+    remove_methylation: bool,
+    acceptance_method_name: str,
+    acceptance_method_fcn: Callable,
+    overwrite: bool = False,
+):
+    # Arrange
+    if isinstance(hs_config, (str, Path)):
+        hs_config = HypedsearchRunConfig.from_json(path=hs_config)
+
+    results_dir = get_results_dir(hs_config=hs_config)
+    results_dir.mkdir(exist_ok=True, parents=True)
+    jct_df_path = get_jct_df_path(
+        hs_config=hs_config,
+        acceptance_method_name=acceptance_method_name,
+        min_hybrid_side_len=min_hybrid_side_len,
+        min_jct_len=min_jct_len,
+    )
+    accepted_hybrids_path = get_accepted_hybrids_file_path(
+        hs_config=hs_config,
+        acceptance_method_name=acceptance_method_name,
+        min_hybrid_side_len=min_hybrid_side_len,
+        min_jct_len=min_jct_len,
+    )
+
+    logger.info("Loading Hypedsearch outputs...")
+    hs_out = HypedsearchOutputs(
+        hs_config=hs_config,
+        min_side_len=min_hybrid_side_len,
+        remove_carbamidomethylation=remove_methylation,
+    )
+    logger.info("Setting hybrid target Q-values...")
+    hs_out.set_q_values()
+
+    if (jct_df_path.exists()) and (not overwrite) and (accepted_hybrids_path.exists()):
+        logger.info(
+            f"Junction support dataframe already exists at {jct_df_path}, skipping analysis..."
+        )
+        df = pd.read_csv(jct_df_path)
+        accepted_hybrid_psms = CometPSM.load(path=accepted_hybrids_path)
+    else:
+        accepted_hybrid_psms = acceptance_method_fcn(hs_out)
+        logger.info("Saving accepted hybrid PSMs...")
+        CometPSM.save_to_json(
+            psms=accepted_hybrid_psms,
+            path=get_accepted_hybrids_file_path(
+                hs_config=hs_config,
+                acceptance_method_name=acceptance_method_name,
+                min_hybrid_side_len=min_hybrid_side_len,
+                min_jct_len=min_jct_len,
+            ),
+        )
+        logger.info("Creating junction support dataframe and plots...")
+        df = create_junction_support_df(
+            hybrid_psms=accepted_hybrid_psms,
+            protein_name_to_seq_map=Fasta(
+                path=hs_out.hs_config.fasta_path
+            ).protein_name_to_seq_map,
+            min_aa_jct_len=min_jct_len,
+            spectrum_uid_to_spectrum_map=hs_out.spectrum_uid_to_spectrum,
+            seq_to_hybrids_map=hs_out.seq_to_hybrids_map,
+            true_hybrids=TrueHybrid.load(),
+        )
+        df.to_csv(
+            jct_df_path,
+            index=False,
+        )
+
+    # Save found hybrids
+    logger.info("Saving found true hybrid junctions...")
+    found_hybrid_jcts = list(set(df[df.true].jct))
+    file_name = get_jct_file_name(
+        hs_config=hs_config,
+        acceptance_method_name=acceptance_method_name,
+        min_hybrid_side_len=min_hybrid_side_len,
+        min_jct_len=min_jct_len,
+    )
+    to_json(
+        data=found_hybrid_jcts,
+        path=results_dir / f"{file_name}_foundTrueJcts.json",
+    )
+    # Create plots
+    acceptance_id = get_acceptance_identifier(
+        acceptance_method_name=acceptance_method_name,
+        min_hybrid_side_len=min_hybrid_side_len,
+        min_jct_len=min_jct_len,
+    )
+
+    # Plot 1: junction support
+    logger.info("Creating junction support plots...")
+    jct_plot_path = get_jct_plot_path(
+        hs_config=hs_config,
+        acceptance_method_name=acceptance_method_name,
+        min_hybrid_side_len=min_hybrid_side_len,
+        min_jct_len=min_jct_len,
+    )
+    fig, axs = junction_plots(df=df)
+    save_fig(
+        path=jct_plot_path,
+        title=f"{hs_config.name}\n{acceptance_id}\nHybrid-junction support",
+        fig=fig,
+    )
+
+    # Plot 2: spectra pairplot
+    logger.info("Creating spectra pairplot...")
+    spectra = list(hs_out.spectrum_uid_to_spectrum.values())
+    sns_fig = spectra_pairplot(spectra=spectra)
+    _ = sns_fig.fig.suptitle(f"Spectra pairplot\n{hs_out.name} (n={len(spectra)})")
+    save_fig(
+        path=results_dir / f"spectraPairplot_{hs_out.name}.png",
+    )
+
+    # Plot 3: PSM-to-Spectrum comparsion pairplot
+    comet_psm_to_spectrum_df = get_comet_psm_to_spectrum_comparison_df(
+        psms=accepted_hybrid_psms,
+        spectrum_uid_to_spectrum=hs_out.spectrum_uid_to_spectrum,
+    )
+    sns_fig = sns.pairplot(
+        data=comet_psm_to_spectrum_df, corner=True, plot_kws={"s": 7}
+    )
+    _ = sns_fig.fig.suptitle(
+        f"PSM-Spectrum pairplot\n{hs_out.name} (n={comet_psm_to_spectrum_df.shape[0]})\n{acceptance_id}"
+    )
+    save_fig(
+        path=results_dir / f"psmToSpectrunPairplot_{hs_out.name}_{acceptance_id}.png",
+    )
 
 
 def create_extract_spectra_from_mzml_bash_script(
