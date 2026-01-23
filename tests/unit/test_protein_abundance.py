@@ -1,4 +1,3 @@
-from src.comet_utils import CometPSM
 from src.protein_abundance import (
     ProteinAbundance,
     get_and_plot_most_common_proteins,
@@ -6,6 +5,7 @@ from src.protein_abundance import (
     get_protein_counts_from_comet_psms,
     load_comet_psms,
 )
+from src.psm import CometPSM
 
 
 class Test_get_protein_counts_from_comet_results:

@@ -1,7 +1,7 @@
 import logging
 import re
 from collections import Counter, defaultdict
-from dataclasses import dataclass, field
+from dataclasses import field
 from functools import cached_property
 from pathlib import Path
 from typing import Annotated, Any, Dict, List, Optional, Tuple, Union
@@ -13,14 +13,14 @@ import pymzml
 import seaborn as sns
 from matplotlib.figure import Figure
 from matplotlib.pyplot import Axes
-from pydantic import BaseModel, BeforeValidator, Field
+from pydantic import BaseModel, BeforeValidator
 from pyteomics import mzml as mzml_reader
 
 from src.constants import (
     COMMON_SPECTRA_ATTRS,
-    DATA_DIR,
     DEFAULT_MAX_PRECURSOR_CHARGE,
     PRECURSOR_INTENSITY,
+    SPECTRA_DF_NAME,
     SPECTRA_DIR,
     THOMAS_SAMPLES,
 )
@@ -28,7 +28,6 @@ from src.plot_utils import (
     add_counts_to_histogram_boxes,
     fig_setup,
     finalize,
-    interactive_scatter_plot,
     plot_histogram,
     save_fig,
     set_title_axes_labels,
@@ -283,6 +282,9 @@ class Spectrum(BaseModel):
             path=path,
         )
 
+    def to_dict(self):
+        return self.model_dump(mode="json")
+
     @classmethod
     def load_from_json(
         cls, json: Union[str, Path], by_uid: bool = False
@@ -352,14 +354,14 @@ def organize_by_spectrum_uid(data: List[Any]):
 
 
 class Mzml(BaseModel):
-    mzml: Annotated[Path, BeforeValidator(lambda x: to_path(path=x, check_exists=True))]
+    path: Annotated[Path, BeforeValidator(lambda x: to_path(path=x, check_exists=True))]
 
     @cached_property
     def ms2_spectra(self) -> List["Spectrum"]:
         """
         Get all spectra from the mzML file.
         """
-        return Spectrum.parse_ms2_from_mzml(mzml=self.mzml)
+        return Spectrum.parse_ms2_from_mzml(mzml=self.path)
 
     @cached_property
     def id_to_spectrum(self) -> Dict[str, Spectrum]:
@@ -371,22 +373,22 @@ class Mzml(BaseModel):
         Get all scan numbers from the mzML file.
         """
         scan_numbers = []
-        with pymzml.run.Reader(str(self.mzml)) as reader:
+        with pymzml.run.Reader(str(self.path)) as reader:
             for spec in reader:
                 if spec.ms_level > 1:  # MS2 or higher
                     scan_numbers.append(int(spec.ID))
         return scan_numbers
 
     def get_spectrum(self, scan: int) -> "Spectrum":
-        return Spectrum.get_spectrum(scan=scan, mzml=self.mzml)
+        return Spectrum.get_spectrum(scan=scan, mzml=self.path)
 
     @property
     def sample(self) -> str:
-        return self.mzml.stem
+        return self.path.stem
 
     @property
     def name(self) -> str:
-        return self.get_mzml_name(mzml=self.mzml)
+        return self.get_mzml_name(mzml=self.path)
 
     @staticmethod
     def get_mzml_name(mzml: Union[str, Path]):
@@ -572,7 +574,7 @@ def create_spectra_plots(
 ) -> pd.DataFrame:
     spectrum_df = Spectrum.create_spectra_df(spectra=spectra)
     if out_dir is not None:
-        spectrum_df.to_csv(out_dir / "spectra.csv", index=False)
+        spectrum_df.to_csv(out_dir / SPECTRA_DF_NAME, index=False)
     charge_cnter = dict(
         sorted(Counter(spectrum_df.z).items(), key=lambda item: item[1], reverse=True)
     )
@@ -687,11 +689,11 @@ def create_sample_scan_to_spectrum_map(
     sample_scan_to_spectrum_map = {}
     if mzmls is not None:
         for mzml in mzmls:
-            for spectrum in Mzml(mzml=mzml).ms2_spectra:
+            for spectrum in Mzml(path=mzml).ms2_spectra:
                 sample_scan_to_spectrum_map[spectrum.uid] = spectrum
     else:
         for mzml in Path(spectra_dir).glob("*.mzML"):
-            for spectrum in Mzml(mzml=mzml).ms2_spectra:
+            for spectrum in Mzml(path=mzml).ms2_spectra:
                 sample_scan_to_spectrum_map[spectrum.uid] = spectrum
     return sample_scan_to_spectrum_map
 
@@ -711,7 +713,7 @@ def create_sample_scan_to_spectrum_map(
     help="Path to the MZML file.",
 )
 def cli_mzml_info(mzml: Path):
-    mzml = Mzml(mzml=mzml)
+    mzml = Mzml(path=mzml)
     print(f"MZML: {mzml.path}")
     print(f"\t - number of scans: {len(mzml.scans)}")
     if len(mzml.scans) < 50:

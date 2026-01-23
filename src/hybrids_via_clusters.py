@@ -41,7 +41,6 @@ from src.utils import (
     flatten_list_of_lists,
     get_positions_of_subseq_in_seq,
     get_time_in_diff_units,
-    load_json,
     log_time,
     relative_ppm_tolerance_in_daltons,
     setup_logger,
@@ -582,21 +581,15 @@ class HybridPeptide(BaseModel):
             )
         return jcts
 
-    # def get_junction_str(self, jct_len: int = 1, with_hyphen: bool = False) -> str:
-    #     left_seq = self.left_seq[-jct_len:]
-    #     right_seq = self.right_seq[:jct_len]
-
-    #     if with_hyphen:
-    #         return f"{left_seq}-{right_seq}"
-    #     else:
-    #         return f"{left_seq}{right_seq}"
-
     @property
     def evidence_of_carbamidomethylation(self):
         if "CG-G" in self.hyphen_seq:
             return True
         else:
             return False
+
+    def to_dict(self):
+        return self.model_dump(mode="json")
 
 
 @log_time(level=logging.DEBUG)

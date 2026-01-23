@@ -10,7 +10,6 @@ from pydantic import BaseModel
 
 from src.constants import (
     AMINO_ACID_MASSES,
-    DEFAULT_MAX_ALLOWED_ION_CHARGE,
     DEFAULT_MAX_KMER_LEN,
     DEFAULT_MIN_KMER_LEN,
     MEMORY,
@@ -27,7 +26,6 @@ from src.peptides_and_ions import (
 )
 from src.sql_database import Sqlite3Database, SqlTableRow
 from src.utils import (
-    PathType,
     decompress_and_depickle,
     load_json,
     log_time,

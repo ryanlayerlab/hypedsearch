@@ -223,9 +223,12 @@ def plot_centered_error_bars(ax, x, y, true_y, lower, upper, label=None, color=N
 
 
 def set_title_axes_labels(ax, title=None, xlabel=None, ylabel=None):
-    ax.set_title(title)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
+    if title is not None:
+        ax.set_title(title)
+    if xlabel is not None:
+        ax.set_xlabel(xlabel)
+    if ylabel is not None:
+        ax.set_ylabel(ylabel)
     # return ax
 
 

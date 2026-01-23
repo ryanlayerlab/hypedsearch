@@ -19,7 +19,6 @@ from src.constants import (
     PROTON_MASS,
     WATER_MASS,
     Y_ION_TYPE,
-    IonTypes,
 )
 from src.utils import (
     ExistingPath,

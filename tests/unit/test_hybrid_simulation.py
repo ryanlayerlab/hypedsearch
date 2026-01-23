@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from src.comet_utils import CometPSM
 from src.constants import HUMAN_PROTEOME
 from src.hybrid_simulation import (
     create_new_kmer_db_and_fasta_for_hybrid_simulation,
@@ -17,6 +16,7 @@ from src.hypedsearch import (
 from src.kmer_database import KmerDatabase
 from src.mass_spectra import Mzml, Spectrum
 from src.peptides_and_ions import Fasta
+from src.psm import CometPSM
 from tests.conftest import default_test_config
 
 
@@ -117,7 +117,7 @@ class Test_run_hybrid_simulation_on_psm:
         psms = [psm for psm in psms if psm.q_value <= q_thresh]
         psm = psms[0]
         mzml = Mzml(
-            mzml="data/251028_RP_Islet_Spikes_Crashout/1_1_Acet_Aspn_Islet_B35spike.mzML"
+            path="data/251028_RP_Islet_Spikes_Crashout/1_1_Acet_Aspn_Islet_B35spike.mzML"
         )
         kmer_db_path = Path("results/hybrid_simulation/inputs/kmers.db")
         # Act

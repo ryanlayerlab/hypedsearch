@@ -1,18 +1,15 @@
 import logging
 from collections import Counter, defaultdict
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Union
 
 import click
-import pandas as pd
-import seaborn as sns
 from matplotlib.axes import Axes
 from pydantic import BaseModel
 
-from src.comet_utils import CometPSM, get_high_confidence_psms
-from src.constants import DEFAULT_Q_VAL_THRESH, Q_VAL
+from src.constants import DEFAULT_Q_THRESHOLD, Q_VAL
 from src.plot_utils import fig_setup, finalize, save_fig, set_title_axes_labels
+from src.psm import CometPSM, get_high_confidence_psms
 from src.utils import PathType, flatten_list_of_lists, setup_logger, to_json
 
 logger = logging.getLogger(__name__)
@@ -90,16 +87,16 @@ class ProteinAbundance(BaseModel):
 
     @classmethod
     def from_comet_txt(
-        cls, txt: Union[str, Path], q_val_thresh: float = DEFAULT_Q_VAL_THRESH
+        cls, txt: Union[str, Path], q_val_thresh: float = DEFAULT_Q_THRESHOLD
     ):
         psms = CometPSM.from_txt(txt=txt)
-        return cls.from_comet_psms(psms=psms, q_val_thresh=q_val_thresh)
+        return cls.from_comet_psms(psms=psms, q_threshold=q_val_thresh)
 
     @classmethod
     def from_comet_psms(
-        cls, psms: List[CometPSM], q_val_thresh: float = DEFAULT_Q_VAL_THRESH
+        cls, psms: List[CometPSM], q_threshold: float = DEFAULT_Q_THRESHOLD
     ) -> "ProteinAbundance":
-        psms = get_high_confidence_psms(psms=psms, score=Q_VAL, threshold=q_val_thresh)
+        psms = get_high_confidence_psms(psms=psms, score=Q_VAL, threshold=q_threshold)
         all_comet_proteins = flatten_list_of_lists([psm.proteins for psm in psms])
         protein_counts = Counter(all_comet_proteins)
         return cls(protein_counts=protein_counts)

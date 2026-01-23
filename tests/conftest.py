@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from src.comet_utils import CometPSM
+from src.psm import CometPSM
 
 repo_dir = Path(__file__).parents[1]
 sys.path.append(str(repo_dir / "src"))

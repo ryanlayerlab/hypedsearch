@@ -2,33 +2,19 @@ import logging
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from functools import cached_property
-from itertools import groupby
 from pathlib import Path
-from typing import (
-    Callable,
-    Counter,
-    Dict,
-    Iterable,
-    List,
-    Literal,
-    Optional,
-    Self,
-    Set,
-    Tuple,
-    Union,
-)
+from typing import Dict, List, Literal, Optional, Set, Union
 
-import click
 import pandas as pd
+from matplotlib.axes import Axes
 from pydantic import BaseModel
-from scipy.stats import percentileofscore
 
 from src.constants import (
     B_ION_TYPE,
     COMET,
     CRUX,
     DEFAULT_PEAK_TO_ION_PPM_TOL,
-    DEFAULT_Q_VAL_THRESH,
+    DEFAULT_Q_THRESHOLD,
     DELTA_CN,
     EVAL,
     HS_PREFIX,
@@ -43,15 +29,11 @@ from src.constants import (
     XCORR,
     Y_ION_TYPE,
 )
-from src.kmer_database import KmerToProteinsMap
 from src.mass_spectra import Mzml, Peak, Spectrum, organize_by_spectrum_uid, plot_peaks
 from src.peptides_and_ions import Peptide, compute_peptide_precursor_mz
 from src.plot_utils import fig_setup, finalize, set_title_axes_labels
 from src.utils import (
-    PathType,
     flatten_list_of_lists,
-    get_arg_fcn_of_objects,
-    get_fcn_of_objects,
     list_to_df,
     load_json,
     mass_difference_in_ppm,
@@ -207,7 +189,9 @@ def spectrum_peptide_plot(
     spectrum: Spectrum,
     seq: str,
     peak_to_ion_ppm_tolerance: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
-):
+    ax: Optional[Axes] = None,
+    title: Optional[str] = None,
+) -> Axes:
     ion_intensity = max(peak.intensity for peak in spectrum.peaks) / 2
     peak_ion_matches = get_peak_product_ion_matches(
         spectrum=spectrum,
@@ -218,8 +202,9 @@ def spectrum_peptide_plot(
     product_ions = peptide.product_ions(
         charges=list(range(1, spectrum.precursor_charge + 1)),
     )
-    fig, axs = fig_setup()
-    ax = axs[0]
+    if ax is None:
+        _, axs = fig_setup()
+        ax = axs[0]
 
     # Plot spectrum
     spectrum.plot_spectrum(
@@ -258,10 +243,14 @@ def spectrum_peptide_plot(
         ax=ax,
         xlabel="m/z",
         ylabel="Intensity",
-        title=f"peptide: {seq}\nspectrum: {spectrum.uid}\nPPM tol: {peak_to_ion_ppm_tolerance}",
+        title=(
+            f"peptide: {seq}\nspectrum: {spectrum.uid}\nPPM tol: {peak_to_ion_ppm_tolerance}"
+            if title is None
+            else title
+        ),
     )
     finalize(ax)
-    return fig, axs
+    return ax
 
 
 @dataclass
@@ -325,6 +314,10 @@ class PSM:
         )
 
     @property
+    def prop_intensity_supported(self):
+        return self.intensity_supported / self.spectrum.total_intensity
+
+    @property
     def prop_prefixes_supported(self):
         return len(self.prefixes_supported) / len(self.seq)
 
@@ -353,6 +346,7 @@ class PSM:
             "q_value": self.q_value,
             "prop_prefixes_supported": self.prop_prefixes_supported,
             "prop_suffixes_supported": self.prop_suffixes_supported,
+            "prop_intensity_supported": self.prop_intensity_supported,
             "prefixes_supported": self.prefixes_supported,
             "suffixes_supported": self.suffixes_supported,
             "mz_ppm_diff": self.mz_ppm_diff,
@@ -511,13 +505,28 @@ class CometPSM:
             if (
                 file.is_file()
                 and file.name[-5:] == ".mzML"
-                and Mzml(mzml=file).name == self.sample
+                and Mzml(path=file).name == self.sample
             ):
                 matching_files.append(file)
         assert (
             len(matching_files) == 1
         ), f"Expected exactly one matching mzML file for PSM with sample {self.sample}, found {len(matching_files)}"
-        return Mzml(mzml=matching_files[0]).get_spectrum(scan=self.scan)
+        return Mzml(path=matching_files[0]).get_spectrum(scan=self.scan)
+
+    def to_psm(
+        self,
+        spectrum: Spectrum,
+        peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
+    ) -> PSM:
+        return PSM(
+            spectrum=spectrum,
+            seq=self.seq,
+            peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
+            xcorr=self.xcorr,
+            q_value=self.q_value,
+            prop_ions_matched=self.prop_ions_matched,
+            positions=self.proteins,
+        )
 
     @classmethod
     def load(cls, path: Union[str, Path], by_uid: bool = False):
@@ -568,7 +577,7 @@ def convert_comet_psms_to_psms(
 def get_high_confidence_psms(
     psms: List[CometPSM],
     score: Literal[Q_VAL] = Q_VAL,
-    threshold: float = DEFAULT_Q_VAL_THRESH,
+    threshold: float = DEFAULT_Q_THRESHOLD,
 ) -> List[CometPSM]:
     """ """
     # Get only `num=1` PSMs

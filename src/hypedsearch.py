@@ -1,46 +1,21 @@
-import json
 import logging
-import os
 import re
 import tempfile
-import time
-from abc import ABC, abstractmethod
 from collections import defaultdict
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import field
 from functools import cached_property
 from pathlib import Path
-from typing import (
-    Any,
-    Callable,
-    Counter,
-    Dict,
-    List,
-    Literal,
-    Optional,
-    Set,
-    Tuple,
-    Union,
-)
+from typing import Dict, List, Literal, Optional, Set, Tuple, Union
 from venv import logger
 
 import click
 import pandas as pd
-import seaborn as sns
-import yaml
-from matplotlib import pyplot as plt
-from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
-from scipy.stats import ecdf
+from pydantic import BaseModel, field_validator, model_validator
 from typing_extensions import Self
 
-from src.blastp import run_blastp
-from src.comet_utils import CometPSM
 from src.constants import (
     ASSIGN_CONFIDENCE,
-    COMET_DIR,
-    COMMON_SPECTRA_ATTRS,
     DECOY,
-    DEFAULT_CRUX_PARAMS,
     DEFAULT_MAX_ALLOWED_ION_CHARGE,
     DEFAULT_MAX_KMER_LEN,
     DEFAULT_MAX_PRECURSOR_CHARGE,
@@ -48,20 +23,11 @@ from src.constants import (
     DEFAULT_MIN_CLUSTER_SUPPORT,
     DEFAULT_MIN_KMER_LEN,
     DEFAULT_MIN_SIDE_LEN,
-    DEFAULT_NATIVE_RUN_CONFIG,
-    DEFAULT_NUM_COMET_THREADS,
     DEFAULT_PEAK_TO_ION_PPM_TOL,
     DEFAULT_PRECURSOR_MZ_PPM_TOL,
-    DEFAULT_Q_VAL_THRESH,
-    DEFAULT_RESULTS_DIR_NAME,
-    GIT_REPO_DIR,
+    DEFAULT_Q_THRESHOLD,
     HS_PREFIX,
     HUMAN_PROTEOME,
-    HYBRID,
-    LINUX_CRUX_EXECUTABLE,
-    NATIVE,
-    RUN_COMET_SMK,
-    RUN_HYPEDSEARCH_SMK,
     TARGET,
     TRUE_HYBRIDS_PATH,
 )
@@ -73,33 +39,18 @@ from src.crux import (
 )
 from src.hybrids_via_clusters import HybridPeptide, form_spectrum_hybrids_via_clustering
 from src.kmer_database import KmerDatabase
-from src.mass_spectra import (
-    Mzml,
-    Spectrum,
-    create_sample_scan_to_spectrum_map,
-    organize_by_spectrum_uid,
-)
-from src.peptide_spectrum_comparison import PSM
+from src.mass_spectra import Mzml, Spectrum, create_sample_scan_to_spectrum_map
 from src.peptides_and_ions import Fasta, Peptide, get_proteins_by_name
-from src.plot_utils import fig_setup, finalize, save_fig, set_title_axes_labels
-from src.protein_abundance import (
-    get_most_common_proteins,
-    get_protein_counts_from_comet_psms,
-)
+from src.plot_utils import fig_setup, save_fig
+from src.protein_abundance import ProteinAbundance
+from src.psm import CometPSM
 from src.utils import (
     PathType,
-    copy_file,
     flatten_list_of_lists,
-    get_time_in_diff_units,
     load_json,
-    load_yaml,
-    log_time,
     mass_difference_in_ppm,
-    save_dict,
     save_pydantic_objects_to_json,
     setup_logger,
-    to_json,
-    write_new_line_separated_file,
 )
 
 logger = logging.getLogger(__name__)
@@ -196,18 +147,6 @@ class TrueHybrid(HybridPeptide):
         return true_hybrids
 
 
-def proteins_needed_for_true_hybrids(
-    true_hybrids: List[TrueHybrid],
-    fasta: Union[Path, str],
-) -> Set[str]:
-    TrueHybrid.set_proteins_for_true_hybrids(true_hybrids=true_hybrids, fasta=fasta)
-    return set(
-        flatten_list_of_lists(
-            [hybrid.left_proteins + hybrid.right_proteins for hybrid in true_hybrids]
-        )
-    )
-
-
 def get_combined_comet_output_name(mzml_name: str, psm_type: str) -> str:
     return f"{mzml_name}.comet.{psm_type}.txt"
 
@@ -299,30 +238,25 @@ def combine_comet_scan_results(
     return outputs
 
 
-class MzmlToScans(BaseModel):
-    mzml_to_scans: Dict[Path, Union[Set[int], str]]
-
-    @property
-    def _mzml_to_scans(self):
-        pass
-
-
 class HybridPSMScorer(BaseModel):
-    fasta: Optional[Path] = None
     comet_params: Path
+    hybrid_decoy_competition: bool = False
+    fasta: Optional[Path] = None
 
-    @field_validator("comet_params", mode="after")
-    def ensure_paths_exist(cls, v: Path) -> Path:
-        if not v.exists():
-            raise ValueError(f"Path does not exist: {v}")
-        return v
+    @model_validator(mode="after")
+    def post_init(self) -> Self:
+        if self.hybrid_decoy_competition and self.fasta is None:
+            raise ValueError(
+                "A FASTA must be provided if hybrid_decoy_competition is True"
+            )
+        return self
 
     @property
-    def decoy_search(self) -> Literal[0, 1, 2]:
-        if self.fasta is None:
-            return 0
-        else:
+    def decoy_search(self) -> Literal[0, 2]:
+        if self.hybrid_decoy_competition:
             return 2
+        else:
+            return 0
 
     def score_hybrids(
         self,
@@ -335,11 +269,17 @@ class HybridPSMScorer(BaseModel):
             tmp_path = Path(tmp_dir)
             mzml_name = Mzml.get_mzml_name(mzml=spectrum.mzml)
             hybrids_fasta = tmp_path / f"{mzml_name}.{spectrum.scan}.fasta"
-            create_hybrids_fasta(
-                hybrid_seqs=seq_to_hybrids.keys(),
-                output_fasta_path=hybrids_fasta,
-                fasta_to_include=self.fasta,
-            )
+            if self.hybrid_decoy_competition:
+                create_hybrids_fasta(
+                    hybrid_seqs=seq_to_hybrids.keys(),
+                    output_fasta_path=hybrids_fasta,
+                    fasta_to_include=self.fasta,
+                )
+            else:
+                create_hybrids_fasta(
+                    hybrid_seqs=seq_to_hybrids.keys(),
+                    output_fasta_path=hybrids_fasta,
+                )
             # Run Comet
             outputs = Crux().run_comet(
                 mzml=spectrum.mzml,
@@ -458,16 +398,19 @@ def find_possible_hybrids_for_seq(
 
 class HypedsearchRunConfig(BaseModel):
     mzml_to_scans: Dict[Path, Union[Set[int], Literal["all"]]]
-    hybrid_former: HybridFormer
-    psm_scorer: HybridPSMScorer
-    name: str = Field(
-        default_factory=lambda: f"autoGeneratedName_time={datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
-    )
-    native_run_dir: Optional[Path] = None
-    hybrid_run_dir: Optional[Path] = None
-    parent_out_dir: Optional[Path] = None
-    spectrum_selector: SpectrumSelector = SpectrumSelector()
-    spectrum_preprocessor: SpectrumPreprocessor = SpectrumPreprocessor()
+    parent_output_dir: Path
+    crux_comet_params: Path
+    name: str
+    hybrid_decoy_competition: bool = False
+    max_precursor_charge: int = DEFAULT_MAX_PRECURSOR_CHARGE
+    fasta: Path = HUMAN_PROTEOME
+    num_peaks: int = 0
+    max_precursor_charge: int = DEFAULT_MAX_PRECURSOR_CHARGE
+    peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL
+    precursor_mz_ppm_tol: float = DEFAULT_PRECURSOR_MZ_PPM_TOL
+    min_cluster_len: int = DEFAULT_MIN_CLUSTER_LENGTH
+    min_cluster_support: int = DEFAULT_MIN_CLUSTER_SUPPORT
+    max_allowed_ion_charge: int = DEFAULT_MAX_ALLOWED_ION_CHARGE
 
     @field_validator("mzml_to_scans", mode="after")
     def ensure_mzmls_exist(
@@ -478,20 +421,93 @@ class HypedsearchRunConfig(BaseModel):
                 raise ValueError(f"MZML file does not exist: {mzml}")
         return mzml_to_scans
 
+    @field_validator("crux_comet_params", mode="after")
+    def ensure_paths_exist(cls, v: Path) -> Path:
+        if not v.exists():
+            raise ValueError(f"Path does not exist: {v}")
+        return v
+
     @model_validator(mode="after")
     def post_init(self) -> Self:
-        # Handle native run and hybrid run directories
-        if self.parent_out_dir is None:
-            self.native_run_dir.mkdir(parents=True, exist_ok=True)
-            self.hybrid_run_dir.mkdir(parents=True, exist_ok=True)
-        else:
-            self.native_run_dir = self.parent_out_dir / f"native_run"
-            self.native_run_dir.mkdir(parents=True, exist_ok=True)
-            self.hybrid_run_dir = self.parent_out_dir / f"hybrid_run"
-            self.hybrid_run_dir.mkdir(parents=True, exist_ok=True)
+        self.native_run_dir.mkdir(parents=True, exist_ok=True)
+        self.hybrid_run_dir.mkdir(parents=True, exist_ok=True)
+        self.plots_dir.mkdir(parents=True, exist_ok=True)
         self.hybrid_run_scan_results_dir.mkdir(parents=True, exist_ok=True)
-        self.native_run_scan_results_dir.mkdir(parents=True, exist_ok=True)
         return self
+
+    @property
+    def mzml_names(self) -> List[str]:
+        return [Mzml(path=mzml).name for mzml in self.mzml_to_scans.keys()]
+
+    @property
+    def native_run_dir(self) -> Path:
+        return self.parent_output_dir / "native_run"
+
+    @property
+    def hybrid_run_dir(self) -> Path:
+        return self.parent_output_dir / "hybrid_run"
+
+    @property
+    def hybrid_run_scan_results_dir(self) -> Path:
+        return self.hybrid_run_dir / "scan_results"
+
+    @property
+    def kmer_db(self) -> Path:
+        return self.parent_output_dir / f"{self.name}.kmers.db"
+
+    @cached_property
+    def spectrum_selector(self) -> SpectrumSelector:
+        return SpectrumSelector(max_precursor_charge=self.max_precursor_charge)
+
+    @cached_property
+    def hybrid_former(self) -> HybridFormer:
+        return HybridFormer(
+            kmer_db=self.kmer_db,
+            fasta=self.fasta,
+            peak_to_ion_ppm_tol=self.peak_to_ion_ppm_tol,
+            precursor_mz_ppm_tol=self.precursor_mz_ppm_tol,
+            min_cluster_len=self.min_cluster_len,
+            min_cluster_support=self.min_cluster_support,
+            max_allowed_ion_charge=self.max_allowed_ion_charge,
+        )
+
+    @cached_property
+    def psm_scorer(self) -> HybridPSMScorer:
+        if self.hybrid_decoy_competition:
+            return HybridPSMScorer(
+                fasta=self.fasta,
+                comet_params=self.crux_comet_params,
+                hybrid_decoy_competition=self.hybrid_decoy_competition,
+            )
+        else:
+            return HybridPSMScorer(
+                comet_params=self.crux_comet_params,
+            )
+
+    @cached_property
+    def spectrum_uid_to_spectrum(self) -> Dict[str, Spectrum]:
+        spectrum_uid_to_spectrum = {}
+        for mzml in self.mzml_to_scans.keys():
+            mzml = Mzml(path=mzml)
+            spectrum_uid_to_spectrum.update(mzml.id_to_spectrum)
+        return spectrum_uid_to_spectrum
+
+    @classmethod
+    def from_json(cls, path: Union[Path, str]):
+        data = load_json(path=path)
+        return cls(**data)
+
+    @cached_property
+    def native_assign_confidence_psms(self) -> List[CometPSM]:
+        return CometPSM.from_txt(txt=self.native_assign_confidence_path)
+
+    @property
+    def native_assign_confidence_path(self) -> Path:
+        return self.native_run_dir / f"{self.name}-{ASSIGN_CONFIDENCE}.txt"
+
+    @property
+    def plots_dir(self) -> Path:
+        return self.parent_output_dir / "plots"
 
     @cached_property
     def _mzml_to_scans(self) -> Dict[Path, List[int]]:
@@ -506,116 +522,42 @@ class HypedsearchRunConfig(BaseModel):
                 )
         return mzml_to_scans
 
-    @cached_property
-    def spectrum_uid_to_spectrum(self) -> Dict[str, Spectrum]:
-        spectrum_uid_to_spectrum = {}
-        for mzml in self.mzml_to_scans.keys():
-            mzml = Mzml(mzml=mzml)
-            spectrum_uid_to_spectrum.update(mzml.id_to_spectrum)
-        return spectrum_uid_to_spectrum
-
-    @cached_property
-    def hybrid_run_scan_results_dir(self) -> Path:
-        return self.hybrid_run_dir / "scan_results"
-
-    @cached_property
-    def native_run_scan_results_dir(self) -> Path:
-        return self.native_run_dir / "scan_results"
-
-    @classmethod
-    def from_json(cls, path: Union[Path, str]):
-        data = load_json(path=path)
-        return cls(**data)
-
-    @classmethod
-    def from_data_and_results_dir(
-        cls,
-        data_dir: Union[Path, str],
-        results_dir: Union[Path, str],
-        fasta: Union[Path, str] = HUMAN_PROTEOME,
-        hybrid_native_competition: bool = False,
-    ):
-        data_dir = Path(data_dir)
-        results_dir = Path(results_dir)
-        inputs_dir = results_dir / "inputs"
-        assert inputs_dir.exists(), f"Inputs directory does not exist: {inputs_dir}"
-        comet_params = list(inputs_dir.glob("*comet.params"))
-        assert (
-            len(comet_params) == 1
-        ), f"Expected exactly one comet.params file in {inputs_dir}, found {len(comet_params)}"
-        comet_params = comet_params[0]
-        psm_scorer = {
-            "comet_params": str(comet_params),
-        }
-        if hybrid_native_competition:
-            psm_scorer["fasta"] = str(fasta)
-        hybrid_former = {
-            "kmer_db": str(inputs_dir / "kmers.db"),
-            "fasta": str(fasta),
-        }
-        hs_config = {
-            "name": data_dir.name,
-            "parent_out_dir": str(results_dir),
-            "mzml_to_scans": {
-                str(mzml): "all" for mzml in list(Path(data_dir).glob("*.mzML"))
-            },
-            "psm_scorer": psm_scorer,
-            "hybrid_former": hybrid_former,
-        }
-        to_json(data=hs_config, path=Path(inputs_dir) / "hs.config.json")
-
-    def to_json(self, path: Union[str, Path]) -> None:
-        data_as_json_str = self.model_dump_json()
-        to_json(data=json.loads(data_as_json_str), path=path)
-
-    def create_native_run_comet_config(
-        self,
-        out_path: Optional[Union[Path, str]] = None,
-        num_threads_4_comet: int = DEFAULT_NUM_COMET_THREADS,
-        decoy_search: Literal[0, 1, 2] = 2,
-    ) -> CometConfig:
-        comet_config = CometConfig(
-            mzml_to_scans={
-                mzml: [0]
-                # if scans == "all" else scans
-                # for mzml, scans in self.mzml_to_scans.items()
-                for mzml in self.mzml_to_scans.keys()
-            },
-            crux_comet_params=self.psm_scorer.comet_params,
-            decoy_search=decoy_search,
-            fasta=self.hybrid_former.fasta,
-            out_dir=self.native_run_scan_results_dir,
-            num_threads=num_threads_4_comet,
+    @property
+    def expected_hybrid_run_scan_target_txts(self) -> Set[Path]:
+        txts = self.psm_scorer.expected_hybrid_target_outputs(
+            mzml_to_scans=self._mzml_to_scans,
+            out_dir=self.hybrid_run_scan_results_dir,
         )
-        if out_path is not None:
-            comet_config.save(path=out_path)
-        return comet_config
+        assert len(txts) == len(set(txts))
+        return set(txts)
 
-    def native_run(
-        self,
-        method: Literal["direct", "snakemake"],
-        native_config: Optional[Path] = None,
-    ):
-        if method == "direct":
-            comet_outputs = self.native_run_via_comet()
-            return
-        elif method == "snakemake":
-            if native_config is None:
-                native_config = self.native_run_dir / DEFAULT_NATIVE_RUN_CONFIG
-            self.create_native_run_comet_config(
-                out_path=native_config,
+    @property
+    def existing_hybrid_run_scan_target_txts(self) -> Set[Path]:
+        txts = []
+        for mzml_name in self.mzml_names:
+            txts.extend(
+                list(
+                    self.hybrid_run_scan_results_dir.glob(
+                        f"{mzml_name}.comet.*.{TARGET}.txt"
+                    )
+                )
             )
-            logger.info(
-                f"To run Comet via snakemake, use the following command:\n"
-                + f"snakemake -s {RUN_COMET_SMK} --configfile {native_config} --scheduler greedy"
-            )
+        assert len(txts) == len(set(txts))
+        return set(txts)
 
-    def native_run_via_comet(self) -> List[CometOutputs]:
+    @property
+    def missing_hybrid_run_scan_target_txts(self) -> Set[Path]:
+        return (
+            self.expected_hybrid_run_scan_target_txts
+            - self.existing_hybrid_run_scan_target_txts
+        )
+
+    def native_comet_run(self, dry_run: bool = False) -> List[CometOutputs]:
         crux = Crux()
         outputs = []
         mzmls = list(self.mzml_to_scans.keys())
         for idx, mzml in enumerate(mzmls):
-            logger.info(f"Processing MZML: {mzml.name} ({idx+1}/{len(mzmls)})")
+            logger.info(f"Native Comet run on MZML {mzml.name} ({idx+1}/{len(mzmls)})")
             outputs.append(
                 crux.run_comet(
                     mzml=mzml,
@@ -624,289 +566,416 @@ class HypedsearchRunConfig(BaseModel):
                     decoy_search=2,
                     out_dir=self.native_run_dir,
                     file_root=Mzml.get_mzml_name(mzml=mzml),
+                    dry_run=dry_run,
                 )
             )
         return outputs
 
-    @property
-    def kmer_db_path(self):
-        return self.hybrid_former.kmer_db
-
-    @property
-    def fasta_path(self):
-        return self.hybrid_former.fasta
-
-    @property
-    def comet_params_path(self):
-        return self.psm_scorer.comet_params
-
-    @cached_property
-    def native_psms(self) -> List[CometPSM]:
-        psms = flatten_list_of_lists(
-            CometPSM.from_txt(txt=txt)
-            for txt in self.native_run_dir.glob("*.target.txt")
+    def native_assign_confidence(self):
+        native_outputs = self.get_expected_native_run_output_txts()
+        Crux().run_assign_confidence(
+            target_txts=native_outputs[TARGET],
+            out_path=self.native_assign_confidence_path,
         )
-        return [psm for psm in psms if psm.num == 1]
 
-    def native_protein_counts(
-        self, q_value_threshold: Optional[float] = None
-    ) -> Counter:
-        if q_value_threshold is None:
-            return get_protein_counts_from_comet_psms(psms=self.native_psms)
-        else:
-            psms = CometPSM.from_txt(txt=self.native_assign_confidence_path)
-            psms = [psm for psm in psms if psm.q_value <= q_value_threshold]
-            return get_protein_counts_from_comet_psms(psms=psms)
+    def get_expected_native_run_output_txts(self):
+        expected_outputs = self.native_comet_run(dry_run=True)
+        results = {
+            TARGET: [],
+            DECOY: [],
+        }
+        for output in expected_outputs:
+            results[TARGET].append(output.target)
+            if output.decoy:
+                results[DECOY].append(output.decoy)
+        return results
 
-    @staticmethod
-    def assign_confidence_name(prefix: Literal[NATIVE, HYBRID]) -> str:
-        return f"{prefix}-assign-confidence.txt"
+    # def get_expected_hybrid_run_output_txts(self):
 
-    @property
-    def native_assign_confidence_path(self) -> Path:
-        return self.native_run_dir / self.assign_confidence_name(prefix=NATIVE)
-
-    @property
-    def hybrid_assign_confidence_path(self) -> Path:
-        return self.hybrid_run_dir / self.assign_confidence_name(prefix=HYBRID)
-
-    def run_assign_confidence(self, run_type: Literal[NATIVE, HYBRID]):
-        if run_type == NATIVE:
-            out_dir = self.native_run_dir
-            out_path = self.native_assign_confidence_path
-        elif run_type == HYBRID:
-            out_dir = self.hybrid_run_dir
-            out_path = self.hybrid_assign_confidence_path
-        else:
-            raise ValueError(
-                f"Invalid run_type: {run_type}. Allowed: {NATIVE}, {HYBRID}"
+    def get_protein_abundance(
+        self,
+        q_threshold: float = DEFAULT_Q_THRESHOLD,
+        top_n_prots: int = 20,
+        plot: bool = False,
+    ) -> ProteinAbundance:
+        prot_ab = ProteinAbundance.from_comet_psms(
+            psms=self.native_assign_confidence_psms, q_threshold=q_threshold
+        )
+        if plot:
+            fig, axs = fig_setup(h=8)
+            ax = axs[0]
+            prot_ab.plot(top_n_prots=top_n_prots, ax=ax)
+            save_fig(
+                fig=fig,
+                title=f"{self.name}\nTop {top_n_prots} proteins by number of PSMs w/ q<={q_threshold}",
+                path=self.plots_dir / f"{self.name}.protAb.png",
             )
-        target_txts = list(out_dir.glob(f"*.{TARGET}.txt"))
-        decoy_txts = list(out_dir.glob(f"*.{DECOY}.txt"))
-        crux = Crux()
-        if len(decoy_txts) == 0:
-            logger.info(f"No decoy txt files found in {out_dir}. Skipping.")
-            return
-        crux.run_assign_confidence(
-            target_txts=target_txts,
-            out_path=out_path,
+        return prot_ab
+
+    def create_kmer_db(
+        self,
+        top_n_prots: Optional[int] = None,
+        min_psm_count: Optional[int] = None,
+        q_threshold: float = DEFAULT_Q_THRESHOLD,
+        min_k: int = DEFAULT_MIN_KMER_LEN,
+        max_k: int = DEFAULT_MAX_KMER_LEN,
+    ) -> KmerDatabase:
+        # Get proteins
+        fasta = Fasta(path=self.fasta)
+        prot_cnts = self.get_protein_abundance(
+            q_threshold=q_threshold,
+        ).protein_counts
+        if top_n_prots:
+            prots = prot_cnts.most_common(n=top_n_prots)
+        elif min_psm_count:
+            prots = [prot for prot, cnt in prot_cnts.items() if cnt >= min_psm_count]
+        else:
+            raise ValueError("Either top_n_prots or min_psm_count must be provided")
+        assert len(prots) > 0, "No proteins selected for kmer database!"
+        db = KmerDatabase.create_db(
+            db_path=self.kmer_db,
+            proteins=fasta.get_proteins_by_name(names=prots),
+            min_k=min_k,
+            max_k=max_k,
         )
+        return db
 
-    @cached_property
-    def spectra(self) -> List[Spectrum]:
-        spectra = []
-        for mzml, scans in self._mzml_to_scans.items():
-            mzml_spectra = Spectrum.parse_ms2_from_mzml(mzml=mzml)
-            spectra_from_mzml = [
-                spectrum for spectrum in mzml_spectra if spectrum.scan in scans
-            ]
-            spectra.extend(spectra_from_mzml)
-        return spectra
-
-    def native_run_on_spectrum(
-        self, spectrum: Spectrum, num_threads_4_comet: int = DEFAULT_NUM_COMET_THREADS
-    ) -> CometOutputs:
-        comet_config = self.create_native_run_comet_config(
-            num_threads_4_comet=num_threads_4_comet, decoy_search=2
-        )
-        outputs = native_run_on_spectrum(spectrum=spectrum, comet_config=comet_config)
-        return outputs
-
-    def run_hypedsearch_on_spectrum(
-        self, spectrum: Spectrum, num_threads_4_comet: int = DEFAULT_NUM_COMET_THREADS
+    def hybrid_run_on_spectrum(
+        self,
+        spectrum: Spectrum,
     ) -> Tuple[CometOutputs, CometOutputs, Dict[str, List[HybridPeptide]]]:
-        native_outputs = self.native_run_on_spectrum(
-            spectrum=spectrum, num_threads_4_comet=num_threads_4_comet
-        )
-        seq_to_hybrids, hybrid_outputs = hybrid_run_on_spectrum(
+        return hybrid_run_on_spectrum(
             spectrum=spectrum,
             out_dir=self.hybrid_run_scan_results_dir,
-            spectrum_preprocessor=self.spectrum_preprocessor,
             hybrid_former=self.hybrid_former,
             psm_scorer=self.psm_scorer,
         )
 
-        return native_outputs, hybrid_outputs, seq_to_hybrids
 
-    @property
-    def expected_native_scan_target_outputs(self) -> List[str]:
-        return get_expected_comet_outputs_for_mzml_to_scans(
-            mzml_to_scans=self._mzml_to_scans,
-            out_dir=self.native_run_scan_results_dir,
-            decoy_search=2,  # this value doesn't matter
-            psm_type=TARGET,
-        )
+# class HypedsearchRunConfig(BaseModel):
+#     mzml_to_scans: Dict[Path, Union[Set[int], Literal["all"]]]
+#     hybrid_former: HybridFormer
+#     psm_scorer: HybridPSMScorer
+#     name: str = Field(
+#         default_factory=lambda: f"autoGeneratedName_time={datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+#     )
+#     native_run_dir: Optional[Path] = None
+#     hybrid_run_dir: Optional[Path] = None
+#     parent_out_dir: Optional[Path] = None
+#     spectrum_selector: SpectrumSelector = SpectrumSelector()
+#     spectrum_preprocessor: SpectrumPreprocessor = SpectrumPreprocessor()
 
-    @property
-    def missing_native_target_outputs(self) -> List[str]:
-        actual = set([txt for txt in self.native_run_scan_results_dir.glob("*.txt")])
-        expected = set(self.expected_native_scan_target_outputs)
-        return [str(txt) for txt in (expected - actual)]
+#     @field_validator("mzml_to_scans", mode="after")
+#     def ensure_mzmls_exist(
+#         cls, mzml_to_scans: Dict[Path, Union[List[int], Literal["all"]]]
+#     ):
+#         for mzml in mzml_to_scans.keys():
+#             if not mzml.exists():
+#                 raise ValueError(f"MZML file does not exist: {mzml}")
+#         return mzml_to_scans
 
-    @property
-    def expected_hybrid_scan_target_outputs(self) -> List[str]:
-        return self.psm_scorer.expected_hybrid_target_outputs(
-            mzml_to_scans=self._mzml_to_scans,
-            out_dir=self.hybrid_run_scan_results_dir,
-        )
+#     @model_validator(mode="after")
+#     def post_init(self) -> Self:
+#         # Handle native run and hybrid run directories
+#         if self.parent_out_dir is None:
+#             self.native_run_dir.mkdir(parents=True, exist_ok=True)
+#             self.hybrid_run_dir.mkdir(parents=True, exist_ok=True)
+#         else:
+#             self.native_run_dir = self.parent_out_dir / "native_run"
+#             self.native_run_dir.mkdir(parents=True, exist_ok=True)
+#             self.hybrid_run_dir = self.parent_out_dir / "hybrid_run"
+#             self.hybrid_run_dir.mkdir(parents=True, exist_ok=True)
+#         self.hybrid_run_scan_results_dir.mkdir(parents=True, exist_ok=True)
+#         self.native_run_scan_results_dir.mkdir(parents=True, exist_ok=True)
+#         return self
 
-    @property
-    def missing_hybrid_target_outputs(self) -> List[str]:
-        actual = set([txt for txt in self.hybrid_run_scan_results_dir.glob("*.txt")])
-        expected = set(self.expected_hybrid_scan_target_outputs)
-        return [str(txt) for txt in (expected - actual)]
+#     @cached_property
+#     def _mzml_to_scans(self) -> Dict[Path, List[int]]:
+#         mzml_to_scans = self.mzml_to_scans.copy()
+#         for mzml, scans in self.mzml_to_scans.items():
+#             if isinstance(scans, str):
+#                 logger.info
+#                 mzml_to_scans[mzml] = (
+#                     self.spectrum_selector.get_scan_numbers_of_selected_spectra_from_mzml(
+#                         mzml=mzml
+#                     )
+#                 )
+#         return mzml_to_scans
 
-    def print_missing_scan_info(self) -> Tuple[List[str], List[str]]:
-        missing_hybrid_targets = self.missing_hybrid_target_outputs
-        missing_native_targets = self.missing_native_target_outputs
-        print(
-            f"There are\n- {len(missing_hybrid_targets)} missing hybrid scan (target) outputs and\n- {len(missing_native_targets)} missing native scan (target) outputs."
-        )
-        return missing_native_targets, missing_hybrid_targets
+#     @cached_property
+#     def spectrum_uid_to_spectrum(self) -> Dict[str, Spectrum]:
+#         spectrum_uid_to_spectrum = {}
+#         for mzml in self.mzml_to_scans.keys():
+#             mzml = Mzml(path=mzml)
+#             spectrum_uid_to_spectrum.update(mzml.id_to_spectrum)
+#         return spectrum_uid_to_spectrum
 
-    def combine_comet_scan_results(self):
-        num_missing_natives = len(self.missing_native_target_outputs)
-        num_missin_hybrids = len(self.missing_hybrid_target_outputs)
-        assert (num_missing_natives == 0) and (num_missin_hybrids == 0), (
-            f"There are {num_missing_natives} missing native scan results and {num_missin_hybrids} missing hybrids! "
-            "Aborting because you probably want to have every spectrum's results before combining them by MZML."
-        )
-        # Combine native results
-        logger.info("Combining native scan results...")
-        combine_comet_scan_results(
-            scan_results_dir=self.native_run_scan_results_dir,
-            out_dir=self.native_run_dir,
-        )
+#     @cached_property
+#     def hybrid_run_scan_results_dir(self) -> Path:
+#         return self.hybrid_run_dir / "scan_results"
 
-        # Combine hybrid results
-        logger.info("Combining hybrid scan results...")
-        combine_comet_scan_results(
-            scan_results_dir=self.hybrid_run_scan_results_dir,
-            out_dir=self.hybrid_run_dir,
-        )
+#     @cached_property
+#     def native_run_scan_results_dir(self) -> Path:
+#         return self.native_run_dir / "scan_results"
 
-    def get_output_txts(
-        self,
-        run_type: Literal[NATIVE, HYBRID],
-        psm_type: Literal[TARGET, DECOY, ASSIGN_CONFIDENCE],
-    ) -> List:
-        def file_to_load(run_type, psm_type):
-            if psm_type == TARGET:
-                return f"*.comet.{TARGET}.txt"
-            elif psm_type == DECOY:
-                return f"*.comet.{DECOY}.txt"
-            elif psm_type == ASSIGN_CONFIDENCE:
-                return self.assign_confidence_name(prefix=run_type)
-            else:
-                raise ValueError(
-                    f"Invalid psm_type: {psm_type}. Allowed: {TARGET}, {DECOY}, {ASSIGN_CONFIDENCE}"
-                )
+#     @classmethod
+#     def from_json(cls, path: Union[Path, str]):
+#         data = load_json(path=path)
+#         return cls(**data)
 
-        if run_type == NATIVE:
-            out_dir = self.native_run_dir
-        elif run_type == HYBRID:
-            out_dir = self.hybrid_run_dir
-        else:
-            raise ValueError(
-                f"Invalid run_type: {run_type}. Allowed: {NATIVE}, {HYBRID}"
-            )
-        output_txts = []
-        for mzml in self.mzml_to_scans.keys():
-            mzml_name = Mzml.get_mzml_name(mzml=mzml)
-            try:
-                output_txts.append(
-                    get_matching_output_txt(
-                        out_dir=out_dir,
-                        mzml_name=mzml_name,
-                        psm_type=psm_type,
-                    )
-                )
-            except:
-                logger.info(
-                    f"Wasn't able to find output txt for MZML={mzml_name}, run_type={run_type}, psm_type={psm_type}"
-                )
+#     @classmethod
+#     def from_data_and_results_dir(
+#         cls,
+#         data_dir: Union[Path, str],
+#         results_dir: Union[Path, str],
+#         fasta: Union[Path, str] = HUMAN_PROTEOME,
+#         hybrid_native_competition: bool = False,
+#     ):
+#         data_dir = Path(data_dir)
+#         results_dir = Path(results_dir)
+#         inputs_dir = results_dir / "inputs"
+#         assert inputs_dir.exists(), f"Inputs directory does not exist: {inputs_dir}"
+#         comet_params = list(inputs_dir.glob("*comet.params"))
+#         assert (
+#             len(comet_params) == 1
+#         ), f"Expected exactly one comet.params file in {inputs_dir}, found {len(comet_params)}"
+#         comet_params = comet_params[0]
+#         psm_scorer = {
+#             "comet_params": str(comet_params),
+#         }
+#         if hybrid_native_competition:
+#             psm_scorer["fasta"] = str(fasta)
+#         hybrid_former = {
+#             "kmer_db": str(inputs_dir / "kmers.db"),
+#             "fasta": str(fasta),
+#         }
+#         hs_config = {
+#             "name": data_dir.name,
+#             "parent_out_dir": str(results_dir),
+#             "mzml_to_scans": {
+#                 str(mzml): "all" for mzml in list(Path(data_dir).glob("*.mzML"))
+#             },
+#             "psm_scorer": psm_scorer,
+#             "hybrid_former": hybrid_former,
+#         }
+#         to_json(data=hs_config, path=Path(inputs_dir) / "hs.config.json")
 
-        return output_txts
+#     def to_json(self, path: Union[str, Path]) -> None:
+#         data_as_json_str = self.model_dump_json()
+#         to_json(data=json.loads(data_as_json_str), path=path)
 
-    @property
-    def _results_dir(self) -> Path:
-        results_dir = self.parent_out_dir / DEFAULT_RESULTS_DIR_NAME
-        results_dir.mkdir(parents=True, exist_ok=True)
-        return results_dir
+#     def native_run(
+#         self,
+#         method: Literal["direct", "snakemake"] = "direct",
+#         native_config: Optional[Path] = None,
+#     ):
+#         if method == "direct":
+#             comet_outputs = self.native_run_via_comet()
+#             return
+#         elif method == "snakemake":
+#             if native_config is None:
+#                 native_config = self.native_run_dir / DEFAULT_NATIVE_RUN_CONFIG
+#             self.create_native_run_comet_config(
+#                 out_path=native_config,
+#             )
+#             logger.info(
+#                 "To run Comet via snakemake, use the following command:\n"
+#                 + f"snakemake -s {RUN_COMET_SMK} --configfile {native_config} --scheduler greedy"
+#             )
 
+#     def native_run_via_comet(self) -> List[CometOutputs]:
+#         crux = Crux()
+#         outputs = []
+#         mzmls = list(self.mzml_to_scans.keys())
+#         for idx, mzml in enumerate(mzmls):
+#             logger.info(f"Processing MZML: {mzml.name} ({idx+1}/{len(mzmls)})")
+#             outputs.append(
+#                 crux.run_comet(
+#                     mzml=mzml,
+#                     fasta=self.hybrid_former.fasta,
+#                     crux_comet_params=self.psm_scorer.comet_params,
+#                     decoy_search=2,
+#                     out_dir=self.native_run_dir,
+#                     file_root=Mzml.get_mzml_name(mzml=mzml),
+#                 )
+#             )
+#         return outputs
 
-class SpectrumCometRunResults(BaseModel):
-    targets: List[CometPSM] = Field(default_factory=list)
-    decoys: List[CometPSM] = Field(default_factory=list)
-    assign_conf: Optional[CometPSM] = None
+#     @staticmethod
+#     def assign_confidence_name(prefix: Literal[NATIVE, HYBRID]) -> str:
+#         return f"{prefix}-assign-confidence.txt"
 
-    @model_validator(mode="after")
-    def check_consistent_spectrum_uid(self):
-        # Collect UIDs from targets and decoys
-        uids = {psm.spectrum_uid for psm in self.targets + self.decoys}
-        if len(uids) != 1:
-            raise ValueError(f"Inconsistent spectrum_uid values found: {uids}")
-        return self
+#     @property
+#     def native_assign_confidence_path(self) -> Path:
+#         return self.native_run_dir / self.assign_confidence_name(prefix=NATIVE)
 
-    @property
-    def spectrum_uid(self) -> str:
-        if len(self.targets) > 0:
-            return self.targets[0].spectrum_uid
-        elif len(self.decoys) > 0:
-            return self.decoys[0].spectrum_uid
-        else:
-            raise ValueError("No targets or decoys to get spectrum_uid from.")
+#     @property
+#     def hybrid_assign_confidence_path(self) -> Path:
+#         return self.hybrid_run_dir / self.assign_confidence_name(prefix=HYBRID)
 
-    @cached_property
-    def target(self) -> Optional[CometPSM]:
-        if len(self.targets) == 0:
-            return None
-        else:
-            top_psms = CometPSM.get_top_psms(psms=self.targets)
-            assert (
-                len(top_psms) == 1
-            ), f"Expected 1 top target PSM, found {len(top_psms)}"
-            return top_psms[0]
+#     def run_assign_confidence(self, run_type: Literal[NATIVE, HYBRID] = NATIVE):
+#         if run_type == NATIVE:
+#             out_dir = self.native_run_dir
+#             out_path = self.native_assign_confidence_path
+#         elif run_type == HYBRID:
+#             out_dir = self.hybrid_run_dir
+#             out_path = self.hybrid_assign_confidence_path
+#         else:
+#             raise ValueError(
+#                 f"Invalid run_type: {run_type}. Allowed: {NATIVE}, {HYBRID}"
+#             )
+#         target_txts = list(out_dir.glob(f"*.{TARGET}.txt"))
+#         decoy_txts = list(out_dir.glob(f"*.{DECOY}.txt"))
+#         crux = Crux()
+#         if len(decoy_txts) == 0:
+#             logger.info(f"No decoy txt files found in {out_dir}. Skipping.")
+#             return
+#         crux.run_assign_confidence(
+#             target_txts=target_txts,
+#             out_path=out_path,
+#         )
 
-    @cached_property
-    def decoy(self) -> CometPSM:
-        if len(self.decoys) == 0:
-            return None
-        else:
-            top_psms = CometPSM.get_top_psms(psms=self.decoys)
-            assert (
-                len(top_psms) == 1
-            ), f"Expected 1 top decoy PSM, found {len(top_psms)}"
-            return top_psms[0]
+#     @cached_property
+#     def spectra(self) -> List[Spectrum]:
+#         spectra = []
+#         for mzml, scans in self._mzml_to_scans.items():
+#             mzml_spectra = Spectrum.parse_ms2_from_mzml(mzml=mzml)
+#             spectra_from_mzml = [
+#                 spectrum for spectrum in mzml_spectra if spectrum.scan in scans
+#             ]
+#             spectra.extend(spectra_from_mzml)
+#         return spectra
 
-    def target_psm(
-        self,
-        spectrum: Spectrum,
-        peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
-    ) -> PSM:
-        if self.assign_conf is not None:
-            return PSM.from_spectrum_and_comet_psm(
-                spectrum=spectrum,
-                comet_psm=self.assign_conf,
-                peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tol,
-            )
-        else:
-            return PSM.from_spectrum_and_comet_psm(
-                spectrum=spectrum,
-                comet_psm=self.target,
-                peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tol,
-            )
+#     def native_run_on_spectrum(
+#         self, spectrum: Spectrum, num_threads_4_comet: int = DEFAULT_NUM_COMET_THREADS
+#     ) -> CometOutputs:
+#         comet_config = self.create_native_run_comet_config(
+#             num_threads_4_comet=num_threads_4_comet, decoy_search=2
+#         )
+#         outputs = native_run_on_spectrum(spectrum=spectrum, comet_config=comet_config)
+#         return outputs
 
-    def decoy_psm(
-        self,
-        spectrum: Spectrum,
-        peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
-    ) -> PSM:
-        return PSM.from_spectrum_and_comet_psm(
-            spectrum=spectrum,
-            comet_psm=self.decoy,
-            peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tol,
-        )
+#     def run_hypedsearch_on_spectrum(
+#         self, spectrum: Spectrum, num_threads_4_comet: int = DEFAULT_NUM_COMET_THREADS
+#     ) -> Tuple[CometOutputs, CometOutputs, Dict[str, List[HybridPeptide]]]:
+#         native_outputs = self.native_run_on_spectrum(
+#             spectrum=spectrum, num_threads_4_comet=num_threads_4_comet
+#         )
+#         seq_to_hybrids, hybrid_outputs = hybrid_run_on_spectrum(
+#             spectrum=spectrum,
+#             out_dir=self.hybrid_run_scan_results_dir,
+#             spectrum_preprocessor=self.spectrum_preprocessor,
+#             hybrid_former=self.hybrid_former,
+#             psm_scorer=self.psm_scorer,
+#         )
+
+#         return native_outputs, hybrid_outputs, seq_to_hybrids
+
+#     @property
+#     def expected_native_scan_target_outputs(self) -> List[str]:
+#         return get_expected_comet_outputs_for_mzml_to_scans(
+#             mzml_to_scans=self._mzml_to_scans,
+#             out_dir=self.native_run_scan_results_dir,
+#             decoy_search=2,  # this value doesn't matter
+#             psm_type=TARGET,
+#         )
+
+#     @property
+#     def missing_native_target_outputs(self) -> List[str]:
+#         actual = set([txt for txt in self.native_run_scan_results_dir.glob("*.txt")])
+#         expected = set(self.expected_native_scan_target_outputs)
+#         return [str(txt) for txt in (expected - actual)]
+
+#     @property
+#     def expected_hybrid_scan_target_outputs(self) -> List[str]:
+#         return self.psm_scorer.expected_hybrid_target_outputs(
+#             mzml_to_scans=self._mzml_to_scans,
+#             out_dir=self.hybrid_run_scan_results_dir,
+#         )
+
+#     @property
+#     def missing_hybrid_target_outputs(self) -> List[str]:
+#         actual = set([txt for txt in self.hybrid_run_scan_results_dir.glob("*.txt")])
+#         expected = set(self.expected_hybrid_scan_target_outputs)
+#         return [str(txt) for txt in (expected - actual)]
+
+#     def print_missing_scan_info(self) -> Tuple[List[str], List[str]]:
+#         missing_hybrid_targets = self.missing_hybrid_target_outputs
+#         missing_native_targets = self.missing_native_target_outputs
+#         print(
+#             f"There are\n- {len(missing_hybrid_targets)} missing hybrid scan (target) outputs and\n- {len(missing_native_targets)} missing native scan (target) outputs."
+#         )
+#         return missing_native_targets, missing_hybrid_targets
+
+#     def combine_comet_scan_results(self):
+#         num_missing_natives = len(self.missing_native_target_outputs)
+#         num_missin_hybrids = len(self.missing_hybrid_target_outputs)
+#         assert (num_missing_natives == 0) and (num_missin_hybrids == 0), (
+#             f"There are {num_missing_natives} missing native scan results and {num_missin_hybrids} missing hybrids! "
+#             "Aborting because you probably want to have every spectrum's results before combining them by MZML."
+#         )
+#         # Combine native results
+#         logger.info("Combining native scan results...")
+#         combine_comet_scan_results(
+#             scan_results_dir=self.native_run_scan_results_dir,
+#             out_dir=self.native_run_dir,
+#         )
+
+#         # Combine hybrid results
+#         logger.info("Combining hybrid scan results...")
+#         combine_comet_scan_results(
+#             scan_results_dir=self.hybrid_run_scan_results_dir,
+#             out_dir=self.hybrid_run_dir,
+#         )
+
+#     def get_output_txts(
+#         self,
+#         run_type: Literal[NATIVE, HYBRID],
+#         psm_type: Literal[TARGET, DECOY, ASSIGN_CONFIDENCE],
+#     ) -> List:
+#         def file_to_load(run_type, psm_type):
+#             if psm_type == TARGET:
+#                 return f"*.comet.{TARGET}.txt"
+#             elif psm_type == DECOY:
+#                 return f"*.comet.{DECOY}.txt"
+#             elif psm_type == ASSIGN_CONFIDENCE:
+#                 return self.assign_confidence_name(prefix=run_type)
+#             else:
+#                 raise ValueError(
+#                     f"Invalid psm_type: {psm_type}. Allowed: {TARGET}, {DECOY}, {ASSIGN_CONFIDENCE}"
+#                 )
+
+#         if run_type == NATIVE:
+#             out_dir = self.native_run_dir
+#         elif run_type == HYBRID:
+#             out_dir = self.hybrid_run_dir
+#         else:
+#             raise ValueError(
+#                 f"Invalid run_type: {run_type}. Allowed: {NATIVE}, {HYBRID}"
+#             )
+#         output_txts = []
+#         for mzml in self.mzml_to_scans.keys():
+#             mzml_name = Mzml.get_mzml_name(mzml=mzml)
+#             try:
+#                 output_txts.append(
+#                     get_matching_output_txt(
+#                         out_dir=out_dir,
+#                         mzml_name=mzml_name,
+#                         psm_type=psm_type,
+#                     )
+#                 )
+#             except:
+#                 logger.info(
+#                     f"Wasn't able to find output txt for MZML={mzml_name}, run_type={run_type}, psm_type={psm_type}"
+#                 )
+
+#         return output_txts
+
+#     @property
+#     def _results_dir(self) -> Path:
+#         results_dir = self.parent_out_dir / f"{self.name}/{DEFAULT_RESULTS_DIR_NAME}"
+#         results_dir.mkdir(parents=True, exist_ok=True)
+#         return results_dir
 
 
 def native_run_on_spectrum(
@@ -920,11 +989,9 @@ def native_run_on_spectrum(
 def hybrid_run_on_spectrum(
     spectrum: Spectrum,
     out_dir: Path,
-    spectrum_preprocessor: SpectrumPreprocessor,
     hybrid_former: HybridFormer,
     psm_scorer: HybridPSMScorer,
 ) -> Tuple[Dict[str, List[HybridPeptide]], List[CometOutputs]]:
-    spectrum = spectrum_preprocessor.preprocess_spectrum(spectrum=spectrum)
     seq_to_hybrids = hybrid_former.form_hybrids(spectrum=spectrum)
     comet_outputs = psm_scorer.score_hybrids(
         seq_to_hybrids=seq_to_hybrids,
@@ -972,106 +1039,106 @@ def create_hybrids_fasta(
     return prots
 
 
-@click.command(
-    name="combine-comet-scan-results",
-    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-    help="""
-    Given a directory containing the Comet output for each scan, combine them by mzML.
-    For each mzML file, two files will be created in out_dir:\n
-    1) <mzML name>.comet.target.txt - containing all the target PSMs, and\n
-    2) <mzML name>.comet.decoy.txt - containing all the decoy PSMs.
-    """,
-)
-@click.option(
-    "--scan_results_dir",
-    "-srd",
-    type=PathType(),
-    required=False,
-    help="Path to the directory containing scan results",
-)
-@click.option(
-    "--out_dir",
-    "-od",
-    type=PathType(),
-    required=False,
-    help="Path to the output directory where the combined results for each mzML will be saved",
-)
-@click.option(
-    "--config",
-    "-c",
-    type=PathType(),
-    required=False,
-    help="Path to the Hypedsearch config JSON",
-)
-def cli_combine_comet_scan_results(
-    scan_results_dir: Optional[Path], out_dir: Optional[Path], config: Optional[Path]
-):
-    if config is None:
-        combine_comet_scan_results(scan_results_dir=scan_results_dir, out_dir=out_dir)
-    else:
-        hs_config = HypedsearchRunConfig.from_json(path=config)
-        hs_config.combine_comet_scan_results()
-    logger.info("Finished combining Comet scan results")
+# @click.command(
+#     name="combine-comet-scan-results",
+#     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+#     help="""
+#     Given a directory containing the Comet output for each scan, combine them by mzML.
+#     For each mzML file, two files will be created in out_dir:\n
+#     1) <mzML name>.comet.target.txt - containing all the target PSMs, and\n
+#     2) <mzML name>.comet.decoy.txt - containing all the decoy PSMs.
+#     """,
+# )
+# @click.option(
+#     "--scan_results_dir",
+#     "-srd",
+#     type=PathType(),
+#     required=False,
+#     help="Path to the directory containing scan results",
+# )
+# @click.option(
+#     "--out_dir",
+#     "-od",
+#     type=PathType(),
+#     required=False,
+#     help="Path to the output directory where the combined results for each mzML will be saved",
+# )
+# @click.option(
+#     "--config",
+#     "-c",
+#     type=PathType(),
+#     required=False,
+#     help="Path to the Hypedsearch config JSON",
+# )
+# def cli_combine_comet_scan_results(
+#     scan_results_dir: Optional[Path], out_dir: Optional[Path], config: Optional[Path]
+# ):
+#     if config is None:
+#         combine_comet_scan_results(scan_results_dir=scan_results_dir, out_dir=out_dir)
+#     else:
+#         hs_config = HypedsearchRunConfig.from_json(path=config)
+#         hs_config.combine_comet_scan_results()
+#     logger.info("Finished combining Comet scan results")
 
 
-@click.command(
-    name="create-native-run-snakemake-config",
-    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-    help="""
-    Create the native run snakemake config
-    """,
-)
-@click.option(
-    "--config",
-    "-c",
-    type=PathType(),
-    required=True,
-    help="Path to the Hypedsearch config JSON",
-)
-@click.option(
-    "--out_path",
-    "-o",
-    type=PathType(),
-    required=False,
-    help=f"Path to where the native run snakemake config will be saved. Default is <native_run_dir>/{DEFAULT_NATIVE_RUN_CONFIG}",
-)
-@click.option(
-    "--num_threads",
-    "-n",
-    type=int,
-    required=False,
-    default=DEFAULT_NUM_COMET_THREADS,
-    show_default=True,
-    help="Number of threads to use for Comet in the native run",
-)
-def cli_create_native_run_snakemake_config(
-    config: Path, out_path: Optional[Path], num_threads: int
-):
-    hs_config = HypedsearchRunConfig.from_json(path=config)
-    if out_path is None:
-        out_path = hs_config.native_run_dir / DEFAULT_NATIVE_RUN_CONFIG
-    hs_config.create_native_run_comet_config(
-        out_path=out_path, num_threads_4_comet=num_threads
-    )
+# @click.command(
+#     name="create-native-run-snakemake-config",
+#     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+#     help="""
+#     Create the native run snakemake config
+#     """,
+# )
+# @click.option(
+#     "--config",
+#     "-c",
+#     type=PathType(),
+#     required=True,
+#     help="Path to the Hypedsearch config JSON",
+# )
+# @click.option(
+#     "--out_path",
+#     "-o",
+#     type=PathType(),
+#     required=False,
+#     help=f"Path to where the native run snakemake config will be saved. Default is <native_run_dir>/{DEFAULT_NATIVE_RUN_CONFIG}",
+# )
+# @click.option(
+#     "--num_threads",
+#     "-n",
+#     type=int,
+#     required=False,
+#     default=DEFAULT_NUM_COMET_THREADS,
+#     show_default=True,
+#     help="Number of threads to use for Comet in the native run",
+# )
+# def cli_create_native_run_snakemake_config(
+#     config: Path, out_path: Optional[Path], num_threads: int
+# ):
+#     hs_config = HypedsearchRunConfig.from_json(path=config)
+#     if out_path is None:
+#         out_path = hs_config.native_run_dir / DEFAULT_NATIVE_RUN_CONFIG
+#     hs_config.create_native_run_comet_config(
+#         out_path=out_path, num_threads_4_comet=num_threads
+#     )
 
 
-@click.command(
-    name="check-for-missing-scans",
-    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-    help="""
-    Check which scans were and were not processed.
-    """,
-)
-@click.option(
-    "--config",
-    "-c",
-    type=PathType(),
-    required=True,
-    help="Path to the Hypedsearch config JSON",
-)
-def cli_check_for_missing_scans(config: Path):
-    hs_config = HypedsearchRunConfig.from_json(path=config)
-    hs_config.print_missing_scan_info()
+# @click.command(
+#     name="check-for-missing-scans",
+#     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+#     help="""
+#     Check which scans were and were not processed.
+#     """,
+# )
+# @click.option(
+#     "--config",
+#     "-c",
+#     type=PathType(),
+#     required=True,
+#     help="Path to the Hypedsearch config JSON",
+# )
+# def cli_check_for_missing_scans(config: Path):
+#     hs_config = HypedsearchRunConfig.from_json(path=config)
+#     hs_config.print_missing_scan_info()
 
 
 @click.command(
@@ -1102,32 +1169,20 @@ def cli_check_for_missing_scans(config: Path):
     required=False,
     help="Scan in MZML on which to run HypedSearch",
 )
-@click.option(
-    "--num_threads",
-    "-n",
-    type=int,
-    required=False,
-    default=1,
-    show_default=True,
-    help="Number of threads for Comet",
-)
-def cli_run_hypedsearch(
-    mzml: Optional[Path], scan: Optional[int], config: Path, num_threads: int
-):
+def cli_run_hypedsearch(mzml: Optional[Path], scan: Optional[int], config: Path):
     hs_config = HypedsearchRunConfig.from_json(path=config)
     # Run on one spectrum
     if scan is not None:
-        mzml_obj = Mzml(mzml=mzml)
-        return hs_config.run_hypedsearch_on_spectrum(
-            spectrum=mzml_obj.get_spectrum(scan=scan), num_threads_4_comet=num_threads
+        mzml_obj = Mzml(path=mzml)
+        return hs_config.hybrid_run_on_spectrum(
+            spectrum=mzml_obj.get_spectrum(scan=scan)
         )
     # Run on all spectra specified in config
     for mzml, scans in hs_config._mzml_to_scans.items():
-        mzml_obj = Mzml(mzml=mzml)
+        mzml_obj = Mzml(path=mzml)
         for scan in scans:
-            _ = hs_config.run_hypedsearch_on_spectrum(
-                spectrum=mzml_obj.get_spectrum(scan=scan),
-                num_threads_4_comet=num_threads,
+            _ = hs_config.hybrid_run_on_spectrum(
+                spectrum=mzml_obj.get_spectrum(scan=scan)
             )
 
 
@@ -1140,13 +1195,8 @@ def cli():
 
 if __name__ == "__main__":
     setup_logger()
-    cli.add_command(cli_combine_comet_scan_results)
-    cli.add_command(cli_check_for_missing_scans)
+    # cli.add_command(cli_combine_comet_scan_results)
+    # cli.add_command(cli_check_for_missing_scans)
     cli.add_command(cli_run_hypedsearch)
-    cli.add_command(cli_create_native_run_snakemake_config)
-    cli()
-    cli.add_command(cli_combine_comet_scan_results)
-    cli.add_command(cli_check_for_missing_scans)
-    cli.add_command(cli_run_hypedsearch)
-    cli.add_command(cli_create_native_run_snakemake_config)
+    # cli.add_command(cli_create_native_run_snakemake_config)
     cli()

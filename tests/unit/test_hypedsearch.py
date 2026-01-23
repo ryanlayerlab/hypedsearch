@@ -7,7 +7,6 @@ import pytest
 from click.testing import CliRunner
 from pydantic import ValidationError
 
-from src.comet_utils import CometPSM
 from src.constants import (
     HUMAN_PROTEOME,
     MAC_CRUX_EXECUTABLE,
@@ -32,6 +31,7 @@ from src.hypedsearch import (
 from src.kmer_database import KmerDatabase
 from src.mass_spectra import Mzml, Spectrum
 from src.peptides_and_ions import Fasta
+from src.psm import CometPSM
 from src.utils import flatten_list_of_lists, load_json, mass_difference_in_ppm
 from tests.conftest import default_hs_run, default_test_config
 
@@ -374,7 +374,7 @@ class Test_find_possible_hybrids:
         db_path = "results/251028_RP_Islet_Spikes_Crashout/inputs/kmers.db"
         scan_num = 1316004
         seq = "GITLNHLKATPIESHQV"
-        spectrum = Mzml(mzml=mzml).get_spectrum(scan=scan_num)
+        spectrum = Mzml(path=mzml).get_spectrum(scan=scan_num)
         kmer_to_proteins_map = kmer_to_proteins_map = KmerDatabase(
             db_path=db_path
         ).kmer_to_proteins_map.kmer_to_protein_map

@@ -91,7 +91,7 @@ MZML = "mzml"
 SCAN_HYBRIDS = "scan_hybrids"
 Q_VAL = "q_value"
 NEOFUSION = "neofusion"
-DEFAULT_Q_VAL_THRESH = 0.01
+DEFAULT_Q_THRESHOLD = 0.01
 PRECURSOR_MZ_PPM_TOL = "precursor_mz_ppm_tol"
 PEAK_TO_ION_PPM_TOL = "peak_to_ion_ppm_tol"
 MZML_EXT = "mzML"
@@ -159,6 +159,19 @@ COMMON_SPECTRA_ATTRS = [
     RETENTION_TIME,
     PRECURSOR_INTENSITY,
 ]
+NONXCORR_PSM_SCORES = [
+    "prop_intensity_supported",
+    "prop_ions_matched",
+    "prop_prefixes_supported",
+    "prop_suffixes_supported",
+]
+
+PSM_SCORES = NONXCORR_PSM_SCORES + ["xcorr"]
+SPECTRUM_PSMS_NAME = "spectrum_psms.json"
+HYBRID_PEPTIDES_NAME = "hybrid_peptides.json"
+PSMS_DF_NAME = "psms.csv"
+SPECTRA_DF_NAME = "spectra.csv"
+
 
 # ## Asserts
 # assert file_exists(COMET_PARAMS) == True, "Comet executable not found!"

@@ -1,12 +1,7 @@
 import logging
-from copy import deepcopy
-from dataclasses import dataclass
-from typing import List, Optional, Tuple
 
-import pandas as pd
 import seaborn as sns
 
-from src.hypedsearch_run_analysis import SpectrumPSMs
 from src.plot_utils import fig_setup, finalize
 
 logger = logging.getLogger(__name__)

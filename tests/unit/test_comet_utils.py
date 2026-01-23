@@ -1,4 +1,4 @@
-from src.comet_utils import CometPSM
+from src.psm import CometPSM
 
 
 class Test_CometPSM:

@@ -2,7 +2,6 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from src.comet_utils import CometPSM
 from src.constants import MAC_CRUX_EXECUTABLE
 from src.crux import (
     CometConfig,
@@ -14,6 +13,7 @@ from src.crux import (
 )
 from src.hypedsearch import HypedsearchRunConfig
 from src.mass_spectra import Mzml, Spectrum
+from src.psm import CometPSM
 from src.utils import load_json
 
 

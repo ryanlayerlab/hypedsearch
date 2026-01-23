@@ -73,8 +73,11 @@ EOF
 
 
 # Move files to a directory that's on the node itself for faster I/O
-python -m fiji.fiji_utils prep-files-on-fiji \
-    --config $HS_CONFIG --data_dir $DATA_DIR
+if $USE_SINGULARITY; then
+    python -m fiji.fiji_utils prep-files-on-fiji \
+        --config $HS_CONFIG \
+        --data_dir $DATA_DIR
+fi
 
 # Run Hypedsearch
 if $USE_SINGULARITY; then
@@ -98,18 +101,20 @@ else
         --nolock \
         --retries 5 || true
 fi
+if $USE_SINGULARITY; then
+    # Move scan results back to persistent storage
+    echo "Moving scan results back to persistent storage"
+    python -m fiji.fiji_utils move-scan-results \
+        --config $HS_CONFIG \
+        --data_dir $DATA_DIR
 
-# Move scan results back to persistent storage
-echo "Moving scan results back to persistent storage"
-python -m fiji.fiji_utils move-scan-results \
-    --config $HS_CONFIG --data_dir $DATA_DIR
+    # Clean up data directory on the node
+    echo "Removing data directory $DATA_DIR/$NAME"
+    rm -rf $DATA_DIR/$NAME
 
-# Clean up data directory on the node
-echo "Removing data directory $DATA_DIR/$NAME"
-rm -rf $DATA_DIR/$NAME
-
-# Combine scan results IF ALL scans completed successfully
-python -m src.hypedsearch combine-comet-scan-results \
-    --config $HS_CONFIG
+    # Combine scan results IF ALL scans completed successfully
+    python -m src.hypedsearch combine-comet-scan-results \
+        --config $HS_CONFIG
+fi
 
 echo "Finished running Hypedsearch!"

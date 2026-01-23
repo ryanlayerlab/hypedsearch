@@ -1,5 +1,4 @@
 import logging
-import os
 import platform
 import shutil
 import subprocess
@@ -8,16 +7,14 @@ import tempfile
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Set, Tuple, Union
+from typing import Dict, List, Literal, Optional, Set, Union
 from venv import logger
 
 import click
 import yaml
 from pydantic import BaseModel
 
-from src.comet_utils import CometPSM
 from src.constants import (
-    COMET_DIR,
     DECOY,
     DEFAULT_NUM_COMET_THREADS,
     GIT_REPO_DIR,
@@ -28,6 +25,7 @@ from src.constants import (
 )
 from src.mass_spectra import Mzml, Spectrum
 from src.peptides_and_ions import Fasta, Peptide
+from src.psm import CometPSM
 from src.utils import (
     CmdLineRunner,
     PathType,
@@ -35,9 +33,6 @@ from src.utils import (
     read_new_line_separated_file,
     save_dict,
     setup_logger,
-    to_json,
-    to_yaml,
-    write_new_line_separated_file,
 )
 
 ASSIGN_CONFIDENCE_NAME = "assign-confidence.target.txt"
@@ -224,7 +219,7 @@ class Crux:
         if result.returncode != 0:
             if (result.returncode == 1) and "no spectra searched" in result.stderr:
                 logger.debug(
-                    f"Warning: `crux comet` finished with return code 1 and 'no spectra searched' in stderr. "
+                    "Warning: `crux comet` finished with return code 1 and 'no spectra searched' in stderr. "
                     "This can happen and generally is not an error even though the return code is 1"
                 )
             else:
@@ -245,7 +240,7 @@ class Crux:
         scan_min: int = 0,
         scan_max: int = 0,
         num_threads: Optional[int] = None,
-        # run_method: Literal["background", "foreground"],
+        dry_run: bool = False,
     ) -> CometOutputs:
         """
         This function runs `crux comet` on the given mzML file with the specified parameters.
@@ -253,7 +248,6 @@ class Crux:
         are temporarily saved in a temporary directory and then JUST the target and (if it exists)
         decoy txt files are moved to the specified output directory
         """
-        logger.info("Running `crux comet`...")
         # Check if expected outputs already exist and skip Comet run if they do
         expected_final_outputs = CometOutputs.standardized_comet_outputs(
             out_dir=Path(out_dir),
@@ -262,6 +256,10 @@ class Crux:
             scan_max=scan_max,
             decoy_search=decoy_search,
         )
+        if dry_run:
+            logger.info("Dry run enabled. Skipping actual `crux comet` execution.")
+            return expected_final_outputs
+
         if expected_final_outputs.target.exists():
             logger.info(
                 f"File {expected_final_outputs.target} already exists. Skipping `crux comet`."

@@ -1,22 +1,23 @@
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import click
 import pandas as pd
 
-from src.comet_utils import CometPSM, convert_comet_psms_to_psms
 from src.constants import (
     DEFAULT_MIN_SIDE_LEN,
     DEFAULT_PEAK_TO_ION_PPM_TOL,
-    DEFAULT_Q_VAL_THRESH,
+    DEFAULT_Q_THRESHOLD,
+    PSMS_DF_NAME,
 )
 from src.hypedsearch import HypedsearchRunConfig
 from src.hypedsearch_run_analysis import HypedsearchOutputs, create_junction_support_df
 from src.mass_spectra import Spectrum, create_spectra_plots
-from src.plot_utils import fig_setup, finalize, save_fig, set_title_axes_labels
+from src.plot_utils import fig_setup, save_fig
 from src.protein_abundance import ProteinAbundance
-from src.utils import PathType, setup_logger
+from src.psm import CometPSM, convert_comet_psms_to_psms
+from src.utils import PathType, flatten_list_of_lists, setup_logger
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,57 @@ def cli_spectra_plots(config: Path):
         spectra=list(hs_config.spectrum_uid_to_spectrum.values()),
         sample=hs_config.name,
         out_dir=hs_config._results_dir,
+    )
+
+
+@click.command(
+    "create-psms",
+    help=("Create and save spectra PSM objects"),
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+)
+@click.option(
+    "--config",
+    "-c",
+    type=PathType(),
+    required=True,
+    help="Path to run config",
+)
+@click.option(
+    "--hy_side_len",
+    "-s",
+    type=int,
+    default=DEFAULT_MIN_SIDE_LEN,
+    show_default=True,
+    required=True,
+    help="Path to run config",
+)
+def cli_create_psms(config: Union[Path, str], hy_side_len: int):
+    hs_config = HypedsearchRunConfig.from_json(path=config)
+
+    # Spectrum plots
+    create_spectra_plots(
+        spectra=list(hs_config.spectrum_uid_to_spectrum.values()),
+        sample=hs_config.name,
+        out_dir=hs_config._results_dir,
+    )
+
+    # Create and save SpectrumPSMs objects
+    # if not (hs_config._results_dir / SPECTRUM_PSMS_NAME).exists():
+    hs_out = HypedsearchOutputs(
+        hs_config=hs_config,
+        min_side_len=hy_side_len,
+        remove_carbamidomethylation=True,
+    )
+    hs_out.collect_outputs()
+    hs_out.set_q_values()
+    psms = hs_out.save_spectrum_psms()
+    hs_out.save_hybrid_peptides()
+
+    # Save dataframes
+    psm_df = pd.DataFrame(flatten_list_of_lists(psm.to_rows() for psm in psms))
+    psm_df.to_csv(
+        hs_config._results_dir / PSMS_DF_NAME,
+        index=False,
     )
 
 
@@ -67,7 +119,7 @@ def cli_spectra_plots(config: Path):
     "--q_threshold",
     "-q",
     type=float,
-    default=DEFAULT_Q_VAL_THRESH,
+    default=DEFAULT_Q_THRESHOLD,
     show_default=True,
     required=True,
     help="q-value threshold",
@@ -92,7 +144,7 @@ def cli_process(config: Path, hy_side_len: int, q_threshold: float):
     logger.info("Computing protein abundances...")
     prot_ab = ProteinAbundance.from_comet_psms(
         psms=list(hs_out.top_native_targets.values()),
-        q_val_thresh=q_threshold,
+        q_threshold=q_threshold,
     )
     fig, axs = fig_setup(h=8, w=8)
     prot_ab.plot(top_n_prots=20, ax=axs[0])
@@ -169,6 +221,27 @@ def cli_process(config: Path, hy_side_len: int, q_threshold: float):
     )
 
 
+# def create_spectrum_psm_df(
+#     spectrum_psms: List[SpectrumPSMs],
+#     prot_ab: Optional[ProteinAbundance] = None,
+# ):
+#     # Create dataframe
+#     rows = []
+#     for spectrum_psm in spectrum_psms:
+#         if spectrum_psm.native_target:
+
+#         for psm in spectrum_psm.psms:
+#             row = psm.to_row()
+#             if prot_ab is not None:
+#                 # Get protein abundance
+#                 row["prot_ab"] = max(
+#                     prot_ab.get_rel_ab(protein=prot) for prot in psm.positions
+#                 )
+#             rows.append(row)
+#     df = pd.DataFrame(rows)
+#     return df
+
+
 def process_psms(
     psms: List[CometPSM],
     uid_to_spectrum_map: Dict[str, Spectrum],
@@ -207,5 +280,5 @@ if __name__ == "__main__":
     setup_logger()
     cli.add_command(cli_spectra_plots)
     cli.add_command(cli_process)
-    # cli.add_command(cli_process)
+    cli.add_command(cli_create_psms)
     cli()

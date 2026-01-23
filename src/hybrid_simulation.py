@@ -1,4 +1,3 @@
-import argparse
 import logging
 import os
 import sys
@@ -8,19 +7,13 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import click
-from pydantic import BaseModel
 
 repo_dir = Path("/Users/erjo3868/repos/hypedsearch/hypedsearch")
 os.chdir(repo_dir)
 sys.path.append(str(repo_dir))
-import json
 import random
 import tempfile
-from collections import Counter
 
-from src.comet_utils import CometPSM
-from src.constants import MEMORY, MOUSE_PROTEOME
-from src.hybrids_via_clusters import HybridPeptide
 from src.hypedsearch import (
     HybridFormer,
     HybridPSMScorer,
@@ -31,7 +24,8 @@ from src.hypedsearch import (
 from src.kmer_database import KmerDatabase
 from src.mass_spectra import Mzml, Spectrum
 from src.peptides_and_ions import Fasta, Peptide
-from src.utils import PathType, load_json, setup_logger
+from src.psm import CometPSM
+from src.utils import setup_logger
 
 logger = logging.getLogger(__name__)
 
@@ -243,7 +237,7 @@ def cli_run_hybrid_finding_simulation_study(
 ):
     hs_config_path = "results/hybrid_simulation/inputs/hs.config.json"
     hs_config = HypedsearchRunConfig.from_json(hs_config_path)
-    mzml = Mzml(mzml=list(hs_config.mzml_to_scans.keys())[0])
+    mzml = Mzml(path=list(hs_config.mzml_to_scans.keys())[0])
     q_thresh = 0.01
     psms = CometPSM.from_txt(
         txt="results/1_1_Acet_Aspn_Islet_B35spike/native_run/assign-confidence.target.txt"
