@@ -49,6 +49,7 @@ from src.utils import (
     flatten_list_of_lists,
     load_json,
     mass_difference_in_ppm,
+    save_dict,
     save_pydantic_objects_to_json,
     setup_logger,
 )
@@ -401,6 +402,7 @@ class HypedsearchRunConfig(BaseModel):
     parent_output_dir: Path
     crux_comet_params: Path
     name: str
+    kmer_db: Optional[Path] = None
     hybrid_decoy_competition: bool = False
     max_precursor_charge: int = DEFAULT_MAX_PRECURSOR_CHARGE
     fasta: Path = HUMAN_PROTEOME
@@ -420,6 +422,13 @@ class HypedsearchRunConfig(BaseModel):
             if not mzml.exists():
                 raise ValueError(f"MZML file does not exist: {mzml}")
         return mzml_to_scans
+
+    @field_validator("kmer_db", mode="before")
+    @classmethod
+    def set_kmer_db(cls, v, info):
+        if v is not None:
+            return v
+        return info.data["parent_output_dir"] / f"{info.data['name']}.kmers.db"
 
     @field_validator("crux_comet_params", mode="after")
     def ensure_paths_exist(cls, v: Path) -> Path:
@@ -451,9 +460,9 @@ class HypedsearchRunConfig(BaseModel):
     def hybrid_run_scan_results_dir(self) -> Path:
         return self.hybrid_run_dir / "scan_results"
 
-    @property
-    def kmer_db(self) -> Path:
-        return self.parent_output_dir / f"{self.name}.kmers.db"
+    # @property
+    # def kmer_db(self) -> Path:
+    #     return self.parent_output_dir / f"{self.name}.kmers.db"
 
     @cached_property
     def spectrum_selector(self) -> SpectrumSelector:
@@ -495,6 +504,7 @@ class HypedsearchRunConfig(BaseModel):
     @classmethod
     def from_json(cls, path: Union[Path, str]):
         data = load_json(path=path)
+        Path(data["parent_output_dir"]).mkdir(exist_ok=True, parents=True)
         return cls(**data)
 
     @cached_property
@@ -551,6 +561,16 @@ class HypedsearchRunConfig(BaseModel):
             self.expected_hybrid_run_scan_target_txts
             - self.existing_hybrid_run_scan_target_txts
         )
+
+    def to_dict(self):
+        return self.model_dump(mode="json")
+
+    def save(
+        self,
+        path: Union[Path, str],
+    ):
+        """Save config as a JSON"""
+        save_dict(data=self.to_dict(), path=path)
 
     def native_comet_run(self, dry_run: bool = False) -> List[CometOutputs]:
         crux = Crux()

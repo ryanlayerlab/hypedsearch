@@ -12,7 +12,7 @@ show_help() {
   echo "Usage: $0 [--options]"
   echo
   echo "Options:"
-  echo "  --name   Number of cores to use (required)"
+#   echo "  --name   Number of cores to use (required)"
   echo "  --config    Path to Hypedsearch JSON config (required)"
   echo "  --mem    Memory allocation for SLURM job (default: $MEM)"
 #   echo "  --data   Path to the directory on the node where files will be temporarily copied for I/O optimization (default: $DATA_DIR)"
@@ -24,7 +24,7 @@ show_help() {
 # Argument parsing
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        --name) NAME="$2"; shift ;;
+        # --name) NAME="$2"; shift ;;
         --config) HS_CONFIG="$2"; shift ;;
         --mem) MEM="$2"; shift ;;
         --part) PARTITION="$2"; shift ;;
@@ -36,15 +36,17 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
+NAME=$(python -c "import json,sys; print(json.load(open(sys.argv[1]))['name'])" "$HS_CONFIG")
+
 # Validation
 if [ -z "$HS_CONFIG" ]; then
     echo "Error: You must provide both a Hypedsearch JSON config via '--config'"
     exit 0
 fi
-if [ -z "$NAME" ]; then
-    echo "Error: You must provide a name for the SLURM job name via '--name'"
-    exit 0
-fi
+# if [ -z "$NAME" ]; then
+#     echo "Error: You must provide a name for the SLURM job name via '--name'"
+#     exit 0
+# fi
 if [ -z "$PARTITION" ]; then
     echo "Error: You must provide a partition for the SLURM job via '--part'. Recommend 'highmem'"
     exit 0

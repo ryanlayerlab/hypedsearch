@@ -1,1 +1,0 @@
-scan	charge	spectrum precursor m/z	spectrum neutral mass	peptide mass	delta_cn	sp score	sp rank	xcorr score	xcorr rank	b/y ions matched	b/y ions total	total matches/spectrum	sequence	modified sequence	modifications	protein id	flanking aa	e-value

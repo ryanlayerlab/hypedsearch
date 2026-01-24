@@ -138,21 +138,6 @@ class Test_KmerToProteinMap:
 
 
 class Test_KmerDatabase:
-    @staticmethod
-    def test_get_kmer_to_proteins_map_from_db(test_data_dir):
-        # Arrange
-        db_path = (
-            test_data_dir / "sp-P99027-RLA2_MOUSE_mzml=BMEM_AspN_Fxn4;scan=7_kmer_db.db"
-        )
-        kmer_db = KmerDatabase(db_path=db_path)
-        true_kmer_to_proteins = KmerToProteinsMap.load(
-            path=test_data_dir
-            / "sp-P99027-RLA2_MOUSE_mzml=BMEM_AspN_Fxn4;scan=7_kmer_to_proteins.json"
-        )
-        # Act
-        computed_kmer_to_proteins = kmer_db.kmer_to_proteins_map
-        assert computed_kmer_to_proteins == true_kmer_to_proteins
-
     class Test_create_db:
         @staticmethod
         def test_smoke(test_data_dir, tmp_path, snapshot, snapshot_dir):

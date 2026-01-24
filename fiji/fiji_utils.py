@@ -5,7 +5,7 @@ import shutil
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Union
+from typing import Dict, Optional, Union
 
 import click
 import pandas as pd
@@ -17,6 +17,8 @@ from src.utils import PathType, copy_file, log_params, setup_logger
 
 logger = logging.getLogger(__name__)
 
+LOCALSCRATCH = "/localscratch"
+DEFAULT_FIJI_CONFIG_NAME = "hs.fiji.config.json"
 node_to_data_dir_map = {"": "/localscratch"}
 
 
@@ -39,91 +41,69 @@ def collect_benchmarking_data(dir: Path) -> pd.DataFrame:
     return df
 
 
-@dataclass
-class HypedsearchOnFijiConfig:
-    hs_config: HypedsearchRunConfig
+def create_config_for_fiji_run(
+    config: Union[str, Path],
+    node_data_dir: Union[str, Path] = LOCALSCRATCH,
+    dry_run: bool = False,
+) -> HypedsearchRunConfig:
+    hs_config = HypedsearchRunConfig.from_json(path=config)
 
-    @classmethod
-    def from_json(cls, path: Union[str, Path]):
-        hs_config = HypedsearchRunConfig.from_json(path=path)
-        return cls(hs_config=hs_config)
-
-    def prepare_files_for_hybrid_run(
-        self,
-        node: Optional[str] = None,
-        node_data_dir: Optional[Path] = None,
-        out_path: Optional[Union[str, Path]] = None,
-    ) -> HypedsearchRunConfig:
-        if node_data_dir is None:
-            node_data_dir = node_to_data_dir_map[node]
-
-        # Create directories that need to exist
-        name_dir = node_data_dir / self.hs_config.name
+    # Create directories that need to exist
+    name_dir = Path(node_data_dir) / hs_config.name
+    if not dry_run:
         name_dir.mkdir(parents=True, exist_ok=True)
 
-        # Copy MZMLs
-        new_mzml_to_scans = {}
-        for mzml, scans in self.hs_config.mzml_to_scans.items():
-            new_mzml_path = str(name_dir / Path(mzml).name)
-            new_mzml_to_scans[new_mzml_path] = scans
+    # Copy MZMLs
+    new_mzml_to_scans = {}
+    for mzml, scans in hs_config.mzml_to_scans.items():
+        new_mzml_path = name_dir / Path(mzml).name
+        new_mzml_to_scans[new_mzml_path] = scans
+        if not dry_run:
             copy_file(src=mzml, dest=new_mzml_path)
 
-        # Copy other files
-        # comet.params
-        old_comet_params = self.hs_config.psm_scorer.comet_params
-        new_comet_params = name_dir / old_comet_params.name
-        copy_file(src=old_comet_params, dest=new_comet_params)
-
-        # k-mer database
-        old_kmer_db = self.hs_config.hybrid_former.kmer_db
-        new_kmer_db = name_dir / old_kmer_db.name
-        copy_file(src=old_kmer_db, dest=new_kmer_db)
-
-        # FASTA
-        old_fasta = self.hs_config.hybrid_former.fasta
-        new_fasta = name_dir / old_fasta.name
-        copy_file(src=old_fasta, dest=new_fasta)
-
-        # Create new config
-        hybrid_former = deepcopy(self.hs_config.hybrid_former)
-        hybrid_former.kmer_db = new_kmer_db
-        hybrid_former.fasta = new_fasta
-
-        psm_scorer = deepcopy(self.hs_config.psm_scorer)
-        if psm_scorer.fasta is not None:
-            psm_scorer.fasta = new_fasta
-        psm_scorer.comet_params = new_comet_params
-
-        fiji_config = HypedsearchRunConfig(
-            mzml_to_scans=new_mzml_to_scans,
-            parent_out_dir=name_dir,
-            name=self.hs_config.name,
-            spectrum_selector=self.hs_config.spectrum_selector,
-            spectrum_preprocessor=self.hs_config.spectrum_preprocessor,
-            psm_scorer=psm_scorer,
-            hybrid_former=hybrid_former,
+    # Copy other files
+    # comet.params
+    new_params_path = name_dir / hs_config.crux_comet_params.name
+    if not dry_run:
+        copy_file(
+            src=hs_config.crux_comet_params,
+            dest=new_params_path,
         )
-        if out_path is None:
-            out_path = name_dir / f"hs.fiji.config.json"
-        fiji_config.to_json(path=out_path)
-        return fiji_config
 
-    def move_scan_results(
-        self,
-        node_data_dir: Path,
-    ):
-        fiji_config = self.prepare_files_for_hybrid_run(node_data_dir=node_data_dir)
-        # Move native scan results
-        src = fiji_config.native_run_scan_results_dir
-        dest = self.hs_config.native_run_scan_results_dir
-        logger.info(f"Copying native scan results from {src} to {dest}...")
-        shutil.copytree(src, dest, dirs_exist_ok=True)
+    # k-mer database
+    new_kmer_db_path = name_dir / hs_config.kmer_db.name
+    if not dry_run:
+        copy_file(src=hs_config.kmer_db, dest=new_kmer_db_path)
 
-        # Move hybrid scan results
-        src = fiji_config.hybrid_run_scan_results_dir
-        dest = self.hs_config.hybrid_run_scan_results_dir
-        logger.info(f"Copying hybrid scan results from {src} to {dest}...")
-        shutil.copytree(src, dest, dirs_exist_ok=True)
+    # FASTA
+    new_fasta_path = name_dir / hs_config.fasta.name
+    if not dry_run:
+        copy_file(src=hs_config.fasta, dest=new_fasta_path)
+
+    # Create new config
+    new_config = deepcopy(hs_config)
+    new_config.mzml_to_scans = new_mzml_to_scans
+    new_config.fasta = new_fasta_path
+    new_config.kmer_db = new_kmer_db_path
+    new_config.crux_comet_params = new_params_path
+    new_config.parent_output_dir = name_dir
+
+    return new_config
+
+
+def move_scan_results_from_node_to_persistent_storage(
+    config: Path,
+    node_data_dir: Path,
+):
+    non_fiji_config = HypedsearchRunConfig.from_json(path=config)
+    fiji_config = create_config_for_fiji_run(
+        config=config, node_data_dir=node_data_dir, dry_run=True
+    )
+    # Move hybrid scan results
+    src = fiji_config.hybrid_run_scan_results_dir
+    dest = non_fiji_config.hybrid_run_scan_results_dir
+    logger.info(f"Copying hybrid scan results from {src} to {dest}...")
+    shutil.copytree(src, dest, dirs_exist_ok=True)
 
 
 @click.command(
@@ -156,8 +136,8 @@ def cli_prep_files_on_fiji(
 ):
     logger = setup_logger()
     logger.info("Setting up files on Fiji node...")
-    fiji_runner = HypedsearchOnFijiConfig.from_json(path=config)
-    _ = fiji_runner.prepare_files_for_hybrid_run(node_data_dir=data_dir)
+    fiji_config = create_config_for_fiji_run(config=config, node_data_dir=data_dir)
+    fiji_config.save(path=data_dir / DEFAULT_FIJI_CONFIG_NAME)
     logger.info("Finished preparing files on Fiji node")
 
 
@@ -191,9 +171,9 @@ def cli_move_scan_results(
     config: Path,
     data_dir: Path,
 ):
-    logger = setup_logger()
-    fiji_runner = HypedsearchOnFijiConfig.from_json(path=config)
-    fiji_runner.move_scan_results(node_data_dir=data_dir)
+    move_scan_results_from_node_to_persistent_storage(
+        config=config, node_data_dir=data_dir
+    )
 
 
 @click.command(
@@ -231,6 +211,7 @@ def cli():
 
 
 if __name__ == "__main__":
+    setup_logger()
     cli.add_command(cli_prep_files_on_fiji)
     cli.add_command(cli_collect_benchmark_data)
     cli.add_command(cli_move_scan_results)

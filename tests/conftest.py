@@ -79,7 +79,6 @@ def comet_psm(test_data_dir):
     )
     psms = [psm for psm in psms if "sp|P99027|RLA2_MOUSE" in psm.proteins]
     psms[0].save(path=path)
-
     return CometPSM.load(path=path)
 
 
