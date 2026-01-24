@@ -153,14 +153,12 @@ old_tests
 dbs
 no-git
 tmp 
-data
 slurm
 old_stuff
 no_git
 plots
 experiments
 notebooks
-data/spectra/human_samples
 results
 logs
 dev_code

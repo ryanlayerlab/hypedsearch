@@ -423,13 +423,6 @@ class HypedsearchRunConfig(BaseModel):
                 raise ValueError(f"MZML file does not exist: {mzml}")
         return mzml_to_scans
 
-    @field_validator("kmer_db", mode="before")
-    @classmethod
-    def set_kmer_db(cls, v, info):
-        if v is not None:
-            return v
-        return info.data["parent_output_dir"] / f"{info.data['name']}.kmers.db"
-
     @field_validator("crux_comet_params", mode="after")
     def ensure_paths_exist(cls, v: Path) -> Path:
         if not v.exists():
@@ -438,9 +431,14 @@ class HypedsearchRunConfig(BaseModel):
 
     @model_validator(mode="after")
     def post_init(self) -> Self:
+        # Set kmer database path
+        if self.kmer_db is None:
+            self.kmer_db = self.parent_output_dir / f"{self.name}.kmers.db"
+
+        # Ensure directories exist
         self.native_run_dir.mkdir(parents=True, exist_ok=True)
         self.hybrid_run_dir.mkdir(parents=True, exist_ok=True)
-        self.plots_dir.mkdir(parents=True, exist_ok=True)
+        # self.plots_dir.mkdir(parents=True, exist_ok=True)
         self.hybrid_run_scan_results_dir.mkdir(parents=True, exist_ok=True)
         return self
 
@@ -1142,23 +1140,27 @@ def create_hybrids_fasta(
 #     )
 
 
-# @click.command(
-#     name="check-for-missing-scans",
-#     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-#     help="""
-#     Check which scans were and were not processed.
-#     """,
-# )
-# @click.option(
-#     "--config",
-#     "-c",
-#     type=PathType(),
-#     required=True,
-#     help="Path to the Hypedsearch config JSON",
-# )
-# def cli_check_for_missing_scans(config: Path):
-#     hs_config = HypedsearchRunConfig.from_json(path=config)
-#     hs_config.print_missing_scan_info()
+@click.command(
+    name="check-for-missing-scans",
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+    help="""
+    Check which scans were and were not processed.
+    """,
+)
+@click.option(
+    "--config",
+    "-c",
+    type=PathType(),
+    required=True,
+    help="Path to the Hypedsearch config JSON",
+)
+def cli_check_for_missing_scans(config: Path):
+    logger.info(
+        f"Checking for missing hybrid scan target txt files for config: {config.name}"
+    )
+    hs_config = HypedsearchRunConfig.from_json(path=config)
+    missing_txts = hs_config.missing_hybrid_run_scan_target_txts
+    logger.info(f"Found {len(missing_txts)} missing hybrid scan target txt files")
 
 
 @click.command(

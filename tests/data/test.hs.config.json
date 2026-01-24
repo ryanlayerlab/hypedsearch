@@ -1,8 +1,7 @@
 {
     "name": "test_hypedsearch",
     "mzml_to_scans": {
-        "tests/data/10_mouse_spectra.mzML": "all",
-        "tests/data/BMEM_AspN_Fxn4_scans1-20.mzML": [1, 2, 3]
+        "tests/data/BMEM_AspN_Fxn4_scans1-20.mzML": "all"
     },
     "parent_output_dir": "tests/outputs",
     "kmer_db": "tests/data/sp-P99027-RLA2_MOUSE_mzml=BMEM_AspN_Fxn4;scan=7_kmer_db.db",

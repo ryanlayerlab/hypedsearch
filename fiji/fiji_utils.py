@@ -137,7 +137,7 @@ def cli_prep_files_on_fiji(
     logger = setup_logger()
     logger.info("Setting up files on Fiji node...")
     fiji_config = create_config_for_fiji_run(config=config, node_data_dir=data_dir)
-    fiji_config.save(path=data_dir / DEFAULT_FIJI_CONFIG_NAME)
+    fiji_config.save(path=fiji_config.parent_output_dir / DEFAULT_FIJI_CONFIG_NAME)
     logger.info("Finished preparing files on Fiji node")
 
 

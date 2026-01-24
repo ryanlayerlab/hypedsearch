@@ -111,10 +111,6 @@ if $USE_SINGULARITY; then
     # Clean up data directory on the node
     echo "Removing data directory $DATA_DIR/$NAME"
     rm -rf $DATA_DIR/$NAME
-
-    # Combine scan results IF ALL scans completed successfully
-    python -m src.hypedsearch combine-comet-scan-results \
-        --config $HS_CONFIG
 fi
 
 echo "Finished running Hypedsearch!"
