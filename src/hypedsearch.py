@@ -189,15 +189,15 @@ def get_matching_output_txt(out_dir: Path, mzml_name: str, psm_type: str) -> Pat
     )
 
 
-def get_combine_comet_outputs_in_scan_results_dir(
-    scan_results_dir: Path, out_dir: Path
-) -> Dict[str, Dict[str, Path]]:
+def get_comet_outputs_in_folder(folder: Union[str, Path]) -> Dict[str, Dict[str, Path]]:
+    """
+    Given a folder, find all Comet output txt files and group them by MZML name and PSM type (=target or decoy). Return a dictionary of the form
+    """
     output_regex = r"^(?P<mzml>(.+?))\.comet\.(?P<scan>\d+)-(?P=scan)\.(?P<psm_type>target|decoy)\.txt$"
     # Get Comet outputs for each MZML
     logger.info("Grouping Comet outputs by MZML...")
-    mzml_names = set()
-    mzml_files = defaultdict(lambda: {TARGET: [], DECOY: []})
-    for comet_txt in scan_results_dir.glob("*.txt"):
+    mzml_to_psm_type_to_txts = defaultdict(lambda: {TARGET: [], DECOY: []})
+    for comet_txt in Path(folder).glob("*.txt"):
         match = re.match(output_regex, comet_txt.name)
         if match is None:
             logger.info(
@@ -207,36 +207,30 @@ def get_combine_comet_outputs_in_scan_results_dir(
 
         mzml_name = match.groupdict()["mzml"]
         psm_type = match.groupdict()["psm_type"]
-        mzml_files[mzml_name][psm_type].append(comet_txt)
-        mzml_names.add(mzml_name)
-
-    outputs = defaultdict(dict)
-    for mzml_name in mzml_names:
-        for psm_type in [TARGET, DECOY]:
-            outputs[mzml_name][psm_type] = out_dir / get_combined_comet_output_name(
-                mzml_name=mzml_name, psm_type=psm_type
-            )
-    return outputs
+        mzml_to_psm_type_to_txts[mzml_name][psm_type].append(comet_txt)
+    return dict(mzml_to_psm_type_to_txts)
 
 
-def combine_comet_scan_results(
-    scan_results_dir: Path, out_dir: Path
+def combine_comet_results_by_mzml_and_psm_type(
+    folder: Union[Path, str], out_dir: Optional[Union[Path, str]] = None
 ) -> Dict[str, Dict[str, Path]]:
+    if out_dir is None:
+        out_dir = Path(folder).parent
+        logger.info(f"Out directory not set so setting to {out_dir}")
     # Get Comet outputs for each MZML
-    outputs = get_combine_comet_outputs_in_scan_results_dir(
-        scan_results_dir=scan_results_dir, out_dir=out_dir
-    )
-    for mzml_name in outputs.keys():
-        for psm_type in [TARGET, DECOY]:
-            files = outputs[mzml_name].get(psm_type, [])
-            if len(files) == 0:
+    mzml_to_psm_type_to_txts = get_comet_outputs_in_folder(folder=folder)
+    for mzml_name, psm_type_to_txts in mzml_to_psm_type_to_txts.items():
+        for psm_type, txts in psm_type_to_txts.items():
+            if len(txts) == 0:
                 continue
             logger.info(f"Combining Comet {psm_type} outputs for {mzml_name}...")
             _ = Crux.combine_crux_comet_files(
-                files=files,
-                out_path=outputs[mzml_name][psm_type],
+                files=txts,
+                out_path=Path(out_dir)
+                / get_combined_comet_output_name(
+                    mzml_name=mzml_name, psm_type=psm_type
+                ),
             )
-    return outputs
 
 
 class HybridPSMScorer(BaseModel):
@@ -1057,46 +1051,50 @@ def create_hybrids_fasta(
     return prots
 
 
-# @click.command(
-#     name="combine-comet-scan-results",
-#     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-#     help="""
-#     Given a directory containing the Comet output for each scan, combine them by mzML.
-#     For each mzML file, two files will be created in out_dir:\n
-#     1) <mzML name>.comet.target.txt - containing all the target PSMs, and\n
-#     2) <mzML name>.comet.decoy.txt - containing all the decoy PSMs.
-#     """,
-# )
-# @click.option(
-#     "--scan_results_dir",
-#     "-srd",
-#     type=PathType(),
-#     required=False,
-#     help="Path to the directory containing scan results",
-# )
-# @click.option(
-#     "--out_dir",
-#     "-od",
-#     type=PathType(),
-#     required=False,
-#     help="Path to the output directory where the combined results for each mzML will be saved",
-# )
-# @click.option(
-#     "--config",
-#     "-c",
-#     type=PathType(),
-#     required=False,
-#     help="Path to the Hypedsearch config JSON",
-# )
-# def cli_combine_comet_scan_results(
-#     scan_results_dir: Optional[Path], out_dir: Optional[Path], config: Optional[Path]
-# ):
-#     if config is None:
-#         combine_comet_scan_results(scan_results_dir=scan_results_dir, out_dir=out_dir)
-#     else:
-#         hs_config = HypedsearchRunConfig.from_json(path=config)
-#         hs_config.combine_comet_scan_results()
-#     logger.info("Finished combining Comet scan results")
+@click.command(
+    name="combine-comet-txts",
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+    help="""
+    Given a directory containing the Comet output for each scan, combine them by mzML.
+    For each mzML file, two files will be created in out_dir:\n
+    1) <mzML name>.comet.target.txt - containing all the target PSMs, and\n
+    2) <mzML name>.comet.decoy.txt - containing all the decoy PSMs.
+    """,
+)
+@click.option(
+    "--results_dir",
+    "-rd",
+    type=PathType(),
+    required=False,
+    help="Path to the directory containing scan results",
+)
+@click.option(
+    "--out_dir",
+    "-od",
+    type=PathType(),
+    required=False,
+    help="Path to the output directory where the combined results for each mzML will be saved",
+)
+@click.option(
+    "--config",
+    "-c",
+    type=PathType(),
+    required=False,
+    help="Path to the Hypedsearch config JSON",
+)
+def cli_combine_comet_txts(
+    results_dir: Optional[Path], out_dir: Optional[Path], config: Optional[Path]
+):
+    if config is None:
+        combine_comet_results_by_mzml_and_psm_type(
+            scan_results_dir=results_dir, out_dir=out_dir
+        )
+    else:
+        hs_config = HypedsearchRunConfig.from_json(path=config)
+        combine_comet_results_by_mzml_and_psm_type(
+            folder=hs_config.hybrid_run_scan_results_dir
+        )
+    logger.info("Finished combining Comet scan results")
 
 
 # @click.command(
@@ -1217,8 +1215,8 @@ def cli():
 
 if __name__ == "__main__":
     setup_logger()
-    # cli.add_command(cli_combine_comet_scan_results)
-    # cli.add_command(cli_check_for_missing_scans)
+    cli.add_command(cli_combine_comet_txts)
+    cli.add_command(cli_check_for_missing_scans)
     cli.add_command(cli_run_hypedsearch)
     # cli.add_command(cli_create_native_run_snakemake_config)
     cli()
