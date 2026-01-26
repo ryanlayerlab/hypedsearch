@@ -2,7 +2,7 @@ import logging
 import re
 import tempfile
 from collections import defaultdict
-from dataclasses import field
+from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Set, Tuple, Union
@@ -28,6 +28,8 @@ from src.constants import (
     DEFAULT_Q_THRESHOLD,
     HS_PREFIX,
     HUMAN_PROTEOME,
+    HYBRID,
+    NATIVE,
     TARGET,
     TRUE_HYBRIDS_PATH,
 )
@@ -148,29 +150,79 @@ class TrueHybrid(HybridPeptide):
         return true_hybrids
 
 
-def get_combined_comet_output_name(mzml_name: str, psm_type: str) -> str:
-    return f"{mzml_name}.comet.{psm_type}.txt"
+@dataclass
+class HypedsearchOutputs:
+    comet_regex = r"^(?P<mzml>(.+?))\.comet\.(?P<scan>\d+)-(?P=scan)\.(?P<psm_type>target|decoy)\.txt$"
+    assign_conf_regex = r"^(?P<name>(.+?))-assign-confidence.txt"
 
+    @staticmethod
+    def get_combined_comet_output_name(mzml_name: str, psm_type: str) -> str:
+        return f"{mzml_name}.comet.0-0.{psm_type}.txt"
 
-def parse_combined_comet_output_name(filename: str):
-    output_regex = r"^(?P<mzml>(.+?))\.comet\.(?P<psm_type>target|decoy)\.txt$"
-    match = re.match(output_regex, filename)
-    if match is not None:
-        mzml_name = match.groupdict()["mzml"]
-        psm_type = match.groupdict()["psm_type"]
-        return mzml_name, psm_type
+    @classmethod
+    def get_comet_outputs_in_folder(
+        cls,
+        folder: Union[str, Path],
+    ) -> Dict[str, Dict[str, Path]]:
+        """
+        Given a folder, find all Comet output txt files and group them by MZML name and PSM type (=target or decoy). Return a dictionary of the form
+        """
+        # Get Comet outputs for each MZML
+        logger.info("Grouping Comet outputs by MZML...")
+        mzml_to_psm_type_to_txts = defaultdict(lambda: {TARGET: [], DECOY: []})
+        for comet_txt in Path(folder).glob("*.txt"):
+            match = re.match(cls.comet_regex, comet_txt.name)
+            if match is None:
+                logger.info(
+                    f"Skipping file {comet_txt} because it doesn't match expected pattern"
+                )
+                continue
 
-    output_regex = r"^(?P<name>(.+?))-assign-confidence.txt"
-    match = re.match(output_regex, filename)
-    if match is not None:
-        mzml_name = match.groupdict()["name"]
-        psm_type = ASSIGN_CONFIDENCE
-        return mzml_name, psm_type
+            mzml_name = match.groupdict()["mzml"]
+            psm_type = match.groupdict()["psm_type"]
+            mzml_to_psm_type_to_txts[mzml_name][psm_type].append(comet_txt)
+        return dict(mzml_to_psm_type_to_txts)
 
-    else:
-        raise ValueError(
-            f"Filename {filename} does not match expected combined comet output pattern: {output_regex}"
-        )
+    @classmethod
+    def parse_combined_comet_output_name(cls, filename: str):
+        match = re.match(cls.comet_regex, filename)
+        if match is not None:
+            mzml_name = match.groupdict()["mzml"]
+            psm_type = match.groupdict()["psm_type"]
+            return mzml_name, psm_type
+
+        match = re.match(cls.assign_conf_regex, filename)
+        if match is not None:
+            mzml_name = match.groupdict()["name"]
+            psm_type = ASSIGN_CONFIDENCE
+            return mzml_name, psm_type
+
+        else:
+            raise ValueError(
+                f"Filename {filename} does not match expected combined comet output patterns: {cls.assign_conf_regex} nor {cls.comet_regex}"
+            )
+
+    @classmethod
+    def combine_comet_results_by_mzml_and_psm_type(
+        cls, folder: Union[Path, str], out_dir: Optional[Union[Path, str]] = None
+    ) -> Dict[str, Dict[str, Path]]:
+        if out_dir is None:
+            out_dir = Path(folder).parent
+            logger.info(f"Out directory not set so setting to {out_dir}")
+        # Get Comet outputs for each MZML
+        mzml_to_psm_type_to_txts = cls.get_comet_outputs_in_folder(folder=folder)
+        for mzml_name, psm_type_to_txts in mzml_to_psm_type_to_txts.items():
+            for psm_type, txts in psm_type_to_txts.items():
+                if len(txts) == 0:
+                    continue
+                logger.info(f"Combining Comet {psm_type} outputs for {mzml_name}...")
+                _ = Crux.combine_crux_comet_files(
+                    files=txts,
+                    out_path=Path(out_dir)
+                    / cls.get_combined_comet_output_name(
+                        mzml_name=mzml_name, psm_type=psm_type
+                    ),
+                )
 
 
 def get_matching_output_txt(out_dir: Path, mzml_name: str, psm_type: str) -> Path:
@@ -187,50 +239,6 @@ def get_matching_output_txt(out_dir: Path, mzml_name: str, psm_type: str) -> Pat
     raise RuntimeError(
         f"No matching output txt found for MZML={mzml_name}, PSM_TYPE={psm_type} in directory {out_dir}"
     )
-
-
-def get_comet_outputs_in_folder(folder: Union[str, Path]) -> Dict[str, Dict[str, Path]]:
-    """
-    Given a folder, find all Comet output txt files and group them by MZML name and PSM type (=target or decoy). Return a dictionary of the form
-    """
-    output_regex = r"^(?P<mzml>(.+?))\.comet\.(?P<scan>\d+)-(?P=scan)\.(?P<psm_type>target|decoy)\.txt$"
-    # Get Comet outputs for each MZML
-    logger.info("Grouping Comet outputs by MZML...")
-    mzml_to_psm_type_to_txts = defaultdict(lambda: {TARGET: [], DECOY: []})
-    for comet_txt in Path(folder).glob("*.txt"):
-        match = re.match(output_regex, comet_txt.name)
-        if match is None:
-            logger.info(
-                f"Skipping file {comet_txt} because it doesn't match expected pattern"
-            )
-            continue
-
-        mzml_name = match.groupdict()["mzml"]
-        psm_type = match.groupdict()["psm_type"]
-        mzml_to_psm_type_to_txts[mzml_name][psm_type].append(comet_txt)
-    return dict(mzml_to_psm_type_to_txts)
-
-
-def combine_comet_results_by_mzml_and_psm_type(
-    folder: Union[Path, str], out_dir: Optional[Union[Path, str]] = None
-) -> Dict[str, Dict[str, Path]]:
-    if out_dir is None:
-        out_dir = Path(folder).parent
-        logger.info(f"Out directory not set so setting to {out_dir}")
-    # Get Comet outputs for each MZML
-    mzml_to_psm_type_to_txts = get_comet_outputs_in_folder(folder=folder)
-    for mzml_name, psm_type_to_txts in mzml_to_psm_type_to_txts.items():
-        for psm_type, txts in psm_type_to_txts.items():
-            if len(txts) == 0:
-                continue
-            logger.info(f"Combining Comet {psm_type} outputs for {mzml_name}...")
-            _ = Crux.combine_crux_comet_files(
-                files=txts,
-                out_path=Path(out_dir)
-                / get_combined_comet_output_name(
-                    mzml_name=mzml_name, psm_type=psm_type
-                ),
-            )
 
 
 class HybridPSMScorer(BaseModel):
@@ -663,6 +671,37 @@ class HypedsearchRunConfig(BaseModel):
             psm_scorer=self.psm_scorer,
         )
 
+    def get_output_txts(
+        self,
+        run_type: Literal[NATIVE, HYBRID],
+        psm_type: Literal[TARGET, DECOY, ASSIGN_CONFIDENCE],
+    ) -> List:
+        if run_type == NATIVE:
+            out_dir = self.native_run_dir
+        elif run_type == HYBRID:
+            out_dir = self.hybrid_run_dir
+        else:
+            raise ValueError(
+                f"Invalid run_type: {run_type}. Allowed: {NATIVE}, {HYBRID}"
+            )
+        output_txts = []
+        for mzml in self.mzml_to_scans.keys():
+            mzml_name = Mzml.get_mzml_name(mzml=mzml)
+            try:
+                output_txts.append(
+                    get_matching_output_txt(
+                        out_dir=out_dir,
+                        mzml_name=mzml_name,
+                        psm_type=psm_type,
+                    )
+                )
+            except:
+                logger.info(
+                    f"Wasn't able to find output txt for MZML={mzml_name}, run_type={run_type}, psm_type={psm_type}"
+                )
+
+        return output_txts
+
 
 # class HypedsearchRunConfig(BaseModel):
 #     mzml_to_scans: Dict[Path, Union[Set[int], Literal["all"]]]
@@ -940,48 +979,48 @@ class HypedsearchRunConfig(BaseModel):
 #             out_dir=self.hybrid_run_dir,
 #         )
 
-#     def get_output_txts(
-#         self,
-#         run_type: Literal[NATIVE, HYBRID],
-#         psm_type: Literal[TARGET, DECOY, ASSIGN_CONFIDENCE],
-#     ) -> List:
-#         def file_to_load(run_type, psm_type):
-#             if psm_type == TARGET:
-#                 return f"*.comet.{TARGET}.txt"
-#             elif psm_type == DECOY:
-#                 return f"*.comet.{DECOY}.txt"
-#             elif psm_type == ASSIGN_CONFIDENCE:
-#                 return self.assign_confidence_name(prefix=run_type)
-#             else:
-#                 raise ValueError(
-#                     f"Invalid psm_type: {psm_type}. Allowed: {TARGET}, {DECOY}, {ASSIGN_CONFIDENCE}"
-#                 )
-
-#         if run_type == NATIVE:
-#             out_dir = self.native_run_dir
-#         elif run_type == HYBRID:
-#             out_dir = self.hybrid_run_dir
+# def get_output_txts(
+#     self,
+#     run_type: Literal[NATIVE, HYBRID],
+#     psm_type: Literal[TARGET, DECOY, ASSIGN_CONFIDENCE],
+# ) -> List:
+#     def file_to_load(run_type, psm_type):
+#         if psm_type == TARGET:
+#             return f"*.comet.{TARGET}.txt"
+#         elif psm_type == DECOY:
+#             return f"*.comet.{DECOY}.txt"
+#         elif psm_type == ASSIGN_CONFIDENCE:
+#             return self.assign_confidence_name(prefix=run_type)
 #         else:
 #             raise ValueError(
-#                 f"Invalid run_type: {run_type}. Allowed: {NATIVE}, {HYBRID}"
+#                 f"Invalid psm_type: {psm_type}. Allowed: {TARGET}, {DECOY}, {ASSIGN_CONFIDENCE}"
 #             )
-#         output_txts = []
-#         for mzml in self.mzml_to_scans.keys():
-#             mzml_name = Mzml.get_mzml_name(mzml=mzml)
-#             try:
-#                 output_txts.append(
-#                     get_matching_output_txt(
-#                         out_dir=out_dir,
-#                         mzml_name=mzml_name,
-#                         psm_type=psm_type,
-#                     )
-#                 )
-#             except:
-#                 logger.info(
-#                     f"Wasn't able to find output txt for MZML={mzml_name}, run_type={run_type}, psm_type={psm_type}"
-#                 )
 
-#         return output_txts
+#     if run_type == NATIVE:
+#         out_dir = self.native_run_dir
+#     elif run_type == HYBRID:
+#         out_dir = self.hybrid_run_dir
+#     else:
+#         raise ValueError(
+#             f"Invalid run_type: {run_type}. Allowed: {NATIVE}, {HYBRID}"
+#         )
+#     output_txts = []
+#     for mzml in self.mzml_to_scans.keys():
+#         mzml_name = Mzml.get_mzml_name(mzml=mzml)
+#         try:
+#             output_txts.append(
+#                 get_matching_output_txt(
+#                     out_dir=out_dir,
+#                     mzml_name=mzml_name,
+#                     psm_type=psm_type,
+#                 )
+#             )
+#         except:
+#             logger.info(
+#                 f"Wasn't able to find output txt for MZML={mzml_name}, run_type={run_type}, psm_type={psm_type}"
+#             )
+
+#     return output_txts
 
 #     @property
 #     def _results_dir(self) -> Path:
@@ -1086,12 +1125,12 @@ def cli_combine_comet_txts(
     results_dir: Optional[Path], out_dir: Optional[Path], config: Optional[Path]
 ):
     if config is None:
-        combine_comet_results_by_mzml_and_psm_type(
-            scan_results_dir=results_dir, out_dir=out_dir
+        HypedsearchOutputs.combine_comet_results_by_mzml_and_psm_type(
+            folder=results_dir, out_dir=out_dir
         )
     else:
         hs_config = HypedsearchRunConfig.from_json(path=config)
-        combine_comet_results_by_mzml_and_psm_type(
+        HypedsearchOutputs.combine_comet_results_by_mzml_and_psm_type(
             folder=hs_config.hybrid_run_scan_results_dir
         )
     logger.info("Finished combining Comet scan results")
