@@ -1,6 +1,7 @@
 import json
 from dataclasses import asdict
 
+from src.constants import MOUSE_PROTEOME
 from src.kmer_database import DbKmer, KmerDatabase, KmerToProteinsMap
 from src.mass_spectra import Spectrum
 from src.peptides_and_ions import Fasta, Peptide, UnpositionedProductIon
@@ -96,12 +97,9 @@ class Test_KmerToProteinMap:
 
         @staticmethod
         def test_include_only_proteins_from_file(test_data_dir):
-            fasta = (
-                test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
-            )
             protein_names = test_data_dir / "mouse_data_top_10_proteins.txt"
             kmer_to_prot_map = KmerToProteinsMap.create(
-                fasta=fasta,
+                fasta=MOUSE_PROTEOME,
                 min_k=1,
                 max_k=3,
                 protein_names=protein_names,
@@ -111,10 +109,6 @@ class Test_KmerToProteinMap:
             assert proteins == set(
                 flatten_list_of_lists(kmer_to_prot_map.kmer_to_protein_map.values())
             )
-            # assert len(kmer_to_prot_map.kmer_to_protein_map) > 0
-            # # Check that the proteins are from the file
-            # for protein in kmer_to_prot_map.kmer_to_protein_map.values():
-            #     assert protein[0].startswith("test_")
 
     @staticmethod
     def test_save_and_load_pklz(tmp_path, test_data_dir):
@@ -207,17 +201,18 @@ class Test_KmerDatabase:
 
     class Test_get_peak_ion_matches_for_spectrum:
         @staticmethod
-        def test_smoke(test_data_dir, tmp_path, snapshot, snapshot_dir):
+        def test_smoke(
+            test_data_dir, tmp_path, snapshot, snapshot_dir, mouse_mzml_path
+        ):
             # Arrange
-            mzml, scan = test_data_dir / "BMEM_AspN_Fxn4/BMEM_AspN_Fxn4.mzML", 7
-            spectrum = Spectrum.get_spectrum(scan=scan, mzml=mzml)
-            fasta = (
-                test_data_dir / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
-            )
+            scan = 7
+            spectrum = Spectrum.get_spectrum(scan=scan, mzml=mouse_mzml_path)
             protein_names = ["sp|P99027|RLA2_MOUSE"]
             kmer_db = KmerDatabase.create_db(
                 db_path=tmp_path / "test.db",
-                proteins=Fasta(path=fasta).get_proteins_by_name(names=protein_names),
+                proteins=Fasta(path=MOUSE_PROTEOME).get_proteins_by_name(
+                    names=protein_names
+                ),
                 min_k=1,
                 max_k=25,
             )

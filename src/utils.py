@@ -190,6 +190,9 @@ def get_time_in_diff_units(time_sec: float, decimal_places: int = 2) -> str:
 def log_params(func):
     """
     Decorator to log the parameters of a function when it's called.
+    Usage:
+    @log_params
+    def my_fcn...
     """
 
     def wrapper(*args, **kwargs):

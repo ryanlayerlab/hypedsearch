@@ -7,10 +7,10 @@ show_help() {
   echo "Usage: $0 [--options]"
   echo
   echo "Options:"
-  echo "  --config    Path to Hypedsearch JSON config (required)"
-  echo "  --singularity    Whether to use sinuglarity or not (default: $USE_SINGULARITY)"
-  echo "  --data   Path to data directory (default: temporary directory)"
-  echo "  --cores   Number of cores to use (required)"
+  echo "  --config    Path to Hypedsearch JSON config. Required"
+  echo "  --data    Path to data directory. Defaults to a temporary directory created by 'mktemp -d'."
+  echo "  --cores    Number of cores to give to snakemake. Required"
+  echo "  --singularity    Flag that sets whether or not to use sinuglarity. Default: $USE_SINGULARITY"
   echo "  -h, --help    Show this help message"
 }
 

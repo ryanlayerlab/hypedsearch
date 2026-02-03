@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pytest import approx
 
-from src.constants import B_ION_TYPE, Y_ION_TYPE
+from src.constants import B_ION_TYPE, MOUSE_PROTEOME, Y_ION_TYPE
 from src.peptides_and_ions import (
     Fasta,
     Peptide,
@@ -116,8 +116,7 @@ class Test_get_proteins_by_name:
         ]
         prots = get_proteins_by_name(
             protein_names=protein_names,
-            fasta_path=test_data_dir
-            / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta",
+            fasta_path=MOUSE_PROTEOME,
         )
         assert len(prots) == 2
         assert "sp|P01326|INS2_MOUSE" in {p.name for p in prots}

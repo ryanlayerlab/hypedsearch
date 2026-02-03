@@ -8,10 +8,10 @@ from tests.fixtures_and_helpers import create_spectrum
 
 class Test_Mzml:
     @staticmethod
-    def test_initialization_by_string(mouse_mzml):
-        mzml = Mzml(path=str(mouse_mzml))
+    def test_initialization_by_string(mouse_mzml_path):
+        mzml = Mzml(path=str(mouse_mzml_path))
         assert isinstance(mzml.path, Path)
-        assert mzml.path == mouse_mzml
+        assert mzml.path == mouse_mzml_path
 
 
 class Test_Spectrum:
@@ -53,11 +53,10 @@ class Test_Spectrum:
         assert actual == expected
 
     @staticmethod
-    def test_parse_mzml(test_data_dir):
+    def test_parse_mzml(mouse_mzml_path):
         # It's difficult to create a test MZML. So this test just checks that
         # the function does not fail on an actual MZML
-        mzml_path = test_data_dir / "spectra/10_mouse_spectra.mzML"
-        actual = Spectrum.parse_ms2_from_mzml(mzml=mzml_path)
+        actual = Spectrum.parse_ms2_from_mzml(mzml=mouse_mzml_path)
         assert len(actual) > 0
 
 

@@ -1,5 +1,5 @@
 import logging
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
 from functools import cached_property
 from pathlib import Path
@@ -30,7 +30,7 @@ from src.constants import (
     Y_ION_TYPE,
 )
 from src.mass_spectra import Mzml, Peak, Spectrum, organize_by_spectrum_uid, plot_peaks
-from src.peptides_and_ions import Peptide, compute_peptide_precursor_mz
+from src.peptides_and_ions import Fasta, Peptide, compute_peptide_precursor_mz
 from src.plot_utils import fig_setup, finalize, set_title_axes_labels
 from src.utils import (
     flatten_list_of_lists,
@@ -572,6 +572,78 @@ def convert_comet_psms_to_psms(
         )
         psms.append(psm)
     return psms
+
+
+class ProteinAbundance(BaseModel):
+    protein_counts: Counter
+
+    @classmethod
+    def from_comet_txt(
+        cls, txt: Union[str, Path], q_val_thresh: float = DEFAULT_Q_THRESHOLD
+    ):
+        psms = CometPSM.from_txt(txt=txt)
+        return cls.from_comet_psms(psms=psms, q_threshold=q_val_thresh)
+
+    @classmethod
+    def from_comet_psms(
+        cls, psms: List[CometPSM], q_threshold: float = DEFAULT_Q_THRESHOLD
+    ) -> "ProteinAbundance":
+        psms = get_high_confidence_psms(psms=psms, score=Q_VAL, threshold=q_threshold)
+        all_comet_proteins = flatten_list_of_lists([psm.proteins for psm in psms])
+        protein_counts = Counter(all_comet_proteins)
+        return cls(protein_counts=protein_counts)
+
+    def top_n_prots(
+        self, n: int, with_cnts: bool = False
+    ) -> Union[Set[str], Dict[str, int]]:
+        most_common_proteins = {
+            prot: cnt for prot, cnt in self.protein_counts.most_common(n)
+        }
+        if with_cnts:
+            return most_common_proteins
+        else:
+            return set(most_common_proteins.keys())
+
+    def relative_protein_abundances(
+        self, fasta_path: Union[Path, str]
+    ) -> "ProteinAbundance":
+        fasta = Fasta(path=fasta_path)
+        prot_name_to_leng = {prot.name: len(prot.seq) for prot in fasta.proteins}
+        prot_cnts = defaultdict(int)
+        for prot_name, cnt in self.protein_counts.items():
+            prot_cnts[prot_name] = cnt / prot_name_to_leng[prot_name]
+        return ProteinAbundance(protein_counts=Counter(prot_cnts))
+
+    def plot(
+        self, top_n_prots: Optional[int] = None, ax: Optional[Axes] = None
+    ) -> Axes:
+        # Define data
+        items = sorted(self.protein_counts.items(), key=lambda x: x[1], reverse=True)
+        if top_n_prots is not None:
+            items = items[:top_n_prots]
+        keys, values = zip(*items)
+
+        # Plot
+        if ax is None:
+            fig, axs = fig_setup(h=8, w=10)
+            ax = axs[0]
+        ax.scatter(range(len(keys)), values)
+        ax.set_xticks(range(len(keys)), keys, rotation=90, fontsize=8)
+        set_title_axes_labels(
+            ax=ax,
+            # title="Protein counts",
+            xlabel="Protein",
+            ylabel="PSM counts",
+        )
+        finalize(ax)
+        return ax
+
+    def get_ab(self, protein: str) -> int:
+        return self.protein_counts[protein]
+
+    def get_rel_ab(self, protein: str) -> float:
+        max_count = max(self.protein_counts.values())
+        return self.protein_counts[protein] / max_count
 
 
 def get_high_confidence_psms(

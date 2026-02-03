@@ -108,6 +108,7 @@ NAT_TARGET = "Native target"
 NAT_DECOY = "Native decoy"
 HY_TARGET = "Hybrid target"
 HY_DECOY = "Hybrid decoy"
+GOOD_HYBRID_BAD_NATIVE = "good_hybrid_bad_native"
 
 
 class IonTypes(Enum):

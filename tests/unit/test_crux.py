@@ -2,7 +2,7 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from src.constants import MAC_CRUX_EXECUTABLE
+from src.constants import MAC_CRUX_EXECUTABLE, MOUSE_PROTEOME
 from src.crux import (
     CometConfig,
     CometOutputs,
@@ -60,11 +60,10 @@ class Test_get_expected_comet_outputs_for_mzml_to_scans:
 class Test_Crux:
     class Test_run_comet:
         @staticmethod
-        def test_smoke(tmp_path, test_data_dir):
+        def test_smoke(tmp_path, test_data_dir, mouse_mzml_path):
             comet_outputs = Crux().run_comet(
-                mzml=test_data_dir / "spectra/BMEM_AspN_Fxn4_scans1-20.mzML",
-                fasta=test_data_dir
-                / "mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta",
+                mzml=mouse_mzml_path,
+                fasta=MOUSE_PROTEOME,
                 crux_comet_params=test_data_dir / "crux.comet.params",
                 decoy_search=2,
                 out_dir=tmp_path,
@@ -78,7 +77,7 @@ class Test_Crux:
             # Arrange
             crux = Crux()
             out_path = tmp_path / "assign-confidence.target.txt"
-            target_txt = test_data_dir / "BMEM_AspN_Fxn4/BMEM_AspN_Fxn4.target.txt"
+            target_txt = test_data_dir / "BMEM_AspN_Fxn4.target.txt"
             # Act
             crux.run_assign_confidence(
                 target_txts=[target_txt],
@@ -91,10 +90,9 @@ class Test_Crux:
 
 class Test_run_comet_on_custom_seqs:
     @staticmethod
-    def test_smoke(test_data_dir):
+    def test_smoke(test_data_dir, mouse_mzml_path):
         seqs = ["EPVDPNRGLRTL", "SAAPAAGSAPAAAEEKK"]
-        mzml = test_data_dir / "spectra/BMEM_AspN_Fxn4_scans1-20.mzML"
-        spectra = Spectrum.parse_ms2_from_mzml(mzml=mzml)
+        spectra = Spectrum.parse_ms2_from_mzml(mzml=mouse_mzml_path)
         spectrum_to_psms = run_comet_on_custom_seqs(
             seqs=seqs,
             spectra=spectra,

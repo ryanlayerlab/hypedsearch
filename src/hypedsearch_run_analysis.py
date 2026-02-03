@@ -3,7 +3,7 @@ from copy import deepcopy
 from dataclasses import asdict, dataclass, field, replace
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
 from venv import logger
 
 import click
@@ -25,10 +25,15 @@ from src.constants import (
     DEFAULT_Q_RANGE,
     DEFAULT_Q_THRESHOLD,
     DEFAULT_SCORE_CHANGE_RANGE,
+    GOOD_HYBRID_BAD_NATIVE,
+    HUMAN_PROTEOME,
+    HY_TARGET,
     HYBRID,
     HYBRID_PEPTIDES_NAME,
+    NAT_DECOY,
     NAT_TARGET,
     NATIVE,
+    NEOFUSION,
     PSMS_DF_NAME,
     Q_VAL,
     SPECTRA_DF_NAME,
@@ -46,25 +51,23 @@ from src.plot_utils import (
     finalize,
     plot_line,
     plot_sorted_1d_data,
+    save_fig,
     set_title_axes_labels,
 )
-from src.protein_abundance import ProteinAbundance
-from src.psm import PSM, CometPSM, spectrum_peptide_plot
+from src.psm import PSM, CometPSM, ProteinAbundance, spectrum_peptide_plot
 from src.utils import (
     PathType,
     flatten_list_of_lists,
     get_positions_of_subseq_in_seq,
     load_json,
+    log_params,
     log_time,
     setup_logger,
     to_json,
     write_new_line_separated_file,
 )
 
-
-@dataclass
-class HybridJunction:
-    jct: str
+ALLOWED_ACCEPTANCE_METHODS = ["good_hybrid_bad_native"]
 
 
 def num_hybrids_per_seq_histplot(seq_to_hybrids_map):
@@ -84,7 +87,7 @@ def num_hybrids_per_seq_histplot(seq_to_hybrids_map):
         ylabel="Count",
     )
     finalize(axs)
-    return df
+    return df, fig, axs
 
 
 def group_hybrid_psms_by_junction(
@@ -186,6 +189,7 @@ class SpectrumPSMs:
             ),
         }
 
+    @log_time()
     @staticmethod
     def save(psms: List["SpectrumPSMs"], path: Union[Path, str]):
         to_json(data=[psm.to_dict() for psm in psms], path=path)
@@ -254,11 +258,13 @@ class SpectrumPSMs:
             ax=axs[1],
             title=f"Hybrid target: {self.hybrid_target.seq}\nxcorr={self.hybrid_target.xcorr}, q={self.hybrid_target.q_value}",
         )
-        fig.suptitle(f"Spectrum: {self.spectrum.uid} (PPM tol={peak_to_ion_ppm_tol})")
+        fig.suptitle(
+            f"Spectrum: {self.spectrum.uid}\nprecursor-intensity: {round(self.spectrum.precursor_intensity, 3)} (PPM tol={peak_to_ion_ppm_tol})"
+        )
 
 
 @dataclass
-class HypedsearchOutputs:
+class ResultsAnalysis:
     hs_config: Union[str, Path, HypedsearchRunConfig]
     min_side_len: int = DEFAULT_MIN_SIDE_LEN
     remove_carbamidomethylation: bool = True
@@ -266,11 +272,11 @@ class HypedsearchOutputs:
     native_assign_conf: Dict[str, CometPSM] = field(init=False)
     native_decoys: Dict[str, List[CometPSM]] = field(init=False)
     hybrid_targets: Dict[str, List[CometPSM]] = field(init=False)
-    hybrid_decoys: Dict[str, List[CometPSM]] = field(init=False)
 
     def __post_init__(self):
         if isinstance(self.hs_config, (str, Path)):
             self.hs_config = HypedsearchRunConfig.from_json(path=self.hs_config)
+        self.results_dir.mkdir(parents=True, exist_ok=True)
 
     @property
     def name(self) -> str:
@@ -286,9 +292,13 @@ class HypedsearchOutputs:
     def seq_to_hybrids_map(self) -> Dict[str, List[HybridPeptide]]:
         return get_seq_to_hybrids_map(
             seqs=self.hybrid_seqs,
-            db_path=self.hs_config.kmer_db_path,
+            db_path=self.hs_config.kmer_db,
             min_side_len=self.min_side_len,
         )
+
+    @cached_property
+    def _native_output_txts(self) -> Dict[str, List[Path]]:
+        return self.hs_config.get_expected_native_run_output_txts()
 
     @cached_property
     def q_value_interpolator(self) -> PchipInterpolator:
@@ -304,19 +314,19 @@ class HypedsearchOutputs:
             set(self.native_targets.keys()).union(set(self.hybrid_targets.keys()))
         )
 
-    @property
+    @cached_property
     def top_native_targets(self) -> Dict[str, CometPSM]:
         return get_top_psm_per_spectrum(
             psms=flatten_list_of_lists(self.native_targets.values())
         )
 
-    @property
+    @cached_property
     def top_hybrid_targets(self) -> Dict[str, CometPSM]:
         return get_top_psm_per_spectrum(
             psms=flatten_list_of_lists(self.hybrid_targets.values())
         )
 
-    @property
+    @cached_property
     def top_native_decoys(self) -> Dict[str, CometPSM]:
         return get_top_psm_per_spectrum(
             psms=flatten_list_of_lists(self.native_decoys.values())
@@ -324,15 +334,24 @@ class HypedsearchOutputs:
 
     @cached_property
     def protein_name_to_seq_map(self) -> Dict[str, str]:
-        fasta = Fasta(path=self.hs_config.fasta_path)
+        fasta = Fasta(path=self.hs_config.fasta)
         return fasta.protein_name_to_seq_map
+
+    @property
+    def results_dir(self) -> Path:
+        return self.hs_config.parent_output_dir / "results"
+
+    def get_spectrum_psms_path(self, min_side_len: int) -> Path:
+        return (
+            self.results_dir
+            / f"{self.name}.minSideLen={min_side_len}.spectrumPSMs.json"
+        )
 
     def collect_outputs(self):
         self.native_targets = self._get_native_targets()
         self.native_assign_conf = self._get_native_assign_conf()
         self.native_decoys = self._get_native_decoys()
         self.hybrid_targets = self._get_hybrid_targets()
-        self.hybrid_decoys = self._get_hybrid_decoys()
         logger.info("Loading spectra so they're quickly available...")
         _ = self.spectrum_uid_to_spectrum  # force loading spectra
 
@@ -347,16 +366,21 @@ class HypedsearchOutputs:
     def _get_native_targets(self) -> Dict[str, List[CometPSM]]:
         logger.info("Getting native target PSMs...")
         return CometPSM.from_txts(
-            txts=self.hs_config.get_output_txts(run_type=NATIVE, psm_type=TARGET),
+            txts=self._native_output_txts[TARGET],
+            by_spectrum=True,
+        )
+
+    def _get_native_decoys(self) -> Dict[str, List[CometPSM]]:
+        logger.info("Getting native decoy PSMs...")
+        return CometPSM.from_txts(
+            txts=self._native_output_txts[DECOY],
             by_spectrum=True,
         )
 
     def _get_native_assign_conf(self) -> Dict[str, List[CometPSM]]:
         logger.info("Getting native assign confidence PSMs...")
-        spectrum_to_psm = CometPSM.from_txts(
-            txts=self.hs_config.get_output_txts(
-                run_type=NATIVE, psm_type=ASSIGN_CONFIDENCE
-            ),
+        spectrum_to_psm = CometPSM.from_txt(
+            txt=self._native_output_txts[ASSIGN_CONFIDENCE],
             by_spectrum=True,
         )
         for key, psms in spectrum_to_psm.items():
@@ -364,19 +388,12 @@ class HypedsearchOutputs:
             spectrum_to_psm[key] = psms[0]
         return spectrum_to_psm
 
-    def _get_native_decoys(self) -> Dict[str, List[CometPSM]]:
-        logger.info("Getting native decoy PSMs...")
-        return CometPSM.from_txts(
-            txts=self.hs_config.get_output_txts(run_type=NATIVE, psm_type=DECOY),
-            by_spectrum=True,
-        )
-
     def _get_hybrid_targets(self) -> Dict[str, List[CometPSM]]:
         logger.info("Getting hybrid target PSMs...")
         psms = [
             psm
             for psm in CometPSM.from_txts(
-                txts=self.hs_config.get_output_txts(run_type=HYBRID, psm_type=TARGET),
+                txts=self.hs_config.get_expected_hybrid_run_output_txts(),
                 by_spectrum=False,
             )
             if psm.is_hybrid
@@ -387,23 +404,17 @@ class HypedsearchOutputs:
         logger.info("Removing native PSMs from hybrid PSMs...")
         psms = remove_native_psms(
             hybrid_psms=psms,
-            fasta=self.hs_config.fasta_path,
+            fasta=self.hs_config.fasta,
         )
 
         seq_to_hybrids = get_seq_to_hybrids_map(
             seqs=set(psm.seq for psm in psms),
-            db_path=self.hs_config.kmer_db_path,
+            db_path=self.hs_config.kmer_db,
             min_side_len=self.min_side_len,
             remove_carbamidomethylation=self.remove_carbamidomethylation,
         )
         hybrid_supported_psms = [psm for psm in psms if psm.seq in seq_to_hybrids]
         return organize_by_spectrum_uid(data=hybrid_supported_psms)
-
-    def _get_hybrid_decoys(self) -> Dict[str, List[CometPSM]]:
-        return CometPSM.from_txts(
-            txts=self.hs_config.get_output_txts(run_type=HYBRID, psm_type=DECOY),
-            by_spectrum=True,
-        )
 
     def save_spectrum_psms(self) -> List[SpectrumPSMs]:
         psms = self.to_spectrum_psms()
@@ -482,6 +493,130 @@ class HypedsearchOutputs:
             results.append(self.get_spectrum_psms(spectrum_uid=uid))
         return results
 
+    def xcorr_plot(self):
+        psms = self.to_spectrum_psms()
+        fig, axs = fig_setup(ncols=2)
+        xcorr_plot(
+            psms_by_type={
+                NAT_TARGET: self.top_native_targets.values(),
+                NAT_DECOY: self.top_native_decoys.values(),
+                HY_TARGET: self.top_hybrid_targets.values(),
+            },
+            ax=axs[0],
+        )
+        plot_native_vs_hybrid_scores(psms=psms, ax=axs[1])
+        finalize(axs)
+        save_fig(
+            fig=fig,
+            title=f"{self.name}",
+            path=self.hs_config.plots_dir / f"{self.name}.xcorr.png",
+        )
+
+    def create_plots(
+        self,
+    ):
+        # Xcorr plot
+        self.xcorr_plot()
+
+        # Num of hybrid explanations per hybrid seq, e.g., hybrid seq = ABC with hybrid
+        # explanations A-BC, AB-C
+        df, fig, axs = num_hybrids_per_seq_histplot(
+            seq_to_hybrids_map=self.seq_to_hybrids_map
+        )
+        save_fig(
+            fig=fig,
+            title=f"{self.name}",
+            path=self.hs_config.plots_dir / f"{self.name}.numHybridsPerHybridSeq.png",
+        )
+
+        # Spectra plots
+        fig, axs = Spectrum.plot_spectra_info(
+            spectra=list(self.hs_config.spectrum_uid_to_spectrum.values()),
+            add_counts=False,
+        )
+        save_fig(
+            fig=fig,
+            title=f"{self.name}",
+            path=self.hs_config.plots_dir / f"{self.name}.spectraHistograms.png",
+        )
+
+
+@log_params
+def process_hs_config(
+    hs_config: Path,
+    acceptance_method_name: Literal[
+        GOOD_HYBRID_BAD_NATIVE, NEOFUSION
+    ] = GOOD_HYBRID_BAD_NATIVE,
+    q_threshold: Optional[float] = DEFAULT_Q_THRESHOLD,
+    jct_len: int = DEFAULT_JCT_LEN,
+    min_hybrid_side_len: int = DEFAULT_MIN_SIDE_LEN,
+    remove_methylation: bool = True,
+):
+    results = ResultsAnalysis(
+        hs_config=hs_config,
+        min_side_len=min_hybrid_side_len,
+        remove_carbamidomethylation=remove_methylation,
+    )
+    spectrum_psms_path = results.get_spectrum_psms_path(
+        min_side_len=min_hybrid_side_len
+    )
+    if not spectrum_psms_path.exists():
+        # Collect all the PSMs, and set q-values
+        results.collect_outputs()
+        results.set_q_values()
+
+        # Create SpectrumPSMs
+        psms = results.to_spectrum_psms()
+        SpectrumPSMs.save(psms=psms, path=spectrum_psms_path)
+
+        # Plots
+        results.create_plots()
+
+        seq_to_hybrids_map = results.seq_to_hybrids_map
+
+    else:
+        logger.info(f"SpectrumPSMs already exist so loading them...")
+        psms = SpectrumPSMs.load(path=spectrum_psms_path)
+        seq_to_hybrids_map = get_seq_to_hybrids_map(
+            seqs=set(psm.hybrid_target.seq for psm in psms if psm.hybrid_target),
+            db_path=results.hs_config.kmer_db,
+            min_side_len=min_hybrid_side_len,
+            remove_carbamidomethylation=remove_methylation,
+        )
+    # Junction analysis
+    logger.info("Junction analysis starting...")
+    identifier = AcceptanceMethod.get_acceptance_identifier(
+        acceptance_method_name=acceptance_method_name,
+        min_hybrid_side_len=min_hybrid_side_len,
+        jct_len=jct_len,
+    )
+    if acceptance_method_name == GOOD_HYBRID_BAD_NATIVE:
+        accepted_hybrids = (
+            AcceptanceMethod.acccept_good_hybrids_with_no_good_native_explanation(
+                psms=psms, q_threshold=q_threshold
+            )
+        )
+    elif acceptance_method_name == NEOFUSION:
+        accepted_hybrids = AcceptanceMethod.accept_hybrids_via_neofusion(
+            psms=psms,
+        )
+    else:
+        raise ValueError("Unrecognized acceptance method")
+    df = get_junction_df(
+        hybrid_psms=accepted_hybrids,
+        protein_name_to_seq_map=results.protein_name_to_seq_map,
+        seq_to_hybrids_map=seq_to_hybrids_map,
+        spectrum_uid_to_spectrum_map=results.spectrum_uid_to_spectrum,
+        jct_len=jct_len,
+    )
+    fig, axs = junction_plots(df=df)
+    save_fig(
+        fig=fig,
+        title=f"{results.name}\n{identifier}",
+        path=results.hs_config.plots_dir / f"{results.name}.{identifier}.png",
+    )
+    df.to_csv(results.results_dir / f"{results.name}.{identifier}.csv", index=False)
+
 
 def get_support_in_pileup(
     pos: ProteinRange,
@@ -514,6 +649,10 @@ def get_pileup_from_positions(positions: List[ProteinRange]):
     for pos in positions:
         for idx in range(pos.inclusive_start, pos.exclusive_end):
             pileup[pos.protein][idx] += 1
+
+    # Sort each protein's pileup by location and turn the pileup into a dict from a default dict
+    for prot, pile in pileup.items():
+        pileup[prot] = dict(sorted(pile.items()))
     return dict(pileup)
 
 
@@ -530,7 +669,10 @@ def get_hybrid_psm_pileups(psms: List[SpectrumPSMs], fasta: Path):
     return left_pileup, right_pileup
 
 
-def get_native_pileup(psms: List[CometPSM], fasta: Path):
+# @dataclass
+# class PSMPileup:
+#     @staticmethod
+def get_native_pileup(psms: List[CometPSM], fasta: Path = HUMAN_PROTEOME):
     return get_pileup_from_positions(
         positions=align_psms_to_proteome(
             psms=psms,
@@ -1006,11 +1148,6 @@ def max_precursor_abundance(
     return max(abundances)
 
 
-def get_junction_positions(jct_str: str, protein_name_to_seq_map: Dict[str, str]):
-    hy = HybridPeptide.parse_hybrid_peptide_str(hybrid_str=jct_str)
-    return hy.get_positions(protein_name_to_seq_map=protein_name_to_seq_map)
-
-
 def get_junction_df(
     hybrid_psms: List[CometPSM],
     protein_name_to_seq_map: Dict[str, str],
@@ -1058,19 +1195,10 @@ def get_junction_df(
         ],
     )
     df["num_uniq_seqs"] = df.psm_seq_cnter.apply(lambda cnter: len(cnter.keys()))
+    df.sort_values(
+        by="num_psm_supporting", ascending=False, ignore_index=True, inplace=True
+    )
     return df
-    # if true_hybrids is not None:
-    #     true_jcts = list(
-    #         set(
-    #             flatten_list_of_lists(
-    #                 true.get_junctions(
-    #                     protein_name_to_seq_map=protein_name_to_seq_map,
-    #                     min_aa_side_len=min_aa_jct_len,
-    #                 )
-    #                 for true in true_hybrids
-    #             )
-    #         )
-    #     )
 
 
 def junction_plots(
@@ -1180,17 +1308,6 @@ def plot_native_vs_hybrid_scores(
         label=f"n={len(native_and_hybrid_psms)}",
         ax=ax,
     )
-    # sns.scatterplot(
-    #     data=data,
-    #     x=f"native_target_{score}",
-    #     y=f"hybrid_target_{score}",
-    #     s=2 * s,
-    #     marker="x",
-    #     color="red",
-    #     label=f"True hybrid seqs (n={data.shape[0]})",
-    #     ax=ax,
-    #     linewidth=1.5,
-    # )
     plot_line(ax=ax, label="y=x")
     set_title_axes_labels(
         ax=ax,
@@ -1305,144 +1422,80 @@ def extract_spectrum_command(
     return f'wine msconvert {local_mzml_path} --filter "index {spectrum_idx}" --outfile {file_name} -o {out_dir} --mgf'
 
 
-def get_acceptance_identifier(
-    acceptance_method_name: str,
-    min_hybrid_side_len: int,
-    min_jct_len: int,
-) -> str:
-    return f"acceptanceMethod={acceptance_method_name}_minHySideLen={min_hybrid_side_len}_minJctLen{min_jct_len}"
+@dataclass
+class AcceptanceMethod:
 
+    @staticmethod
+    def get_acceptance_identifier(
+        acceptance_method_name: str,
+        min_hybrid_side_len: int,
+        jct_len: int,
+    ) -> str:
+        return f"acceptanceMethod={acceptance_method_name}_minHySideLen={min_hybrid_side_len}_minJctLen{jct_len}"
 
-def get_accepted_hybrids_file_path(
-    hs_config: Union[HypedsearchRunConfig, Path, str],
-    acceptance_method_name: str,
-    min_hybrid_side_len: int,
-    min_jct_len: int,
-):
-    if isinstance(hs_config, (str, Path)):
-        hs_config = HypedsearchRunConfig.from_json(path=hs_config)
-    results_dir = get_results_dir(hs_config=hs_config)
-    method = get_acceptance_identifier(
-        acceptance_method_name=acceptance_method_name,
-        min_hybrid_side_len=min_hybrid_side_len,
-        min_jct_len=min_jct_len,
-    )
-    return results_dir / f"acceptedHybrids_{hs_config.name}_{method}.json"
+    # def accept_all_hybrids(hs_out: ResultsAnalysis) -> List[CometPSM]:
+    #     return list(hs_out.top_hybrid_targets.values())
 
+    @staticmethod
+    def accept_hybrids_that_beat_native(
+        results: ResultsAnalysis,
+    ) -> List[CometPSM]:
+        accepted_hybrid_psms = []
+        for spectrum_uid, hybrid_psm in results.top_hybrid_targets.items():
+            native_psm = results.native_assign_conf.get(spectrum_uid, None)
+            if native_psm is None:
+                accepted_hybrid_psms.append(hybrid_psm)
+                continue
+            if hybrid_psm.xcorr > native_psm.xcorr:
+                accepted_hybrid_psms.append(hybrid_psm)
+        return accepted_hybrid_psms
 
-def load_accepted_hybrid_psms(
-    hs_config: Union[HypedsearchRunConfig, Path, str],
-    acceptance_method_name: str,
-    min_hybrid_side_len: int,
-    min_jct_len: int,
-) -> List[CometPSM]:
-    return CometPSM.load(
-        path=get_accepted_hybrids_file_path(
-            hs_config=hs_config,
-            acceptance_method_name=acceptance_method_name,
-            min_hybrid_side_len=min_hybrid_side_len,
-            min_jct_len=min_jct_len,
+    @staticmethod
+    def acccept_good_hybrids_with_no_good_native_explanation(
+        psms: List[SpectrumPSMs], q_threshold: float = DEFAULT_Q_THRESHOLD
+    ) -> List[CometPSM]:
+        accepted_hybrid_psms = []
+        for psm in psms:
+            if psm.hybrid_target is not None:
+                if psm.hybrid_target.q_value > q_threshold:
+                    # Skip hybrids with bad/high q-value
+                    continue
+                # Continue with hybrids with good/low q-value
+                if psm.native_target is None:
+                    accepted_hybrid_psms.append(psm.hybrid_target)
+                elif psm.native_target.q_value > q_threshold:
+                    accepted_hybrid_psms.append(psm.hybrid_target)
+        return accepted_hybrid_psms
+
+    @staticmethod
+    def accept_hybrids_via_neofusion(
+        psms: List[SpectrumPSMs],
+        q_vals: List[float] = DEFAULT_Q_RANGE,
+        score_deltas: List[float] = DEFAULT_SCORE_CHANGE_RANGE,
+        fpr_threshold: float = DEFAULT_FPR,
+    ) -> List[CometPSM]:
+        neofusion_runner = NeoFusionRunner(
+            native_assign_conf={
+                psm.spectrum.uid: psm.native_target
+                for psm in psms
+                if psm.native_target is not None
+            },
+            top_hybrid_targets={
+                psm.spectrum.uid: psm.hybrid_target
+                for psm in psms
+                if psm.hybrid_target is not None
+            },
+            q_vals=q_vals,
+            score_deltas=score_deltas,
+            fpr_threshold=fpr_threshold,
         )
-    )
-
-
-def accept_all_hybrids(hs_out: HypedsearchOutputs) -> List[CometPSM]:
-    return list(hs_out.top_hybrid_targets.values())
-
-
-def accept_hybrids_that_beat_native(hs_out: HypedsearchOutputs) -> List[CometPSM]:
-    accepted_hybrid_psms = []
-    for spectrum_uid, hybrid_psm in hs_out.top_hybrid_targets.items():
-        native_psm = hs_out.native_assign_conf.get(spectrum_uid, None)
-        if native_psm is None:
-            accepted_hybrid_psms.append(hybrid_psm)
-            continue
-        if hybrid_psm.xcorr > native_psm.xcorr:
-            accepted_hybrid_psms.append(hybrid_psm)
-    return accepted_hybrid_psms
-
-
-def accept_hybrids_by_q_value(hs_out: HypedsearchOutputs, q_threshold: float):
-    accepted_hybrid_psms = accept_hybrids_that_beat_native(hs_out=hs_out)
-    accepted_hybrid_psms = [
-        psm for psm in accepted_hybrid_psms if psm.q_value <= q_threshold
-    ]
-    return accepted_hybrid_psms
-
-
-def get_jct_file_name(
-    hs_config: Union[HypedsearchRunConfig, Path, str],
-    acceptance_method_name: str,
-    min_hybrid_side_len: int,
-    min_jct_len: int,
-):
-    if isinstance(hs_config, (str, Path)):
-        hs_config = HypedsearchRunConfig.from_json(path=hs_config)
-    method = get_acceptance_identifier(
-        acceptance_method_name=acceptance_method_name,
-        min_hybrid_side_len=min_hybrid_side_len,
-        min_jct_len=min_jct_len,
-    )
-    return f"junctionSupport_name={hs_config.name}_{method}"
-
-
-def get_jct_df_path(
-    hs_config: Union[HypedsearchRunConfig, Path, str],
-    acceptance_method_name: str,
-    min_hybrid_side_len: int,
-    min_jct_len: int,
-):
-    results_dir = get_results_dir(hs_config=hs_config)
-    file_name = get_jct_file_name(
-        hs_config=hs_config,
-        acceptance_method_name=acceptance_method_name,
-        min_hybrid_side_len=min_hybrid_side_len,
-        min_jct_len=min_jct_len,
-    )
-    return results_dir / f"{file_name}.csv"
-
-
-def get_jct_plot_path(
-    hs_config: Union[HypedsearchRunConfig, Path, str],
-    acceptance_method_name: str,
-    min_hybrid_side_len: int,
-    min_jct_len: int,
-):
-    results_dir = get_results_dir(hs_config=hs_config)
-    file_name = get_jct_file_name(
-        hs_config=hs_config,
-        acceptance_method_name=acceptance_method_name,
-        min_hybrid_side_len=min_hybrid_side_len,
-        min_jct_len=min_jct_len,
-    )
-    return results_dir / f"{file_name}.png"
-
-
-def get_results_dir(
-    hs_config: Union[HypedsearchRunConfig, Path, str],
-):
-    if isinstance(hs_config, (str, Path)):
-        hs_config = HypedsearchRunConfig.from_json(path=hs_config)
-    return hs_config.parent_out_dir / "analysis"
-
-
-def get_jct_df(
-    hs_config: Union[HypedsearchRunConfig, Path, str],
-    acceptance_method_name: str,
-    min_hybrid_side_len: int,
-    min_jct_len: int,
-) -> pd.DataFrame:
-    jct_df_path = get_jct_df_path(
-        hs_config=hs_config,
-        acceptance_method_name=acceptance_method_name,
-        min_hybrid_side_len=min_hybrid_side_len,
-        min_jct_len=min_jct_len,
-    )
-    if not jct_df_path.exists():
-        raise FileNotFoundError(
-            f"Junction support dataframe not found at {jct_df_path}"
+        best_iteration, accepted_hybrids = (
+            neofusion_runner.select_hybrid_psms_from_best_iteration(
+                neofusion_results=neofusion_runner.run_neofusion()
+            )
         )
-    return pd.read_csv(jct_df_path)
+        logger.info(f"Best NeoFusion iteration info:\n{best_iteration.info}")
+        return accepted_hybrids
 
 
 def create_extract_spectra_from_mzml_bash_script(
@@ -1468,6 +1521,69 @@ def create_extract_spectra_from_mzml_bash_script(
         lines=script_lines,
         path=Path(local_script_out_dir)
         / f"{mzml.name}_get_true_hybrid_supporting_spectra.sh",
+    )
+
+
+@click.command(
+    name="process-config",
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+    help="""
+    """,
+)
+@click.option(
+    "--config",
+    "-c",
+    type=PathType(),
+    required=True,
+    help="Path to config",
+)
+@click.option(
+    "--acceptance_method",
+    "-am",
+    type=str,
+    required=True,
+    help=f"Name of the hybrid acceptance method to use. Accepted values: {GOOD_HYBRID_BAD_NATIVE} and {NEOFUSION}",
+)
+@click.option(
+    "--min_hy_side_len",
+    "-mhsl",
+    type=int,
+    required=False,
+    show_default=True,
+    default=DEFAULT_MIN_SIDE_LEN,
+    help="Minimum hybrid side length",
+)
+@click.option(
+    "--q_threshold",
+    "-qt",
+    type=float,
+    required=False,
+    show_default=True,
+    default=DEFAULT_Q_THRESHOLD,
+    help="",
+)
+@click.option(
+    "--jct_len",
+    "-jl",
+    type=int,
+    required=False,
+    show_default=True,
+    default=DEFAULT_JCT_LEN,
+    help="",
+)
+def cli_process_config(
+    config: Path,
+    acceptance_method: str,
+    q_threshold: float,
+    min_hy_side_len: int,
+    jct_len: int,
+):
+    process_hs_config(
+        hs_config=config,
+        acceptance_method_name=acceptance_method,
+        q_threshold=q_threshold,
+        min_hybrid_side_len=min_hy_side_len,
+        jct_len=jct_len,
     )
 
 
@@ -1516,4 +1632,5 @@ def cli():
 if __name__ == "__main__":
     setup_logger()
     cli.add_command(cli_create_spectrum_psms)
+    cli.add_command(cli_process_config)
     cli()

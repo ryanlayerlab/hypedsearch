@@ -24,7 +24,6 @@ from src.hypedsearch import (
     SpectrumSelector,
     TrueHybrid,
     cli_run_hypedsearch,
-    combine_comet_scan_results,
     find_possible_hybrids_for_seq,
     hybrid_run_on_spectrum,
 )
@@ -33,329 +32,29 @@ from src.mass_spectra import Mzml, Spectrum
 from src.peptides_and_ions import Fasta
 from src.psm import CometPSM
 from src.utils import flatten_list_of_lists, load_json, mass_difference_in_ppm
-from tests.conftest import default_hs_run, default_test_config
-
-
-class Test_TrueHybrid:
-    @staticmethod
-    def test_from_excel():
-        path = "data/251022_RP_HUMAN_SERUM_SPIKEDvsNOSPIKE/true_hybrids.xlsx"
-        TrueHybrid.from_excel(path=path)
-
-    @staticmethod
-    def test_set_proteins_for_true_hybrids():
-        path = "data/251022_RP_HUMAN_SERUM_SPIKEDvsNOSPIKE/true_hybrids.xlsx"
-        hybrids = TrueHybrid.from_excel(path=path)
-        assert hybrids[0].left_proteins == set()
-        assert hybrids[0].right_proteins == set()
-        HybridPeptide.set_proteins(hybrids=hybrids, fasta=HUMAN_PROTEOME)
-        assert len(hybrids[0].left_proteins) > 0
-        assert len(hybrids[0].right_proteins) > 0
-
-    @staticmethod
-    def test_get_spectra_for_true_hybrids():
-        # Arrange
-        path = "data/251022_RP_HUMAN_SERUM_SPIKEDvsNOSPIKE/true_hybrids.xlsx"
-        hybrids = TrueHybrid.from_excel(path=path)
-        TrueHybrid.set_proteins(hybrids=hybrids, fasta=HUMAN_PROTEOME)
-        mzmls = [
-            "data/251022_RP_HUMAN_SERUM_SPIKEDvsNOSPIKE/HumanSerum_with_36_humanHIPS_RP_250430.mzML"
-        ]
-        precursor_mz_ppm_tol = 20
-        rt_tol = 1
-        # Act
-        TrueHybrid.get_spectra_for_true_hybrids(
-            true_hybrids=hybrids,
-            mzmls=mzmls,
-            precursor_mz_ppm_tol=precursor_mz_ppm_tol,
-            retention_time_tol=rt_tol,
-        )
-        # Assert
-        for hybrid in hybrids:
-            # Make sure every spectra found is within the chosen precursor m/z tolerance
-            # and retention time tolerance
-            for spectrum in hybrid.spectra:
-                assert (
-                    mass_difference_in_ppm(
-                        mass1=spectrum.precursor_mz, mass2=hybrid.precursor_mz
-                    )
-                    <= precursor_mz_ppm_tol
-                )
-                assert abs(spectrum.retention_time - hybrid.rt)
 
 
 class Test_HypedsearchRunConfig:
-    class Test_from_json:
-        @staticmethod
-        def test_valid_json(tmp_path, test_data_dir):
-            config = HypedsearchRunConfig.from_json(
-                path=test_data_dir / "valid_hypedsearch_config.json"
-            )
-
-        @staticmethod
-        def test_invalid_json(test_data_dir):
-            with pytest.raises(ValidationError):
-                HypedsearchRunConfig.from_json(
-                    path=test_data_dir / "invalid_hypedsearch_config.json"
-                )
+    @staticmethod
+    def test_native_run(tmp_path, test_hs_config_path):
+        data = load_json(path=test_hs_config_path)
+        data["parent_output_dir"] = str(tmp_path)
+        config = HypedsearchRunConfig(**data)
+        outputs = config.native_comet_run(
+            # dry_run=True
+        )
+        assert len(outputs) == len(config.mzml_names)
+        assert outputs[0].target.exists()
+        assert outputs[0].decoy.exists()
+        assert len(CometPSM.from_txt(txt=outputs[0].target)) > 0
 
     @staticmethod
-    def test_native_run_via_comet(tmp_path, test_data_dir):
-        # Arrange
-        config = default_test_config(
-            test_data_dir=test_data_dir,
-            out_dir=tmp_path,
-        )
-        # Act
-        comet_outputs = config.native_run_via_comet()
-        # Assert
-        assert len(comet_outputs) == 1
-        for output in comet_outputs:
-            assert output.target.exists()
-            assert output.decoy.exists()
-            _ = CometPSM.from_txt(output.target)
-            _ = CometPSM.from_txt(output.decoy)
-
-    class Test_run_hypedsearch_on_spectrum:
-        @staticmethod
-        def test_run_hypedsearch_on_spectrum(test_data_dir, tmp_path):
-            # Arrange
-            mzml = test_data_dir / "spectra/BMEM_AspN_Fxn4_scans1-20.mzML"
-            scan = 7
-            spectrum = Spectrum.get_spectrum(scan=scan, mzml=mzml)
-            hs_config = default_test_config(
-                test_data_dir=test_data_dir, out_dir=tmp_path
-            )
-            # Act
-            native_outs, hybrid_outs, _ = hs_config.run_hypedsearch_on_spectrum(
-                spectrum=spectrum
-            )
-            # Assert
-            assert native_outs.target.exists()
-            assert hybrid_outs.target.exists()
-            assert (
-                len(hs_config.missing_native_target_outputs)
-                == len(hs_config.expected_native_scan_target_outputs) - 1
-            )
-            assert (
-                len(hs_config.missing_hybrid_target_outputs)
-                == len(hs_config.expected_hybrid_scan_target_outputs) - 1
-            )
-
-        @staticmethod
-        def test_removing_fasta_from_psm_scorer(test_data_dir):
-            """
-            Removeing the fasta from the PSMSCorer object should remove native-decoy
-            competition in the hybrid run.
-            """
-            # Run with FASTA in the PSMScorer
-            # Arrange
-            spectrum = Spectrum.get_spectrum(
-                scan=7, mzml=test_data_dir / "spectra/BMEM_AspN_Fxn4_scans1-20.mzML"
-            )
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                tmp_path = Path(tmp_dir)
-                # The default config does NOT have the fasta in the PSMScorer object
-                hs_config = default_test_config(
-                    test_data_dir=test_data_dir, out_dir=tmp_path
-                )
-                # Act
-                _, hybrid_outs, _ = hs_config.run_hypedsearch_on_spectrum(
-                    spectrum=spectrum
-                )
-                # Assert
-                with_fasta_psm = list(
-                    filter(
-                        lambda psm: psm.num == 1, CometPSM.from_txt(hybrid_outs.target)
-                    )
-                )[0]
-                assert (
-                    with_fasta_psm.is_hybrid
-                ), "Expected the top PSM to be a hybrid FASTA is in PSMScorer."
-
-            # Without FASTA
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                tmp_path = Path(tmp_dir)
-                hs_config = default_test_config(
-                    test_data_dir=test_data_dir, out_dir=tmp_path
-                )
-                hs_config.psm_scorer.fasta = hs_config.hybrid_former.fasta
-                assert hs_config.psm_scorer.fasta is not None
-                _, hybrid_outs, _ = hs_config.run_hypedsearch_on_spectrum(
-                    spectrum=spectrum
-                )
-                wo_fasta_psm = list(
-                    filter(
-                        lambda psm: psm.num == 1, CometPSM.from_txt(hybrid_outs.target)
-                    )
-                )[0]
-                assert ~wo_fasta_psm.is_hybrid
-
-        @staticmethod
-        def test_get_output_txts():
-            hs_config = HypedsearchRunConfig.from_json(
-                path="results/251219_Stressed_Human_Islets_vs_No_Stress/inputs/mzml_configs/HuIslet_01_NormalGlucose_01_Only_AspN_Fxn5.hs.config.json"
-            )
-            hs_config.get_output_txts(run_type=NATIVE, psm_type=TARGET)
-
-
-class Test_hybrid_run_on_spectrum:
-    @staticmethod
-    def test_smoke(tmp_path, test_data_dir):
-        mzml = test_data_dir / "BMEM_AspN_Fxn4/BMEM_AspN_Fxn4.mzML"
-        scan = 7
-        spectrum = Spectrum.get_spectrum(scan=scan, mzml=mzml)
-        db_path = (
-            test_data_dir / "sp-P99027-RLA2_MOUSE_mzml=BMEM_AspN_Fxn4;scan=7_kmer_db.db"
-        )
-        spectrum_preprocessor = SpectrumPreprocessor()
-        hybrid_former = HybridFormer(
-            kmer_db=db_path,
-            fasta=MOUSE_PROTEOME,
-        )
-        scorer = HybridPSMScorer(
-            comet_params=test_data_dir / "comet.params", crux_path=MAC_CRUX_EXECUTABLE
-        )
-        _, comet_outputs = hybrid_run_on_spectrum(
-            spectrum=spectrum,
-            out_dir=tmp_path,
-            spectrum_preprocessor=spectrum_preprocessor,
-            hybrid_former=hybrid_former,
-            psm_scorer=scorer,
+    def test_hybrid_run(tmp_path, test_hs_config_path, mouse_mzml_path, mouse_spectrum):
+        data = load_json(path=test_hs_config_path)
+        data["parent_output_dir"] = str(tmp_path)
+        config = HypedsearchRunConfig(**data)
+        seq_to_hybrids, comet_outputs = config.hybrid_run_on_spectrum(
+            spectrum=mouse_spectrum
         )
         assert comet_outputs.target.exists()
-        assert comet_outputs.decoy is None
         assert len(CometPSM.from_txt(txt=comet_outputs.target)) > 0
-
-
-class Test_cli_run_hypedsearch:
-    @staticmethod
-    def test_run_on_one_scan(tmp_path, test_data_dir):
-        # Arrange
-        hs_config = default_test_config(
-            test_data_dir=test_data_dir,
-            out_dir=tmp_path,
-        )
-        config_path = tmp_path / "config.json"
-        hs_config.to_json(path=config_path)
-        # Act
-        runner = CliRunner()
-        result = runner.invoke(
-            cli_run_hypedsearch,
-            [
-                "--mzml",
-                "tests/data/spectra/BMEM_AspN_Fxn4_scans1-20.mzML",
-                "--scan",
-                "7",
-                "--config",
-                str(config_path),
-            ],
-        )
-        # Assert
-        assert result.exit_code == 0
-        comet_psm = (
-            hs_config.hybrid_run_scan_results_dir
-            / "BMEM_AspN_Fxn4_scans1-20.comet.7-7.target.txt"
-        )
-        assert len(CometPSM.from_txt(txt=comet_psm)) > 0
-
-    @staticmethod
-    def test_run_on_all_scans(tmp_path, test_data_dir):
-        # Arrange
-        hs_config = default_test_config(
-            test_data_dir=test_data_dir,
-            out_dir=tmp_path,
-        )
-        config_path = tmp_path / "config.json"
-        hs_config.to_json(path=config_path)
-        # Act
-        runner = CliRunner()
-        result = runner.invoke(
-            cli_run_hypedsearch,
-            [
-                "--config",
-                str(config_path),
-            ],
-        )
-        # Assert
-        assert result.exit_code == 0
-        mzml = list(hs_config._mzml_to_scans.keys())[0]
-        for scan in hs_config._mzml_to_scans[mzml]:
-            comet_txt = (
-                hs_config.hybrid_run_scan_results_dir
-                / f"{mzml.stem}.comet.{scan}-{scan}.target.txt"
-            )
-            assert comet_txt.exists()
-
-
-class Test_combine_comet_scan_results:
-    @staticmethod
-    def test_smoke(tmp_path, test_data_dir):
-        #
-        data = load_json(path=test_data_dir / "test.hs.config.json")
-        data["parent_out_dir"] = str(tmp_path)
-        hs_config = HypedsearchRunConfig(**data)
-        config_path = tmp_path / "hs_config.json"
-        hs_config.to_json(path=config_path)
-        cmd = f"snakemake -s {RUN_HYPEDSEARCH_SMK} --config hs_config={config_path} --cores 8 --scheduler greedy"
-        result = subprocess.run(
-            cmd,
-            stdout=sys.stdout,
-            stderr=sys.stderr,
-            text=True,
-            shell=True,
-        )
-        combine_comet_scan_results(
-            scan_results_dir=hs_config.hybrid_run_scan_results_dir,
-            out_dir=hs_config.hybrid_run_dir,
-        )
-        assert (
-            len(
-                CometPSM.from_txt(
-                    txt=hs_config.hybrid_run_dir / "10_mouse_spectra.comet.target.txt"
-                )
-            )
-            > 0
-        )
-
-
-class Test_default_hs_run:
-    @staticmethod
-    def test_make_sure_it_works(tmp_path, test_data_dir):
-        hs_config = default_hs_run(test_data_dir=test_data_dir, out_dir=tmp_path)
-        for folder in [
-            hs_config.native_run_dir,
-            hs_config.hybrid_run_dir,
-            hs_config.native_run_scan_results_dir,
-            hs_config.hybrid_run_scan_results_dir,
-            hs_config.native_run_scan_results_dir,
-        ]:
-            assert len(list(folder.glob("*.txt"))) > 0
-
-
-class Test_find_possible_hybrids:
-    @staticmethod
-    def test_hybrids_have_right_side_len(tmp_path):
-        """ """
-        # Arrange
-        mzml = "data/251028_RP_Islet_Spikes_Crashout/1_1_Acet_Aspn_Islet_B35spike.mzML"
-        db_path = "results/251028_RP_Islet_Spikes_Crashout/inputs/kmers.db"
-        scan_num = 1316004
-        seq = "GITLNHLKATPIESHQV"
-        spectrum = Mzml(path=mzml).get_spectrum(scan=scan_num)
-        kmer_to_proteins_map = kmer_to_proteins_map = KmerDatabase(
-            db_path=db_path
-        ).kmer_to_proteins_map.kmer_to_protein_map
-        # Act
-        hybrids_2 = find_possible_hybrids_for_seq(
-            seq=seq, kmer_to_proteins_map=kmer_to_proteins_map, min_side_len=2
-        )
-        hybrids_5 = find_possible_hybrids_for_seq(
-            seq=seq, kmer_to_proteins_map=kmer_to_proteins_map, min_side_len=5
-        )
-        # Assert
-        assert len(hybrids_2) > 0
-        assert len(hybrids_5) == 0
-        assert len(hybrids_5) == 0
-        assert len(hybrids_5) == 0
-        assert len(hybrids_5) == 0

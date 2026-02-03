@@ -12,11 +12,10 @@ from src.constants import (
     PSMS_DF_NAME,
 )
 from src.hypedsearch import HypedsearchRunConfig
-from src.hypedsearch_run_analysis import HypedsearchOutputs, create_junction_support_df
+from src.hypedsearch_run_analysis import ResultsAnalysis, create_junction_support_df
 from src.mass_spectra import Spectrum, create_spectra_plots
 from src.plot_utils import fig_setup, save_fig
-from src.protein_abundance import ProteinAbundance
-from src.psm import CometPSM, convert_comet_psms_to_psms
+from src.psm import CometPSM, ProteinAbundance, convert_comet_psms_to_psms
 from src.utils import PathType, flatten_list_of_lists, setup_logger
 
 logger = logging.getLogger(__name__)
@@ -76,7 +75,7 @@ def cli_create_psms(config: Union[Path, str], hy_side_len: int):
 
     # Create and save SpectrumPSMs objects
     # if not (hs_config._results_dir / SPECTRUM_PSMS_NAME).exists():
-    hs_out = HypedsearchOutputs(
+    hs_out = ResultsAnalysis(
         hs_config=hs_config,
         min_side_len=hy_side_len,
         remove_carbamidomethylation=True,
@@ -126,7 +125,7 @@ def cli_create_psms(config: Union[Path, str], hy_side_len: int):
 )
 def cli_process(config: Path, hy_side_len: int, q_threshold: float):
     hs_config = HypedsearchRunConfig.from_json(path=config)
-    hs_out = HypedsearchOutputs(
+    hs_out = ResultsAnalysis(
         hs_config=hs_config, min_side_len=hy_side_len, remove_carbamidomethylation=True
     )
     hs_out.collect_outputs()
