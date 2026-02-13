@@ -1,0 +1,1000 @@
+{
+  "b_clusters": [
+    {
+      "ions": [
+        {
+          "seq": "DPQ",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 59,
+          "exclusive_end": 62
+        },
+        {
+          "seq": "DPQV",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 59,
+          "exclusive_end": 63
+        },
+        {
+          "seq": "DPQVE",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 59,
+          "exclusive_end": 64
+        },
+        {
+          "seq": "DPQVEQ",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 59,
+          "exclusive_end": 65
+        },
+        {
+          "seq": "DPQVEQL",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 59,
+          "exclusive_end": 66
+        },
+        {
+          "seq": "DPQVEQLE",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 59,
+          "exclusive_end": 67
+        },
+        {
+          "seq": "DPQVEQLEL",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 59,
+          "exclusive_end": 68
+        },
+        {
+          "seq": "DPQVEQLELG",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 59,
+          "exclusive_end": 69
+        },
+        {
+          "seq": "DPQVEQLELGG",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 59,
+          "exclusive_end": 70
+        },
+        {
+          "seq": "DPQVEQLELGGS",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 59,
+          "exclusive_end": 71
+        },
+        {
+          "seq": "DPQVEQLELGGSPGDLQTLALEVAR",
+          "charge": 2,
+          "ion_type": "b",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 59,
+          "exclusive_end": 84
+        },
+        {
+          "seq": "DPQVEQLELGGSPGD",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 59,
+          "exclusive_end": 74
+        }
+      ],
+      "ion_type": "b",
+      "protein": "sp|P01325|INS1_MOUSE",
+      "inclusive_start": 59,
+      "exclusive_end": 84,
+      "extended_seq": "DPQVEQLELGGSPGDLQTLALEVARQ"
+    },
+    {
+      "ions": [
+        {
+          "seq": "PQVE",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 60,
+          "exclusive_end": 64
+        },
+        {
+          "seq": "PQVEQL",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 60,
+          "exclusive_end": 66
+        },
+        {
+          "seq": "PQVEQLELG",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 60,
+          "exclusive_end": 69
+        }
+      ],
+      "ion_type": "b",
+      "protein": "sp|P01325|INS1_MOUSE",
+      "inclusive_start": 60,
+      "exclusive_end": 69,
+      "extended_seq": "PQVEQLELGGSPGDLQTLALEVARQ"
+    },
+    {
+      "ions": [
+        {
+          "seq": "EVEDPQVAQLELGGGP",
+          "charge": 2,
+          "ion_type": "b",
+          "protein": "sp|P01326|INS2_MOUSE",
+          "inclusive_start": 56,
+          "exclusive_end": 72
+        },
+        {
+          "seq": "EVEDPQVAQL",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01326|INS2_MOUSE",
+          "inclusive_start": 56,
+          "exclusive_end": 66
+        },
+        {
+          "seq": "EVEDPQVAQLELGGG",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01326|INS2_MOUSE",
+          "inclusive_start": 56,
+          "exclusive_end": 71
+        }
+      ],
+      "ion_type": "b",
+      "protein": "sp|P01326|INS2_MOUSE",
+      "inclusive_start": 56,
+      "exclusive_end": 72,
+      "extended_seq": "EVEDPQVAQLELGGGPGAGDLQTLALE"
+    },
+    {
+      "ions": [
+        {
+          "seq": "DPQ",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01326|INS2_MOUSE",
+          "inclusive_start": 59,
+          "exclusive_end": 62
+        },
+        {
+          "seq": "DPQV",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01326|INS2_MOUSE",
+          "inclusive_start": 59,
+          "exclusive_end": 63
+        },
+        {
+          "seq": "DPQVAQLEL",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P01326|INS2_MOUSE",
+          "inclusive_start": 59,
+          "exclusive_end": 68
+        }
+      ],
+      "ion_type": "b",
+      "protein": "sp|P01326|INS2_MOUSE",
+      "inclusive_start": 59,
+      "exclusive_end": 68,
+      "extended_seq": "DPQVAQLELGGGPGAGDLQTLALEVAQ"
+    },
+    {
+      "ions": [
+        {
+          "seq": "GAPVE",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 104,
+          "exclusive_end": 109
+        },
+        {
+          "seq": "GAPVED",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 104,
+          "exclusive_end": 110
+        },
+        {
+          "seq": "GAPVEDS",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 104,
+          "exclusive_end": 111
+        }
+      ],
+      "ion_type": "b",
+      "protein": "sp|P16014|SCG1_MOUSE",
+      "inclusive_start": 104,
+      "exclusive_end": 111,
+      "extended_seq": "GAPVEDSQGQTKVGNEKWTEGGGHSR"
+    },
+    {
+      "ions": [
+        {
+          "seq": "RDAAAEVPSRDTME",
+          "charge": 2,
+          "ion_type": "b",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 137,
+          "exclusive_end": 151
+        },
+        {
+          "seq": "RDAAAEVPS",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 137,
+          "exclusive_end": 146
+        },
+        {
+          "seq": "RDAAAEVPSR",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 137,
+          "exclusive_end": 147
+        }
+      ],
+      "ion_type": "b",
+      "protein": "sp|P26339|CMGA_MOUSE",
+      "inclusive_start": 137,
+      "exclusive_end": 151,
+      "extended_seq": "RDAAAEVPSRDTMEKRKDSDKGQQ"
+    },
+    {
+      "ions": [
+        {
+          "seq": "QELESLSAIEA",
+          "charge": 2,
+          "ion_type": "b",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 437,
+          "exclusive_end": 448
+        },
+        {
+          "seq": "QELES",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 437,
+          "exclusive_end": 442
+        },
+        {
+          "seq": "QELESLSAIEAELEKVAHQ",
+          "charge": 2,
+          "ion_type": "b",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 437,
+          "exclusive_end": 456
+        }
+      ],
+      "ion_type": "b",
+      "protein": "sp|P26339|CMGA_MOUSE",
+      "inclusive_start": 437,
+      "exclusive_end": 456,
+      "extended_seq": "QELESLSAIEAELEKVAHQLQALR"
+    },
+    {
+      "ions": [
+        {
+          "seq": "PAAAE",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P99027|RLA2_MOUSE",
+          "inclusive_start": 87,
+          "exclusive_end": 92
+        },
+        {
+          "seq": "PAAAEE",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|P99027|RLA2_MOUSE",
+          "inclusive_start": 87,
+          "exclusive_end": 93
+        },
+        {
+          "seq": "PAAAEEKKDEKKEE",
+          "charge": 2,
+          "ion_type": "b",
+          "protein": "sp|P99027|RLA2_MOUSE",
+          "inclusive_start": 87,
+          "exclusive_end": 101
+        }
+      ],
+      "ion_type": "b",
+      "protein": "sp|P99027|RLA2_MOUSE",
+      "inclusive_start": 87,
+      "exclusive_end": 101,
+      "extended_seq": "PAAAEEKKDEKKEESEESDDDMGF"
+    },
+    {
+      "ions": [
+        {
+          "seq": "SHLAESSRDALS",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|Q03517|SCG2_MOUSE",
+          "inclusive_start": 96,
+          "exclusive_end": 108
+        },
+        {
+          "seq": "SHLAESSRDALS",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|Q03517|SCG2_MOUSE",
+          "inclusive_start": 96,
+          "exclusive_end": 108
+        },
+        {
+          "seq": "SHLAESSRDALSE",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|Q03517|SCG2_MOUSE",
+          "inclusive_start": 96,
+          "exclusive_end": 109
+        }
+      ],
+      "ion_type": "b",
+      "protein": "sp|Q03517|SCG2_MOUSE",
+      "inclusive_start": 96,
+      "exclusive_end": 109,
+      "extended_seq": "SHLAESSRDALSEDEWMRIILEA"
+    },
+    {
+      "ions": [
+        {
+          "seq": "DMFQSK",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|Q03517|SCG2_MOUSE",
+          "inclusive_start": 404,
+          "exclusive_end": 410
+        },
+        {
+          "seq": "DMFQSKMLSKGGY",
+          "charge": 2,
+          "ion_type": "b",
+          "protein": "sp|Q03517|SCG2_MOUSE",
+          "inclusive_start": 404,
+          "exclusive_end": 417
+        },
+        {
+          "seq": "DMFQSKMLSKG",
+          "charge": 1,
+          "ion_type": "b",
+          "protein": "sp|Q03517|SCG2_MOUSE",
+          "inclusive_start": 404,
+          "exclusive_end": 415
+        }
+      ],
+      "ion_type": "b",
+      "protein": "sp|Q03517|SCG2_MOUSE",
+      "inclusive_start": 404,
+      "exclusive_end": 417,
+      "extended_seq": "DMFQSKMLSKGGYPKAPGRGMVEAL"
+    },
+    {
+      "ions": [
+        {
+          "seq": "ENLNDQELGEYLAR",
+          "charge": 2,
+          "ion_type": "b",
+          "protein": "sp|Q03517|SCG2_MOUSE",
+          "inclusive_start": 496,
+          "exclusive_end": 510
+        },
+        {
+          "seq": "ENLNDQELGEYLARMLVKYPE",
+          "charge": 2,
+          "ion_type": "b",
+          "protein": "sp|Q03517|SCG2_MOUSE",
+          "inclusive_start": 496,
+          "exclusive_end": 517
+        },
+        {
+          "seq": "ENLNDQELGEYLARMLVKYPEL",
+          "charge": 2,
+          "ion_type": "b",
+          "protein": "sp|Q03517|SCG2_MOUSE",
+          "inclusive_start": 496,
+          "exclusive_end": 518
+        }
+      ],
+      "ion_type": "b",
+      "protein": "sp|Q03517|SCG2_MOUSE",
+      "inclusive_start": 496,
+      "exclusive_end": 518,
+      "extended_seq": "ENLNDQELGEYLARMLVKYPELL"
+    }
+  ],
+  "y_clusters": [
+    {
+      "ions": [
+        {
+          "seq": "ARQ",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 82,
+          "exclusive_end": 85
+        },
+        {
+          "seq": "VARQ",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 81,
+          "exclusive_end": 85
+        },
+        {
+          "seq": "EVARQ",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 80,
+          "exclusive_end": 85
+        },
+        {
+          "seq": "LEVARQ",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 79,
+          "exclusive_end": 85
+        },
+        {
+          "seq": "ALEVARQ",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 78,
+          "exclusive_end": 85
+        },
+        {
+          "seq": "LALEVARQ",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 77,
+          "exclusive_end": 85
+        },
+        {
+          "seq": "TLALEVARQ",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 76,
+          "exclusive_end": 85
+        },
+        {
+          "seq": "QTLALEVARQ",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 75,
+          "exclusive_end": 85
+        },
+        {
+          "seq": "PGDLQTLALEVARQ",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 71,
+          "exclusive_end": 85
+        },
+        {
+          "seq": "SPGDLQTLALEVARQ",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 70,
+          "exclusive_end": 85
+        },
+        {
+          "seq": "GSPGDLQTLALEVARQ",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P01325|INS1_MOUSE",
+          "inclusive_start": 69,
+          "exclusive_end": 85
+        }
+      ],
+      "ion_type": "y",
+      "protein": "sp|P01325|INS1_MOUSE",
+      "inclusive_start": 69,
+      "exclusive_end": 85,
+      "extended_seq": "DPQVEQLELGGSPGDLQTLALEVARQ"
+    },
+    {
+      "ions": [
+        {
+          "seq": "VGSNTYG",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P12968B|IAPP_MOUSE",
+          "inclusive_start": 68,
+          "exclusive_end": 75
+        },
+        {
+          "seq": "SSNNLGPVLPPTNVGSNTYG",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P12968B|IAPP_MOUSE",
+          "inclusive_start": 55,
+          "exclusive_end": 75
+        },
+        {
+          "seq": "NFLVRSSNNLGPVLPPTNVGSNTYG",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P12968B|IAPP_MOUSE",
+          "inclusive_start": 50,
+          "exclusive_end": 75
+        }
+      ],
+      "ion_type": "y",
+      "protein": "sp|P12968B|IAPP_MOUSE",
+      "inclusive_start": 50,
+      "exclusive_end": 75,
+      "extended_seq": "ANFLVRSSNNLGPVLPPTNVGSNTYG"
+    },
+    {
+      "ions": [
+        {
+          "seq": "VGSNTYG",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P12968|IAPP_MOUSE",
+          "inclusive_start": 68,
+          "exclusive_end": 75
+        },
+        {
+          "seq": "SSNNLGPVLPPTNVGSNTYG",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P12968|IAPP_MOUSE",
+          "inclusive_start": 55,
+          "exclusive_end": 75
+        },
+        {
+          "seq": "NFLVRSSNNLGPVLPPTNVGSNTYG",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P12968|IAPP_MOUSE",
+          "inclusive_start": 50,
+          "exclusive_end": 75
+        }
+      ],
+      "ion_type": "y",
+      "protein": "sp|P12968|IAPP_MOUSE",
+      "inclusive_start": 50,
+      "exclusive_end": 75,
+      "extended_seq": "ANFLVRSSNNLGPVLPPTNVGSNTYG"
+    },
+    {
+      "ions": [
+        {
+          "seq": "AAVSSAP",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 15,
+          "exclusive_end": 22
+        },
+        {
+          "seq": "LAAVSSAP",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 14,
+          "exclusive_end": 22
+        },
+        {
+          "seq": "ALAAVSSAP",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 13,
+          "exclusive_end": 22
+        }
+      ],
+      "ion_type": "y",
+      "protein": "sp|P16014|SCG1_MOUSE",
+      "inclusive_start": 13,
+      "exclusive_end": 22,
+      "extended_seq": "MQPAMLLGLLGAAALAAVSSAP"
+    },
+    {
+      "ions": [
+        {
+          "seq": "SNALSKSSVPTI",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 41,
+          "exclusive_end": 53
+        },
+        {
+          "seq": "SSVPTI",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 47,
+          "exclusive_end": 53
+        },
+        {
+          "seq": "EEMVTRCIIEVLSNALSKSSVPTI",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 29,
+          "exclusive_end": 53
+        }
+      ],
+      "ion_type": "y",
+      "protein": "sp|P16014|SCG1_MOUSE",
+      "inclusive_start": 29,
+      "exclusive_end": 53,
+      "extended_seq": "NEEMVTRCIIEVLSNALSKSSVPTI"
+    },
+    {
+      "ions": [
+        {
+          "seq": "QGQTKVGNEKWTEGGG",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 111,
+          "exclusive_end": 127
+        },
+        {
+          "seq": "DSQGQTKVGNEKWTEGGG",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 109,
+          "exclusive_end": 127
+        },
+        {
+          "seq": "AGAPVEDSQGQTKVGNEKWTEGGG",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 103,
+          "exclusive_end": 127
+        }
+      ],
+      "ion_type": "y",
+      "protein": "sp|P16014|SCG1_MOUSE",
+      "inclusive_start": 103,
+      "exclusive_end": 127,
+      "extended_seq": "EDAGAPVEDSQGQTKVGNEKWTEGGG"
+    },
+    {
+      "ions": [
+        {
+          "seq": "SGEKPNTF",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 189,
+          "exclusive_end": 197
+        },
+        {
+          "seq": "GEKPNTF",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 190,
+          "exclusive_end": 197
+        },
+        {
+          "seq": "IEDSGEKPNTF",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 186,
+          "exclusive_end": 197
+        }
+      ],
+      "ion_type": "y",
+      "protein": "sp|P16014|SCG1_MOUSE",
+      "inclusive_start": 186,
+      "exclusive_end": 197,
+      "extended_seq": "GEHREDAGEEKKHIEDSGEKPNTF"
+    },
+    {
+      "ions": [
+        {
+          "seq": "QSSQESGEETRR",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 231,
+          "exclusive_end": 243
+        },
+        {
+          "seq": "GEETRR",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 237,
+          "exclusive_end": 243
+        },
+        {
+          "seq": "SREQSSQESGEETRR",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P16014|SCG1_MOUSE",
+          "inclusive_start": 228,
+          "exclusive_end": 243
+        }
+      ],
+      "ion_type": "y",
+      "protein": "sp|P16014|SCG1_MOUSE",
+      "inclusive_start": 228,
+      "exclusive_end": 243,
+      "extended_seq": "MELEEKTHSREQSSQESGEETRR"
+    },
+    {
+      "ions": [
+        {
+          "seq": "FALPVNS",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 16,
+          "exclusive_end": 23
+        },
+        {
+          "seq": "CAGQVFALPVNS",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 11,
+          "exclusive_end": 23
+        },
+        {
+          "seq": "TAVLALLLCAGQVFALPVNS",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 3,
+          "exclusive_end": 23
+        }
+      ],
+      "ion_type": "y",
+      "protein": "sp|P26339|CMGA_MOUSE",
+      "inclusive_start": 3,
+      "exclusive_end": 23,
+      "extended_seq": "MRSTAVLALLLCAGQVFALPVNS"
+    },
+    {
+      "ions": [
+        {
+          "seq": "KQQQQQQQQ",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 101,
+          "exclusive_end": 110
+        },
+        {
+          "seq": "QPPKQQQQQQQQ",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 98,
+          "exclusive_end": 110
+        },
+        {
+          "seq": "QQPPKQQQQQQQQ",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 97,
+          "exclusive_end": 110
+        }
+      ],
+      "ion_type": "y",
+      "protein": "sp|P26339|CMGA_MOUSE",
+      "inclusive_start": 97,
+      "exclusive_end": 110,
+      "extended_seq": "ERAQQPLKQQQPPKQQQQQQQQ"
+    },
+    {
+      "ions": [
+        {
+          "seq": "PPKQQQQQQQQQ",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 99,
+          "exclusive_end": 111
+        },
+        {
+          "seq": "QPPKQQQQQQQQQ",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 98,
+          "exclusive_end": 111
+        },
+        {
+          "seq": "QQQPPKQQQQQQQQQ",
+          "charge": 2,
+          "ion_type": "y",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 96,
+          "exclusive_end": 111
+        }
+      ],
+      "ion_type": "y",
+      "protein": "sp|P26339|CMGA_MOUSE",
+      "inclusive_start": 96,
+      "exclusive_end": 111,
+      "extended_seq": "RAQQPLKQQQPPKQQQQQQQQQ"
+    },
+    {
+      "ions": [
+        {
+          "seq": "GRELEHKQEE",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 331,
+          "exclusive_end": 341
+        },
+        {
+          "seq": "GRELEHKQEE",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 331,
+          "exclusive_end": 341
+        },
+        {
+          "seq": "KGRELEHKQEE",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|P26339|CMGA_MOUSE",
+          "inclusive_start": 330,
+          "exclusive_end": 341
+        }
+      ],
+      "ion_type": "y",
+      "protein": "sp|P26339|CMGA_MOUSE",
+      "inclusive_start": 330,
+      "exclusive_end": 341,
+      "extended_seq": "AMVGTPQGLFPQGGKGRELEHKQEE"
+    },
+    {
+      "ions": [
+        {
+          "seq": "HREE",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|Q03517|SCG2_MOUSE",
+          "inclusive_start": 69,
+          "exclusive_end": 73
+        },
+        {
+          "seq": "RQQAHREE",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|Q03517|SCG2_MOUSE",
+          "inclusive_start": 65,
+          "exclusive_end": 73
+        },
+        {
+          "seq": "LRQQAHREE",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|Q03517|SCG2_MOUSE",
+          "inclusive_start": 64,
+          "exclusive_end": 73
+        }
+      ],
+      "ion_type": "y",
+      "protein": "sp|Q03517|SCG2_MOUSE",
+      "inclusive_start": 64,
+      "exclusive_end": 73,
+      "extended_seq": "SPEMIRALEYIEKLRQQAHREE"
+    },
+    {
+      "ions": [
+        {
+          "seq": "AENEPP",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|Q03517|SCG2_MOUSE",
+          "inclusive_start": 122,
+          "exclusive_end": 128
+        },
+        {
+          "seq": "LRQAENEPP",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|Q03517|SCG2_MOUSE",
+          "inclusive_start": 119,
+          "exclusive_end": 128
+        },
+        {
+          "seq": "EALRQAENEPP",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|Q03517|SCG2_MOUSE",
+          "inclusive_start": 117,
+          "exclusive_end": 128
+        }
+      ],
+      "ion_type": "y",
+      "protein": "sp|Q03517|SCG2_MOUSE",
+      "inclusive_start": 117,
+      "exclusive_end": 128,
+      "extended_seq": "ALSEDEWMRIILEALRQAENEPP"
+    },
+    {
+      "ions": [
+        {
+          "seq": "SARPVKE",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|Q9QXV0|PCSK1_MOUSE",
+          "inclusive_start": 32,
+          "exclusive_end": 39
+        },
+        {
+          "seq": "LSARPVKE",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|Q9QXV0|PCSK1_MOUSE",
+          "inclusive_start": 31,
+          "exclusive_end": 39
+        },
+        {
+          "seq": "TLSARPVKE",
+          "charge": 1,
+          "ion_type": "y",
+          "protein": "sp|Q9QXV0|PCSK1_MOUSE",
+          "inclusive_start": 30,
+          "exclusive_end": 39
+        }
+      ],
+      "ion_type": "y",
+      "protein": "sp|Q9QXV0|PCSK1_MOUSE",
+      "inclusive_start": 30,
+      "exclusive_end": 39,
+      "extended_seq": "GVGILVLLLLGLLRLPPTLSARPVKE"
+    }
+  ]
+}

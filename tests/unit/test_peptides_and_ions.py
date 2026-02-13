@@ -1,16 +1,20 @@
 from pathlib import Path
 
+from click.testing import CliRunner
 from pytest import approx
 
 from src.constants import B_ION_TYPE, MOUSE_PROTEOME, Y_ION_TYPE
 from src.peptides_and_ions import (
     Fasta,
+    Fasta2MFMIndex,
     Peptide,
     UnpositionedProductIon,
+    cli_create_mfm_index_for_fasta,
     get_kmer_counts_by_protein,
     get_proteins_by_name,
     get_unique_kmers,
 )
+from src.utils import from_pickle
 
 
 class Test_UnpositionedProductIon:
@@ -180,3 +184,38 @@ class Test_get_unique_kmers:
         Fasta.write_fasta(peptides=peptides, path=out_path)
         uniq_kmers = get_unique_kmers(peptides=out_path, min_k=1, max_k=2)
         assert uniq_kmers == {"A", "C", "D", "N", "AC", "CA", "CD", "CN"}
+
+
+class Test_FastaFMIndex:
+    @staticmethod
+    def test_from_fasta(tmp_path):
+        # Arrange
+        peptides = [
+            Peptide(seq="ACACD", name="protein1"),
+            Peptide(seq="ACN", name="protein2"),
+        ]
+        path = tmp_path / "prots.fasta"
+        Fasta.write_fasta(peptides=peptides, path=path)
+        # Act
+        converter = Fasta2MFMIndex(fasta=path)
+        mfm = converter.create_mfm_index()
+        # Assert
+        assert mfm.count("AC") == {0: 2, 1: 1}
+
+    @staticmethod
+    def test_creation_via_cli(tmp_path):
+        # Arrange
+        converter = Fasta2MFMIndex(fasta=MOUSE_PROTEOME)
+        seq = "KTQILYVMLWLLCVAFTTFLC"
+        prot = "sp|Q99LH2|PTSS1_MOUSE"
+        # Act
+        runner = CliRunner()
+        r1 = runner.invoke(
+            cli_create_mfm_index_for_fasta,
+            ["--fasta", f"{MOUSE_PROTEOME}", "--out_dir", f"{tmp_path}"],
+        )
+        # Assert
+        mfm = from_pickle(path=tmp_path / converter.mfm_name)
+        seq_cnt = mfm.count(pattern=seq)
+        assert len(seq_cnt.keys()) == 1
+        assert converter.idx_to_protein_map[list(seq_cnt.keys())[0]].name == prot

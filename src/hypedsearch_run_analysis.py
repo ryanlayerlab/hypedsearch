@@ -28,11 +28,9 @@ from src.constants import (
     GOOD_HYBRID_BAD_NATIVE,
     HUMAN_PROTEOME,
     HY_TARGET,
-    HYBRID,
     HYBRID_PEPTIDES_NAME,
     NAT_DECOY,
     NAT_TARGET,
-    NATIVE,
     NEOFUSION,
     PSMS_DF_NAME,
     Q_VAL,
@@ -146,6 +144,10 @@ class SpectrumPSMs:
     native_target: Optional[Union[CometPSM, PSM]] = None
     native_decoy: Optional[Union[CometPSM, PSM]] = None
     hybrid_target: Optional[Union[CometPSM, PSM]] = None
+
+    @property
+    def uid(self):
+        return self.spectrum.uid
 
     def convert_comet_psms_to_psms(
         self, peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL
@@ -568,14 +570,10 @@ def process_hs_config(
         # Create SpectrumPSMs
         psms = results.to_spectrum_psms()
         SpectrumPSMs.save(psms=psms, path=spectrum_psms_path)
-
-        # Plots
-        results.create_plots()
-
         seq_to_hybrids_map = results.seq_to_hybrids_map
 
     else:
-        logger.info(f"SpectrumPSMs already exist so loading them...")
+        logger.info("SpectrumPSMs already exist so loading them...")
         psms = SpectrumPSMs.load(path=spectrum_psms_path)
         seq_to_hybrids_map = get_seq_to_hybrids_map(
             seqs=set(psm.hybrid_target.seq for psm in psms if psm.hybrid_target),
@@ -583,8 +581,9 @@ def process_hs_config(
             min_side_len=min_hybrid_side_len,
             remove_carbamidomethylation=remove_methylation,
         )
-    # Junction analysis
-    logger.info("Junction analysis starting...")
+
+    # Accept hybrids
+    logger.info("Accepting hybrids...")
     identifier = AcceptanceMethod.get_acceptance_identifier(
         acceptance_method_name=acceptance_method_name,
         min_hybrid_side_len=min_hybrid_side_len,
@@ -602,6 +601,59 @@ def process_hs_config(
         )
     else:
         raise ValueError("Unrecognized acceptance method")
+
+    # Plots
+    logger.info("Plotting...")
+    # Xcorr plot
+    fig, axs = fig_setup(ncols=2)
+    xcorr_plot(
+        psms_by_type={
+            NAT_TARGET: [
+                psm.native_target for psm in psms if psm.native_target is not None
+            ],
+            NAT_DECOY: [
+                psm.native_decoy for psm in psms if psm.native_decoy is not None
+            ],
+            HY_TARGET: [
+                psm.hybrid_target for psm in psms if psm.hybrid_target is not None
+            ],
+        },
+        ax=axs[0],
+    )
+    plot_xcorr_of_accepted_vs_not_accepted_hybrids(
+        ax=axs[1],
+        all_psms=psms,
+        accepted_hybrid_psms=accepted_hybrids,
+    )
+    finalize(axs)
+    save_fig(
+        fig=fig,
+        title=f"{results.name}",
+        path=results.hs_config.plots_dir / f"{results.name}.{identifier}.xcorr.png",
+    )
+
+    # Num of hybrid explanations per hybrid seq, e.g., hybrid seq = ABC with hybrid
+    # explanations A-BC, AB-C
+    df, fig, axs = num_hybrids_per_seq_histplot(seq_to_hybrids_map=seq_to_hybrids_map)
+    save_fig(
+        fig=fig,
+        title=f"{results.name}",
+        path=results.hs_config.plots_dir / f"{results.name}.numHybridsPerHybridSeq.png",
+    )
+
+    # Spectra plots
+    fig, axs = Spectrum.plot_spectra_info(
+        spectra=list(results.hs_config.spectrum_uid_to_spectrum.values()),
+        add_counts=False,
+    )
+    save_fig(
+        fig=fig,
+        title=f"{results.name}",
+        path=results.hs_config.plots_dir / f"{results.name}.spectraHistograms.png",
+    )
+
+    # Junction analysis
+    logger.info("Junction analysis...")
     df = get_junction_df(
         hybrid_psms=accepted_hybrids,
         protein_name_to_seq_map=results.protein_name_to_seq_map,
@@ -1071,6 +1123,26 @@ def xcorr_plot(psms_by_type: Dict[str, List[CometPSM]], ax: Axes) -> Axes:
     return ax
 
 
+def create_general_results_plots(psms: List[SpectrumPSMs]):
+    fig, axs = fig_setup(ncols=2)
+    xcorr_plot(
+        psms_by_type={
+            NAT_TARGET: [
+                psm.native_target for psm in psms if psm.native_target is not None
+            ],
+            NAT_DECOY: [
+                psm.native_decoy for psm in psms if psm.native_decoy is not None
+            ],
+            HY_TARGET: [
+                psm.hybrid_target for psm in psms if psm.hybrid_target is not None
+            ],
+        },
+        ax=axs[0],
+    )
+    plot_native_vs_hybrid_scores(psms=psms, ax=axs[1])
+    finalize(axs)
+
+
 def accept_hybrid_psms_via_neo_fusion(
     psms: List[SpectrumPSMs],
     q_vals: List[float] = DEFAULT_Q_RANGE,
@@ -1521,6 +1593,47 @@ def create_extract_spectra_from_mzml_bash_script(
         lines=script_lines,
         path=Path(local_script_out_dir)
         / f"{mzml.name}_get_true_hybrid_supporting_spectra.sh",
+    )
+
+
+def plot_xcorr_of_accepted_vs_not_accepted_hybrids(
+    ax: Axes, all_psms: List[SpectrumPSMs], accepted_hybrid_psms: List[CometPSM]
+) -> Tuple[Figure, List[Axes]]:
+    accepted_uids = set(psm.uid for psm in accepted_hybrid_psms)
+    accepted_hybrid_psms = [
+        psm for psm in all_psms if psm.spectrum.uid in accepted_uids
+    ]
+
+    native_and_hybrid_psms = [
+        psm
+        for psm in all_psms
+        if (psm.native_target is not None) and (psm.hybrid_target is not None)
+    ]
+    score = "xcorr"
+    s = 7
+    sns.scatterplot(
+        x=[getattr(psm.native_target, score) for psm in native_and_hybrid_psms],
+        y=[getattr(psm.hybrid_target, score) for psm in native_and_hybrid_psms],
+        s=s,
+        marker="o",
+        color="blue",
+        label=f"All spectra with a native and hybrid PSM (n={len(native_and_hybrid_psms)})",
+        ax=ax,
+    )
+    sns.scatterplot(
+        x=[getattr(psm.native_target, score) for psm in accepted_hybrid_psms],
+        y=[getattr(psm.hybrid_target, score) for psm in accepted_hybrid_psms],
+        s=s,
+        marker="X",
+        color="red",
+        label=f"Accepted hybrid spectra (n={len(accepted_hybrid_psms)})",
+        ax=ax,
+    )
+    plot_line(ax=ax, label="y=x")
+    set_title_axes_labels(
+        ax=ax,
+        xlabel="Native target xcorr",
+        ylabel="Hybrid target xcorr",
     )
 
 

@@ -1,7 +1,5 @@
-import pytest
 
 from fiji.fiji_utils import create_config_for_fiji_run
-from src.constants import MAC_CRUX_EXECUTABLE
 
 
 class Test_create_config_for_fiji_run:

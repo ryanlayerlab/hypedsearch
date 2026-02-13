@@ -239,6 +239,16 @@ def mass_difference_in_ppm(mass1: float, mass2: float) -> float:
     return (abs(mass1 - mass2) / mass1) * (10**6)
 
 
+def to_pickle(obj: Any, path: Union[Path, str]):
+    with open(path, "wb") as f:
+        pickle.dump(obj, f)
+
+
+def from_pickle(path: Union[Path, str]):
+    with open(path, "rb") as f:
+        return pickle.load(f)
+
+
 def pickle_and_compress(obj: Any, path: str):
     with gzip.open(path, "wb") as file:
         pickle.dump(obj, file, protocol=pickle.HIGHEST_PROTOCOL)

@@ -6,11 +6,11 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Tuple, Union
+from typing import Literal, Tuple, Union
 
 import click
 
-from src.constants import DEFAULT_MIN_SIDE_LEN, DEFAULT_Q_THRESHOLD
+from src.constants import DEFAULT_Q_THRESHOLD
 from src.crux import Crux
 
 repo_dir = Path("/Users/erjo3868/repos/hypedsearch/hypedsearch")
@@ -20,10 +20,7 @@ import random
 import tempfile
 
 from src.hypedsearch import (
-    HybridFormer,
-    HybridPSMScorer,
     HypedsearchRunConfig,
-    SpectrumPreprocessor,
     hybrid_run_on_spectrum,
 )
 from src.kmer_database import KmerDatabase
@@ -324,7 +321,7 @@ class HybridSimulation:
     ):
         mzml = Mzml(path=mzml_path)
         fasta = Fasta(path=self.config.fasta)
-        assert psm.sample == mzml.name, f"PSM sample and MZML name should be the same!"
+        assert psm.sample == mzml.name, "PSM sample and MZML name should be the same!"
         if validate_psm_for_hybrid_finding_simulation_study(psm=psm, fasta=fasta):
             left_hy_seq, right_hy_seq = cut_seq_into_hybrid(
                 seq=psm.seq, method=cut_method, min_side_len=min_side_len

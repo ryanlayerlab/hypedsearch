@@ -195,7 +195,7 @@ class Crux:
     # crux_path: Path
     # env: Dict = field(init=False)
 
-    def __post_init__(self):
+    def check_if_crux_is_available(self):
         # Check that crux is available on the system and set self.env
         result = subprocess.run(
             f"{self.crux_path} version",

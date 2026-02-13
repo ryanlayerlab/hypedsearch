@@ -1,8 +1,6 @@
-import subprocess
 import sys
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 from src.mass_spectra import Spectrum
@@ -11,10 +9,8 @@ from src.psm import CometPSM
 repo_dir = Path(__file__).parents[1]
 sys.path.append(str(repo_dir / "src"))
 
-from click.testing import CliRunner
 
-from src.constants import GIT_REPO_DIR, MOUSE_PROTEOME
-from src.hypedsearch import HybridFormer, HybridPSMScorer, HypedsearchRunConfig
+from src.constants import GIT_REPO_DIR
 
 
 @pytest.fixture

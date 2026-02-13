@@ -1,20 +1,14 @@
-from pathlib import Path
 
-from click.testing import CliRunner
 
-from src.constants import MAC_CRUX_EXECUTABLE, MOUSE_PROTEOME
+from src.constants import MOUSE_PROTEOME
 from src.crux import (
-    CometConfig,
     CometOutputs,
     Crux,
-    cli_run_comet,
     get_expected_comet_outputs_for_mzml_to_scans,
     run_comet_on_custom_seqs,
 )
-from src.hypedsearch import HypedsearchRunConfig
-from src.mass_spectra import Mzml, Spectrum
+from src.mass_spectra import Spectrum
 from src.psm import CometPSM
-from src.utils import load_json
 
 
 class Test_CometOutputs:

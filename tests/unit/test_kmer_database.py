@@ -1,5 +1,4 @@
 import json
-from dataclasses import asdict
 
 from src.constants import MOUSE_PROTEOME
 from src.kmer_database import DbKmer, KmerDatabase, KmerToProteinsMap

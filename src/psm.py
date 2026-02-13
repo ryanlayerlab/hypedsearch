@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from src.constants import (
     B_ION_TYPE,
     COMET,
+    COMET_PROTEIN_SEPARATOR,
     CRUX,
     DEFAULT_PEAK_TO_ION_PPM_TOL,
     DEFAULT_Q_THRESHOLD,
@@ -29,6 +30,7 @@ from src.constants import (
     XCORR,
     Y_ION_TYPE,
 )
+from src.hybrids_via_clusters import HybridPeptide
 from src.mass_spectra import Mzml, Peak, Spectrum, organize_by_spectrum_uid, plot_peaks
 from src.peptides_and_ions import Fasta, Peptide, compute_peptide_precursor_mz
 from src.plot_utils import fig_setup, finalize, set_title_axes_labels
@@ -404,9 +406,10 @@ class CometPSM:
 
     @staticmethod
     def check_if_hybrid_prot(prot: str):
-        if prot.startswith(HS_PREFIX) or prot.startswith("hybrid_"):
+        try:
+            HybridPeptide.parse_hybrid_peptide_str(hybrid_str=prot)
             return True
-        else:
+        except ValueError:
             return False
 
     @classmethod
@@ -463,7 +466,7 @@ class CometPSM:
                     ions_matched=row[IONS_MATCHED],
                     ions_total=row[IONS_TOTAL],
                     # protein_count=row[PROTEIN_COUNT],
-                    proteins=row[PROTEIN].split(","),
+                    proteins=row[PROTEIN].split(COMET_PROTEIN_SEPARATOR),
                     seq=row[PLAIN_PEPTIDE],
                     xcorr=row[XCORR],
                     eval=row[EVAL],

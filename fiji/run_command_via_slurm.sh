@@ -2,9 +2,9 @@
 
 
 # Default values
-MEM="500GB"
+MEM="1GB"
 CORES=180
-LOG_DIR="logs/"
+LOG_DIR="logs/run_commands_via_slurm"
 TIME="24:00:00"
 
 show_help() {
@@ -28,7 +28,7 @@ while [[ "$#" -gt 0 ]]; do
         --name) NAME="$2"; shift ;;
         --time) TIME="$2"; shift ;;
         --part) PARTITION="$2"; shift ;;
-        --cores) SLURM_CORES="$2"; shift ;;
+        --cores) CORES="$2"; shift ;;
         -h|--help) show_help; exit 0 ;;
         *) echo "Unknown parameter: $1"; exit 0 ;;
     esac

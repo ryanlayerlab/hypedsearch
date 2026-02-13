@@ -9,12 +9,12 @@ from pathlib import Path
 from typing import Dict, List, Literal, Optional, Set, Union
 from venv import logger
 
-import click
-import numpy as np
+from fm_index import MultiFMIndex
 from pydantic import BaseModel
 
 from src.constants import (
     B_ION_TYPE,
+    COMET_PROTEIN_SEPARATOR,
     DEFAULT_JCT_LEN,
     DEFAULT_MAX_ALLOWED_ION_CHARGE,
     DEFAULT_MIN_CLUSTER_LENGTH,
@@ -22,6 +22,7 @@ from src.constants import (
     DEFAULT_PEAK_TO_ION_PPM_TOL,
     DEFAULT_PRECURSOR_MZ_PPM_TOL,
     HS_PREFIX,
+    HYBRID_PROT_SEPARATOR,
     PROTON_MASS,
     WATER_MASS,
     Y_ION_TYPE,
@@ -30,6 +31,7 @@ from src.kmer_database import KmerDatabase
 from src.mass_spectra import Spectrum
 from src.peptides_and_ions import (
     Fasta,
+    Fasta2MFMIndex,
     Peptide,
     ProteinRange,
     UnpositionedProductIon,
@@ -43,8 +45,6 @@ from src.utils import (
     get_time_in_diff_units,
     log_time,
     relative_ppm_tolerance_in_daltons,
-    setup_logger,
-    to_json,
 )
 
 logger = logging.getLogger(__name__)
@@ -217,25 +217,20 @@ class Cluster:
 
         self.extended_seq = extended_seq
 
-    def get_seqs_for_hybrids(self) -> List[str]:
-        """
-        These are the sequences that we'll use for forming hybrids.
-        For b-ions,
-        """
-        shortest_seq = self.ions[np.argmin([len(ion.seq) for ion in self.ions])].seq
+    def get_seqs_for_hybrids(self, min_side_len: int) -> List[str]:
         if self.ion_type == B_ION_TYPE:
             # For b-ions, we take all prefixes of the extended sequence starting from the
             # sequence of the shortest supported ion
             return [
                 self.extended_seq[:idx]
-                for idx in range(len(shortest_seq), len(self.extended_seq) + 1)
+                for idx in range(min_side_len, len(self.extended_seq) + 1)
             ]
         elif self.ion_type == Y_ION_TYPE:
             # For y-ions, we take all suffixes of the extended sequence starting from the
             # sequence of the shortest supported ion
             return [
                 self.extended_seq[idx:]
-                for idx in range(0, len(self.extended_seq) - len(shortest_seq) + 1)
+                for idx in range(0, len(self.extended_seq) - min_side_len + 1)
             ]
         else:
             raise ValueError(f"Unknown ion type: {self.ion_type}")
@@ -337,6 +332,10 @@ def form_extended_clusters_for_spectrum(
     precursor_mz_ppm_tol: float = DEFAULT_PRECURSOR_MZ_PPM_TOL,
     max_allowed_ion_charge: int = DEFAULT_MAX_ALLOWED_ION_CHARGE,
 ) -> SpectrumClusters:
+    # Drop those proteins that aren't in the kmer database
+    protein_name_to_seq_map = {
+        prot: protein_name_to_seq_map[prot] for prot in kmer_db.proteins
+    }
     # Get peak-ion matches for the spectrum
     peak_ion_matches = kmer_db.get_peak_ion_matches_for_spectrum(
         spectrum=spectrum,
@@ -408,7 +407,7 @@ def create_junction_str(
     left_prots: str,
     right_prots: str,
 ):
-    return f"({left_prots}) {left_seq}-{right_seq} ({right_prots})"
+    return f"({left_prots}){left_seq}-{right_seq}({right_prots})"
 
 
 class HybridPeptide(BaseModel):
@@ -425,29 +424,13 @@ class HybridPeptide(BaseModel):
             right_prots=self.right_prot_str,
         )
 
-    @classmethod
-    def parse_hybrid_peptide_str(cls, hybrid_str: str) -> "HybridPeptide":
-        ouput_regex = r"^\((?P<left_prots>[^)]*)\)\s+(?P<left_seq>[^-\s]+)-(?P<right_seq>[^\s]+)\s+\((?P<right_prots>[^)]*)\)$"
-        match = re.match(ouput_regex, hybrid_str)
-        if not match:
-            raise ValueError(f"Invalid HybridPeptide string: {hybrid_str}")
-        left_proteins = {p for p in match.group("left_prots").split(";") if p}
-        right_proteins = {p for p in match.group("right_prots").split(";") if p}
-
-        return cls(
-            left_seq=match.group("left_seq"),
-            right_seq=match.group("right_seq"),
-            left_proteins=left_proteins,
-            right_proteins=right_proteins,
-        )
-
     @property
     def left_prot_str(self):
-        return ";".join(self.left_proteins)
+        return HYBRID_PROT_SEPARATOR.join(self.left_proteins)
 
     @property
     def right_prot_str(self):
-        return ";".join(self.right_proteins)
+        return HYBRID_PROT_SEPARATOR.join(self.right_proteins)
 
     @property
     def seq(self):
@@ -456,37 +439,6 @@ class HybridPeptide(BaseModel):
     @property
     def seq_with_hyphen(self):
         return f"{self.left_seq}-{self.right_seq}"
-
-    @property
-    def fasta_name(self):
-        return f"{HS_PREFIX}{self.left_seq}-{self.right_seq}"
-
-    @classmethod
-    def from_name(cls, name: str):
-        b_seq, y_seq = cls.parse_name_to_b_and_y_seqs(name=name)
-        return cls(
-            b_seq=b_seq,
-            y_seq=y_seq,
-        )
-
-    @staticmethod
-    def parse_name_to_b_and_y_seqs(name: str):
-        """
-        Parse the name of a hybrid peptide to extract the b and y sequences.
-        Depends on how .fasta_name works
-        """
-        if name.startswith(HS_PREFIX):
-            name = name[len(HS_PREFIX) :]
-        # For back compatibility
-        elif name.startswith("hybrid_"):
-            name = name[len("hybrid_") :]
-        else:
-            raise ValueError(
-                f"Invalid hybrid peptide name: {name}. Expected prefix '{HS_PREFIX}' or 'hybrid_'."
-            )
-
-        b_seq, y_seq = name.split("-")
-        return b_seq, y_seq
 
     @staticmethod
     def set_proteins(
@@ -591,6 +543,48 @@ class HybridPeptide(BaseModel):
     def to_dict(self):
         return self.model_dump(mode="json")
 
+    @staticmethod
+    def seq_to_hybrids_map_to_peptides(
+        seq_to_hybrids: Dict[str, List["HybridPeptide"]],
+    ) -> List[Peptide]:
+        peptides = []
+        for idx, (seq, hybrids) in enumerate(seq_to_hybrids.items()):
+            idx, seq, hybrids
+            peptides.append(
+                Peptide(
+                    seq=seq,
+                    name=COMET_PROTEIN_SEPARATOR.join([str(hy) for hy in hybrids]),
+                )
+            )
+        return peptides
+
+    @classmethod
+    def parse_hybrid_peptide_str(cls, hybrid_str: str) -> "HybridPeptide":
+        ouput_regex = r"^\((?P<left_prots>[^)]*)\)(?P<left_seq>[^-\s]+)-(?P<right_seq>[^\s]+)\((?P<right_prots>[^)]*)\)$"
+        match = re.match(ouput_regex, hybrid_str)
+        if not match:
+            raise ValueError(f"Invalid HybridPeptide string: {hybrid_str}")
+        left_proteins = {
+            p for p in match.group("left_prots").split(HYBRID_PROT_SEPARATOR) if p
+        }
+        right_proteins = {
+            p for p in match.group("right_prots").split(HYBRID_PROT_SEPARATOR) if p
+        }
+
+        return cls(
+            left_seq=match.group("left_seq"),
+            right_seq=match.group("right_seq"),
+            left_proteins=left_proteins,
+            right_proteins=right_proteins,
+        )
+
+    @classmethod
+    def parse_hybrid_fasta_name(cls, name: str) -> List["HybridPeptide"]:
+        hybrids = []
+        for hybrid_str in name.split(COMET_PROTEIN_SEPARATOR):
+            hybrids.append(cls.parse_hybrid_peptide_str(hybrid_str=hybrid_str))
+        return hybrids
+
 
 @log_time(level=logging.DEBUG)
 def form_hybrids_from_clusters(
@@ -599,6 +593,9 @@ def form_hybrids_from_clusters(
     precursor_charge: int,
     precursor_mz: float,
     precursor_mz_ppm_tol: float,
+    min_side_len: int,
+    fasta_fm_index: MultiFMIndex,
+    remove_carbamidomethylated_hybrids: bool,
 ) -> List[HybridPeptide]:
     """
     Given b- and y-clusters, form hybrids.
@@ -608,14 +605,14 @@ def form_hybrids_from_clusters(
         Y_ION_TYPE: defaultdict(set),
     }
     for cluster in b_clusters:
-        for seq in cluster.get_seqs_for_hybrids():
+        for seq in cluster.get_seqs_for_hybrids(min_side_len=min_side_len):
             seq_protein_map[B_ION_TYPE][seq].add(cluster.protein)
     for cluster in y_clusters:
-        for seq in cluster.get_seqs_for_hybrids():
+        for seq in cluster.get_seqs_for_hybrids(min_side_len=min_side_len):
             seq_protein_map[Y_ION_TYPE][seq].add(cluster.protein)
     left_seqs = list(seq_protein_map[B_ION_TYPE].keys())
     right_seqs = list(seq_protein_map[Y_ION_TYPE].keys())
-    hybrid_seqs = form_hybrids_from_left_and_right_seqs(
+    potential_hybrid_seqs = form_potential_hybrids_from_left_and_right_seqs(
         left_seqs=left_seqs,
         right_seqs=right_seqs,
         precursor_charge=precursor_charge,
@@ -623,29 +620,37 @@ def form_hybrids_from_clusters(
         precursor_mz_ppm_tol=precursor_mz_ppm_tol,
     )
     hybrids = []
-    for hybrid_seq in hybrid_seqs:
-        left_seq, right_seq = hybrid_seq.split("-")
-        hybrids.append(
-            HybridPeptide(
+    for hy_seq in potential_hybrid_seqs:
+        cnt = fasta_fm_index.count_all(pattern=hy_seq.replace("-", ""))
+        if cnt > 0:
+            # This removes natives
+            continue
+        else:
+            left_seq, right_seq = hy_seq.split("-")
+            hybrid = HybridPeptide(
                 left_seq=left_seq,
                 right_seq=right_seq,
-                left_proteins=seq_protein_map[B_ION_TYPE].get(left_seq),
-                right_proteins=seq_protein_map[Y_ION_TYPE].get(right_seq),
-                # scan=scan,
-                # sample=sample,
+                left_proteins=seq_protein_map[B_ION_TYPE][left_seq],
+                right_proteins=seq_protein_map[Y_ION_TYPE][right_seq],
             )
-        )
+            if (
+                remove_carbamidomethylated_hybrids
+                and hybrid.evidence_of_carbamidomethylation
+            ):
+                continue
+            else:
+                hybrids.append(hybrid)
     return hybrids
 
 
 @log_time(level=logging.DEBUG)
-def form_hybrids_from_left_and_right_seqs(
+def form_potential_hybrids_from_left_and_right_seqs(
     left_seqs: List[str],
     right_seqs: List[str],
     precursor_charge: int,
     precursor_mz: float,
     precursor_mz_ppm_tol: float,
-) -> List[str]:
+) -> Set[str]:
     """
     Consider all possible hybrids of form <left seq>-<right seq>.
     To do so, we
@@ -689,27 +694,19 @@ def form_hybrids_from_left_and_right_seqs(
         hybrids.extend(
             [f"{left_seq}-{match['seq']}" for match in db.read_query(query=query)]
         )
-    return hybrids
-
-
-def remove_native_hybrids(
-    hybrids: List[HybridPeptide], fasta: Fasta
-) -> List[HybridPeptide]:
-    native_seqs = fasta.proteins_that_contain_seqs(
-        seqs=[hy.seq for hy in hybrids]
-    ).keys()
-    return [hy for hy in hybrids if hy.seq not in native_seqs]
+    return set(hybrids)
 
 
 def form_spectrum_hybrids_via_clustering(
     spectrum: Spectrum,
     kmer_db: KmerDatabase,
     fasta: Fasta,
-    precursor_mz_ppm_tol: float = DEFAULT_PRECURSOR_MZ_PPM_TOL,
-    peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
-    min_cluster_len: int = DEFAULT_MIN_CLUSTER_LENGTH,
-    min_cluster_support: int = DEFAULT_MIN_CLUSTER_SUPPORT,
-    max_allowed_ion_charge: int = DEFAULT_MAX_ALLOWED_ION_CHARGE,
+    precursor_mz_ppm_tol: float = 20,
+    peak_to_ion_ppm_tol: float = 20,
+    min_side_len: int = 3,
+    min_cluster_support: int = 3,
+    max_allowed_ion_charge: int = 4,
+    remove_carbamidomethylated_hybrids: bool = True,
 ) -> Dict[str, List[HybridPeptide]]:
     """
     This function will
@@ -723,10 +720,12 @@ def form_spectrum_hybrids_via_clustering(
     clusters = form_extended_clusters_for_spectrum(
         kmer_db=kmer_db,
         spectrum=spectrum,
-        protein_name_to_seq_map=fasta.protein_name_to_seq_map,
+        protein_name_to_seq_map={
+            prot: fasta.protein_name_to_seq_map[prot] for prot in kmer_db.proteins
+        },
         peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
         precursor_mz_ppm_tol=precursor_mz_ppm_tol,
-        min_cluster_len=min_cluster_len,
+        min_cluster_len=min_side_len,
         min_cluster_support=min_cluster_support,
         max_allowed_ion_charge=max_allowed_ion_charge,
     )
@@ -736,22 +735,15 @@ def form_spectrum_hybrids_via_clustering(
         precursor_charge=spectrum.precursor_charge,
         precursor_mz=spectrum.precursor_mz,
         precursor_mz_ppm_tol=precursor_mz_ppm_tol,
-    )
-    # Remove hybrids that are native sequences and
-    # group hybrids by sequence (e.g., group A-BC with AB-C)
-    logger.debug(
-        "Removing hybrids that correspond to native sequences. Then grouping the non-native "
-        "hybrid peptides by sequence"
+        min_side_len=min_side_len,
+        fasta_fm_index=Fasta2MFMIndex(fasta=fasta.path).create_mfm_index(),
+        remove_carbamidomethylated_hybrids=remove_carbamidomethylated_hybrids,
     )
     seq_to_hybrids = defaultdict(list)
     for hybrid in hybrids:
-        if hybrid.seq in kmer_db.kmer_to_proteins_map.kmer_to_protein_map:
-            continue
         seq_to_hybrids[hybrid.seq].append(hybrid)
-
-    duration = time.perf_counter() - start_time
     logger.info(
-        f"Completed forming hybrids for spectrum ({spectrum.sample}, {spectrum.scan})\nIt took {get_time_in_diff_units(duration)}"
+        f"Completed forming hybrids for spectrum ({spectrum.sample}, {spectrum.scan})\nIt took {get_time_in_diff_units(time.perf_counter() - start_time)}"
     )
     return dict(seq_to_hybrids)
 
@@ -761,113 +753,3 @@ def serialize_hybrids(seq_to_hybrids: Dict[str, List[HybridPeptide]]) -> Dict:
         seq: [hybrid.serialize() for hybrid in hybrids]
         for seq, hybrids in seq_to_hybrids.items()
     }
-
-
-@click.command(
-    name="form-hybrids",
-    context_settings={
-        "help_option_names": ["-h", "--help"],
-    },
-    help=(
-        "Form hybrids for the given spectra. If no `--scan` (`-s`) is given, then hybrids "
-        "will be formed for all scans in the MZML file. The hybrids will be saved as "
-        "'<scan>.json' in the specified output directory."
-    ),
-)
-@click.option(
-    "--mzml",
-    "-m",
-    type=click.Path(exists=True, path_type=Path),
-    required=True,
-    help="Path to the MZML file.",
-)
-@click.option(
-    "--scan",
-    "-s",
-    type=int,
-    required=False,
-    help="Scan number of the spectrum to form hybrids for. If not provided, all scans will be processed.",
-)
-@click.option(
-    "--database",
-    "-d",
-    type=click.Path(exists=True, path_type=Path),
-    required=True,
-    help="Path to the kmer database",
-)
-@click.option(
-    "--precursor_mz_ppm_tol",
-    "-pmpt",
-    type=float,
-    default=DEFAULT_PRECURSOR_MZ_PPM_TOL,
-    show_default=True,
-    help="Precursor m/z PPM tolerance. Hybrids will be within this PPM of the precursor m/z.",
-)
-@click.option(
-    "--peak_to_ion_ppm_tol",
-    "-pipt",
-    type=float,
-    default=DEFAULT_PEAK_TO_ION_PPM_TOL,
-    show_default=True,
-    help="The PPM tolerance within which spectra peaks and matched fragment ions must be",
-)
-@click.option(
-    "--fasta",
-    "-f",
-    type=click.Path(exists=True, path_type=Path),
-    required=True,
-    help="Path to the FASTA file",
-)
-@click.option(
-    "--out_dir",
-    "-o",
-    type=click.Path(path_type=Path),
-    required=True,
-    help="Where hybrid .json files will be saved as '<scan>.json'",
-)
-@log_time(level=logging.DEBUG)
-def cli_form_hybrids(
-    mzml: Path,
-    database: Path,
-    fasta: Path,
-    out_dir: Path,
-    precursor_mz_ppm_tol: float,
-    peak_to_ion_ppm_tol: float,
-    scan: Optional[int],
-):
-    if scan is None:
-        logger.info(f"Processing all scans in {mzml}")
-        for spectrum in Spectrum.parse_ms2_from_mzml(mzml):
-            logger.info(f"Processing scan {spectrum.scan} in {mzml}")
-            seq_to_hybrids = form_spectrum_hybrids_via_clustering(
-                kmer_db=database,
-                fasta=fasta,
-                precursor_mz_ppm_tol=precursor_mz_ppm_tol,
-                peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
-                spectrum=spectrum,
-            )
-            # Save the hybrids to a JSON file
-            to_json(
-                data=serialize_hybrids(seq_to_hybrids=seq_to_hybrids),
-                path=out_dir / f"{spectrum.scan}.json",
-            )
-    else:
-        logger.info(f"Processing scan {scan} in {mzml}")
-        spectrum = Spectrum.get_spectrum(scan=scan, mzml=mzml)
-        seq_to_hybrids = form_spectrum_hybrids_via_clustering(
-            kmer_db=database,
-            fasta=fasta,
-            precursor_mz_ppm_tol=precursor_mz_ppm_tol,
-            peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
-            spectrum=spectrum,
-        )
-        # Save the hybrids to a JSON file
-        to_json(
-            data=serialize_hybrids(seq_to_hybrids=seq_to_hybrids),
-            path=out_dir / f"{spectrum.scan}.json",
-        )
-
-
-if __name__ == "__main__":
-    logger = setup_logger()
-    cli_form_hybrids()

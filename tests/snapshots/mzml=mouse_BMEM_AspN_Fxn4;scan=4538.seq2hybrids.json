@@ -1,0 +1,394 @@
+{
+  "DMFQSKMLSKGPGDLQTLALEVARQ": [
+    {
+      "left_proteins": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "left_seq": "DMFQSKMLSKG",
+      "right_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "right_seq": "PGDLQTLALEVARQ"
+    }
+  ],
+  "DPQVAQLELGGGPGAGDLQTLALEREE": [
+    {
+      "left_proteins": [
+        "sp|P01326|INS2_MOUSE"
+      ],
+      "left_seq": "DPQVAQLELGGGPGAGDLQTLALE",
+      "right_proteins": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "right_seq": "REE"
+    }
+  ],
+  "DPQVAQLELGGGPGAGLSNALSKSSVPTI": [
+    {
+      "left_proteins": [
+        "sp|P01326|INS2_MOUSE"
+      ],
+      "left_seq": "DPQVAQLELGGGPGAG",
+      "right_proteins": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "right_seq": "LSNALSKSSVPTI"
+    }
+  ],
+  "DPQVAQLELGGGPKHIEDSGEKPNTF": [
+    {
+      "left_proteins": [
+        "sp|P01326|INS2_MOUSE"
+      ],
+      "left_seq": "DPQVAQLELGGGP",
+      "right_proteins": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "right_seq": "KHIEDSGEKPNTF"
+    }
+  ],
+  "DPQVEEWMRIILEALRQAENEPP": [
+    {
+      "left_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "left_seq": "DPQVE",
+      "right_proteins": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "right_seq": "EWMRIILEALRQAENEPP"
+    }
+  ],
+  "DPQVEQLELGGSPGDLQTLALAAVSSAP": [
+    {
+      "left_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "left_seq": "DPQVEQLELGGSPGDLQTL",
+      "right_proteins": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "right_seq": "ALAAVSSAP"
+    },
+    {
+      "left_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "left_seq": "DPQVEQLELGGSPGDLQTLA",
+      "right_proteins": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "right_seq": "LAAVSSAP"
+    },
+    {
+      "left_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "left_seq": "DPQVEQLELGGSPGDLQTLAL",
+      "right_proteins": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "right_seq": "AAVSSAP"
+    }
+  ],
+  "DPQVEQLELGGSPGDLQTLSARPVKE": [
+    {
+      "left_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "left_seq": "DPQVEQLELGGSPGDLQ",
+      "right_proteins": [
+        "sp|Q9QXV0|PCSK1_MOUSE"
+      ],
+      "right_seq": "TLSARPVKE"
+    },
+    {
+      "left_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "left_seq": "DPQVEQLELGGSPGDLQT",
+      "right_proteins": [
+        "sp|Q9QXV0|PCSK1_MOUSE"
+      ],
+      "right_seq": "LSARPVKE"
+    },
+    {
+      "left_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "left_seq": "DPQVEQLELGGSPGDLQTL",
+      "right_proteins": [
+        "sp|Q9QXV0|PCSK1_MOUSE"
+      ],
+      "right_seq": "SARPVKE"
+    }
+  ],
+  "EVEDPQVAQLELGGGLQTLALEVARQ": [
+    {
+      "left_proteins": [
+        "sp|P01326|INS2_MOUSE"
+      ],
+      "left_seq": "EVEDPQVAQLELGGG",
+      "right_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "right_seq": "LQTLALEVARQ"
+    }
+  ],
+  "EVEDPQVAQLELGGGPGAGDLKSSVPTI": [
+    {
+      "left_proteins": [
+        "sp|P01326|INS2_MOUSE"
+      ],
+      "left_seq": "EVEDPQVAQLELGGGPGAGDL",
+      "right_proteins": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "right_seq": "KSSVPTI"
+    }
+  ],
+  "EVEDPQVAQLELGGGPGAGDLQSSVPTI": [
+    {
+      "left_proteins": [
+        "sp|P01326|INS2_MOUSE"
+      ],
+      "left_seq": "EVEDPQVAQLELGGGPGAGDLQ",
+      "right_proteins": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "right_seq": "SSVPTI"
+    }
+  ],
+  "EVEDPQVAQLGSPGDLQTLALEVARQ": [
+    {
+      "left_proteins": [
+        "sp|P01326|INS2_MOUSE"
+      ],
+      "left_seq": "EVEDPQVAQL",
+      "right_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "right_seq": "GSPGDLQTLALEVARQ"
+    }
+  ],
+  "EVEDPQWMRIILEALRQAENEPP": [
+    {
+      "left_proteins": [
+        "sp|P01326|INS2_MOUSE"
+      ],
+      "left_seq": "EVEDPQ",
+      "right_proteins": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "right_seq": "WMRIILEALRQAENEPP"
+    }
+  ],
+  "GAPVEDEWMRIILEALRQAENEPP": [
+    {
+      "left_proteins": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "left_seq": "GAPV",
+      "right_proteins": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "right_seq": "EDEWMRIILEALRQAENEPP"
+    },
+    {
+      "left_proteins": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "left_seq": "GAPVE",
+      "right_proteins": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "right_seq": "DEWMRIILEALRQAENEPP"
+    },
+    {
+      "left_proteins": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "left_seq": "GAPVED",
+      "right_proteins": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "right_seq": "EWMRIILEALRQAENEPP"
+    }
+  ],
+  "GAPVEDQLELGGSPGDLQTLALEVARQ": [
+    {
+      "left_proteins": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "left_seq": "GAPVED",
+      "right_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "right_seq": "QLELGGSPGDLQTLALEVARQ"
+    }
+  ],
+  "PAAAEEEWMRIILEALRQAENEPP": [
+    {
+      "left_proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "left_seq": "PAAAEE",
+      "right_proteins": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "right_seq": "EWMRIILEALRQAENEPP"
+    }
+  ],
+  "PAAAEEKLELGGSPGDLQTLALEVARQ": [
+    {
+      "left_proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "left_seq": "PAAAEEK",
+      "right_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "right_seq": "LELGGSPGDLQTLALEVARQ"
+    }
+  ],
+  "PAAAEEQLELGGSPGDLQTLALEVARQ": [
+    {
+      "left_proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "left_seq": "PAAAE",
+      "right_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "right_seq": "EQLELGGSPGDLQTLALEVARQ"
+    },
+    {
+      "left_proteins": [
+        "sp|P99027|RLA2_MOUSE"
+      ],
+      "left_seq": "PAAAEE",
+      "right_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "right_seq": "QLELGGSPGDLQTLALEVARQ"
+    }
+  ],
+  "PQVEDEWMRIILEALRQAENEPP": [
+    {
+      "left_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "left_seq": "PQV",
+      "right_proteins": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "right_seq": "EDEWMRIILEALRQAENEPP"
+    },
+    {
+      "left_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "left_seq": "PQVE",
+      "right_proteins": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "right_seq": "DEWMRIILEALRQAENEPP"
+    }
+  ],
+  "PQVEQLELGGSPGDDLQTLALEVARQ": [
+    {
+      "left_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "left_seq": "PQVEQLELGGSPGD",
+      "right_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "right_seq": "DLQTLALEVARQ"
+    }
+  ],
+  "QELEPQGLFPQGGKGRELEHKQEE": [
+    {
+      "left_proteins": [
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "left_seq": "QELE",
+      "right_proteins": [
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "right_seq": "PQGLFPQGGKGRELEHKQEE"
+    }
+  ],
+  "QELESLSAIEAELEKVAHALAAVSSAP": [
+    {
+      "left_proteins": [
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "left_seq": "QELESLSAIEAELEKVAH",
+      "right_proteins": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "right_seq": "ALAAVSSAP"
+    }
+  ],
+  "QELESLSAIEAELEKVAHALEVARQ": [
+    {
+      "left_proteins": [
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "left_seq": "QELESLSAIEAELEKVAH",
+      "right_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "right_seq": "ALEVARQ"
+    }
+  ],
+  "QELESLSAIEAELEKVAHSARPVKE": [
+    {
+      "left_proteins": [
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "left_seq": "QELESLSAIEAELEKVAH",
+      "right_proteins": [
+        "sp|Q9QXV0|PCSK1_MOUSE"
+      ],
+      "right_seq": "SARPVKE"
+    }
+  ],
+  "QELESLSAIEAELEKVDSGEKPNTF": [
+    {
+      "left_proteins": [
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "left_seq": "QELESLSAIEAELEKV",
+      "right_proteins": [
+        "sp|P16014|SCG1_MOUSE"
+      ],
+      "right_seq": "DSGEKPNTF"
+    }
+  ],
+  "QELESLSAIEAIILEALRQAENEPP": [
+    {
+      "left_proteins": [
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "left_seq": "QELESLSAIEA",
+      "right_proteins": [
+        "sp|Q03517|SCG2_MOUSE"
+      ],
+      "right_seq": "IILEALRQAENEPP"
+    }
+  ],
+  "RDAAAEVPELGGSPGDLQTLALEVARQ": [
+    {
+      "left_proteins": [
+        "sp|P26339|CMGA_MOUSE"
+      ],
+      "left_seq": "RDAAAEVP",
+      "right_proteins": [
+        "sp|P01325|INS1_MOUSE"
+      ],
+      "right_seq": "ELGGSPGDLQTLALEVARQ"
+    }
+  ]
+}

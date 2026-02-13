@@ -10,7 +10,8 @@ from venv import logger
 
 import click
 import pandas as pd
-from pydantic import BaseModel, field_validator, model_validator
+from fm_index import MultiFMIndex
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 from typing_extensions import Self
 
 from src.constants import (
@@ -26,23 +27,15 @@ from src.constants import (
     DEFAULT_PEAK_TO_ION_PPM_TOL,
     DEFAULT_PRECURSOR_MZ_PPM_TOL,
     DEFAULT_Q_THRESHOLD,
-    HS_PREFIX,
     HUMAN_PROTEOME,
-    HYBRID,
-    NATIVE,
     TARGET,
     TRUE_HYBRIDS_PATH,
 )
-from src.crux import (
-    CometConfig,
-    CometOutputs,
-    Crux,
-    get_expected_comet_outputs_for_mzml_to_scans,
-)
+from src.crux import CometOutputs, Crux, get_expected_comet_outputs_for_mzml_to_scans
 from src.hybrids_via_clusters import HybridPeptide, form_spectrum_hybrids_via_clustering
 from src.kmer_database import KmerDatabase
 from src.mass_spectra import Mzml, Spectrum, create_sample_scan_to_spectrum_map
-from src.peptides_and_ions import Fasta, Peptide, get_proteins_by_name
+from src.peptides_and_ions import Fasta, Fasta2MFMIndex, Peptide, get_proteins_by_name
 from src.plot_utils import fig_setup, save_fig
 from src.psm import CometPSM, ProteinAbundance
 from src.utils import (
@@ -285,13 +278,13 @@ class HybridPSMScorer(BaseModel):
             hybrids_fasta = tmp_path / f"{mzml_name}.{spectrum.scan}.fasta"
             if self.hybrid_decoy_competition:
                 create_hybrids_fasta(
-                    hybrid_seqs=seq_to_hybrids.keys(),
+                    seq_to_hybrids=seq_to_hybrids,
                     output_fasta_path=hybrids_fasta,
                     fasta_to_include=self.fasta,
                 )
             else:
                 create_hybrids_fasta(
-                    hybrid_seqs=seq_to_hybrids.keys(),
+                    seq_to_hybrids=seq_to_hybrids,
                     output_fasta_path=hybrids_fasta,
                 )
             # Run Comet
@@ -335,7 +328,7 @@ class HybridFormer(BaseModel):
             fasta=Fasta(path=self.fasta),
             precursor_mz_ppm_tol=self.precursor_mz_ppm_tol,
             peak_to_ion_ppm_tol=self.peak_to_ion_ppm_tol,
-            min_cluster_len=self.min_cluster_len,
+            min_side_len=self.min_cluster_len,
             min_cluster_support=self.min_cluster_support,
             max_allowed_ion_charge=self.max_allowed_ion_charge,
         )
@@ -423,9 +416,10 @@ class HypedsearchRunConfig(BaseModel):
     max_precursor_charge: int = DEFAULT_MAX_PRECURSOR_CHARGE
     peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL
     precursor_mz_ppm_tol: float = DEFAULT_PRECURSOR_MZ_PPM_TOL
-    min_cluster_len: int = DEFAULT_MIN_CLUSTER_LENGTH
+    min_hybrid_side_len: int = DEFAULT_MIN_SIDE_LEN
     min_cluster_support: int = DEFAULT_MIN_CLUSTER_SUPPORT
     max_allowed_ion_charge: int = DEFAULT_MAX_ALLOWED_ION_CHARGE
+    remove_carbamidomethylation_hybrids: bool = True
 
     @field_validator("mzml_to_scans", mode="after")
     def ensure_mzmls_exist(
@@ -474,18 +468,6 @@ class HypedsearchRunConfig(BaseModel):
     @property
     def spectrum_selector(self) -> SpectrumSelector:
         return SpectrumSelector(max_precursor_charge=self.max_precursor_charge)
-
-    @property
-    def hybrid_former(self) -> HybridFormer:
-        return HybridFormer(
-            kmer_db=self.kmer_db,
-            fasta=self.fasta,
-            peak_to_ion_ppm_tol=self.peak_to_ion_ppm_tol,
-            precursor_mz_ppm_tol=self.precursor_mz_ppm_tol,
-            min_cluster_len=self.min_cluster_len,
-            min_cluster_support=self.min_cluster_support,
-            max_allowed_ion_charge=self.max_allowed_ion_charge,
-        )
 
     @property
     def psm_scorer(self) -> HybridPSMScorer:
@@ -597,8 +579,8 @@ class HypedsearchRunConfig(BaseModel):
             outputs.append(
                 crux.run_comet(
                     mzml=mzml,
-                    fasta=self.hybrid_former.fasta,
-                    crux_comet_params=self.psm_scorer.comet_params,
+                    fasta=self.fasta,
+                    crux_comet_params=self.crux_comet_params,
                     decoy_search=2,
                     out_dir=self.native_run_dir,
                     file_root=Mzml.get_mzml_name(mzml=mzml),
@@ -692,43 +674,27 @@ class HypedsearchRunConfig(BaseModel):
         self,
         spectrum: Spectrum,
     ) -> Tuple[Dict[str, List[HybridPeptide]], List[CometOutputs]]:
-        return hybrid_run_on_spectrum(
+        seq_to_hybrids = form_spectrum_hybrids_via_clustering(
+            spectrum=spectrum,
+            kmer_db=KmerDatabase(db_path=self.kmer_db),
+            fasta=Fasta(path=self.fasta),
+            precursor_mz_ppm_tol=self.precursor_mz_ppm_tol,
+            peak_to_ion_ppm_tol=self.peak_to_ion_ppm_tol,
+            min_side_len=self.min_hybrid_side_len,
+            min_cluster_support=self.min_cluster_support,
+            max_allowed_ion_charge=self.max_allowed_ion_charge,
+            remove_carbamidomethylated_hybrids=self.remove_carbamidomethylation_hybrids,
+        )
+        comet_outputs = self.psm_scorer.score_hybrids(
+            seq_to_hybrids=seq_to_hybrids,
             spectrum=spectrum,
             out_dir=self.hybrid_run_scan_results_dir,
-            hybrid_former=self.hybrid_former,
-            psm_scorer=self.psm_scorer,
         )
-
-
-def native_run_on_spectrum(
-    spectrum: Spectrum, comet_config: CometConfig
-) -> CometOutputs:
-    return comet_config.run_comet_on_mzml(
-        mzml=spectrum.mzml, scan_min=spectrum.scan, scan_max=spectrum.scan
-    )
-
-
-def hybrid_run_on_spectrum(
-    spectrum: Spectrum,
-    out_dir: Path,
-    hybrid_former: HybridFormer,
-    psm_scorer: HybridPSMScorer,
-) -> Tuple[Dict[str, List[HybridPeptide]], List[CometOutputs]]:
-    seq_to_hybrids = hybrid_former.form_hybrids(spectrum=spectrum)
-    comet_outputs = psm_scorer.score_hybrids(
-        seq_to_hybrids=seq_to_hybrids,
-        spectrum=spectrum,
-        out_dir=out_dir,
-    )
-    return seq_to_hybrids, comet_outputs
-
-
-def hybrid_fasta_name(hybrid_seq: str) -> str:
-    return f"{HS_PREFIX}{hybrid_seq}"
+        return seq_to_hybrids, comet_outputs
 
 
 def create_hybrids_fasta(
-    hybrid_seqs: List[str],
+    seq_to_hybrids: Dict[str, List[HybridPeptide]],
     output_fasta_path: Path,
     fasta_to_include: Optional[Path] = None,
     protein_names: Optional[Union[List[str], Path]] = None,
@@ -749,14 +715,9 @@ def create_hybrids_fasta(
             # Get all the proteins in the FASTA
             prots = Peptide.from_fasta(fasta_path=fasta_to_include)
 
-    for _, hybrid_seq in enumerate(hybrid_seqs):
-        new_peptide = Peptide(
-            seq=hybrid_seq,
-            name=hybrid_fasta_name(hybrid_seq=hybrid_seq),
-        )
-
-        prots.append(new_peptide)
-
+    prots.extend(
+        HybridPeptide.seq_to_hybrids_map_to_peptides(seq_to_hybrids=seq_to_hybrids)
+    )
     Fasta.write_fasta(peptides=prots, path=output_fasta_path)
     return prots
 
@@ -805,47 +766,6 @@ def cli_combine_comet_txts(
             folder=hs_config.hybrid_run_scan_results_dir
         )
     logger.info("Finished combining Comet scan results")
-
-
-# @click.command(
-#     name="create-native-run-snakemake-config",
-#     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-#     help="""
-#     Create the native run snakemake config
-#     """,
-# )
-# @click.option(
-#     "--config",
-#     "-c",
-#     type=PathType(),
-#     required=True,
-#     help="Path to the Hypedsearch config JSON",
-# )
-# @click.option(
-#     "--out_path",
-#     "-o",
-#     type=PathType(),
-#     required=False,
-#     help=f"Path to where the native run snakemake config will be saved. Default is <native_run_dir>/{DEFAULT_NATIVE_RUN_CONFIG}",
-# )
-# @click.option(
-#     "--num_threads",
-#     "-n",
-#     type=int,
-#     required=False,
-#     default=DEFAULT_NUM_COMET_THREADS,
-#     show_default=True,
-#     help="Number of threads to use for Comet in the native run",
-# )
-# def cli_create_native_run_snakemake_config(
-#     config: Path, out_path: Optional[Path], num_threads: int
-# ):
-#     hs_config = HypedsearchRunConfig.from_json(path=config)
-#     if out_path is None:
-#         out_path = hs_config.native_run_dir / DEFAULT_NATIVE_RUN_CONFIG
-#     hs_config.create_native_run_comet_config(
-#         out_path=out_path, num_threads_4_comet=num_threads
-#     )
 
 
 @click.command(

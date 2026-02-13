@@ -3,11 +3,11 @@ from collections import defaultdict
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
-from time import time
 from typing import Dict, List, Literal, Optional, Set, Union
 
 import click
 from Bio import SeqIO
+from fm_index import MultiFMIndex
 from pydantic import BaseModel
 
 from src.constants import (
@@ -25,14 +25,15 @@ from src.utils import (
     Kmer,
     PathType,
     Position,
+    from_pickle,
     generate_aa_kmers,
     get_b_ion_prefixes,
-    get_time_in_diff_units,
     get_y_ion_suffixes,
     log_params,
     log_time,
     pickle_and_compress,
     setup_logger,
+    to_pickle,
 )
 
 logger = logging.getLogger(__name__)
@@ -233,6 +234,49 @@ class Fasta(BaseModel):
         return {pep.name: pep for pep in self.proteins}
 
 
+@dataclass
+class Fasta2MFMIndex:
+    fasta: Fasta
+
+    def __post_init__(self):
+        if isinstance(self.fasta, (str, Path)):
+            self.fasta = Fasta(path=self.fasta)
+
+    def create_mfm_index(self) -> MultiFMIndex:
+        fm_index = self.from_fasta(self.fasta.path)
+        return fm_index
+
+    @property
+    def mfm_name(self) -> str:
+        return self.fasta_name_to_mfm_index_name(fasta=self.fasta.path)
+
+    @cached_property
+    def idx_to_protein_map(self) -> Dict[int, Peptide]:
+        return {idx: prot for idx, prot in enumerate(self.fasta.proteins)}
+
+    @staticmethod
+    def fasta_name_to_mfm_index_name(fasta: Union[str, Path]):
+        return f"{Path(fasta).stem}.mfmindex"
+
+    @staticmethod
+    def mfm_index_name_to_fasta_name(mfm_index: Union[str, Path]):
+        return f"{Path(mfm_index).stem}.fasta"
+
+    @staticmethod
+    def from_fasta(fasta_path: Union[str, Path]) -> MultiFMIndex:
+        fasta = Fasta(path=fasta_path)
+        seqs = [pep.seq for pep in fasta.proteins]
+        return MultiFMIndex(data=seqs)
+
+    @staticmethod
+    def load(path: Union[str, Path]) -> MultiFMIndex:
+        return from_pickle(path=path)
+
+    @staticmethod
+    def save(mfm_index: MultiFMIndex, path: Union[str, Path]):
+        to_pickle(obj=mfm_index, path=path)
+
+
 def compute_peptide_precursor_mz(seq: str, charge: int):
     """
     The m/z of a peptide as a precursor
@@ -365,7 +409,7 @@ def get_kmer_counts_by_protein(
 
 
 @click.command(
-    name="get-kmer-info",
+    name="create-mfm-index-for-fasta",
     help=(
         "Given a FASTA and a k, get the number of times each unique k-mer appears in each protein."
     ),
@@ -379,62 +423,39 @@ def get_kmer_counts_by_protein(
     help="Path to the FASTA file.",
 )
 @click.option(
-    "--k",
-    "-k",
-    type=int,
-    required=True,
-    help="The k-mer length, k",
-)
-@click.option(
-    "--out_path",
-    "-o",
-    type=PathType(),
-    required=True,
-    help=("The results will be saved in this location"),
-)
-@click.option(
     "--overwrite",
     "-ow",
     is_flag=True,
     help="If outputs already exist, this controls whether or not to overwrite them.",
 )
-@log_time(level=logging.DEBUG)
-@log_params
-def cli_get_kmer_counts_by_protein(
-    fasta: Path,
-    k: int,
-    out_path: Path,
-    overwrite: bool,
-):
-    if out_path.exists() and not overwrite:
-        logger.info(f"File {out_path} already exists. Skipping...")
-        return
-    loop_start_time = time()
-    logger.info(f"Processing k={k}")
-    k_map = get_kmer_counts_by_protein(
-        fasta=fasta,
-        k=k,
-    )
-    pickle_and_compress(obj=k_map, path=out_path)
-    loop_duration = time() - loop_start_time
-    logger.info(f"Processed k={k} in {get_time_in_diff_units(loop_duration)}")
-
-
-@click.command(
-    name="create-fasta",
-    help=(""),
-    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+@click.option(
+    "--out_dir",
+    "-o",
+    type=PathType(),
+    required=False,
+    help="If provided, the MFM index will be saved to <out_dir>/<FASTA file stem>.mfmindex. Otherwise it'll be saved to <FASTA file parent dir>/<FASTA file stem>.mfmindex.",
 )
-def cli_create_fasta(
+@log_time()
+@log_params
+def cli_create_mfm_index_for_fasta(
     fasta: Path,
-    protein_names: Union[List[str], Path],
-    out_path: Path,
+    overwrite: bool,
+    out_dir: Optional[Path],
 ):
-    proteins = get_proteins_by_name(
-        protein_names=protein_names,
-        fasta_path=fasta,
-    )
-    Fasta.write_fasta(peptides=proteins, path=out_path)
+    if out_dir is not None:
+        out_path = out_dir / Fasta2MFMIndex.fasta_name_to_mfm_index_name(fasta=fasta)
+    else:
+        out_path = fasta.parent / Fasta2MFMIndex.fasta_name_to_mfm_index_name(
+            fasta=fasta
+        )
+    if out_path.exists() and not overwrite:
+        logger.info(
+            f"File {out_path} already exists and overwrite={overwrite}. So skipping creation."
+        )
+    else:
+        logger.info(f"Creating MFM index from FASTA and saving to {out_path}")
+        mfm = Fasta2MFMIndex.from_fasta(fasta_path=fasta)
+        Fasta2MFMIndex.save(mfm_index=mfm, path=out_path)
 
 
 @click.group(context_settings=dict(help_option_names=["-h", "--help"]))
@@ -445,5 +466,5 @@ def cli():
 if __name__ == "__main__":
     logger = setup_logger()
     cli.add_command(cli_get_uniq_kmers)
-    cli.add_command(cli_get_kmer_counts_by_protein)
+    cli.add_command(cli_create_mfm_index_for_fasta)
     cli()
