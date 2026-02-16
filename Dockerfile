@@ -33,31 +33,22 @@ RUN tar -zxvf crux-4.3.Source.tar.gz \
   && make install
 
 # === STAGE 2: Runtime with Micromamba + Python + Crux ===
-FROM mambaorg/micromamba:1.5.7
+FROM ghcr.io/astral-sh/uv:python3.11-trixie
 
-# Runtime dependencies
-USER root
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libssl3 \
-    libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy Crux binary
+# Copy Crux binary from starge 1 to this stage
 COPY --from=builder /usr/local/bin/crux /usr/local/bin/crux
 
-# Install hypedsearch conda environment
-USER $MAMBA_USER
-COPY --chown=$MAMBA_USER:$MAMBA_USER environment.yaml /tmp/env.yaml
-RUN micromamba install -y -n base -f /tmp/env.yaml \
-    && micromamba clean --all --yes \
-    && rm /tmp/env.yaml
+WORKDIR /app
 
-# Make micromamba Python globally available
-USER root
-RUN ln -sf /opt/conda/bin/python /usr/local/bin/python
+# Copy the project into the image
+COPY pyproject.toml ./
 
-# Switch back to micromamba user
-USER $MAMBA_USER
+# Disable development dependencies
+ENV UV_NO_DEV=1
 
-# Ensure Crux is in PATH
-ENV PATH="/usr/local/bin:${PATH}"
+# Sync the project into a new environment, asserting the lockfile is up to date
+WORKDIR /app
+RUN uv sync --locked
+
+# Activate the project virtual environment by placing its binary directory at the front of the path
+ENV PATH="/app/.venv/bin:$PATH"
