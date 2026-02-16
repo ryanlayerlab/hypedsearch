@@ -19,10 +19,7 @@ sys.path.append(str(repo_dir))
 import random
 import tempfile
 
-from src.hypedsearch import (
-    HypedsearchRunConfig,
-    hybrid_run_on_spectrum,
-)
+from src.hypedsearch import HypedsearchRunConfig, hybrid_run_on_spectrum
 from src.kmer_database import KmerDatabase
 from src.mass_spectra import Mzml, Spectrum
 from src.peptides_and_ions import Fasta, Peptide

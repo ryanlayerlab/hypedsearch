@@ -1,0 +1,23 @@
+[project]
+name = "hypedsearch"
+version = "0.1.0"
+description = "Hypedsearch: mass spectrometer hybrid-peptide finder"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "biopython>=1.86",
+    "click>=8.3.1",
+    "fm-index>=2.3.2",
+    "lxml>=6.0.2",
+    "matplotlib>=3.10.8",
+    "numpy>=2.4.2",
+    "pandas>=3.0.0",
+    "plotly>=6.5.2",
+    "pydantic>=2.12.5",
+    "pymzml>=2.6.0",
+    "pyteomics>=4.7.5",
+    "pytest>=9.0.2",
+    "scipy>=1.17.0",
+    "seaborn>=0.13.2",
+    "snakemake>=9.16.3",
+]
