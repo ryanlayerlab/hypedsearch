@@ -17,6 +17,7 @@ dependencies = [
     "pymzml>=2.6.0",
     "pyteomics>=4.7.5",
     "pytest>=9.0.2",
+    "pytest-snapshot>=0.9.0",
     "scipy>=1.17.0",
     "seaborn>=0.13.2",
     "snakemake>=9.16.3",

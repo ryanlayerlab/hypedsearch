@@ -147,13 +147,11 @@ Timing_data.txt
 # comet
 
 # Directories to ignore 
-slurm/logs
 old_src
 old_tests
 dbs
 no-git
 tmp 
-slurm
 old_stuff
 no_git
 plots

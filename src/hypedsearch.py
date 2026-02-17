@@ -408,6 +408,7 @@ class HypedsearchRunConfig(BaseModel):
     parent_output_dir: Path
     crux_comet_params: Path
     name: str
+    fasta_fm_index: Path
     kmer_db: Optional[Path] = None
     hybrid_decoy_competition: bool = False
     max_precursor_charge: int = DEFAULT_MAX_PRECURSOR_CHARGE
@@ -447,6 +448,7 @@ class HypedsearchRunConfig(BaseModel):
         self.hybrid_run_dir.mkdir(parents=True, exist_ok=True)
         self.plots_dir.mkdir(parents=True, exist_ok=True)
         self.hybrid_run_scan_results_dir.mkdir(parents=True, exist_ok=True)
+
         return self
 
     @property
@@ -678,6 +680,7 @@ class HypedsearchRunConfig(BaseModel):
             spectrum=spectrum,
             kmer_db=KmerDatabase(db_path=self.kmer_db),
             fasta=Fasta(path=self.fasta),
+            fasta_fm_index=Fasta2MFMIndex.load(path=self.fasta_fm_index),
             precursor_mz_ppm_tol=self.precursor_mz_ppm_tol,
             peak_to_ion_ppm_tol=self.peak_to_ion_ppm_tol,
             min_side_len=self.min_hybrid_side_len,

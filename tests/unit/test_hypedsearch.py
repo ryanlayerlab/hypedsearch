@@ -36,7 +36,7 @@ class Test_HypedsearchRunConfig:
 
     @staticmethod
     def test_hybrid_run_on_spectrum_with_multiple_right_parental_proteins(
-        tmp_path, test_hs_config_path, test_data_dir
+        tmp_path, test_data_dir
     ):
         hs_config = HypedsearchRunConfig(
             mzml_to_scans={test_data_dir / "mouse_BMEM_AspN_Fxn4.mzML": [2508]},
@@ -46,6 +46,7 @@ class Test_HypedsearchRunConfig:
             min_hybrid_side_len=3,
             kmer_db=test_data_dir / "mouse_samples.kmers.db",
             fasta=MOUSE_PROTEOME,
+            fasta_fm_index="fastas/SwissProt.TAW_mouse_w_NOD_IAPP.mfmindex",
         )
         _, comet_outputs = hs_config.hybrid_run_on_spectrum(
             spectrum=Spectrum.get_spectrum(

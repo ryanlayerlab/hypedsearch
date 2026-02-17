@@ -380,6 +380,9 @@ class Test_form_spectrum_hybrids_via_clustering:
             spectrum=spectrum,
             kmer_db=KmerDatabase(db_path=test_data_dir / "mouse_samples.kmers.db"),
             fasta=Fasta(path=MOUSE_PROTEOME),
+            fasta_fm_index=Fasta2MFMIndex.load(
+                path="fastas/SwissProt.TAW_mouse_w_NOD_IAPP.mfmindex"
+            ),
             precursor_mz_ppm_tol=20,
             peak_to_ion_ppm_tol=20,
             min_side_len=3,

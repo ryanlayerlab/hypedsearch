@@ -1,5 +1,4 @@
-
-from fiji.fiji_utils import create_config_for_fiji_run
+from slurm.fiji_utils import create_config_for_fiji_run
 
 
 class Test_create_config_for_fiji_run:

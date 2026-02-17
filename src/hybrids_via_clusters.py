@@ -701,6 +701,7 @@ def form_spectrum_hybrids_via_clustering(
     spectrum: Spectrum,
     kmer_db: KmerDatabase,
     fasta: Fasta,
+    fasta_fm_index: MultiFMIndex,
     precursor_mz_ppm_tol: float = 20,
     peak_to_ion_ppm_tol: float = 20,
     min_side_len: int = 3,
@@ -736,7 +737,7 @@ def form_spectrum_hybrids_via_clustering(
         precursor_mz=spectrum.precursor_mz,
         precursor_mz_ppm_tol=precursor_mz_ppm_tol,
         min_side_len=min_side_len,
-        fasta_fm_index=Fasta2MFMIndex(fasta=fasta.path).create_mfm_index(),
+        fasta_fm_index=fasta_fm_index,
         remove_carbamidomethylated_hybrids=remove_carbamidomethylated_hybrids,
     )
     seq_to_hybrids = defaultdict(list)
