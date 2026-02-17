@@ -30,12 +30,21 @@ rule run_hypedsearch:
         runtime = "10m"
     # benchmark:
     #     "logs/hypedsearch/{sample}.{scan}.log"
-    singularity: 
+    singularity:
         "docker://airikjohnson/hypedsearch:latest"
     shell:
         """
-        python -m src.hypedsearch run-hypedsearch \
-            --mzml {input.mzml} \
-            --scan {wildcards.scan} \
-            --config {config.hs_config}
+        if [[ "$(uname)" == "Linux" ]]; then
+            /app/.venv/bin/python -m src.hypedsearch run-hypedsearch \
+                --mzml {input.mzml} \
+                --scan {wildcards.scan} \
+                --config {config.hs_config}
+        elif [[ "$(uname)" == "Darwin" ]]; then
+            python -m src.hypedsearch run-hypedsearch \
+                --mzml {input.mzml} \
+                --scan {wildcards.scan} \
+                --config {config.hs_config}
+        else
+            echo "Unknown OS"
+        fi
         """

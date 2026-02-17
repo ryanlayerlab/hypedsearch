@@ -86,7 +86,7 @@ if $USE_SINGULARITY; then
         --cores $CORES \
         --scheduler greedy \
         --use-singularity \
-        --singularity-args "-B $DATA_DIR:$DATA_DIR" \
+        --singularity-args "--bind $DATA_DIR:$DATA_DIR" \
         --keep-going \
         --rerun-incomplete \
         --nolock \

@@ -48,7 +48,4 @@ ENV UV_NO_DEV=1
 
 # Sync the project into a new environment, asserting the lockfile is up to date
 WORKDIR /app
-RUN uv sync --locked
-
-# Activate the project virtual environment by placing its binary directory at the front of the path
-ENV PATH="/app/.venv/bin:$PATH"
+RUN uv sync
