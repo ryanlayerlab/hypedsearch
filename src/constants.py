@@ -39,6 +39,8 @@ MOUSE_PROTEOME = FASTAS_DIR / "SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
 HUMAN_PROTEOME = FASTAS_DIR / "uniprotkb_proteome_UP000005640_AND_revi_2025_04_29.fasta"
 RUN_COMET_SMK = (GIT_REPO_DIR / "snakefiles/run_comet.smk").relative_to(GIT_REPO_DIR)
 RUN_HYPEDSEARCH_SMK = GIT_REPO_DIR / "snakefiles/run_hypedsearch.smk"
+SINGULARITY_IMAGE = "hypedsearch_latest.sif"
+SHARED_PARAMS = "shared_params.pkl"
 
 # Strings
 MASS = "mass"

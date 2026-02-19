@@ -5,21 +5,76 @@ import shutil
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import click
 import pandas as pd
 from pydantic import BaseModel, field_validator
 
 from src.constants import LINUX_CRUX_EXECUTABLE, MAC_CRUX_EXECUTABLE
-from src.hypedsearch import HybridPSMScorer, HypedsearchRunConfig
-from src.utils import PathType, copy_file, log_params, setup_logger
+from src.hypedsearch import HybridPSMScorer, HypedsearchRunConfig, run_in_parallel
+from src.utils import (
+    PathType,
+    copy_file,
+    log_params,
+    setup_logger,
+    write_new_line_separated_file,
+)
 
 logger = logging.getLogger(__name__)
 
 LOCALSCRATCH = "/localscratch"
 DEFAULT_FIJI_CONFIG_NAME = "hs.fiji.config.json"
+DEFAULT_MEM = "500GB"
+DEFAULT_N_CORES = 180
+DEFAULT_TIME = "24:00:00"
+DEFAULT_LOG_DIR = "logs/hypedsearch"
+DEFAULT_PARTITION = "highmem"
 node_to_data_dir_map = {"": "/localscratch"}
+
+
+@dataclass
+class SbatchConfig:
+    name: str
+    time: str = DEFAULT_TIME
+    mem: str = DEFAULT_MEM
+    n_cores: int = DEFAULT_N_CORES
+    partition: str = DEFAULT_PARTITION
+    log_dir: Union[str, Path] = DEFAULT_LOG_DIR
+
+    def get_sbatch_directives_lines(self) -> List[str]:
+        header = [
+            f"#SBATCH --job-name={self.name}",
+            f"#SBATCH --mem={self.mem}",
+            f"#SBATCH --ntasks={self.n_cores}",
+            f'#SBATCH --partition="{self.partition}"',
+            "#SBATCH --nodes=1",
+            f"#SBATCH --time={self.time}",
+            f"#SBATCH --output={self.log_dir}/{self.name}.out",
+            f"#SBATCH --error={self.log_dir}/{self.name}.err",
+            "#SBATCH --mail-type=BEGIN,FAIL,END",
+            "#SBATCH --mail-user=erjo3868@colorado.edu",
+        ]
+        return header
+
+
+def create_sbatch_script_to_run_hypedsearch(
+    sbatch_config: SbatchConfig,
+    config: Union[str, Path],
+    out_path: Optional[Union[str, Path]] = None,
+    n_cores: int = 80,
+):
+    hs_config = HypedsearchRunConfig.from_json(path=config)
+    fiji_config = create_config_for_fiji_run(config=config, dry_run=True)
+    fiji_config_path = fiji_config.parent_output_dir / DEFAULT_FIJI_CONFIG_NAME
+    cmds = [
+        f"python -m slurm.fiji_utils prep-files-on-fiji -c {config}",
+        f"python -m src.hypedsearch run-in-parallel -c {fiji_config_path} -n {n_cores} -os",
+    ]
+    lines = ["#!/bin/bash"] + sbatch_config.get_sbatch_directives_lines() + [""] + cmds
+    if out_path is None:
+        out_path = hs_config.parent_output_dir / f"{hs_config.name}.hybrid_run.sbatch"
+    write_new_line_separated_file(lines=lines, path=out_path)
 
 
 def collect_benchmarking_data(dir: Path) -> pd.DataFrame:
@@ -46,6 +101,9 @@ def create_config_for_fiji_run(
     node_data_dir: Union[str, Path] = LOCALSCRATCH,
     dry_run: bool = False,
 ) -> HypedsearchRunConfig:
+    logger.info(
+        f"Moving and preparing files on Fiji node in directory {node_data_dir}..."
+    )
     hs_config = HypedsearchRunConfig.from_json(path=config)
 
     # Create directories that need to exist
@@ -209,6 +267,55 @@ def cli_collect_benchmark_data(
     df.to_csv(out_path, index=False)
 
 
+@click.command(
+    name="run-hs-on-slurm",
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+    help=(""),
+)
+@click.option(
+    "--config",
+    "-c",
+    type=PathType(),
+    required=True,
+    help="",
+)
+@click.option(
+    "--n_cores",
+    "-n",
+    type=int,
+    required=True,
+    help="",
+)
+@click.option(
+    "--data_dir",
+    "-d",
+    type=PathType(),
+    default=Path("/localscratch"),
+    show_default=True,
+    help=(
+        "Path to the data directory on the Fiji node. "
+        "A Hypedsearch config file will be created here: <data_dir>/<config.name>"
+    ),
+)
+def cli_run_hs_on_slurm(
+    config: Path,
+    n_cores: int,
+    data_dir: Path,
+):
+    # Move files to local directory
+    fiji_config = create_config_for_fiji_run(config=config, node_data_dir=data_dir)
+    fiji_config_path = fiji_config.parent_output_dir / DEFAULT_FIJI_CONFIG_NAME
+    fiji_config.save(path=fiji_config_path)
+
+    # Run Hypedsearch
+    run_in_parallel(config=fiji_config_path, n_cores=n_cores, on_singularity=True)
+
+    # Move files back to persistent storage
+    move_scan_results_from_node_to_persistent_storage(
+        config=config, node_data_dir=data_dir
+    )
+
+
 @click.group(
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200}
 )
@@ -221,4 +328,11 @@ if __name__ == "__main__":
     cli.add_command(cli_prep_files_on_fiji)
     cli.add_command(cli_collect_benchmark_data)
     cli.add_command(cli_move_scan_results)
+    cli.add_command(cli_run_hs_on_slurm)
+    cli()
+    setup_logger()
+    cli.add_command(cli_prep_files_on_fiji)
+    cli.add_command(cli_collect_benchmark_data)
+    cli.add_command(cli_move_scan_results)
+    cli.add_command(cli_run_hs_on_slurm)
     cli()

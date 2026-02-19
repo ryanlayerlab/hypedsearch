@@ -1,9 +1,9 @@
-from slurm.fiji_utils import create_config_for_fiji_run
+from slurm.fiji_utils import SbatchConfig, create_config_for_fiji_run
 
 
 class Test_create_config_for_fiji_run:
     @staticmethod
-    def test_smoke(tmp_path, test_data_dir, test_hs_config_path):
+    def test_smoke(tmp_path, test_hs_config_path):
         fiji_config = create_config_for_fiji_run(
             node_data_dir=tmp_path,
             config=test_hs_config_path,
@@ -14,3 +14,10 @@ class Test_create_config_for_fiji_run:
         assert fiji_config.crux_comet_params.exists()
         for mzml in fiji_config.mzml_to_scans.keys():
             assert mzml.exists()
+
+
+class Test_SbatchConfig:
+    @staticmethod
+    def test_smoke():
+        config = SbatchConfig(name="test", time="24:00:00")
+        config.get_sbatch_directives_lines()

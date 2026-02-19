@@ -4,10 +4,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from copy import deepcopy
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Set, Union
+from typing import Dict, List, Literal, Optional, Set, Tuple, Union
 from venv import logger
 
 import click
@@ -21,12 +22,14 @@ from src.constants import (
     LINUX_CRUX_EXECUTABLE,
     MAC_CRUX_EXECUTABLE,
     RUN_COMET_SMK,
+    SINGULARITY_IMAGE,
     TARGET,
 )
 from src.mass_spectra import Mzml, Spectrum
 from src.peptides_and_ions import Fasta, Peptide
 from src.psm import CometPSM
 from src.utils import (
+    CmdLineResult,
     CmdLineRunner,
     PathType,
     load_json,
@@ -190,6 +193,143 @@ class CometConfig(BaseModel):
         )
 
 
+class CometRun(BaseModel):
+    fasta: Path
+    mzml: Path
+    crux_comet_params: Path
+    out_dir: Path
+    decoy_search: Literal[0, 1, 2] = 0
+    scan_min: int = 0
+    scan_max: int = 0
+    num_threads: Optional[int] = None
+
+    @property
+    def file_root(self) -> str:
+        return Mzml(path=self.mzml).name
+
+    @staticmethod
+    def get_run_comet_command(
+        crux_path: Union[str, Path],
+        comet_run: "CometRun",
+    ) -> str:
+        cmd_parts = [
+            f"{crux_path} comet",
+            "--verbosity 60",
+            f"--parameter-file {comet_run.crux_comet_params}",
+            f"--decoy_search {comet_run.decoy_search}",
+            f"--fileroot '{comet_run.file_root}'",
+            f"--scan_range '{comet_run.scan_min} {comet_run.scan_max}'",
+            f"--output-dir {comet_run.out_dir}",
+            (
+                f"--num_threads {comet_run.num_threads}"
+                if comet_run.num_threads is not None
+                else ""
+            ),
+            f"{comet_run.mzml}",
+            f"{comet_run.fasta}",
+        ]
+        return " ".join(cmd_parts)
+
+    @property
+    def nonstandardized_outputs(self) -> CometOutputs:
+        return CometOutputs.crux_comet_outputs(
+            out_dir=self.out_dir,
+            file_root=self.file_root,
+            scan_min=self.scan_min,
+            scan_max=self.scan_max,
+            decoy_search=self.decoy_search,
+        )
+
+    def run_comet_locally(self, crux_path: Union[str, Path]) -> CmdLineResult:
+        cmd_result = CmdLineRunner.run_cmd(
+            cmd=self.get_run_comet_command(crux_path=crux_path, comet_run=self)
+        )
+        # Standardize output file names
+        if self.nonstandardized_outputs.target.exists():
+            shutil.move(
+                src=self.nonstandardized_outputs.target,
+                dst=self.standardized_comet_outputs.target,
+            )
+        if (
+            self.nonstandardized_outputs.decoy is not None
+            and self.nonstandardized_outputs.decoy.exists()
+        ):
+            shutil.move(
+                src=self.nonstandardized_outputs.decoy,
+                dst=self.standardized_comet_outputs.decoy,
+            )
+        return cmd_result
+
+    def run_comet_in_singularity(
+        self,
+        singularity_image: Union[str, Path],
+        singularity_crux_path: str = "crux",
+        singularity_num_threads: int = 1,
+    ):
+        singularity_run = self.__class__(
+            fasta=f"/data/{self.fasta.name}",
+            mzml=f"/data/{self.mzml.name}",
+            crux_comet_params="/data/crux.comet.params",
+            out_dir="/outdir",
+            decoy_search=self.decoy_search,
+            scan_min=self.scan_min,
+            scan_max=self.scan_max,
+            num_threads=singularity_num_threads,
+        )
+        singularity_cmd_parts = [
+            "singularity exec",
+            f"--bind {self.mzml}:{singularity_run.mzml}",
+            f"--bind {self.fasta}:{singularity_run.fasta}",
+            f"--bind {self.crux_comet_params}:{singularity_run.crux_comet_params}",
+            f"--bind {self.out_dir}:{singularity_run.out_dir}",
+            f"{singularity_image}",
+            self.get_run_comet_command(
+                crux_path=singularity_crux_path, comet_run=singularity_run
+            ),
+        ]
+        singularity_cmd = " ".join(singularity_cmd_parts)
+        return CmdLineRunner.run_cmd(cmd=singularity_cmd)
+
+    @property
+    def standardized_comet_outputs(self):
+        return CometOutputs.standardized_comet_outputs(
+            out_dir=Path(self.out_dir),
+            file_root=self.file_root,
+            scan_min=self.scan_min,
+            scan_max=self.scan_max,
+            decoy_search=self.decoy_search,
+        )
+
+    def run_comet_and_keep_only_results(
+        self,
+        crux_path: Optional[str] = None,
+        on_singularity: bool = False,
+    ):
+        # Run Comet. Run in a temporary directory so comet.log.txt and comet.params.txt are not kept
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            tmp_run = deepcopy(self)
+            tmp_run.out_dir = tmp_path
+            if on_singularity:
+                process = tmp_run.run_comet_in_singularity(
+                    singularity_image=SINGULARITY_IMAGE,
+                )
+            else:
+                process = tmp_run.run_comet_locally(crux_path=crux_path)
+
+            # Move files from temp directory to final resting place
+            shutil.move(
+                tmp_run.nonstandardized_outputs.target,
+                self.standardized_comet_outputs.target,
+            )
+            if tmp_run.nonstandardized_outputs.decoy:
+                shutil.move(
+                    tmp_run.nonstandardized_outputs.decoy,
+                    self.standardized_comet_outputs.decoy,
+                )
+        return process
+
+
 @dataclass
 class Crux:
     # crux_path: Path
@@ -211,8 +351,10 @@ class Crux:
     def crux_path(self) -> str:
         if sys.platform == "darwin":
             return MAC_CRUX_EXECUTABLE
-        else:
+        elif sys.platform == "linux":
             return LINUX_CRUX_EXECUTABLE
+        else:
+            return None
 
     @staticmethod
     def validate_comet_output(result: subprocess.CompletedProcess):

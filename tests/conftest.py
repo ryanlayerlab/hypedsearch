@@ -15,7 +15,7 @@ from src.constants import GIT_REPO_DIR
 
 @pytest.fixture
 def test_data_dir():
-    return GIT_REPO_DIR / "tests/data"
+    return Path("tests/data")
 
 
 @pytest.fixture

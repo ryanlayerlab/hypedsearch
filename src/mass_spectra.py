@@ -354,7 +354,7 @@ def organize_by_spectrum_uid(data: List[Any]):
 
 
 class Mzml(BaseModel):
-    path: Annotated[Path, BeforeValidator(lambda x: to_path(path=x, check_exists=True))]
+    path: Path
 
     @cached_property
     def ms2_spectra(self) -> List["Spectrum"]:

@@ -39,7 +39,7 @@ class CmdLineRunner(BaseModel):
     def run_cmd(cmd: Union[str, List[str]]):
         if isinstance(cmd, list):
             cmd = " ".join(cmd)
-        logger.info(f"Running command line command: {cmd}")
+        logger.info(f"Running command line command:\n{cmd}")
         result = subprocess.run(
             cmd,
             shell=True,  # runs command thru shell (e.g., /bin/bash)
@@ -47,14 +47,19 @@ class CmdLineRunner(BaseModel):
             stderr=subprocess.PIPE,  # capture command’s stderr in result.stderr
             text=True,  # decode output as text (str) instead of raw bytes so results.stdout and stderr are str
         )
-        return result
+        return CmdLineResult(
+            stdout=result.stdout, stderr=result.stderr, returncode=result.returncode
+        )
 
 
 @dataclass
 class CmdLineResult:
     stdout: Optional[str] = None
     stderr: Optional[str] = None
-    code: Optional[int] = None
+    returncode: Optional[int] = None
+
+    def __str__(self):
+        return f"RETURNCODE: {self.returncode}\nSTDOUT:\n{self.stdout}\nSTDERR:\n{self.stderr}"
 
 
 @dataclass

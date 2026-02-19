@@ -1,9 +1,12 @@
 import logging
+import multiprocessing as mp
 import re
+import shutil
 import tempfile
 from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from functools import cached_property
+from functools import cached_property, partial
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Set, Tuple, Union
 from venv import logger
@@ -28,10 +31,17 @@ from src.constants import (
     DEFAULT_PRECURSOR_MZ_PPM_TOL,
     DEFAULT_Q_THRESHOLD,
     HUMAN_PROTEOME,
+    MAC_CRUX_EXECUTABLE,
+    SHARED_PARAMS,
     TARGET,
     TRUE_HYBRIDS_PATH,
 )
-from src.crux import CometOutputs, Crux, get_expected_comet_outputs_for_mzml_to_scans
+from src.crux import (
+    CometOutputs,
+    CometRun,
+    Crux,
+    get_expected_comet_outputs_for_mzml_to_scans,
+)
 from src.hybrids_via_clusters import HybridPeptide, form_spectrum_hybrids_via_clustering
 from src.kmer_database import KmerDatabase
 from src.mass_spectra import Mzml, Spectrum, create_sample_scan_to_spectrum_map
@@ -41,11 +51,14 @@ from src.psm import CometPSM, ProteinAbundance
 from src.utils import (
     PathType,
     flatten_list_of_lists,
+    from_pickle,
     load_json,
+    log_params,
     mass_difference_in_ppm,
     save_dict,
     save_pydantic_objects_to_json,
     setup_logger,
+    to_pickle,
 )
 
 logger = logging.getLogger(__name__)
@@ -696,6 +709,82 @@ class HypedsearchRunConfig(BaseModel):
         return seq_to_hybrids, comet_outputs
 
 
+@dataclass
+class HybridRunParams:
+    kmer_db: Path
+    fasta: Path
+    crux_comet_params: Path
+    fasta_fm_index: MultiFMIndex
+    out_dir: Path
+    precursor_mz_ppm_tol: float = DEFAULT_PRECURSOR_MZ_PPM_TOL
+    peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL
+    min_hybrid_side_len: int = DEFAULT_MIN_SIDE_LEN
+    min_cluster_support: int = DEFAULT_MIN_CLUSTER_SUPPORT
+    max_allowed_ion_charge: int = DEFAULT_MAX_ALLOWED_ION_CHARGE
+    remove_carbamidomethylated_hybrids: bool = True
+    hybrid_decoy_competition: bool = False
+
+
+def hybrid_run_on_spectrum(
+    spectrum: Spectrum,
+    params: Union[HybridRunParams, str, Path],
+    on_singularity: bool = False,
+    crux_path: Optional[Path] = None,
+    num_threads: int = 1,
+):
+    if isinstance(params, (str, Path)):
+        params = from_pickle(path=params)
+    # Form hybrids
+    seq_to_hybrids = form_spectrum_hybrids_via_clustering(
+        spectrum=spectrum,
+        kmer_db=KmerDatabase(db_path=params.kmer_db),
+        fasta=Fasta(path=params.fasta),
+        fasta_fm_index=params.fasta_fm_index,
+        precursor_mz_ppm_tol=params.precursor_mz_ppm_tol,
+        peak_to_ion_ppm_tol=params.peak_to_ion_ppm_tol,
+        min_side_len=params.min_hybrid_side_len,
+        min_cluster_support=params.min_cluster_support,
+        max_allowed_ion_charge=params.max_allowed_ion_charge,
+        remove_carbamidomethylated_hybrids=params.remove_carbamidomethylated_hybrids,
+    )
+    # Create hybrids FASTA
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        # Create FASTA containing hybrids and run Comet
+        tmp_path = Path(tmp_dir)
+        mzml_name = Mzml.get_mzml_name(mzml=spectrum.mzml)
+        hybrids_fasta = tmp_path / f"{mzml_name}.{spectrum.scan}.fasta"
+        if params.hybrid_decoy_competition:
+            create_hybrids_fasta(
+                seq_to_hybrids=seq_to_hybrids,
+                output_fasta_path=hybrids_fasta,
+                fasta_to_include=params.fasta,
+            )
+        else:
+            create_hybrids_fasta(
+                seq_to_hybrids=seq_to_hybrids,
+                output_fasta_path=hybrids_fasta,
+            )
+        # Run Comet
+        if params.hybrid_decoy_competition:
+            decoy_search = 2
+        else:
+            decoy_search = 0
+        run = CometRun(
+            fasta=hybrids_fasta,
+            mzml=spectrum.mzml,
+            crux_comet_params=params.crux_comet_params,
+            out_dir=params.out_dir,
+            decoy_search=decoy_search,
+            scan_min=spectrum.scan,
+            scan_max=spectrum.scan,
+            num_threads=num_threads,
+        )
+        process = run.run_comet_and_keep_only_results(
+            crux_path=crux_path, on_singularity=on_singularity
+        )
+    return process, run
+
+
 def create_hybrids_fasta(
     seq_to_hybrids: Dict[str, List[HybridPeptide]],
     output_fasta_path: Path,
@@ -771,6 +860,110 @@ def cli_combine_comet_txts(
     logger.info("Finished combining Comet scan results")
 
 
+# def process_spectrum(spectrum, shared_params_path, on_singularity, crux_path):
+#     hybrid_run_on_spectrum(
+#         spectrum=spectrum,
+#         params=from_pickle(shared_params_path),
+#         crux_path=MAC_CRUX_EXECUTABLE,
+#     )
+
+
+def run_in_parallel(
+    config: Path,
+    n_cores: int,
+    on_singularity: bool = False,
+    crux_path: Optional[Path] = None,
+):
+    # # Disable threading in child processes (critical for C/C++ libs)
+    # mp.set_start_method(
+    #     "spawn", force=True
+    # )  # Fresh Python interp, no inherited state [web:13][cite:28]
+
+    hs_config = HypedsearchRunConfig.from_json(path=config)
+    # Pickle shared params
+    logger.info("Pickling shared params...")
+    params = HybridRunParams(
+        kmer_db=hs_config.kmer_db,
+        fasta=hs_config.fasta,
+        fasta_fm_index=from_pickle(path=hs_config.fasta_fm_index),
+        crux_comet_params=hs_config.crux_comet_params,
+        out_dir=hs_config.hybrid_run_scan_results_dir,
+    )
+    params_path = hs_config.parent_output_dir / SHARED_PARAMS
+    to_pickle(obj=params, path=params_path)
+
+    # Run Hypedsearch
+    logger.info("Running Hypedsearch")
+    spectra = hs_config.spectra
+    chunksize = max(10, len(spectra) // (n_cores * 4))  # 10-100 typical sweet spot
+    process_partial = partial(
+        hybrid_run_on_spectrum,
+        params=params_path,
+        on_singularity=on_singularity,
+        crux_path=crux_path,
+    )
+    with ProcessPoolExecutor(max_workers=n_cores) as ex:
+        # futures = []
+        # for i in range(0, len(spectra), chunksize):
+        #     batch = spectra[i : i + chunksize]
+        #     futures.extend(ex.submit(process_partial, s) for s in batch)
+        # results = list(ex.map(process_partial, spectra, chunksize=chunksize))
+        futures = [ex.submit(process_partial, spectrum) for spectrum in spectra]
+
+        # Process results as they complete, catching failures
+        results = []
+        failed = []
+        for future in as_completed(futures):
+            try:
+                result = future.result()  # Blocks until THIS task completes
+                results.append(result)
+            except Exception as e:
+                failed.append(str(e))  # Log failure, continue
+                print(f"Task failed: {e}")
+
+    print(f"Completed: {len(results)}, Failed: {len(failed)}")
+
+
+@click.command(
+    name="run-in-parallel",
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+    help="""
+    """,
+)
+@click.option(
+    "--config",
+    "-c",
+    type=PathType(),
+    required=True,
+    help="Path to the Hypedsearch config JSON",
+)
+@click.option(
+    "--n_cores",
+    "-n",
+    type=int,
+    required=True,
+    help="",
+)
+@click.option(
+    "--on_singularity",
+    "-os",
+    is_flag=True,
+    help="If outputs already exist, this controls whether or not to overwrite them.",
+)
+@log_params
+def cli_run_in_parallel(config: Path, n_cores: int, on_singularity: bool):
+    if on_singularity:
+        crux_path = None
+    else:
+        crux_path = MAC_CRUX_EXECUTABLE
+    run_in_parallel(
+        config=config,
+        n_cores=n_cores,
+        crux_path=crux_path,
+        on_singularity=on_singularity,
+    )
+
+
 @click.command(
     name="check-for-missing-scans",
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
@@ -794,51 +987,6 @@ def cli_check_for_missing_scans(config: Path):
     logger.info(f"Found {len(missing_txts)} missing hybrid scan target txt files")
 
 
-@click.command(
-    name="run-hypedsearch",
-    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-    help="""
-    Run HypedSearch on a single scan from an mzML file.
-    """,
-)
-@click.option(
-    "--config",
-    "-c",
-    type=PathType(),
-    required=True,
-    help="Path to Hypedsearch JSON config",
-)
-@click.option(
-    "--mzml",
-    "-m",
-    type=PathType(),
-    required=False,
-    help="Path to MZML",
-)
-@click.option(
-    "--scan",
-    "-s",
-    type=int,
-    required=False,
-    help="Scan in MZML on which to run HypedSearch",
-)
-def cli_run_hypedsearch(mzml: Optional[Path], scan: Optional[int], config: Path):
-    hs_config = HypedsearchRunConfig.from_json(path=config)
-    # Run on one spectrum
-    if scan is not None:
-        mzml_obj = Mzml(path=mzml)
-        return hs_config.hybrid_run_on_spectrum(
-            spectrum=mzml_obj.get_spectrum(scan=scan)
-        )
-    # Run on all spectra specified in config
-    for mzml, scans in hs_config._mzml_to_scans.items():
-        mzml_obj = Mzml(path=mzml)
-        for scan in scans:
-            _ = hs_config.hybrid_run_on_spectrum(
-                spectrum=mzml_obj.get_spectrum(scan=scan)
-            )
-
-
 @click.group(
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200}
 )
@@ -850,6 +998,6 @@ if __name__ == "__main__":
     setup_logger()
     cli.add_command(cli_combine_comet_txts)
     cli.add_command(cli_check_for_missing_scans)
-    cli.add_command(cli_run_hypedsearch)
+    cli.add_command(cli_run_in_parallel)
     # cli.add_command(cli_create_native_run_snakemake_config)
     cli()

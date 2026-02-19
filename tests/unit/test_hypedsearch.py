@@ -1,10 +1,15 @@
-from src.constants import MOUSE_PROTEOME
+from src.constants import MAC_CRUX_EXECUTABLE, MOUSE_PROTEOME
 from src.hybrids_via_clusters import HybridPeptide
-from src.hypedsearch import HypedsearchRunConfig, create_hybrids_fasta
+from src.hypedsearch import (
+    HybridRunParams,
+    HypedsearchRunConfig,
+    create_hybrids_fasta,
+    hybrid_run_on_spectrum,
+)
 from src.mass_spectra import Spectrum
 from src.peptides_and_ions import Fasta
 from src.psm import CometPSM
-from src.utils import load_json
+from src.utils import from_pickle, load_json
 
 
 class Test_HypedsearchRunConfig:
@@ -56,3 +61,43 @@ class Test_HypedsearchRunConfig:
         psms = CometPSM.from_txt(txt=comet_outputs.target)
         hybrid = HybridPeptide.parse_hybrid_peptide_str(hybrid_str=psms[1].proteins[0])
         assert len(hybrid.right_proteins) == 2
+
+
+class Test_hybrid_run_on_spectrum:
+    @staticmethod
+    def test_smoke(tmp_path, test_hs_config_path, mouse_mzml_path):
+        data = load_json(path=test_hs_config_path)
+        data["parent_output_dir"] = str(tmp_path)
+        config = HypedsearchRunConfig(**data)
+        params = HybridRunParams(
+            kmer_db=config.kmer_db,
+            fasta=config.fasta,
+            fasta_fm_index=from_pickle(path=config.fasta_fm_index),
+            crux_comet_params=config.crux_comet_params,
+            out_dir=tmp_path,
+        )
+        cmd_result, run = hybrid_run_on_spectrum(
+            spectrum=Spectrum.get_spectrum(scan=7, mzml=mouse_mzml_path),
+            params=params,
+            crux_path=MAC_CRUX_EXECUTABLE,
+        )
+        assert len(CometPSM.from_txt(txt=run.nonstandardized_outputs.target)) > 0
+        assert run.nonstandardized_outputs.decoy is None
+
+    @staticmethod
+    def test_no_output_file(tmp_path, test_hs_config_path, mouse_mzml_path):
+        data = load_json(path=test_hs_config_path)
+        data["parent_output_dir"] = str(tmp_path)
+        config = HypedsearchRunConfig(**data)
+        params = HybridRunParams(
+            kmer_db=config.kmer_db,
+            fasta=config.fasta,
+            fasta_fm_index=from_pickle(path=config.fasta_fm_index),
+            crux_comet_params=config.crux_comet_params,
+            out_dir=tmp_path,
+        )
+        cmd_result, run = hybrid_run_on_spectrum(
+            spectrum=Spectrum.get_spectrum(scan=2, mzml=mouse_mzml_path),
+            params=params,
+            crux_path=MAC_CRUX_EXECUTABLE,
+        )
