@@ -441,6 +441,5 @@ def cli():
 
 if __name__ == "__main__":
     setup_logger()
-    # cli.add_command(cli_create_native_run_snakemake_config)
     cli.add_command(cli_run_hybrid_finding_simulation_study)
     cli()

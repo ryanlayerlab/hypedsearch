@@ -174,9 +174,6 @@ class CometConfig(BaseModel):
         missing_outputs = [Path(p) for p in expected_outputs if not Path(p).exists()]
         return missing_outputs
 
-    def get_cmd_2_run_comet_via_snakemake(self, config_path: Union[str, Path]) -> str:
-        return f"snakemake -s {RUN_COMET_SMK.relative_to(GIT_REPO_DIR)} --configfile {config_path} [...]"
-
     def run_comet_on_mzml(
         self, mzml: Union[str, Path], scan_min: int = 0, scan_max: int = 0
     ) -> CometOutputs:
@@ -356,87 +353,6 @@ class Crux:
                     f"STDOUT: {result.stdout}\n"
                     f"STDERR: {result.stderr}"
                 )
-
-    def run_comet(
-        self,
-        mzml: Union[str, Path],
-        fasta: Union[str, Path],
-        crux_comet_params: Union[str, Path],
-        out_dir: Union[str, Path],
-        decoy_search: Literal[0, 1, 2] = 0,
-        file_root: str = "",
-        scan_min: int = 0,
-        scan_max: int = 0,
-        num_threads: Optional[int] = None,
-        dry_run: bool = False,
-    ) -> CometOutputs:
-        """
-        This function runs `crux comet` on the given mzML file with the specified parameters.
-        To facilitate parallelization and keep things independent, the outputs of `crux comet`
-        are temporarily saved in a temporary directory and then JUST the target and (if it exists)
-        decoy txt files are moved to the specified output directory
-        """
-        # Check if expected outputs already exist and skip Comet run if they do
-        expected_final_outputs = CometOutputs.standardized_comet_outputs(
-            out_dir=Path(out_dir),
-            file_root=file_root,
-            scan_min=scan_min,
-            scan_max=scan_max,
-            decoy_search=decoy_search,
-        )
-        if dry_run:
-            logger.info("Dry run enabled. Skipping actual `crux comet` execution.")
-            return expected_final_outputs
-
-        if expected_final_outputs.target.exists():
-            logger.info(
-                f"File {expected_final_outputs.target} already exists. Skipping `crux comet`."
-            )
-            return expected_final_outputs
-
-        # Run Comet
-        mzml = Path(mzml)
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_path = Path(tmp_dir)
-
-            # Define outputs that should be created in the temporary directory
-            cmd_parts = [
-                f"{self.crux_path} comet",
-                "--verbosity 60",
-                f"--parameter-file {crux_comet_params}",
-                f"--decoy_search {decoy_search}",
-                f"--fileroot '{file_root}'",
-                f"--scan_range '{scan_min} {scan_max}'",
-                f"--output-dir {tmp_path}",
-                f"--num_threads {num_threads}" if num_threads is not None else "",
-                f"{mzml}",
-                f"{fasta}",
-            ]
-            result = CmdLineRunner.run_cmd(cmd=cmd_parts)
-            # self.validate_comet_output(result=result)
-            # Move the Comet outputs in the temporary directory to their permanent home in out_dir
-            tmp_outputs = CometOutputs.crux_comet_outputs(
-                out_dir=tmp_path,
-                file_root=file_root,
-                scan_min=scan_min,
-                scan_max=scan_max,
-                decoy_search=decoy_search,
-            )
-            try:
-                logger.debug(
-                    f"Moving {tmp_outputs.target} to {expected_final_outputs.target}"
-                )
-                shutil.move(tmp_outputs.target, expected_final_outputs.target)
-                if tmp_outputs.decoy is not None:
-                    shutil.move(tmp_outputs.decoy, expected_final_outputs.decoy)
-            except FileNotFoundError:
-                # Sometimes Comet doesn't product any target or decoy PSM files because
-                # there were no matching PSMs. In this case, create empty files. This is
-                # for Snakemake consistency so that expected output files always exist.
-                expected_final_outputs.target.touch()
-                if tmp_outputs.decoy is not None:
-                    expected_final_outputs.decoy.touch()
-        return expected_final_outputs
 
     @staticmethod
     def combine_crux_comet_files(

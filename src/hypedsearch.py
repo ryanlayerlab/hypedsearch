@@ -1008,5 +1008,4 @@ if __name__ == "__main__":
     cli.add_command(cli_combine_comet_txts)
     cli.add_command(cli_check_for_missing_scans)
     cli.add_command(cli_run_in_parallel)
-    # cli.add_command(cli_create_native_run_snakemake_config)
     cli()
