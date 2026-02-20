@@ -2,10 +2,11 @@
 
 
 # Default values
-MEM="1GB"
+MEM="500GB"
 CORES=180
 LOG_DIR="logs/run_commands_via_slurm"
 TIME="24:00:00"
+PARTITION="highmem"
 
 show_help() {
   echo "Usage: $0 [--options]"
@@ -15,8 +16,8 @@ show_help() {
   echo "  --name    Name (required)"
   echo "  --time    Time to ask SLURM for (default: $TIME)"
   echo "  --mem    Memory allocation for SLURM job (default: $MEM)"
-  echo "  --part   Partition to use (required; recommend 'highmem')"
-  echo "  --cores   Number of cores to ask SLURM for (default $CORES)"
+  echo "  --part   Partition to use (required; recommend 'highmem'; default: $PARTITION)"
+  echo "  --cores   Number of cores to ask SLURM for (default: $CORES)"
   echo "  -h, --help    Show this help message"
 }
 
@@ -40,6 +41,7 @@ Running Hypedsearch via SLURM with:
 - NAME: $NAME
 - PARTITION: $PARTITION
 - CORES: $CORES
+- TIME: $TIME
 - MEM: $MEM
 - LOG_FILES: $LOG_DIR/$NAME.out and $LOG_DIR/$NAME.err
 - CMD: $CMD

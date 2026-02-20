@@ -74,10 +74,9 @@ class Test_CometRun:
             decoy_search=2,
         )
         process = run.run_comet_locally(crux_path=MAC_CRUX_EXECUTABLE)
-        outputs = run.nonstandardized_outputs
         assert process.returncode == 0
-        assert outputs.target.exists()
-        assert outputs.decoy.exists()
+        assert run.nonstandardized_comet_outputs.target.exists()
+        assert run.nonstandardized_comet_outputs.decoy.exists()
 
     class Test_run_comet_and_keep_only_results:
         @staticmethod
@@ -129,7 +128,7 @@ class Test_CometRun:
             process = run.run_comet_and_keep_only_results(crux_path=MAC_CRUX_EXECUTABLE)
             assert process.returncode == 0
             assert len(CometPSM.from_txt(txt=run.standardized_comet_outputs.target)) > 0
-            assert run.nonstandardized_outputs.decoy is None
+            assert run.nonstandardized_comet_outputs.decoy is None
 
 
 class Test_Crux:

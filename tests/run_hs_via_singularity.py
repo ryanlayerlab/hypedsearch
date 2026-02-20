@@ -9,7 +9,7 @@ from src.hypedsearch import (
     HybridRunParams,
     HypedsearchRunConfig,
     hybrid_run_on_spectrum,
-    run_in_parallel,
+    run_hypedsearch_in_parallel,
 )
 from src.mass_spectra import Spectrum
 from src.utils import from_pickle, load_json, setup_logger
@@ -52,8 +52,8 @@ process = run.run_comet_and_keep_only_results(
     on_singularity=on_singularity, crux_path=crux_path
 )
 assert process.returncode == 0
-assert run.nonstandardized_outputs.target.exists()
-assert run.nonstandardized_outputs.decoy.exists()
+assert run.nonstandardized_comet_outputs.target.exists()
+assert run.nonstandardized_comet_outputs.decoy.exists()
 
 logger.info("Running hybrid_run_on_spectrum")
 params = HybridRunParams(
@@ -71,7 +71,7 @@ cmd_result, run = hybrid_run_on_spectrum(
 )
 
 logger.info("Running run_in_parallel...")
-run_in_parallel(
+run_hypedsearch_in_parallel(
     config=test_hs_config_path,
     n_cores=4,
     on_singularity=on_singularity,

@@ -5,11 +5,12 @@ from src.hypedsearch import (
     HypedsearchRunConfig,
     create_hybrids_fasta,
     hybrid_run_on_spectrum,
+    run_hypedsearch_in_parallel,
 )
 from src.mass_spectra import Spectrum
 from src.peptides_and_ions import Fasta
 from src.psm import CometPSM
-from src.utils import from_pickle, load_json
+from src.utils import from_pickle, load_json, setup_logger
 
 
 class Test_HypedsearchRunConfig:
@@ -81,8 +82,8 @@ class Test_hybrid_run_on_spectrum:
             params=params,
             crux_path=MAC_CRUX_EXECUTABLE,
         )
-        assert len(CometPSM.from_txt(txt=run.nonstandardized_outputs.target)) > 0
-        assert run.nonstandardized_outputs.decoy is None
+        assert len(CometPSM.from_txt(txt=run.standardized_comet_outputs.target)) > 0
+        assert run.standardized_comet_outputs.decoy is None
 
     @staticmethod
     def test_no_output_file(tmp_path, test_hs_config_path, mouse_mzml_path):
@@ -101,3 +102,20 @@ class Test_hybrid_run_on_spectrum:
             params=params,
             crux_path=MAC_CRUX_EXECUTABLE,
         )
+
+
+class Test_run_in_parallel:
+    @staticmethod
+    def test_smoke(caplog, tmp_path, test_hs_config_path, mouse_mzml_path):
+        setup_logger()
+        data = load_json(path=test_hs_config_path)
+        data["parent_output_dir"] = str(tmp_path)
+        config = HypedsearchRunConfig(**data)
+        config_path = tmp_path / "config.json"
+        config.save(path=config_path)
+        run_hypedsearch_in_parallel(
+            config=config_path,
+            n_cores=4,
+            crux_path=MAC_CRUX_EXECUTABLE,
+        )
+        pass

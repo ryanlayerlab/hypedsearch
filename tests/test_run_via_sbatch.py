@@ -10,7 +10,7 @@ from src.hypedsearch import (
     HybridRunParams,
     HypedsearchRunConfig,
     hybrid_run_on_spectrum,
-    run_in_parallel,
+    run_hypedsearch_in_parallel,
 )
 from src.mass_spectra import Spectrum
 from src.utils import from_pickle, load_json, setup_logger

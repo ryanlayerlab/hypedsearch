@@ -1,7 +1,6 @@
 import logging
 import multiprocessing as mp
 import re
-import shutil
 import tempfile
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -361,6 +360,7 @@ class SpectrumSelector(BaseModel):
     def get_scan_numbers_of_selected_spectra_from_mzml(self, mzml: Path) -> Set[int]:
         logger.info(f"Getting spectra from {mzml.name}")
         spectra = self.select_spectra(spectra=Spectrum.parse_ms2_from_mzml(mzml=mzml))
+        logger.info("Done selecting spectra")
         return {spectrum.scan for spectrum in spectra}
 
 
@@ -534,7 +534,6 @@ class HypedsearchRunConfig(BaseModel):
         mzml_to_scans = self.mzml_to_scans.copy()
         for mzml, scans in self.mzml_to_scans.items():
             if isinstance(scans, str):
-                logger.info
                 mzml_to_scans[mzml] = (
                     self.spectrum_selector.get_scan_numbers_of_selected_spectra_from_mzml(
                         mzml=mzml
@@ -860,15 +859,7 @@ def cli_combine_comet_txts(
     logger.info("Finished combining Comet scan results")
 
 
-# def process_spectrum(spectrum, shared_params_path, on_singularity, crux_path):
-#     hybrid_run_on_spectrum(
-#         spectrum=spectrum,
-#         params=from_pickle(shared_params_path),
-#         crux_path=MAC_CRUX_EXECUTABLE,
-#     )
-
-
-def run_in_parallel(
+def run_hypedsearch_in_parallel(
     config: Path,
     n_cores: int,
     on_singularity: bool = False,
@@ -889,13 +880,31 @@ def run_in_parallel(
         crux_comet_params=hs_config.crux_comet_params,
         out_dir=hs_config.hybrid_run_scan_results_dir,
     )
-    params_path = hs_config.parent_output_dir / SHARED_PARAMS
+    params_path = hs_config.parent_output_dir / f"{hs_config.name}_shared_params.pkl"
     to_pickle(obj=params, path=params_path)
+
+    # Get spectra to run Hypedsearch on
+    missing_spectra_paths = list(hs_config.missing_hybrid_run_scan_target_txts)
+    logger.info(
+        f"There are {len(missing_spectra_paths)} spectra missing hybrid Comet outputs. So I'll run Hypedsearch on those spectra."
+    )
+    logger.info("Gathering missing spectra")
+    missing_spectra = []
+    for path in missing_spectra_paths:
+        match = re.match(r"^(.+)\.comet\.(\d+)-(\d+)\.(target|decoy)$", path.stem)
+        if not match:
+            raise ValueError(f"Filename does not match expected pattern: {path}")
+        name, start_str, end_str, _ = match.groups()
+        assert start_str == end_str
+        missing_spectra.append(
+            hs_config.spectrum_uid_to_spectrum[
+                Spectrum.get_uid(sample=name, scan=int(start_str))
+            ]
+        )
+    logger.info("Done gathering missing spectra.")
 
     # Run Hypedsearch
     logger.info("Running Hypedsearch")
-    spectra = hs_config.spectra
-    chunksize = max(10, len(spectra) // (n_cores * 4))  # 10-100 typical sweet spot
     process_partial = partial(
         hybrid_run_on_spectrum,
         params=params_path,
@@ -908,7 +917,7 @@ def run_in_parallel(
         #     batch = spectra[i : i + chunksize]
         #     futures.extend(ex.submit(process_partial, s) for s in batch)
         # results = list(ex.map(process_partial, spectra, chunksize=chunksize))
-        futures = [ex.submit(process_partial, spectrum) for spectrum in spectra]
+        futures = [ex.submit(process_partial, spectrum) for spectrum in missing_spectra]
 
         # Process results as they complete, catching failures
         results = []
@@ -919,9 +928,9 @@ def run_in_parallel(
                 results.append(result)
             except Exception as e:
                 failed.append(str(e))  # Log failure, continue
-                print(f"Task failed: {e}")
+                logger.info(f"Task failed: {e}")
 
-    print(f"Completed: {len(results)}, Failed: {len(failed)}")
+    logger.info(f"Completed: {len(results)}, Failed: {len(failed)}")
 
 
 @click.command(
@@ -956,7 +965,7 @@ def cli_run_in_parallel(config: Path, n_cores: int, on_singularity: bool):
         crux_path = None
     else:
         crux_path = MAC_CRUX_EXECUTABLE
-    run_in_parallel(
+    run_hypedsearch_in_parallel(
         config=config,
         n_cores=n_cores,
         crux_path=crux_path,

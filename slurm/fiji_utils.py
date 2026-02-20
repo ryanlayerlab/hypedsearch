@@ -12,7 +12,11 @@ import pandas as pd
 from pydantic import BaseModel, field_validator
 
 from src.constants import LINUX_CRUX_EXECUTABLE, MAC_CRUX_EXECUTABLE
-from src.hypedsearch import HybridPSMScorer, HypedsearchRunConfig, run_in_parallel
+from src.hypedsearch import (
+    HybridPSMScorer,
+    HypedsearchRunConfig,
+    run_hypedsearch_in_parallel,
+)
 from src.utils import (
     PathType,
     copy_file,
@@ -68,8 +72,9 @@ def create_sbatch_script_to_run_hypedsearch(
     fiji_config = create_config_for_fiji_run(config=config, dry_run=True)
     fiji_config_path = fiji_config.parent_output_dir / DEFAULT_FIJI_CONFIG_NAME
     cmds = [
-        f"python -m slurm.fiji_utils prep-files-on-fiji -c {config}",
-        f"python -m src.hypedsearch run-in-parallel -c {fiji_config_path} -n {n_cores} -os",
+        # f"python -m slurm.fiji_utils prep-files-on-fiji -c {config}",
+        # f"python -m src.hypedsearch run-in-parallel -c {fiji_config_path} -n {n_cores} -os",
+        f"python -m slurm.hypedsearch run-in-parallel -c {config} -n {n_cores} -os",
     ]
     lines = ["#!/bin/bash"] + sbatch_config.get_sbatch_directives_lines() + [""] + cmds
     if out_path is None:
@@ -308,7 +313,9 @@ def cli_run_hs_on_slurm(
     fiji_config.save(path=fiji_config_path)
 
     # Run Hypedsearch
-    run_in_parallel(config=fiji_config_path, n_cores=n_cores, on_singularity=True)
+    run_hypedsearch_in_parallel(
+        config=fiji_config_path, n_cores=n_cores, on_singularity=True
+    )
 
     # Move files back to persistent storage
     move_scan_results_from_node_to_persistent_storage(
@@ -324,12 +331,6 @@ def cli():
 
 
 if __name__ == "__main__":
-    setup_logger()
-    cli.add_command(cli_prep_files_on_fiji)
-    cli.add_command(cli_collect_benchmark_data)
-    cli.add_command(cli_move_scan_results)
-    cli.add_command(cli_run_hs_on_slurm)
-    cli()
     setup_logger()
     cli.add_command(cli_prep_files_on_fiji)
     cli.add_command(cli_collect_benchmark_data)

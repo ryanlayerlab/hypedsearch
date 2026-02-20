@@ -231,7 +231,7 @@ class CometRun(BaseModel):
         return " ".join(cmd_parts)
 
     @property
-    def nonstandardized_outputs(self) -> CometOutputs:
+    def nonstandardized_comet_outputs(self) -> CometOutputs:
         return CometOutputs.crux_comet_outputs(
             out_dir=self.out_dir,
             file_root=self.file_root,
@@ -244,20 +244,6 @@ class CometRun(BaseModel):
         cmd_result = CmdLineRunner.run_cmd(
             cmd=self.get_run_comet_command(crux_path=crux_path, comet_run=self)
         )
-        # Standardize output file names
-        if self.nonstandardized_outputs.target.exists():
-            shutil.move(
-                src=self.nonstandardized_outputs.target,
-                dst=self.standardized_comet_outputs.target,
-            )
-        if (
-            self.nonstandardized_outputs.decoy is not None
-            and self.nonstandardized_outputs.decoy.exists()
-        ):
-            shutil.move(
-                src=self.nonstandardized_outputs.decoy,
-                dst=self.standardized_comet_outputs.decoy,
-            )
         return cmd_result
 
     def run_comet_in_singularity(
@@ -319,12 +305,12 @@ class CometRun(BaseModel):
 
             # Move files from temp directory to final resting place
             shutil.move(
-                tmp_run.nonstandardized_outputs.target,
+                tmp_run.nonstandardized_comet_outputs.target,
                 self.standardized_comet_outputs.target,
             )
-            if tmp_run.nonstandardized_outputs.decoy:
+            if tmp_run.nonstandardized_comet_outputs.decoy:
                 shutil.move(
-                    tmp_run.nonstandardized_outputs.decoy,
+                    tmp_run.nonstandardized_comet_outputs.decoy,
                     self.standardized_comet_outputs.decoy,
                 )
         return process
