@@ -444,6 +444,30 @@ def plot_sorted_1d_data(
     return ax
 
 
+def score_histogram(
+    psms_by_type: Dict[str, List[Any]],
+    score: str,
+    ax: Optional[Axes] = None,
+) -> Axes:
+    if ax is None:
+        _, axs = fig_setup()
+        ax = axs[0]
+    for key, psms in psms_by_type.items():
+        if isinstance(psms, pd.DataFrame):
+            data = psms[score]
+        else:
+            try:
+                data = [getattr(psm, score) for psm in psms]
+            except:
+                data = psms
+        _ = sns.kdeplot(
+            data,
+            ax=ax,
+            label=f"{key} (n = {len(data)})",
+        )
+    return ax
+
+
 def plot_histogram(
     attr: Optional[str] = None,
     objects: Optional[List[Any]] = None,

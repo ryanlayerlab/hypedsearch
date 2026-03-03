@@ -170,6 +170,7 @@ NONXCORR_PSM_SCORES = [
     "prop_prefixes_supported",
     "prop_suffixes_supported",
 ]
+DEFAULT_NUM_COMET_RETRIES = 49
 
 PSM_SCORES = NONXCORR_PSM_SCORES + ["xcorr"]
 SPECTRUM_PSMS_NAME = "spectrum_psms.json"

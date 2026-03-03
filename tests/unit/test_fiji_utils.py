@@ -10,7 +10,7 @@ class Test_create_config_for_fiji_run:
         )
         assert fiji_config.parent_output_dir.exists()
         assert fiji_config.fasta.exists()
-        assert fiji_config.kmer_db.exists()
+        assert fiji_config.kmer_db_path.exists()
         assert fiji_config.crux_comet_params.exists()
         for mzml in fiji_config.mzml_to_scans.keys():
             assert mzml.exists()

@@ -4,7 +4,8 @@
 # Default values
 MEM="500GB"
 CORES=180
-LOG_DIR="logs/run_commands_via_slurm"
+# LOG_DIR="logs/run_commands_via_slurm"
+LOG_DIR="logs"
 TIME="24:00:00"
 PARTITION="highmem"
 

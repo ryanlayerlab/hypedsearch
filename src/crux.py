@@ -1,5 +1,6 @@
 import logging
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -17,6 +18,7 @@ from pydantic import BaseModel
 
 from src.constants import (
     DECOY,
+    DEFAULT_NUM_COMET_RETRIES,
     DEFAULT_NUM_COMET_THREADS,
     GIT_REPO_DIR,
     LINUX_CRUX_EXECUTABLE,
@@ -87,6 +89,23 @@ class CometOutputs(BaseModel):
                 log=out_dir / "".join([file_root, "comet.log.txt"]),
                 params=out_dir / "".join([file_root, "comet.params.txt"]),
             )
+
+    @staticmethod
+    def parse_standardized_comet_txt(comet_txt: Union[str, Path]) -> Tuple[str, str]:
+        ouput_regex = r"^(?P<mzml>.+?)\.comet\.(?P<start>\d+)-(?P<end>\d+)\.(?P<psm_type>[^.]+)\.txt$"
+        name = Path(comet_txt).name
+        match = re.match(ouput_regex, name)
+        if not match:
+            raise ValueError(
+                f"Trying to parse Comet TXT's name {name} using regex {ouput_regex}"
+            )
+        mzml, start, end, psm_type = match.groups()
+        assert start == end, f"Expected start and end scan to be the same in {name}"
+        assert psm_type in [
+            TARGET,
+            DECOY,
+        ], f"Expected psm_type to be {TARGET} or {DECOY} in {name}"
+        return mzml, start, psm_type
 
     @classmethod
     def standardized_comet_outputs(
@@ -287,30 +306,67 @@ class CometRun(BaseModel):
         self,
         crux_path: Optional[str] = None,
         on_singularity: bool = False,
+        # num_retries: int = 0,
     ):
         # Run Comet. Run in a temporary directory so comet.log.txt and comet.params.txt are not kept
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            tmp_path = Path(tmp_dir)
-            tmp_run = deepcopy(self)
-            tmp_run.out_dir = tmp_path
-            if on_singularity:
-                process = tmp_run.run_comet_in_singularity(
-                    singularity_image=SINGULARITY_IMAGE,
-                )
-            else:
-                process = tmp_run.run_comet_locally(crux_path=crux_path)
+        if on_singularity:
+            num_retries = DEFAULT_NUM_COMET_RETRIES
+        else:
+            num_retries = 0
+        num_calls = 1 + num_retries
+        for run_idx in range(num_calls):
+            try:
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    tmp_path = Path(tmp_dir)
+                    tmp_run = deepcopy(self)
+                    tmp_run.out_dir = tmp_path
+                    if on_singularity:
+                        process = tmp_run.run_comet_in_singularity(
+                            singularity_image=SINGULARITY_IMAGE,
+                        )
+                    else:
+                        process = tmp_run.run_comet_locally(crux_path=crux_path)
 
-            # Move files from temp directory to final resting place
-            shutil.move(
-                tmp_run.nonstandardized_comet_outputs.target,
-                self.standardized_comet_outputs.target,
-            )
-            if tmp_run.nonstandardized_comet_outputs.decoy:
-                shutil.move(
-                    tmp_run.nonstandardized_comet_outputs.decoy,
-                    self.standardized_comet_outputs.decoy,
+                    # Sometimes Comet won't produce an output file when the spectrum
+                    # that's being run on produces this Comet output:
+                    # "- Load spectra: Warning - no spectra searched" with return code 1
+                    if (
+                        process.returncode == 1
+                        and "no spectra searched" in process.stderr
+                    ):
+                        logger.info(
+                            "Running Comet finished with return code 1 and 'no spectra searched' in stderr. "
+                            "This can happen when the spectrum you're trying to run Comet on doesn't "
+                            "meet some criteria Comet is following. "
+                            f"Creating the expected Comet outputs as empty files and continuing. Here's the STDERR and STDOUT:\nSTDERR:\n{process.stderr}\nSTDOUT:\n{process.stdout}"
+                        )
+                        self.standardized_comet_outputs.target.touch()  # create empty file to indicate that this was run and produced no PSMs
+                        if self.standardized_comet_outputs.decoy:
+                            self.standardized_comet_outputs.decoy.touch()
+                        return
+
+                    # Move files from temp directory to final resting place
+                    logger.info(
+                        f"Moving \n{tmp_run.nonstandardized_comet_outputs.target} -> {self.standardized_comet_outputs.target}"
+                    )
+                    shutil.move(
+                        tmp_run.nonstandardized_comet_outputs.target,
+                        self.standardized_comet_outputs.target,
+                    )
+                    if tmp_run.nonstandardized_comet_outputs.decoy:
+                        logger.info(
+                            f"Moving \n{tmp_run.nonstandardized_comet_outputs.decoy} -> {self.standardized_comet_outputs.decoy}"
+                        )
+                        shutil.move(
+                            tmp_run.nonstandardized_comet_outputs.decoy,
+                            self.standardized_comet_outputs.decoy,
+                        )
+            except OSError as e:
+                logger.info(
+                    f"Failed running Comet. This is try {run_idx + 1} of {num_calls}. Here's the CometConfig: {self}. And the error: {e}"
                 )
-        return process
+                continue
+            return process
 
 
 @dataclass
@@ -382,7 +438,7 @@ class Crux:
             tmp_path = Path(tmp_dir)
             cmd_parts = [
                 f"{self.crux_path} assign-confidence",
-                "--overwrite T",
+                # "--overwrite T",
                 f"--output-dir {tmp_path}",
                 "--list-of-files T",
             ]
@@ -410,6 +466,7 @@ def run_comet_on_custom_seqs(
     seqs: Union[Set[str], List[str]],
     spectra: List[Spectrum],
     comet_params: Union[str, Path],
+    crux_path: Union[str, Path] = MAC_CRUX_EXECUTABLE,
 ) -> Dict[str, Optional[CometPSM]]:
     seqs = set(seqs)
     spectrum_to_psms = {}
@@ -422,18 +479,18 @@ def run_comet_on_custom_seqs(
             ],
             path=fasta_path,
         )
-        crux = Crux()
         for spectrum in spectra:
-            comet_output = crux.run_comet(
-                mzml=spectrum.mzml,
+            run = CometRun(
                 fasta=fasta_path,
+                mzml=spectrum.mzml,
                 crux_comet_params=comet_params,
-                decoy_search=0,
                 out_dir=tmp_path,
+                decoy_search=0,
                 scan_min=spectrum.scan,
                 scan_max=spectrum.scan,
             )
-            psms = CometPSM.from_txt(txt=comet_output.target)
+            process = run.run_comet_and_keep_only_results(crux_path=crux_path)
+            psms = CometPSM.from_txt(txt=run.standardized_comet_outputs.target)
             spectrum_to_psms[spectrum.uid] = psms[0] if len(psms) > 0 else None
 
     return spectrum_to_psms

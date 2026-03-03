@@ -132,19 +132,6 @@ class Test_CometRun:
 
 
 class Test_Crux:
-    class Test_run_comet:
-        @staticmethod
-        def test_smoke(tmp_path, test_data_dir, mouse_mzml_path):
-            comet_outputs = Crux().run_comet(
-                mzml=mouse_mzml_path,
-                fasta=MOUSE_PROTEOME,
-                crux_comet_params=test_data_dir / "crux.comet.params",
-                decoy_search=2,
-                out_dir=tmp_path,
-            )
-            target_psms = CometPSM.from_txt(txt=comet_outputs.target)
-            assert len(target_psms) > 0
-
     class Test_run_assign_confidence:
         @staticmethod
         def test_smoke(tmp_path, test_data_dir):

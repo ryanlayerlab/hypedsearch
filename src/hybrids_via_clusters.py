@@ -447,7 +447,7 @@ class HybridPeptide(BaseModel):
         seq_to_proteins: Optional[Dict[str, Set[str]]] = None,
     ):
         """
-        This is a staticmethod instead of instance method because we have to process
+        Either `fasta` or `seq_to_proteins` must be provided.
         """
         if fasta is not None:
             fasta_obj = Fasta(path=fasta)
@@ -503,14 +503,18 @@ class HybridPeptide(BaseModel):
                 )
         return positions
 
-    def get_positions_str(self, protein_name_to_seq_map: Dict[str, str]) -> str:
+    def get_position_str(self, protein_name_to_seq_map: Dict[str, str]) -> str:
         positions = self.get_positions(protein_name_to_seq_map=protein_name_to_seq_map)
-        return "; ".join(
+        left_prot_str = HYBRID_PROT_SEPARATOR.join(
+            [f"{pos.left.protein}|end={pos.left.exclusive_end}" for pos in positions]
+        )
+        right_prot_str = HYBRID_PROT_SEPARATOR.join(
             [
-                pos.to_str(protein_name_to_seq_map=protein_name_to_seq_map)
+                f"{pos.right.protein}|start={pos.right.inclusive_start}"
                 for pos in positions
             ]
         )
+        return f"({left_prot_str}){self.left_seq}-{self.right_seq}({right_prot_str})"
 
     def get_junction_str(self, jct_len: int = DEFAULT_JCT_LEN) -> str:
         return create_junction_str(
@@ -708,7 +712,7 @@ def form_spectrum_hybrids_via_clustering(
     min_cluster_support: int = 3,
     max_allowed_ion_charge: int = 4,
     remove_carbamidomethylated_hybrids: bool = True,
-) -> Dict[str, List[HybridPeptide]]:
+) -> Dict[str, str]:
     """
     This function will
     1. form hybrids for the given spectrum via clustering
@@ -718,12 +722,14 @@ def form_spectrum_hybrids_via_clustering(
     logger.info(f"Forming hybrids for spectrum ({spectrum.sample}, {spectrum.scan})")
     start_time = time.perf_counter()
     # Form clusters
+    kmer_db_prot_name_to_seq = {
+        prot_name: fasta.protein_name_to_seq_map[prot_name]
+        for prot_name in kmer_db.proteins
+    }
     clusters = form_extended_clusters_for_spectrum(
         kmer_db=kmer_db,
         spectrum=spectrum,
-        protein_name_to_seq_map={
-            prot: fasta.protein_name_to_seq_map[prot] for prot in kmer_db.proteins
-        },
+        protein_name_to_seq_map=kmer_db_prot_name_to_seq,
         peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
         precursor_mz_ppm_tol=precursor_mz_ppm_tol,
         min_cluster_len=min_side_len,
@@ -740,13 +746,16 @@ def form_spectrum_hybrids_via_clustering(
         fasta_fm_index=fasta_fm_index,
         remove_carbamidomethylated_hybrids=remove_carbamidomethylated_hybrids,
     )
-    seq_to_hybrids = defaultdict(list)
+    seq_to_hybrid_peptides = defaultdict(list)
     for hybrid in hybrids:
-        seq_to_hybrids[hybrid.seq].append(hybrid)
+        seq_to_hybrid_peptides[hybrid.seq].append(hybrid)
+        # .append(
+        #     hybrid.get_position_str(protein_name_to_seq_map=kmer_db_prot_name_to_seq)
+        # )
     logger.info(
         f"Completed forming hybrids for spectrum ({spectrum.sample}, {spectrum.scan})\nIt took {get_time_in_diff_units(time.perf_counter() - start_time)}"
     )
-    return dict(seq_to_hybrids)
+    return dict(seq_to_hybrid_peptides)
 
 
 def serialize_hybrids(seq_to_hybrids: Dict[str, List[HybridPeptide]]) -> Dict:

@@ -34,6 +34,20 @@ StrOrPath = Union[str, Path]
 logger = logging.getLogger(__name__)
 
 
+def path_aware_dict_factory(items: list[tuple[str, Any]]) -> dict[str, Any]:
+    result = {}
+    for key, value in items:
+        if isinstance(value, Path):
+            result[key] = str(value)
+        elif isinstance(value, dict):
+            result[key] = {
+                str(k) if isinstance(k, Path) else k: v for k, v in value.items()
+            }
+        else:
+            result[key] = value
+    return result
+
+
 class CmdLineRunner(BaseModel):
     @staticmethod
     def run_cmd(cmd: Union[str, List[str]]):

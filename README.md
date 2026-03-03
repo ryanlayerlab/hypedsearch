@@ -6,8 +6,6 @@
   - [Run Crux](#run-crux)
   - [Create the kmer database (and kmer-to-protein map)](#create-the-kmer-database-and-kmer-to-protein-map)
   - [Form hybrids](#form-hybrids)
-    - [Running via `snakemake`](#running-via-snakemake)
-  - [Run Hypedsearch](#run-hypedsearch)
 - [Running `msconvert` to convert files to MZML, subset spectra in MZML files, etc.](#running-msconvert-to-convert-files-to-mzml-subset-spectra-in-mzml-files-etc)
 - [Hypedsearch Docker \& Singularity container](#hypedsearch-docker--singularity-container)
 
@@ -39,9 +37,7 @@ This code lives in `kmer_database.py`.
 To see the help message: `python -m src.kmer_database -h`.
 Here's an example usage:
 
-```
-
-```
+```bash
 python -m src.kmer_database \
   --min_k 1 \
   --max_k 25 \
@@ -57,7 +53,7 @@ This code lives in `hybrids_via_clusters.py`.
 To see the help message: `python -m src.hybrids_via_clusters -h`. 
 Here's an example usage in which we form hybrids for a single scan:
 
-```
+```bash
 python -m src.hybrids_via_clusters \
   --mzml data/spectra/mouse_samples/BMEM_AspN_Fxn4.mzML \
   --fasta fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta \
@@ -68,37 +64,6 @@ python -m src.hybrids_via_clusters \
   --out_dir tmp
 ```
 
-#### Running via `snakemake`
-
-Here's a command that you can run to make sure that you can form hybrids via snakemake:
-
-```
-snakemake -s snakefiles/form_hybrids.smk --configfile snakefiles/tests/test_form_hybrids.yaml --cores 4
-```
-
-### Run Hypedsearch
-
-Via Python from the command-line: 
-
-```
-python -m src.hypedsearch_utils \
-  --mzml tests/data/mouse_spectra.mzML \
-  --scan 7 \
-  --database tests/data/mouse_top_10_proteins.db \
-  --fasta tests/data/mouse_proteome_SwissProt.TAW_mouse_w_NOD_IAPP.fasta \
-  --crux_comet_params tests/data/crux.comet.params \
-  --out_dir tmp
-```
-
-Via Snakemake:
-
-```
-snakemake -s snakefiles/run_hypedsearch.smk \
-  --configfile snakefiles/configs/test_run_hypedsearch.yaml \
-  --cores 4
-```
-
-
 ## Running `msconvert` to convert files to MZML, subset spectra in MZML files, etc.
 
 Run [the following Docker container](https://hub.docker.com/r/proteowizard/pwiz-skyline-i-agree-to-the-vendor-licenses), mounting any directories that you'd like available in the Docker container. 
@@ -108,7 +73,7 @@ Run [the following Docker container](https://hub.docker.com/r/proteowizard/pwiz-
 docker pull proteowizard/pwiz-skyline-i-agree-to-the-vendor-licenses:skyline_daily_25.1.1.174-b787f12
 
 docker run -it --rm \
-  -v /Users/erjo3868/repos/hypedsearch/hypedsearch/data/spectra/mouse_samples:/data \
+  -v <path/to/foler/to/mount>:/data \
   proteowizard/pwiz-skyline-i-agree-to-the-vendor-licenses:skyline_daily_25.1.1.174-b787f12 \
   /bin/bash
 ```
@@ -128,7 +93,7 @@ wine msconvert --help
 wine msconvert BMEM_AspN_Fxn4.mzML --filter "index [0,19]" --outfile BMEM_AspN_Fxn4_scans1-20.mzML -o subset_spectra_for_testing
 
 # convert raw mass spectrometry data to mzML format 
-msconvert <input_file(s)> -o <output_directory> --mzML
+wine msconvert <input_file(s)> -o <output_directory> --mzML
 ```
 
 ## Hypedsearch Docker & Singularity container

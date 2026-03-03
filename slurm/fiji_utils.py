@@ -134,9 +134,9 @@ def create_config_for_fiji_run(
         )
 
     # k-mer database
-    new_kmer_db_path = name_dir / hs_config.kmer_db.name
+    new_kmer_db_path = name_dir / hs_config.kmer_db_path.name
     if not dry_run:
-        copy_file(src=hs_config.kmer_db, dest=new_kmer_db_path)
+        copy_file(src=hs_config.kmer_db_path, dest=new_kmer_db_path)
 
     # FASTA
     new_fasta_path = name_dir / hs_config.fasta.name
@@ -152,7 +152,7 @@ def create_config_for_fiji_run(
     new_config = deepcopy(hs_config)
     new_config.mzml_to_scans = new_mzml_to_scans
     new_config.fasta = new_fasta_path
-    new_config.kmer_db = new_kmer_db_path
+    new_config.kmer_db_path = new_kmer_db_path
     new_config.crux_comet_params = new_params_path
     new_config.parent_output_dir = name_dir
     new_config.fasta_fm_index = new_fm_index_path

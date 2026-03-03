@@ -410,43 +410,59 @@ class Test_form_spectrum_hybrids_via_clustering:
 
 class Test_HybridPeptide:
     @staticmethod
-    def test_seq_to_hybrids_map_to_peptides_for_fasta():
-        # Arrange
-        h1 = HybridPeptide(
-            left_seq="AB",
-            right_seq="C",
-            left_proteins=set(["sp|10|INS2_MOUSE", "sp|11|GLUC"]),
-            right_proteins=set(["sp|20|INS1_MOUSE"]),
+    def test_as_str():
+        hybrid = HybridPeptide.from_hyphen_str("TDAPQP-PKQQQQQQQQQQQEQQHSSFE")
+        assert len(hybrid.left_proteins) == 0
+        assert len(hybrid.right_proteins) == 0
+        HybridPeptide.set_proteins(hybrids=[hybrid], fasta=MOUSE_PROTEOME)
+        assert len(hybrid.left_proteins) != 0
+        prot_name_to_seq_map = Fasta(path=MOUSE_PROTEOME).protein_name_to_seq_map
+        hybrid_str = hybrid.get_position_str(
+            protein_name_to_seq_map=prot_name_to_seq_map
         )
-        h2 = HybridPeptide(
-            left_seq="A",
-            right_seq="BCD",
-            left_proteins=set(["sp|30|PROT1"]),
-            right_proteins=set(["sp|40|PROT2", "sp|50|PROT3"]),
-        )
-        h3 = HybridPeptide(
-            left_seq="AB",
-            right_seq="CD",
-            left_proteins=set(["sp|60|PROT4"]),
-            right_proteins=set(["sp|70|PROT5"]),
-        )
-        seq_to_hybrids = {
-            "ABC": [h1],
-            "ABCD": [h2, h3],
-        }
-        # Act
-        peptides = HybridPeptide.seq_to_hybrids_map_to_peptides(
-            seq_to_hybrids=seq_to_hybrids
-        )
-        assert len(peptides) == 2
-        # "ABC" hybrid
-        assert peptides[0].seq == "ABC"
-        hybrids = HybridPeptide.parse_hybrid_fasta_name(name=peptides[0].name)
-        assert len(hybrids) == 1
-        assert hybrids[0] == h1
-        # "ABCD" hybrids
-        assert peptides[1].seq == "ABCD"
-        hybrids = HybridPeptide.parse_hybrid_fasta_name(name=peptides[1].name)
-        assert len(hybrids) == 2
-        assert (hybrids[0] == h2) or (hybrids[1] == h2)
-        assert (hybrids[0] == h3) or (hybrids[1] == h3)
+        parsed_hybrid = HybridPeptide.parse_hybrid_peptide_str(hybrid_str=hybrid_str)
+        assert parsed_hybrid.left_seq == hybrid.left_seq
+        assert parsed_hybrid.right_seq == hybrid.right_seq
+
+    class Test_seq_to_hybrids_map_to_peptides_for_fasta:
+        @staticmethod
+        def test_seq_to_hybrids_map_to_peptides_for_fasta():
+            # Arrange
+            h1 = HybridPeptide(
+                left_seq="AB",
+                right_seq="C",
+                left_proteins=set(["sp|10|INS2_MOUSE", "sp|11|GLUC"]),
+                right_proteins=set(["sp|20|INS1_MOUSE"]),
+            )
+            h2 = HybridPeptide(
+                left_seq="A",
+                right_seq="BCD",
+                left_proteins=set(["sp|30|PROT1"]),
+                right_proteins=set(["sp|40|PROT2", "sp|50|PROT3"]),
+            )
+            h3 = HybridPeptide(
+                left_seq="AB",
+                right_seq="CD",
+                left_proteins=set(["sp|60|PROT4"]),
+                right_proteins=set(["sp|70|PROT5"]),
+            )
+            seq_to_hybrids = {
+                "ABC": [h1],
+                "ABCD": [h2, h3],
+            }
+            # Act
+            peptides = HybridPeptide.seq_to_hybrids_map_to_peptides(
+                seq_to_hybrids=seq_to_hybrids
+            )
+            assert len(peptides) == 2
+            # "ABC" hybrid
+            assert peptides[0].seq == "ABC"
+            hybrids = HybridPeptide.parse_hybrid_fasta_name(name=peptides[0].name)
+            assert len(hybrids) == 1
+            assert hybrids[0] == h1
+            # "ABCD" hybrids
+            assert peptides[1].seq == "ABCD"
+            hybrids = HybridPeptide.parse_hybrid_fasta_name(name=peptides[1].name)
+            assert len(hybrids) == 2
+            assert (hybrids[0] == h2) or (hybrids[1] == h2)
+            assert (hybrids[0] == h3) or (hybrids[1] == h3)

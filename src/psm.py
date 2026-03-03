@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Literal, Optional, Set, Union
 
 import pandas as pd
+import seaborn as sns
 from matplotlib.axes import Axes
 from pydantic import BaseModel
 
@@ -33,7 +34,7 @@ from src.constants import (
 from src.hybrids_via_clusters import HybridPeptide
 from src.mass_spectra import Mzml, Peak, Spectrum, organize_by_spectrum_uid, plot_peaks
 from src.peptides_and_ions import Fasta, Peptide, compute_peptide_precursor_mz
-from src.plot_utils import fig_setup, finalize, set_title_axes_labels
+from src.plot_utils import fig_setup, finalize, save_fig, set_title_axes_labels
 from src.utils import (
     flatten_list_of_lists,
     list_to_df,
@@ -544,13 +545,13 @@ class CometPSM:
             return data
 
     @staticmethod
-    def save_to_json(psms: List["CometPSM"], path: Path):
+    def save_psms_to_json(psms: List["CometPSM"], path: Path):
         to_json(
             data=[asdict(psm) for psm in psms],
             path=path,
         )
 
-    def save(self, path: Path):
+    def save_to_json(self, path: Path):
         to_json(
             data=asdict(self),
             path=path,
@@ -579,22 +580,27 @@ def convert_comet_psms_to_psms(
 
 class ProteinAbundance(BaseModel):
     protein_counts: Counter
+    psms: Optional[List[CometPSM]] = None
 
     @classmethod
     def from_comet_txt(
         cls, txt: Union[str, Path], q_val_thresh: float = DEFAULT_Q_THRESHOLD
     ):
         psms = CometPSM.from_txt(txt=txt)
-        return cls.from_comet_psms(psms=psms, q_threshold=q_val_thresh)
+        return cls.from_comet_psms(quality_psms=psms, q_threshold=q_val_thresh)
 
     @classmethod
     def from_comet_psms(
-        cls, psms: List[CometPSM], q_threshold: float = DEFAULT_Q_THRESHOLD
+        cls, quality_psms: List[CometPSM], q_threshold: float = DEFAULT_Q_THRESHOLD
     ) -> "ProteinAbundance":
-        psms = get_high_confidence_psms(psms=psms, score=Q_VAL, threshold=q_threshold)
-        all_comet_proteins = flatten_list_of_lists([psm.proteins for psm in psms])
+        quality_psms = get_high_confidence_psms(
+            psms=quality_psms, score=Q_VAL, threshold=q_threshold
+        )
+        all_comet_proteins = flatten_list_of_lists(
+            [psm.proteins for psm in quality_psms]
+        )
         protein_counts = Counter(all_comet_proteins)
-        return cls(protein_counts=protein_counts)
+        return cls(protein_counts=protein_counts, psms=quality_psms)
 
     def top_n_prots(
         self, n: int, with_cnts: bool = False
@@ -617,10 +623,17 @@ class ProteinAbundance(BaseModel):
             prot_cnts[prot_name] = cnt / prot_name_to_leng[prot_name]
         return ProteinAbundance(protein_counts=Counter(prot_cnts))
 
-    def plot(
-        self, top_n_prots: Optional[int] = None, ax: Optional[Axes] = None
+    def plot_sorted_prot_cnts(
+        self,
+        top_n_prots: Optional[int] = None,
+        ax: Optional[Axes] = None,
+        title: Optional[str] = None,
+        out_path: Optional[Union[str, Path]] = None,
     ) -> Axes:
         # Define data
+        if len(self.protein_counts) == 0:
+            logger.info(f"There are no PSMs to plot!")
+            return
         items = sorted(self.protein_counts.items(), key=lambda x: x[1], reverse=True)
         if top_n_prots is not None:
             items = items[:top_n_prots]
@@ -632,13 +645,29 @@ class ProteinAbundance(BaseModel):
             ax = axs[0]
         ax.scatter(range(len(keys)), values)
         ax.set_xticks(range(len(keys)), keys, rotation=90, fontsize=8)
+
+        # Add counts above points
+        for i, v in enumerate(values):
+            ax.annotate(
+                f"{v}",
+                (i, v),
+                textcoords="offset points",
+                xytext=(0, 8),
+                ha="center",
+                fontsize=9,
+            )
+
         set_title_axes_labels(
             ax=ax,
-            # title="Protein counts",
+            title=title,
             xlabel="Protein",
             ylabel="PSM counts",
         )
         finalize(ax)
+        if out_path:
+            save_fig(
+                path=out_path,
+            )
         return ax
 
     def get_ab(self, protein: str) -> int:
@@ -647,6 +676,46 @@ class ProteinAbundance(BaseModel):
     def get_rel_ab(self, protein: str) -> float:
         max_count = max(self.protein_counts.values())
         return self.protein_counts[protein] / max_count
+
+    def to_json(self, path: Union[str, Path]):
+        data = dict(
+            sorted(self.protein_counts.items(), key=lambda kv: kv[1], reverse=True)
+        )
+        to_json(data=data, path=path)
+
+    def plot_counts_vs_prot_length(
+        self,
+        fasta: Union[str, Path, Fasta],
+        title: Optional[str] = None,
+        out_path: Optional[Union[str, Path]] = None,
+    ):
+        if isinstance(fasta, (str, Path)):
+            fasta = Fasta(path=fasta)
+        df = []
+        for prot, cnt in self.protein_counts.items():
+            df.append(
+                {
+                    "prot": prot,
+                    "cnt": cnt,
+                    "len": len(fasta.protein_name_to_seq_map[prot]),
+                }
+            )
+        df = pd.DataFrame(df)
+        fig, axs = fig_setup()
+        ax = axs[0]
+        sns.scatterplot(x=df.cnt, y=df.len, s=7, ax=ax)
+        set_title_axes_labels(
+            ax=ax,
+            title=title,
+            xlabel="PSM count",
+            ylabel="Protein length",
+        )
+        finalize(ax)
+        if out_path:
+            save_fig(
+                path=out_path,
+            )
+        return df, ax
 
 
 def get_high_confidence_psms(

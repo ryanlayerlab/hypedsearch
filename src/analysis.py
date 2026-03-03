@@ -142,11 +142,11 @@ def cli_process(config: Path, hy_side_len: int, q_threshold: float):
     # Protein abundance plot
     logger.info("Computing protein abundances...")
     prot_ab = ProteinAbundance.from_comet_psms(
-        psms=list(hs_out.top_native_targets.values()),
+        quality_psms=list(hs_out.top_native_targets.values()),
         q_threshold=q_threshold,
     )
     fig, axs = fig_setup(h=8, w=8)
-    prot_ab.plot(top_n_prots=20, ax=axs[0])
+    prot_ab.plot_sorted_prot_cnts(top_n_prots=20, ax=axs[0])
     save_fig(
         path=hs_config._results_dir / "protein_abundance.png",
         fig=fig,

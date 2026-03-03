@@ -1,8 +1,11 @@
 import logging
 import os
+import random
 import shutil
 import sys
+import tempfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from copy import deepcopy
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
@@ -11,20 +14,13 @@ from typing import Literal, Tuple, Union
 import click
 
 from src.constants import DEFAULT_Q_THRESHOLD
-from src.crux import Crux
-
-repo_dir = Path("/Users/erjo3868/repos/hypedsearch/hypedsearch")
-os.chdir(repo_dir)
-sys.path.append(str(repo_dir))
-import random
-import tempfile
-
+from src.crux import CometRun, Crux
 from src.hypedsearch import HypedsearchRunConfig, hybrid_run_on_spectrum
 from src.kmer_database import KmerDatabase
 from src.mass_spectra import Mzml, Spectrum
 from src.peptides_and_ions import Fasta, Peptide
 from src.psm import CometPSM
-from src.utils import setup_logger
+from src.utils import load_json, setup_logger
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +28,6 @@ DIR = Path(__file__).parent
 HALF = "HALF"
 RANDOM = "RANDOM"
 CUT_METHODS = Literal[HALF, RANDOM]
-random.seed(42069)
 
 
 def cut_seq_into_hybrid(seq: str, min_side_len: int, method: CUT_METHODS = HALF):
@@ -52,75 +47,6 @@ def cut_seq_into_hybrid(seq: str, min_side_len: int, method: CUT_METHODS = HALF)
             f"Unknown cut method: {method}. Allowed values are '{RANDOM}' and '{HALF}'."
         )
     return left_hy_seq, right_hy_seq
-
-
-# @dataclass
-# class NativeToHybridChange:
-#     """
-#     Class for representing turning a native sequence into a hybrid sequence within a protein.
-#     E.g., psm="AB" in prot="WXABYZ" -> hybrid="A-B" in "WAXYBZ"
-#     """
-
-#     left_hy_seq: str
-#     right_hy_seq: str
-#     prot_name: str
-#     original_prot_seq: str
-#     new_prot_seq: str
-
-#     @property
-#     def seq(self):
-#         return self.left_hy_seq + self.right_hy_seq
-
-
-# def make_native_seq_a_hybrid_seq_in_prot(
-#     native_seq: str, prot_seq: str
-# ) -> Tuple[str, str, str]:
-#     # Split the hybrid sequence into two halves
-#     left_hy_seq, right_hy_seq = (
-#         native_seq[: int(len(native_seq) / 2)],
-#         native_seq[int(len(native_seq) / 2) :],
-#     )
-
-#     # Split the protein sequence into quarters and insert the hybrid halves between
-#     # the protein sequences first and second quarters and third and fourth quarters
-#     split_seq = prot_seq.split(native_seq)
-#     assert len(split_seq) == 2
-#     new_prot_seq = (
-#         split_seq[0][: int(len(split_seq[0]) / 2)]
-#         + left_hy_seq
-#         + split_seq[0][int(len(split_seq[0]) / 2) :]
-#         + split_seq[1][: int(len(split_seq[1]) / 2)]
-#         + right_hy_seq
-#         + split_seq[1][int(len(split_seq[1]) / 2) :]
-#     )
-#     return left_hy_seq, right_hy_seq, new_prot_seq
-
-
-# def prepare_psm_for_hybrid_finding_simulation_study(
-#     psm: CometPSM, fasta: Path
-# ) -> Optional[NativeToHybridChange]:
-#     """
-#     Make sure the given PSM is easy to turn from a native to a hybrid which means:
-#     1) The PSM sequence appears in only one protein
-#     2) The PSM sequence appears only once in that protein
-#     If the PSM satisifies these conditions, turn it into a hybrid PSM
-#     """
-#     fasta = Fasta(path=fasta)
-#     if validate_psm_for_hybrid_finding_simulation_study(psm=psm, fasta=fasta):
-#         # Create the hybrid sequence by splitting the protein sequence at the PSM sequence location
-#         prot_name = list(fasta.proteins_that_contain_seqs([psm.seq])[psm.seq])[0]
-#         left_hy_seq, right_hy_seq, new_prot_seq = make_native_seq_a_hybrid_seq_in_prot(
-#             native_seq=psm.seq, prot_seq=fasta.protein_name_to_seq_map[prot_name]
-#         )
-#         return NativeToHybridChange(
-#             left_hy_seq=left_hy_seq,
-#             right_hy_seq=right_hy_seq,
-#             prot_name=prot_name,
-#             original_prot_seq=fasta.protein_name_to_seq_map[prot_name],
-#             new_prot_seq=new_prot_seq,
-#         )
-#     else:
-#         return None
 
 
 def validate_psm_for_hybrid_finding_simulation_study(
@@ -147,30 +73,6 @@ def validate_psm_for_hybrid_finding_simulation_study(
         return False
 
     return True
-
-
-def make_native_seq_a_hybrid_seq_in_prot(
-    native_seq: str, prot_seq: str
-) -> Tuple[str, str, str]:
-    # Split the hybrid sequence into two halves
-    left_hy_seq, right_hy_seq = (
-        native_seq[: int(len(native_seq) / 2)],
-        native_seq[int(len(native_seq) / 2) :],
-    )
-
-    # Split the protein sequence into quarters and insert the hybrid halves between
-    # the protein sequences first and second quarters and third and fourth quarters
-    split_seq = prot_seq.split(native_seq)
-    assert len(split_seq) == 2
-    new_prot_seq = (
-        split_seq[0][: int(len(split_seq[0]) / 2)]
-        + left_hy_seq
-        + split_seq[0][int(len(split_seq[0]) / 2) :]
-        + split_seq[1][: int(len(split_seq[1]) / 2)]
-        + right_hy_seq
-        + split_seq[1][int(len(split_seq[1]) / 2) :]
-    )
-    return left_hy_seq, right_hy_seq, new_prot_seq
 
 
 def create_new_kmer_db_and_fasta_for_simulation_with_hybrid_within_prot(
@@ -264,14 +166,14 @@ def create_new_kmer_db_and_fasta_for_simulation_with_hybrid_as_new_prots(
 
 @dataclass
 class HybridSimulation:
-    config: HypedsearchRunConfig
+    hs_config: HypedsearchRunConfig
     assign_confidence_txt: Path
     parent_out_dir: Path
     q_threshold: int = DEFAULT_Q_THRESHOLD
 
     def __post_init__(self):
-        if isinstance(self.config, (str, Path)):
-            self.config = HypedsearchRunConfig.from_json(self.config)
+        if isinstance(self.hs_config, (str, Path)):
+            self.hs_config = HypedsearchRunConfig.from_json(self.hs_config)
         self.parent_out_dir = Path(self.parent_out_dir)
         self.parent_out_dir.mkdir(parents=True, exist_ok=True)
         if self.missing_top_peptide_dir.exists():
@@ -308,75 +210,94 @@ class HybridSimulation:
             reverse=True,
         )
 
+    @classmethod
+    def from_json(cls, path: Union[str, Path]):
+        return cls(**load_json(path=path))
+
     def run_hybrid_simulation_on_psm(
         self,
         psm: CometPSM,
         spectrum: Spectrum,
         mzml_path: Union[str, Path],
+        on_singularity: bool,
+        crux_path: Path,
+        within_prot_hybridization: bool = True,
         cut_method: CUT_METHODS = "HALF",
         min_side_len: int = 3,
     ):
         mzml = Mzml(path=mzml_path)
-        fasta = Fasta(path=self.config.fasta)
+        fasta = Fasta(path=self.hs_config.fasta)
         assert psm.sample == mzml.name, "PSM sample and MZML name should be the same!"
-        if validate_psm_for_hybrid_finding_simulation_study(psm=psm, fasta=fasta):
-            left_hy_seq, right_hy_seq = cut_seq_into_hybrid(
-                seq=psm.seq, method=cut_method, min_side_len=min_side_len
-            )
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                tmp_dir = Path(tmp_dir)
-                new_kmer_db = tmp_dir / "kmers.db"
-                new_fasta = tmp_dir / "proteins.fasta"
-                # create_new_kmer_db_and_fasta_for_simulation_with_hybrid_as_new_prots(
-                #     existing_kmer_db=self.config.kmer_db,
-                #     new_kmer_db=new_kmer_db,
-                #     new_fasta=new_fasta,
-                #     fasta=self.config.fasta,
-                #     psm_seq=psm.seq,
-                #     left_seq=left_hy_seq,
-                #     right_seq=right_hy_seq,
-                # )
+        if not validate_psm_for_hybrid_finding_simulation_study(psm=psm, fasta=fasta):
+            return
+        left_hy_seq, right_hy_seq = cut_seq_into_hybrid(
+            seq=psm.seq, method=cut_method, min_side_len=min_side_len
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_dir = Path(tmp_dir)
+            new_kmer_db = tmp_dir / "kmers.db"
+            new_fasta = tmp_dir / "proteins.fasta"
+            if within_prot_hybridization:
                 create_new_kmer_db_and_fasta_for_simulation_with_hybrid_within_prot(
-                    existing_kmer_db=self.config.kmer_db,
+                    existing_kmer_db=self.hs_config.kmer_db_path,
                     new_kmer_db=new_kmer_db,
                     new_fasta=new_fasta,
-                    fasta=self.config.fasta,
+                    fasta=self.hs_config.fasta,
                     psm_seq=psm.seq,
                     left_seq=left_hy_seq,
                     right_seq=right_hy_seq,
                 )
-                # Run HypedSearch
-                new_config = self.config.model_copy(deep=True)
-                new_config.kmer_db = new_kmer_db
-                new_config.fasta = new_fasta
-                hybrid_run_on_spectrum(
-                    spectrum=spectrum,
-                    hybrid_former=new_config.hybrid_former,
-                    psm_scorer=new_config.psm_scorer,
-                    out_dir=self.hybrid_dir,
+            else:
+                create_new_kmer_db_and_fasta_for_simulation_with_hybrid_as_new_prots(
+                    existing_kmer_db=self.hs_config.kmer_db_path,
+                    new_kmer_db=new_kmer_db,
+                    new_fasta=new_fasta,
+                    fasta=self.hs_config.fasta,
+                    psm_seq=psm.seq,
+                    left_seq=left_hy_seq,
+                    right_seq=right_hy_seq,
                 )
 
-                # Run Comet on native FASTA and hybridized FASTA
-                Crux().run_comet(
-                    mzml=mzml_path,
-                    fasta=self.config.fasta,
-                    crux_comet_params=self.config.crux_comet_params,
-                    out_dir=self.native_dir,
-                    file_root=mzml.name,
-                    scan_min=psm.scan,
-                    scan_max=psm.scan,
-                    num_threads=1,
-                )
-                Crux().run_comet(
-                    mzml=mzml_path,
-                    fasta=new_fasta,
-                    crux_comet_params=self.config.crux_comet_params,
-                    out_dir=self.missing_top_peptide_dir,
-                    file_root=mzml.name,
-                    scan_min=psm.scan,
-                    scan_max=psm.scan,
-                    num_threads=1,
-                )
+            # Run HypedSearch
+            params = deepcopy(self.hs_config.hybrid_run_params)
+            params.kmer_db = new_kmer_db
+            params.fasta = new_fasta
+            params.out_dir = self.hybrid_dir
+            hybrid_run_on_spectrum(
+                spectrum=spectrum,
+                params=params,
+                fasta_dir=tmp_dir,
+            )
+
+            # Run Comet on native FASTA
+            native_run = CometRun(
+                mzml=mzml_path,
+                fasta=self.hs_config.fasta,
+                crux_comet_params=self.hs_config.crux_comet_params,
+                out_dir=self.native_dir,
+                decoy_search=0,
+                scan_min=psm.scan,
+                scan_max=psm.scan,
+                num_threads=1,
+            )
+            native_run.run_comet_and_keep_only_results(
+                crux_path=crux_path, on_singularity=on_singularity
+            )
+
+            # Run Comet on hybridized FASTA
+            hybrid_run = CometRun(
+                mzml=mzml_path,
+                fasta=new_fasta,
+                crux_comet_params=self.hs_config.crux_comet_params,
+                out_dir=self.missing_top_peptide_dir,
+                decoy_search=0,
+                scan_min=psm.scan,
+                scan_max=psm.scan,
+                num_threads=1,
+            )
+            hybrid_run.run_comet_and_keep_only_results(
+                crux_path=crux_path, on_singularity=on_singularity
+            )
 
 
 def processing_fcn(
@@ -413,7 +334,7 @@ def cli_run_hybrid_finding_simulation_study(sample_size: int):
     mzml_path = Path("data/spectra/mouse_samples/BMEM_AspN_Fxn4.mzML")
     uid_to_spectrum = Mzml(path=mzml_path).id_to_spectrum
     sim = HybridSimulation(
-        config="results/tutorial/inputs/hs.config.json",
+        hs_config="results/tutorial/inputs/hs.config.json",
         assign_confidence_txt="results/tutorial/native_run/tutorial-assign-confidence.txt",
         parent_out_dir="results/020226_hybrid_simulation_hybridize_within_protein",
     )

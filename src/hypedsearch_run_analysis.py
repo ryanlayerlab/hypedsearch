@@ -294,7 +294,7 @@ class ResultsAnalysis:
     def seq_to_hybrids_map(self) -> Dict[str, List[HybridPeptide]]:
         return get_seq_to_hybrids_map(
             seqs=self.hybrid_seqs,
-            db_path=self.hs_config.kmer_db,
+            db_path=self.hs_config.kmer_db_path,
             min_side_len=self.min_side_len,
         )
 
@@ -411,7 +411,7 @@ class ResultsAnalysis:
 
         seq_to_hybrids = get_seq_to_hybrids_map(
             seqs=set(psm.seq for psm in psms),
-            db_path=self.hs_config.kmer_db,
+            db_path=self.hs_config.kmer_db_path,
             min_side_len=self.min_side_len,
             remove_carbamidomethylation=self.remove_carbamidomethylation,
         )
@@ -483,7 +483,7 @@ class ResultsAnalysis:
         self, q_threshold: float = DEFAULT_Q_THRESHOLD
     ) -> ProteinAbundance:
         return ProteinAbundance.from_comet_psms(
-            psms=self.native_assign_conf.values(),
+            quality_psms=self.native_assign_conf.values(),
             q_threshold=q_threshold,
         )
 
@@ -577,7 +577,7 @@ def process_hs_config(
         psms = SpectrumPSMs.load(path=spectrum_psms_path)
         seq_to_hybrids_map = get_seq_to_hybrids_map(
             seqs=set(psm.hybrid_target.seq for psm in psms if psm.hybrid_target),
-            db_path=results.hs_config.kmer_db,
+            db_path=results.hs_config.kmer_db_path,
             min_side_len=min_hybrid_side_len,
             remove_carbamidomethylation=remove_methylation,
         )
@@ -1111,7 +1111,12 @@ def add_qvalue_interpolator_to_xcorr_plot(
     ax_copy.tick_params(axis="y", labelcolor="tab:red")
 
 
-def xcorr_plot(psms_by_type: Dict[str, List[CometPSM]], ax: Axes) -> Axes:
+def xcorr_plot(
+    psms_by_type: Dict[str, List[CometPSM]], ax: Optional[Axes] = None
+) -> Axes:
+    if ax is None:
+        fig, axs = fig_setup()
+        ax = axs[0]
     _ = score_histogram(psms_by_type=psms_by_type, score=XCORR, ax=ax)
     if NAT_TARGET in psms_by_type:
         add_qvalue_interpolator_to_xcorr_plot(
@@ -1407,30 +1412,6 @@ def fit_xcorr_to_qval_interpolator(
     y = xy[Q_VAL].to_numpy()
     interpolator = PchipInterpolator(x, y)
     return interpolator
-
-
-def score_histogram(
-    psms_by_type: Dict[str, List[Any]],
-    score: str,
-    ax: Optional[Axes] = None,
-) -> Axes:
-    if ax is None:
-        _, axs = fig_setup()
-        ax = axs[0]
-    for key, psms in psms_by_type.items():
-        if isinstance(psms, pd.DataFrame):
-            data = psms[score]
-        else:
-            try:
-                data = [getattr(psm, score) for psm in psms]
-            except:
-                data = psms
-        _ = sns.kdeplot(
-            data,
-            ax=ax,
-            label=f"{key} (n = {len(data)})",
-        )
-    return ax
 
 
 def filter_to_top_n_highest_precursor_intensity_psms_per_mz(

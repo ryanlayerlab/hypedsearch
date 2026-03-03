@@ -80,7 +80,7 @@ def comet_psm(test_data_dir):
         txt="tests/data/BMEM_AspN_Fxn4/assign-confidence.target.txt"
     )
     psms = [psm for psm in psms if "sp|P99027|RLA2_MOUSE" in psm.proteins]
-    psms[0].save(path=path)
+    psms[0].save_to_json(path=path)
     return CometPSM.load(path=path)
 
 
