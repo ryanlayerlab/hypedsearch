@@ -3,7 +3,7 @@ import logging
 import re
 import shutil
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
@@ -11,12 +11,13 @@ import click
 import pandas as pd
 from pydantic import BaseModel, field_validator
 
-from src.constants import LINUX_CRUX_EXECUTABLE, MAC_CRUX_EXECUTABLE
-from src.hypedsearch import (
-    HybridPSMScorer,
-    HypedsearchRunConfig,
-    run_hypedsearch_in_parallel,
+from src.constants import (
+    DEFAULT_JCT_LEN,
+    DEFAULT_Q_THRESHOLD,
+    LINUX_CRUX_EXECUTABLE,
+    MAC_CRUX_EXECUTABLE,
 )
+from src.hypedsearch import HybridPSMScorer, HypedsearchRunConfig, run_hypedsearch
 from src.utils import (
     PathType,
     copy_file,
@@ -27,6 +28,8 @@ from src.utils import (
 
 logger = logging.getLogger(__name__)
 
+RUN_CMD_SH = "./slurm/run_command_via_slurm.sh"
+SHEBANG = "#!/bin/bash"
 LOCALSCRATCH = "/localscratch"
 DEFAULT_FIJI_CONFIG_NAME = "hs.fiji.config.json"
 DEFAULT_MEM = "500GB"
@@ -45,6 +48,8 @@ class SbatchConfig:
     n_cores: int = DEFAULT_N_CORES
     partition: str = DEFAULT_PARTITION
     log_dir: Union[str, Path] = DEFAULT_LOG_DIR
+    n_nodes: int = 1
+    nodelist: Optional[str] = None
 
     def get_sbatch_directives_lines(self) -> List[str]:
         header = [
@@ -52,13 +57,15 @@ class SbatchConfig:
             f"#SBATCH --mem={self.mem}",
             f"#SBATCH --ntasks={self.n_cores}",
             f'#SBATCH --partition="{self.partition}"',
-            "#SBATCH --nodes=1",
+            f"#SBATCH --nodes={self.n_nodes}",
             f"#SBATCH --time={self.time}",
             f"#SBATCH --output={self.log_dir}/{self.name}.out",
             f"#SBATCH --error={self.log_dir}/{self.name}.err",
             "#SBATCH --mail-type=BEGIN,FAIL,END",
             "#SBATCH --mail-user=erjo3868@colorado.edu",
         ]
+        if self.nodelist is not None:
+            header.append(f"#SBATCH --nodelist={self.nodelist}")
         return header
 
 
@@ -158,6 +165,168 @@ def create_config_for_fiji_run(
     new_config.fasta_fm_index = new_fm_index_path
 
     return new_config
+
+
+@dataclass
+class ConfigAndPath:
+    config_path: Path
+    hs_config: HypedsearchRunConfig = field(init=False)
+
+    def __post_init__(self):
+        self.hs_config = HypedsearchRunConfig.from_json(path=self.config_path)
+
+
+@dataclass
+class HypedsearchRunScripts:
+    config_paths: List[str | Path]
+    script_dir: Path
+    configs: List[ConfigAndPath] = field(init=False)
+
+    def __post_init__(self):
+        self.script_dir = Path(self.script_dir)
+        self.script_dir.mkdir(parents=True, exist_ok=True)
+        self.configs = [
+            ConfigAndPath(config_path=config_path) for config_path in self.config_paths
+        ]
+
+    def create_script_to_run_native_run_via_slurm(self):
+        lines = [SHEBANG]
+        for config in self.configs:
+            cmd_parts = [
+                RUN_CMD_SH,
+                f"--name {config.hs_config.name}_nativeRun",
+                f'--mem "5GB"',
+                f'--part "short"',
+                f'--time "10:00:00"',
+                f"--cores 60",
+                f'--cmd "python -m cli native-run -os -c {config.config_path}"',
+            ]
+            lines.append(" ".join(cmd_parts))
+            write_new_line_separated_file(
+                lines=lines, path=self.script_dir / "native_run_via_slurm.sh"
+            )
+
+    def create_script_to_run_native_run_locally(self):
+        lines = [SHEBANG]
+        for config in self.configs:
+            lines.append(f"python -m cli native-run -c {config.config_path}")
+            write_new_line_separated_file(
+                lines=lines, path=self.script_dir / "native_run_locally.sh"
+            )
+
+    def create_script_for_hybrid_run_via_slurm(self):
+        nodes = ["fijinode-67", "fijinode-68", "fijinode-69"]
+        lines = [SHEBANG]
+        idx = 0
+        for config in self.configs:
+            cmd_parts = [
+                RUN_CMD_SH,
+                f"--name {config.hs_config.name}_hybridRun",
+                f'--mem "500GB"',
+                f'--part "highmem"',
+                f'--time "24:00:00"',
+                f"--cores 180",
+                f'--nodelist "{nodes[idx % len(nodes)]}"',
+                f'--cmd "python -m cli run-in-parallel -c {config.config_path} -n 100 -os"',
+            ]
+            lines.append(" ".join(cmd_parts))
+            idx += 1
+        write_new_line_separated_file(
+            lines=lines, path=self.script_dir / "hybrid_run_via_slurm.sh"
+        )
+
+    def create_script_for_local_hybrid_run(self):
+        lines = [SHEBANG]
+        for config in self.configs:
+            cmd_parts = [
+                "python -m cli run-in-parallel",
+                f"-c {config.config_path} -n 8",
+            ]
+            lines.append(" ".join(cmd_parts))
+        write_new_line_separated_file(
+            lines=lines, path=self.script_dir / "hybrid_run_locally.sh"
+        )
+
+    def create_script_to_combine_hybrid_txts_via_slurm(self):
+        lines = [SHEBANG]
+        for config in self.configs:
+            cmd_parts = [
+                RUN_CMD_SH,
+                f"--name {config.hs_config.name}_combineCometTxts",
+                f'--mem "2GB"',
+                f'--part "short"',
+                f'--time "01:00:00"',
+                f"--cores 10",
+                f'--cmd "python -m cli combine-comet-txts -c {config.config_path}"',
+            ]
+            lines.append(" ".join(cmd_parts))
+        write_new_line_separated_file(
+            lines=lines, path=self.script_dir / "combine_hybrid_txts_via_slurm.sh"
+        )
+
+    def create_script_to_check_for_missing_comet_txts_locally(self):
+        lines = [SHEBANG]
+        for config in self.configs:
+            cmd_parts = [
+                "python -m cli get-missing-hs-outputs"
+                f"--config {config.config_path}"
+                "--verbose",
+                f"> tmp/{config.hs_config.name}_missing_outputs.txt",
+            ]
+            lines.append(" ".join(cmd_parts))
+        write_new_line_separated_file(
+            lines=lines,
+            path=self.script_dir / "check_for_missing_hs_outputs_locally.sh",
+        )
+
+    def create_script_to_process_native_and_hybrid_results(
+        self, jct_len: int, q_threshold: float
+    ):
+        lines = [SHEBANG]
+        for config in self.configs:
+            lines.append(
+                " ".join(
+                    [
+                        "python -m cli process-hs",
+                        f"--config {config.config_path}",
+                        f"--jct_len {jct_len}",
+                        f"--q_threshold {q_threshold}",
+                    ]
+                )
+            )
+        write_new_line_separated_file(
+            lines=lines,
+            path=self.script_dir / "process_native_and_hybrid_results_locally.sh",
+        )
+
+    def create_script_to_run_param_medic_locally(self):
+        lines = [SHEBANG]
+        for config in self.configs:
+            lines.append(
+                " ".join(
+                    [
+                        "python -m cli run-param-medic",
+                        f"--config {config.config_path}",
+                    ]
+                )
+            )
+        write_new_line_separated_file(
+            lines=lines, path=self.script_dir / "run_param_medic.sh"
+        )
+
+    def create_all_scripts(
+        self, jct_len: int = DEFAULT_JCT_LEN, q_threshold: float = DEFAULT_Q_THRESHOLD
+    ):
+        self.create_script_to_run_native_run_via_slurm()
+        self.create_script_to_run_native_run_locally()
+        self.create_script_for_hybrid_run_via_slurm()
+        self.create_script_for_local_hybrid_run()
+        self.create_script_to_combine_hybrid_txts_via_slurm()
+        self.create_script_to_check_for_missing_comet_txts_locally()
+        self.create_script_to_run_param_medic_locally()
+        self.create_script_to_process_native_and_hybrid_results(
+            jct_len=jct_len, q_threshold=q_threshold
+        )
 
 
 def move_scan_results_from_node_to_persistent_storage(
@@ -313,9 +482,7 @@ def cli_run_hs_on_slurm(
     fiji_config.save(path=fiji_config_path)
 
     # Run Hypedsearch
-    run_hypedsearch_in_parallel(
-        config=fiji_config_path, n_cores=n_cores, on_singularity=True
-    )
+    run_hypedsearch(config=fiji_config_path, n_cores=n_cores, on_singularity=True)
 
     # Move files back to persistent storage
     move_scan_results_from_node_to_persistent_storage(

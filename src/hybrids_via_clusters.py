@@ -506,13 +506,20 @@ class HybridPeptide(BaseModel):
     def get_position_str(self, protein_name_to_seq_map: Dict[str, str]) -> str:
         positions = self.get_positions(protein_name_to_seq_map=protein_name_to_seq_map)
         left_prot_str = HYBRID_PROT_SEPARATOR.join(
-            [f"{pos.left.protein}|end={pos.left.exclusive_end}" for pos in positions]
+            set(
+                [
+                    f"{pos.left.protein}|end={pos.left.exclusive_end}"
+                    for pos in positions
+                ]
+            )
         )
         right_prot_str = HYBRID_PROT_SEPARATOR.join(
-            [
-                f"{pos.right.protein}|start={pos.right.inclusive_start}"
-                for pos in positions
-            ]
+            set(
+                [
+                    f"{pos.right.protein}|start={pos.right.inclusive_start}"
+                    for pos in positions
+                ]
+            )
         )
         return f"({left_prot_str}){self.left_seq}-{self.right_seq}({right_prot_str})"
 
@@ -546,21 +553,6 @@ class HybridPeptide(BaseModel):
 
     def to_dict(self):
         return self.model_dump(mode="json")
-
-    @staticmethod
-    def seq_to_hybrids_map_to_peptides(
-        seq_to_hybrids: Dict[str, List["HybridPeptide"]],
-    ) -> List[Peptide]:
-        peptides = []
-        for idx, (seq, hybrids) in enumerate(seq_to_hybrids.items()):
-            idx, seq, hybrids
-            peptides.append(
-                Peptide(
-                    seq=seq,
-                    name=COMET_PROTEIN_SEPARATOR.join([str(hy) for hy in hybrids]),
-                )
-            )
-        return peptides
 
     @classmethod
     def parse_hybrid_peptide_str(cls, hybrid_str: str) -> "HybridPeptide":
@@ -712,7 +704,7 @@ def form_spectrum_hybrids_via_clustering(
     min_cluster_support: int = 3,
     max_allowed_ion_charge: int = 4,
     remove_carbamidomethylated_hybrids: bool = True,
-) -> Dict[str, str]:
+) -> Dict[str, Set[str]]:
     """
     This function will
     1. form hybrids for the given spectrum via clustering
@@ -746,16 +738,15 @@ def form_spectrum_hybrids_via_clustering(
         fasta_fm_index=fasta_fm_index,
         remove_carbamidomethylated_hybrids=remove_carbamidomethylated_hybrids,
     )
-    seq_to_hybrid_peptides = defaultdict(list)
+    hybrid_seq_to_position_strs = defaultdict(set)
     for hybrid in hybrids:
-        seq_to_hybrid_peptides[hybrid.seq].append(hybrid)
-        # .append(
-        #     hybrid.get_position_str(protein_name_to_seq_map=kmer_db_prot_name_to_seq)
-        # )
+        hybrid_seq_to_position_strs[hybrid.seq].add(
+            hybrid.get_position_str(protein_name_to_seq_map=kmer_db_prot_name_to_seq)
+        )
     logger.info(
         f"Completed forming hybrids for spectrum ({spectrum.sample}, {spectrum.scan})\nIt took {get_time_in_diff_units(time.perf_counter() - start_time)}"
     )
-    return dict(seq_to_hybrid_peptides)
+    return dict(hybrid_seq_to_position_strs)
 
 
 def serialize_hybrids(seq_to_hybrids: Dict[str, List[HybridPeptide]]) -> Dict:

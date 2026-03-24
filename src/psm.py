@@ -3,12 +3,14 @@ from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
 from functools import cached_property
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Set, Union
+from typing import Any, Dict, List, Literal, Optional, Set, Union
 
+import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib.axes import Axes
 from pydantic import BaseModel
+from scipy.interpolate import PchipInterpolator
 
 from src.constants import (
     B_ION_TYPE,
@@ -34,7 +36,13 @@ from src.constants import (
 from src.hybrids_via_clusters import HybridPeptide
 from src.mass_spectra import Mzml, Peak, Spectrum, organize_by_spectrum_uid, plot_peaks
 from src.peptides_and_ions import Fasta, Peptide, compute_peptide_precursor_mz
-from src.plot_utils import fig_setup, finalize, save_fig, set_title_axes_labels
+from src.plot_utils import (
+    fig_setup,
+    finalize,
+    plot_line,
+    save_fig,
+    set_title_axes_labels,
+)
 from src.utils import (
     flatten_list_of_lists,
     list_to_df,
@@ -210,7 +218,7 @@ def spectrum_peptide_plot(
         ax = axs[0]
 
     # Plot spectrum
-    spectrum.plot_spectrum(
+    spectrum.plot(
         ax=ax,
     )
     # Plot all product ions below spectrum
@@ -254,114 +262,6 @@ def spectrum_peptide_plot(
     )
     finalize(ax)
     return ax
-
-
-@dataclass
-class PSM:
-    spectrum: Spectrum
-    seq: str
-    positions: List[str]
-    peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL
-    xcorr: Optional[float] = None
-    q_value: Optional[float] = None
-    prop_ions_matched: Optional[float] = None
-
-    @cached_property
-    def peak_ion_matches(self):
-        return get_peak_product_ion_matches(
-            spectrum=self.spectrum,
-            peptide=self.seq,
-            peak_to_ion_ppm_tolerance=self.peak_to_ion_ppm_tol,
-        )
-
-    @property
-    def df(self):
-        return list_to_df(pydantic_list=self.peak_ion_matches)
-
-    @property
-    def num_b_ions_supported(self):
-        return len(
-            self.df[self.df.ion_type == B_ION_TYPE].groupby(
-                by=["ion_charge", "ion_seq"]
-            )
-        )
-
-    @property
-    def uid(self):
-        return self.spectrum.uid
-
-    @property
-    def num_ions_supported(self):
-        return self.num_b_ions_supported + self.num_y_ions_supported
-
-    @property
-    def num_y_ions_supported(self):
-        return len(
-            self.df[self.df.ion_type == Y_ION_TYPE].groupby(
-                by=["ion_charge", "ion_seq"]
-            )
-        )
-
-    @property
-    def prefixes_supported(self) -> List[str]:
-        return list(self.sequences_supported(ion_type=B_ION_TYPE))
-
-    @property
-    def suffixes_supported(self) -> List[str]:
-        return list(self.sequences_supported(ion_type=Y_ION_TYPE))
-
-    @property
-    def intensity_supported(self):
-        return sum(
-            [peak_ion_match.peak_intensity for peak_ion_match in self.peak_ion_matches]
-        )
-
-    @property
-    def prop_intensity_supported(self):
-        return self.intensity_supported / self.spectrum.total_intensity
-
-    @property
-    def prop_prefixes_supported(self):
-        return len(self.prefixes_supported) / len(self.seq)
-
-    @property
-    def prop_suffixes_supported(self):
-        return len(self.suffixes_supported) / len(self.seq)
-
-    @property
-    def mz_ppm_diff(self):
-        seq_mz = compute_peptide_precursor_mz(seq=self.seq, charge=self.spectrum.z)
-        return mass_difference_in_ppm(mass1=seq_mz, mass2=self.spectrum.mz)
-
-    def sequences_supported(
-        self,
-        ion_type: Literal[B_ION_TYPE, Y_ION_TYPE],
-    ) -> Set[str]:
-        if len(self.peak_ion_matches) == 0:
-            return set()
-        return set(self.df.loc[self.df.ion_type == ion_type, "ion_seq"].unique())
-
-    def to_row(self) -> Dict:
-        return {
-            "uid": self.uid,
-            "seq": self.seq,
-            "xcorr": self.xcorr,
-            "q_value": self.q_value,
-            "prop_prefixes_supported": self.prop_prefixes_supported,
-            "prop_suffixes_supported": self.prop_suffixes_supported,
-            "prop_intensity_supported": self.prop_intensity_supported,
-            "prefixes_supported": self.prefixes_supported,
-            "suffixes_supported": self.suffixes_supported,
-            "mz_ppm_diff": self.mz_ppm_diff,
-            "positions": self.positions,
-        }
-
-    def plot(self):
-        return spectrum_peptide_plot(
-            spectrum=self.spectrum,
-            seq=self.seq,
-            peak_to_ion_ppm_tolerance=self.peak_to_ion_ppm_tol,
-        )
 
 
 @dataclass
@@ -521,7 +421,7 @@ class CometPSM:
         self,
         spectrum: Spectrum,
         peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
-    ) -> PSM:
+    ) -> "PSM":
         return PSM(
             spectrum=spectrum,
             seq=self.seq,
@@ -551,10 +451,157 @@ class CometPSM:
             path=path,
         )
 
+    def to_dict(self):
+        data = asdict(self)
+        data["uid"] = self.uid
+        return data
+
     def save_to_json(self, path: Path):
         to_json(
-            data=asdict(self),
+            data=self.to_dict(),
             path=path,
+        )
+
+    @staticmethod
+    def to_df(psms: List["CometPSM"]):
+        return pd.DataFrame([psm.to_dict() for psm in psms])
+
+
+@dataclass
+class PSM:
+    spectrum: Spectrum
+    seq: str
+    positions: List[str]
+    peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL
+    xcorr: Optional[float] = None
+    q_value: Optional[float] = None
+    comet_ions_matched: Optional[int] = None
+    comet_ions_total: Optional[int] = None
+
+    @classmethod
+    def from_spectrum_and_comet_psm(
+        cls,
+        spectrum: Spectrum,
+        psm: CometPSM,
+        ppm_tol: int = DEFAULT_PEAK_TO_ION_PPM_TOL,
+    ):
+        return cls(
+            spectrum=spectrum,
+            seq=psm.seq,
+            peak_to_ion_ppm_tol=ppm_tol,
+            xcorr=psm.xcorr,
+            q_value=psm.q_value,
+            positions=psm.proteins,
+            comet_ions_matched=psm.ions_matched,
+            comet_ions_total=psm.ions_total,
+        )
+
+    @cached_property
+    def peak_ion_matches(self):
+        return get_peak_product_ion_matches(
+            spectrum=self.spectrum,
+            peptide=self.seq,
+            peak_to_ion_ppm_tolerance=self.peak_to_ion_ppm_tol,
+        )
+
+    @property
+    def prop_comet_ions_matched(self):
+        if (self.comet_ions_matched is None) or (self.comet_ions_total is None):
+            return None
+        else:
+            return self.comet_ions_matched / self.comet_ions_total
+
+    @property
+    def df(self):
+        return list_to_df(pydantic_list=self.peak_ion_matches)
+
+    @property
+    def num_b_ions_supported(self):
+        if self.df is None:
+            return 0
+        return len(
+            self.df[self.df.ion_type == B_ION_TYPE].groupby(
+                by=["ion_charge", "ion_seq"]
+            )
+        )
+
+    @property
+    def uid(self):
+        return self.spectrum.uid
+
+    @property
+    def num_ions_supported(self):
+        return self.num_b_ions_supported + self.num_y_ions_supported
+
+    @property
+    def num_y_ions_supported(self):
+        if self.df is None:
+            return 0
+        return len(
+            self.df[self.df.ion_type == Y_ION_TYPE].groupby(
+                by=["ion_charge", "ion_seq"]
+            )
+        )
+
+    @property
+    def prefixes_supported(self) -> List[str]:
+        return list(self.sequences_supported(ion_type=B_ION_TYPE))
+
+    @property
+    def suffixes_supported(self) -> List[str]:
+        return list(self.sequences_supported(ion_type=Y_ION_TYPE))
+
+    @property
+    def intensity_supported(self):
+        return sum(
+            [peak_ion_match.peak_intensity for peak_ion_match in self.peak_ion_matches]
+        )
+
+    @property
+    def prop_intensity_supported(self):
+        return self.intensity_supported / self.spectrum.total_intensity
+
+    @property
+    def prop_prefixes_supported(self):
+        return len(self.prefixes_supported) / len(self.seq)
+
+    @property
+    def prop_suffixes_supported(self):
+        return len(self.suffixes_supported) / len(self.seq)
+
+    @property
+    def mz_ppm_diff(self):
+        seq_mz = compute_peptide_precursor_mz(seq=self.seq, charge=self.spectrum.z)
+        return mass_difference_in_ppm(mass1=seq_mz, mass2=self.spectrum.mz)
+
+    def sequences_supported(
+        self,
+        ion_type: Literal[B_ION_TYPE, Y_ION_TYPE],
+    ) -> Set[str]:
+        if len(self.peak_ion_matches) == 0:
+            return set()
+        return set(self.df.loc[self.df.ion_type == ion_type, "ion_seq"].unique())
+
+    def to_row(self) -> Dict:
+        return {
+            "uid": self.uid,
+            "seq": self.seq,
+            "xcorr": self.xcorr,
+            "q_value": self.q_value,
+            "prop_prefixes_supported": self.prop_prefixes_supported,
+            "prop_suffixes_supported": self.prop_suffixes_supported,
+            "prop_intensity_supported": self.prop_intensity_supported,
+            "prefixes_supported": self.prefixes_supported,
+            "suffixes_supported": self.suffixes_supported,
+            "mz_ppm_diff": self.mz_ppm_diff,
+            "positions": self.positions,
+        }
+
+    def plot(self):
+        return spectrum_peptide_plot(
+            spectrum=self.spectrum,
+            seq=self.seq,
+            peak_to_ion_ppm_tolerance=self.peak_to_ion_ppm_tol,
         )
 
 
@@ -703,11 +750,11 @@ class ProteinAbundance(BaseModel):
         df = pd.DataFrame(df)
         fig, axs = fig_setup()
         ax = axs[0]
-        sns.scatterplot(x=df.cnt, y=df.len, s=7, ax=ax)
+        sns.scatterplot(x=df.cnt, y=df.len, s=7, ax=ax, label=f"n={df.shape[0]}")
         set_title_axes_labels(
             ax=ax,
             title=title,
-            xlabel="PSM count",
+            xlabel="Number of PSMs from protein",
             ylabel="Protein length",
         )
         finalize(ax)
@@ -716,6 +763,257 @@ class ProteinAbundance(BaseModel):
                 path=out_path,
             )
         return df, ax
+
+
+def fit_xcorr_to_qval_interpolator(
+    psms: Union[pd.DataFrame, List[CometPSM]],
+    # ax: Optional[Axes] = None,
+) -> PchipInterpolator:
+    # Get data
+    if isinstance(psms, pd.DataFrame):
+        df = psms.copy()
+    else:
+        df = pd.DataFrame(
+            [(psm.xcorr, psm.q_value) for psm in psms],
+            columns=[XCORR, Q_VAL],
+        )
+    xy = df.drop_duplicates(subset=XCORR)
+    xy.sort_values(by=XCORR, inplace=True)
+    x = xy[XCORR].to_numpy()
+    y = xy[Q_VAL].to_numpy()
+    interpolator = PchipInterpolator(x, y)
+    return interpolator
+
+
+def add_qvalue_interpolator_to_xcorr_plot(
+    q_value_psms: Union[List[CometPSM], pd.DataFrame],
+    ax: Axes,
+    q_threshold: Optional[float] = None,
+    ylabel: str = "Native log10(q-value)",
+):
+    q_interpolator = fit_xcorr_to_qval_interpolator(
+        psms=q_value_psms,
+    )
+    ax_copy = ax.twinx()
+    xmin, xmax = ax.get_xlim()
+    x_new = np.linspace(xmin, xmax, 500)
+    _ = ax_copy.plot(x_new, q_interpolator(x_new), "r--", label="Native q-value")
+    if q_threshold is not None:
+        _ = ax_copy.axhline(
+            y=q_threshold, color="red", linestyle="--", label=f"q={q_threshold}"
+        )
+    ax_copy.set_yscale("log")  # set y-axis to log10 scale
+    ax_copy.set_ylabel(ylabel, color="tab:red")
+    ax_copy.tick_params(axis="y", labelcolor="tab:red")
+
+
+def score_histogram(
+    psms_by_type: Dict[str, List[Any]],
+    score: str,
+    ax: Optional[Axes] = None,
+) -> Axes:
+    if ax is None:
+        _, axs = fig_setup()
+        ax = axs[0]
+    for key, psms in psms_by_type.items():
+        if isinstance(psms, pd.DataFrame):
+            data = psms[score]
+        else:
+            try:
+                data = [getattr(psm, score) for psm in psms]
+            except:
+                data = psms
+        _ = sns.kdeplot(
+            data,
+            ax=ax,
+            label=f"{key} (n = {len(data)})",
+        )
+    return ax
+
+
+def create_xcorr_dists_plot(
+    psms_by_type: Dict[str, List[CometPSM]],
+    title: Optional[str] = None,
+    q_interpolating_psms: Optional[List[CometPSM]] = None,
+    ax: Optional[Axes] = None,
+) -> Axes:
+    if ax is None:
+        fig, axs = fig_setup()
+        ax = axs[0]
+    _ = score_histogram(psms_by_type=psms_by_type, score=XCORR, ax=ax)
+    if q_interpolating_psms is not None:
+        add_qvalue_interpolator_to_xcorr_plot(
+            q_value_psms=q_interpolating_psms,
+            ax=ax,
+        )
+    set_title_axes_labels(ax=ax, xlabel=XCORR, ylabel="Density", title=title)
+    finalize(ax)
+    return ax
+
+
+@dataclass
+class CometRunAnalysis:
+    targets: List[CometPSM]
+    decoys: List[CometPSM] = field(default_factory=list)
+    assign_conf: List[CometPSM] = field(default_factory=list)
+    interpolate: bool = True
+
+    def __post_init__(self):
+        if self.interpolate:
+            logger.info("Interpolating q-values for all PSMs based on assign_conf PSMs")
+            assert (
+                len(self.assign_conf) > 0
+            ), "Must have assign_conf psms to interpolate q-values"
+            interpolator = fit_xcorr_to_qval_interpolator(psms=self.assign_conf)
+            targets = []
+            for psm in self.targets:
+                psm.q_value = float(interpolator(psm.xcorr))
+                targets.append(psm)
+            self.targets = targets
+
+            decoys = []
+            for psm in self.decoys:
+                psm.q_value = float(interpolator(psm.xcorr))
+                decoys.append(psm)
+            self.decoys = decoys
+
+    @cached_property
+    def top_targets(self) -> List[CometPSM]:
+        return [psm for psm in self.targets if psm.num == 1]
+
+    @cached_property
+    def uid_to_top_target(self) -> Dict[str, CometPSM]:
+        return {psm.uid: psm for psm in self.top_targets}
+
+    @cached_property
+    def top_decoys(self) -> List[CometPSM]:
+        return [psm for psm in self.decoys if psm.num == 1]
+
+    @cached_property
+    def uid_to_top_target(self) -> Dict[str, CometPSM]:
+        return {psm.uid: psm for psm in self.top_targets}
+
+    @cached_property
+    def uid_to_top_decoy(self) -> Dict[str, CometPSM]:
+        return {psm.uid: psm for psm in self.top_decoys}
+
+    @cached_property
+    def uid_to_assign_conf(self) -> Dict[str, CometPSM]:
+        return {psm.uid: psm for psm in self.assign_conf}
+
+    @property
+    def df(self):
+        data = pd.DataFrame(
+            [
+                (
+                    uid,
+                    (float(self.uid_to_top_target[uid].xcorr)),
+                    (float(self.uid_to_top_decoy[uid].xcorr)),
+                    len(self.uid_to_top_target[uid].seq),
+                )
+                for uid in set(self.uid_to_top_target.keys()).union(
+                    set(self.uid_to_top_decoy.keys())
+                )
+            ],
+            columns=["uid", "target_xcorr", "decoy_xcorr", "target_len"],
+        )
+        return data
+
+    def xcorr_target_vs_decoy_scatterplot(self, ax: Axes, title: Optional[str] = None):
+        sns.scatterplot(
+            x=self.df["decoy_xcorr"],
+            y=self.df["target_xcorr"],
+            s=7,
+            ax=ax,
+            label=f"n={self.df.shape[0]}",
+        )
+        plot_line(ax=ax, label="y=x")
+        set_title_axes_labels(
+            ax=ax,
+            title=title,
+            xlabel="Top decoy xcorr",
+            ylabel="Top target xcorr",
+        )
+        finalize(ax)
+
+    def xcorr_target_vs_decoy_jointplot(
+        self,
+        title: Optional[str] = None,
+    ):
+        p = sns.jointplot(
+            x=self.df["target_len"],
+            y=self.df["target_xcorr"] - self.df["decoy_xcorr"],
+            s=7,
+            marginal_ticks=True,
+            label=f"n={self.df.shape[0]}",
+        )
+        p.set_axis_labels(
+            xlabel="Top target peptide length",
+            ylabel="top target xcorr - top decoy xcorr",
+        )
+        p.fig.suptitle(title)
+
+        return p
+
+    def xcorr_target_and_decoy_distributions(
+        self, title: Optional[str] = None, ax: Optional[Axes] = None
+    ) -> Axes:
+        create_xcorr_dists_plot(
+            psms_by_type={
+                "Top targets": self.top_targets,
+                "Top decoys": self.top_decoys,
+            },
+            title=title,
+            ax=ax,
+        )
+
+    def basic_analysis(
+        self,
+        name: str,
+        q_threshold: float = DEFAULT_Q_THRESHOLD,
+        out_dir: Optional[Union[str, Path]] = None,
+        fasta: Optional[Union[str, Path]] = None,
+    ):
+        create_xcorr_dists_plot(
+            psms_by_type={
+                "Top targets": self.top_targets,
+                "Top decoys": self.top_decoys,
+            },
+            out_path=out_dir / "xcorr.png",
+            title=name,
+            q_interpolating_psms=(
+                self.assign_conf if len(self.assign_conf) > 0 else None
+            ),
+        )
+        if len(self.assign_conf) > 0:
+            prot_ab = ProteinAbundance.from_comet_psms(
+                quality_psms=self.assign_conf, q_threshold=q_threshold
+            )
+            accepted_psms = [
+                psm for psm in self.assign_conf if psm.q_value <= q_threshold
+            ]
+            title = f"{name}\nNumber of accepted PSMs (q<={q_threshold}): {len(accepted_psms)}"
+            prot_ab.plot_sorted_prot_cnts(
+                top_n_prots=100,
+                title=title,
+                out_path=out_dir
+                / f"protein_abundance_q<={q_threshold}_topNprots100.png",
+            )
+            prot_ab.plot_sorted_prot_cnts(
+                top_n_prots=30,
+                title=title,
+                out_path=out_dir
+                / f"protein_abundance_q<={q_threshold}_topNprots30.png",
+            )
+            if fasta:
+                prot_ab.plot_counts_vs_prot_length(
+                    fasta=fasta,
+                    title=title,
+                    out_path=out_dir / f"prot_ab_vs_prot_len_q<={q_threshold}.png",
+                )
+            prot_ab.to_json(
+                path=out_dir / f"protein_abundance_q<={q_threshold}.json",
+            )
 
 
 def get_high_confidence_psms(

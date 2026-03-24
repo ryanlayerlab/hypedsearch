@@ -263,9 +263,7 @@ def best_fit_line(x, y):
     return slope, intercept, r_squared
 
 
-# Write me a function that (1) has a basic docstring that just describes what the function does
-# in a few sentences, (2) computes the
-def plot_best_fit_line(ax, x, y):
+def plot_best_fit_line(ax, x, y, label: Optional[str] = None):
     """
     Plot the line of best fit for the given x and y values.
     """
@@ -275,9 +273,10 @@ def plot_best_fit_line(ax, x, y):
     # max_val = max(xlim[1], ylim[1])
     x = np.linspace(xlim[0], xlim[1], 1000)
     y = slope * x + intercept
-    label = (
-        f"Best fit line:\ny = {slope:.2f}x + {intercept:.2f} ($R^2$ = {r_squared:.2f})"
-    )
+    prefix = ""
+    if label is not None:
+        prefix = f"{label}: "
+    label = f"{prefix}y={slope:.2f}x+{intercept:.2f} ($R^2$={r_squared:.2f})"
     ax.plot(x, y, label=label)
 
 

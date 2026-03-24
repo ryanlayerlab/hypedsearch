@@ -1,5 +1,6 @@
 import logging
 import re
+import tempfile
 from collections import Counter, defaultdict
 from dataclasses import field
 from functools import cached_property
@@ -19,6 +20,7 @@ from pyteomics import mzml as mzml_reader
 from src.constants import (
     COMMON_SPECTRA_ATTRS,
     DEFAULT_MAX_PRECURSOR_CHARGE,
+    MAC_CRUX_EXECUTABLE,
     PRECURSOR_INTENSITY,
     SPECTRA_DF_NAME,
     SPECTRA_DIR,
@@ -33,6 +35,7 @@ from src.plot_utils import (
     set_title_axes_labels,
 )
 from src.utils import (
+    CmdLineRunner,
     compute_gini_coefficient,
     flatten_list_of_lists,
     load_json,
@@ -152,16 +155,20 @@ class Spectrum(BaseModel):
         )
 
     @classmethod
-    def parse_ms2_from_mzml(cls, mzml: Union[str, Path]) -> List["Spectrum"]:
+    def parse_ms2_from_mzml(
+        cls, mzml: Union[str, Path], by_uid: bool = False
+    ) -> List["Spectrum"]:
         mzml_path = Path(mzml).absolute()
         ms2_spectra = []
         with mzml_reader.MzML(str(mzml_path)) as mzml:
             for spectrum in mzml:
-                if spectrum["ms level"] == 1:
+                if spectrum["ms level"] != 2:
                     continue
                 spectrum = cls.from_dict(spectrum=spectrum, mzml=mzml_path)
                 ms2_spectra.append(spectrum)
-
+        if by_uid:
+            return organize_by_spectrum_uid(data=ms2_spectra)
+        else:
             return ms2_spectra
 
     @classmethod
@@ -201,7 +208,7 @@ class Spectrum(BaseModel):
             # Update boolean that tracks whether peaks where preprocessed
             self.peaks_preprocessed = True
 
-    def plot_spectrum(
+    def plot(
         self,
         ax: Optional[Axes] = None,
         annotate: bool = True,
@@ -223,6 +230,7 @@ class Spectrum(BaseModel):
             color=color,
         )
         ax.set_ylim(bottom=0)
+        finalize(ax)
         return ax
 
     @staticmethod
@@ -368,7 +376,7 @@ class Mzml(BaseModel):
         return {spectrum.uid: spectrum for spectrum in self.ms2_spectra}
 
     @property
-    def msn_scan_numbers(self) -> List[int]:
+    def scan_numbers(self) -> List[int]:
         """
         Get all scan numbers from the mzML file.
         """
@@ -395,6 +403,33 @@ class Mzml(BaseModel):
         """Remove .mzML extension"""
         mzml = Path(mzml)
         return f"{mzml.name[:-5]}"
+
+    def run_param_medic(
+        self,
+        out_dir: Optional[str | Path] = None,
+        crux_path: str | Path = MAC_CRUX_EXECUTABLE,
+    ) -> pd.DataFrame:
+        param_medic_suffix = "param-medic.txt"
+        create_cmd = lambda output_dir: [
+            f"{crux_path} param-medic",
+            f'"{self.path}"',
+            "--overwrite T",
+            f'--fileroot "{self.name}"',
+            f'--output-dir "{output_dir}"',
+        ]
+        if out_dir:
+            result = CmdLineRunner.run_cmd(cmd=create_cmd(output_dir=out_dir))
+            df = pd.read_csv(
+                Path(out_dir) / f"{self.name}.{param_medic_suffix}", sep="\t"
+            )
+        else:
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                tmp_dir = Path(tmp_dir)
+                result = CmdLineRunner.run_cmd(cmd=create_cmd(output_dir=tmp_dir))
+                df = pd.read_csv(
+                    Path(tmp_dir) / f"{self.name}.{param_medic_suffix}", sep="\t"
+                )
+        return result, df
 
 
 def plot_peaks(

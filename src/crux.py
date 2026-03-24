@@ -231,18 +231,18 @@ class CometRun(BaseModel):
         cmd_parts = [
             f"{crux_path} comet",
             "--verbosity 60",
-            f"--parameter-file {comet_run.crux_comet_params}",
+            f'--parameter-file "{comet_run.crux_comet_params}"',
             f"--decoy_search {comet_run.decoy_search}",
             f"--fileroot '{comet_run.file_root}'",
             f"--scan_range '{comet_run.scan_min} {comet_run.scan_max}'",
-            f"--output-dir {comet_run.out_dir}",
+            f'--output-dir "{comet_run.out_dir}"',
             (
                 f"--num_threads {comet_run.num_threads}"
                 if comet_run.num_threads is not None
                 else ""
             ),
-            f"{comet_run.mzml}",
-            f"{comet_run.fasta}",
+            f'"{comet_run.mzml}"',
+            f'"{comet_run.fasta}"',
         ]
         return " ".join(cmd_parts)
 
@@ -371,7 +371,7 @@ class CometRun(BaseModel):
 
 @dataclass
 class Crux:
-    # crux_path: Path
+    # crux_path: Path = MAC_CRUX_EXECUTABLE
     # env: Dict = field(init=False)
 
     def check_if_crux_is_available(self):
@@ -433,7 +433,14 @@ class Crux:
         out_path.write_text("\n".join(file_lines))
         return file_lines
 
-    def run_assign_confidence(self, target_txts: List[Path], out_path: Path):
+    def run_assign_confidence(
+        self, target_txts: List[Path], out_path: Path, overwrite: bool = False
+    ):
+        if out_path.exists() and not overwrite:
+            logger.info(
+                f"{out_path} already exists and overwrite is set to False. Skipping running `crux assign-confidence`."
+            )
+            return
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
             cmd_parts = [
@@ -502,6 +509,7 @@ def get_expected_comet_outputs_for_mzml_to_scans(
     psm_type: Literal["both", TARGET, DECOY],
     out_dir: Union[str, Path],
 ) -> List[Path]:
+
     expected_outputs = {TARGET: [], DECOY: []}
     for mzml, scans in mzml_to_scans.items():
         for scan in scans:

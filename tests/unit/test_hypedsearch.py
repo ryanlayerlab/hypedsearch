@@ -5,7 +5,7 @@ from src.hypedsearch import (
     HypedsearchRunConfig,
     create_hybrids_fasta,
     hybrid_run_on_spectrum,
-    run_hypedsearch_in_parallel,
+    run_hypedsearch,
 )
 from src.mass_spectra import Spectrum
 from src.peptides_and_ions import Fasta
@@ -35,16 +35,9 @@ class Test_hybrid_run_on_spectrum:
         data = load_json(path=test_hs_config_path)
         data["parent_output_dir"] = str(tmp_path)
         config = HypedsearchRunConfig(**data)
-        params = HybridRunParams(
-            kmer_db=config.kmer_db_path,
-            fasta=config.fasta,
-            fasta_fm_index=from_pickle(path=config.fasta_fm_index),
-            crux_comet_params=config.crux_comet_params,
-            out_dir=tmp_path,
-        )
         cmd_result, run = hybrid_run_on_spectrum(
             spectrum=Spectrum.get_spectrum(scan=7, mzml=mouse_mzml_path),
-            params=params,
+            params=config.hybrid_run_params,
             crux_path=MAC_CRUX_EXECUTABLE,
             fasta_dir=tmp_path,
         )
@@ -80,7 +73,7 @@ class Test_run_in_parallel:
         config = HypedsearchRunConfig(**data)
         config_path = tmp_path / "config.json"
         config.save(path=config_path)
-        run_hypedsearch_in_parallel(
+        run_hypedsearch(
             config=config_path,
             n_cores=4,
             crux_path=MAC_CRUX_EXECUTABLE,

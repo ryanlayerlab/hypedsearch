@@ -9,7 +9,7 @@ from src.hypedsearch import (
     HybridRunParams,
     HypedsearchRunConfig,
     hybrid_run_on_spectrum,
-    run_hypedsearch_in_parallel,
+    run_hypedsearch,
 )
 from src.mass_spectra import Spectrum
 from src.utils import from_pickle, load_json, setup_logger
@@ -71,7 +71,7 @@ cmd_result, run = hybrid_run_on_spectrum(
 )
 
 logger.info("Running run_in_parallel...")
-run_hypedsearch_in_parallel(
+run_hypedsearch(
     config=test_hs_config_path,
     n_cores=4,
     on_singularity=on_singularity,

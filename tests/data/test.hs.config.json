@@ -4,7 +4,7 @@
         "tests/data/BMEM_AspN_Fxn4_scans1-20.mzML": "all"
     },
     "parent_output_dir": "tests/outputs",
-    "kmer_db": "tests/data/sp-P99027-RLA2_MOUSE_mzml=BMEM_AspN_Fxn4;scan=7_kmer_db.db",
+    "kmer_db_path": "tests/data/sp-P99027-RLA2_MOUSE_mzml=BMEM_AspN_Fxn4;scan=7_kmer_db.db",
     "fasta": "fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta",
     "fasta_fm_index": "fastas/SwissProt.TAW_mouse_w_NOD_IAPP.mfmindex",
     "crux_comet_params": "tests/data/crux.comet.params"

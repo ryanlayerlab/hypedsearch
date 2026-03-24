@@ -13,6 +13,14 @@ class Test_Mzml:
         assert isinstance(mzml.path, Path)
         assert mzml.path == mouse_mzml_path
 
+    @staticmethod
+    def test_run_param_medic(test_data_dir):
+        mzml_path = test_data_dir / "mouse_BMEM_AspN_Fxn4.mzML"
+        mzml = Mzml(path=mzml_path)
+        result, df = mzml.run_param_medic()
+        assert df.shape[0] == 1
+        assert df.file.iloc[0] == str(mzml_path)
+
 
 class Test_Spectrum:
     @staticmethod
