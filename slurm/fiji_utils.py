@@ -215,7 +215,7 @@ class HypedsearchRunScripts:
             )
 
     def create_script_for_hybrid_run_via_slurm(self):
-        nodes = ["fijinode-67", "fijinode-68", "fijinode-69"]
+        # nodes = ["fijinode-67", "fijinode-68", "fijinode-69"]
         lines = [SHEBANG]
         idx = 0
         for config in self.configs:
@@ -226,8 +226,8 @@ class HypedsearchRunScripts:
                 f'--part "highmem"',
                 f'--time "24:00:00"',
                 f"--cores 180",
-                f'--nodelist "{nodes[idx % len(nodes)]}"',
-                f'--cmd "python -m cli run-in-parallel -c {config.config_path} -n 100 -os"',
+                # f'--nodelist "{nodes[idx % len(nodes)]}"',
+                f'--cmd "python -m cli run-hypedsearch -c {config.config_path} -n 100 -os -p"',
             ]
             lines.append(" ".join(cmd_parts))
             idx += 1
@@ -319,8 +319,8 @@ class HypedsearchRunScripts:
     ):
         self.create_script_to_run_native_run_via_slurm()
         self.create_script_to_run_native_run_locally()
-        self.create_script_for_hybrid_run_via_slurm()
         self.create_script_for_local_hybrid_run()
+        self.create_script_for_hybrid_run_via_slurm()
         self.create_script_to_combine_hybrid_txts_via_slurm()
         self.create_script_to_check_for_missing_comet_txts_locally()
         self.create_script_to_run_param_medic_locally()

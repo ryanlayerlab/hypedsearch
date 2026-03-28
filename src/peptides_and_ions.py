@@ -276,6 +276,13 @@ class Fasta2MFMIndex:
     def save(mfm_index: MultiFMIndex, path: Union[str, Path]):
         to_pickle(obj=mfm_index, path=path)
 
+    @classmethod
+    def create_and_save_index_from_fasta(
+        cls, fasta: Union[str, Path], out_path: Union[str, Path]
+    ):
+        instance = cls(fasta=fasta)
+        cls.save(mfm_index=instance.create_mfm_index(), path=out_path)
+
 
 def compute_peptide_precursor_mz(seq: str, charge: int):
     """

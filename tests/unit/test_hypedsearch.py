@@ -1,3 +1,5 @@
+import logging
+
 from src.constants import MAC_CRUX_EXECUTABLE, MOUSE_PROTEOME
 from src.hybrids_via_clusters import HybridPeptide
 from src.hypedsearch import (
@@ -10,16 +12,40 @@ from src.hypedsearch import (
 from src.mass_spectra import Spectrum
 from src.peptides_and_ions import Fasta
 from src.psm import CometPSM
-from src.utils import from_pickle, load_json, setup_logger
+from src.utils import from_pickle, load_json, setup_logger, to_json
+from tests.conftest import update_hs_config_out_dir_and_save_json
+
+
+class Test_HybridRunParams:
+    @staticmethod
+    def test_load(test_data_dir):
+        path = test_data_dir / "hybrid_run_params.json"
+        params = HybridRunParams.load(path=path)
 
 
 class Test_HypedsearchRunConfig:
+    class Test_load:
+        @staticmethod
+        def test_load_everything_in_one_json(test_data_dir):
+            HypedsearchRunConfig.from_json(
+                path=test_data_dir / "ex1.hypedsearch.config.json"
+            )
+
+        @staticmethod
+        def test_load_where_hybrid_run_params_are_in_another_file(test_data_dir):
+            HypedsearchRunConfig.from_json(
+                path=test_data_dir / "ex2.hypedsearch.config.json"
+            )
+
     @staticmethod
-    def test_native_run(tmp_path, test_hs_config_path):
-        data = load_json(path=test_hs_config_path)
-        data["parent_output_dir"] = str(tmp_path)
-        config = HypedsearchRunConfig(**data)
-        outputs = config.run_native_comet(
+    def test_native_comet_run(tmp_path, test_data_dir):
+        config = HypedsearchRunConfig.from_json(
+            path=update_hs_config_out_dir_and_save_json(
+                old_config_path=test_data_dir / "ex1.hypedsearch.config.json",
+                out_dir=tmp_path,
+            )
+        )
+        outputs = config.native_comet_run_on_all_spectra(
             crux_path=MAC_CRUX_EXECUTABLE,
             # dry_run=True
         )
@@ -28,54 +54,59 @@ class Test_HypedsearchRunConfig:
         assert outputs[0].decoy.exists()
         assert len(CometPSM.from_txt(txt=outputs[0].target)) > 0
 
-
-class Test_hybrid_run_on_spectrum:
     @staticmethod
-    def test_smoke(tmp_path, test_hs_config_path, mouse_mzml_path):
-        data = load_json(path=test_hs_config_path)
-        data["parent_output_dir"] = str(tmp_path)
-        config = HypedsearchRunConfig(**data)
-        cmd_result, run = hybrid_run_on_spectrum(
-            spectrum=Spectrum.get_spectrum(scan=7, mzml=mouse_mzml_path),
-            params=config.hybrid_run_params,
+    def test_hybrid_run_on_spectrum(tmp_path, test_data_dir):
+        config = HypedsearchRunConfig.from_json(
+            path=update_hs_config_out_dir_and_save_json(
+                old_config_path=test_data_dir / "ex1.hypedsearch.config.json",
+                out_dir=tmp_path,
+            )
+        )
+        result = config.hybrid_run_on_spectrum(
+            spectrum=Spectrum.get_spectrum(
+                mzml=test_data_dir / "BMEM_AspN_Fxn4_scans1-20.mzML",
+                scan=7,
+            ),
             crux_path=MAC_CRUX_EXECUTABLE,
             fasta_dir=tmp_path,
+            delete_hybrids_fasta=False,
         )
-        assert len(CometPSM.from_txt(txt=run.standardized_comet_outputs.target)) > 0
-        assert run.standardized_comet_outputs.decoy is None
+        assert len(CometPSM.from_txt(result[1].standardized_comet_outputs.target)) > 0
 
+
+class Test_run_hypedsearch:
     @staticmethod
-    def test_no_output_file(tmp_path, test_hs_config_path, mouse_mzml_path):
-        data = load_json(path=test_hs_config_path)
-        data["parent_output_dir"] = str(tmp_path)
-        config = HypedsearchRunConfig(**data)
-        params = HybridRunParams(
-            kmer_db=config.kmer_db_path,
-            fasta=config.fasta,
-            fasta_fm_index=from_pickle(path=config.fasta_fm_index),
-            crux_comet_params=config.crux_comet_params,
+    def test_in_parallel(tmp_path, test_data_dir, caplog):
+        config_path = update_hs_config_out_dir_and_save_json(
+            old_config_path=test_data_dir / "ex1.hypedsearch.config.json",
             out_dir=tmp_path,
         )
-        cmd_result, run = hybrid_run_on_spectrum(
-            spectrum=Spectrum.get_spectrum(scan=2, mzml=mouse_mzml_path),
-            params=params,
-            crux_path=MAC_CRUX_EXECUTABLE,
-            fasta_dir=tmp_path,
-        )
+        config = HypedsearchRunConfig.from_json(path=config_path)
+        config.native_comet_run_on_all_spectra(crux_path=MAC_CRUX_EXECUTABLE)
+        with caplog.at_level(logging.INFO):
+            run_hypedsearch(
+                config=config_path,
+                n_cores=4,
+                crux_path=MAC_CRUX_EXECUTABLE,
+                run_in_parallel=True,
+            )
+        assert len(list(config.hybrid_run_scan_results_dir.glob("*"))) == 12
+        assert "Running HypedSearch in parallel" in caplog.text
 
-
-class Test_run_in_parallel:
     @staticmethod
-    def test_smoke(tmp_path, test_hs_config_path):
-        setup_logger()
-        data = load_json(path=test_hs_config_path)
-        data["parent_output_dir"] = str(tmp_path)
-        config = HypedsearchRunConfig(**data)
-        config_path = tmp_path / "config.json"
-        config.save(path=config_path)
-        run_hypedsearch(
-            config=config_path,
-            n_cores=4,
-            crux_path=MAC_CRUX_EXECUTABLE,
+    def test_in_serial(tmp_path, test_data_dir, caplog):
+        config_path = update_hs_config_out_dir_and_save_json(
+            old_config_path=test_data_dir / "ex1.hypedsearch.config.json",
+            out_dir=tmp_path,
         )
-        pass
+        config = HypedsearchRunConfig.from_json(path=config_path)
+        config.native_comet_run_on_all_spectra(crux_path=MAC_CRUX_EXECUTABLE)
+        with caplog.at_level(logging.INFO):
+            run_hypedsearch(
+                config=config_path,
+                n_cores=4,
+                crux_path=MAC_CRUX_EXECUTABLE,
+                run_in_parallel=False,
+            )
+        assert len(list(config.hybrid_run_scan_results_dir.glob("*"))) == 12
+        assert "Running HypedSearch in serial" in caplog.text

@@ -1,0 +1,12 @@
+{
+  "name": "mac_",
+  "mzml_to_scans": {
+    "tests/data/mouse_BMEM_AspN_Fxn4.mzML": "all"
+  },
+  "parent_output_dir": "tests/outputs",
+  "kmer_db_path": "tests/data/mouse_top_10_proteins.db",
+  "fasta": "fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta",
+  "fasta_fm_index": "fastas/SwissProt.TAW_mouse_w_NOD_IAPP.mfmindex",
+  "crux_comet_params": "tests/data/crux.comet.params",
+  "crux_path": "comet/crux-4.3.Darwin.x86_64/bin/crux"
+}

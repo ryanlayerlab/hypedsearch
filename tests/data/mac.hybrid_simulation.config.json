@@ -1,0 +1,12 @@
+{
+  "hs_config": "/private/var/folders/wt/l509j2v13614w84pwcgyhw9w0000gp/T/pytest-of-erjo3868/pytest-37/test_load_from_json_and_run0/hs_config.json",
+  "scan_to_aa_seq": {
+    "7": "SAAPAAGSAPAAAEEKK",
+    "4507": "DPQVEQLELGGSPGDLQTLALEVARQ",
+    "4801": "DPQVAQLELGGGPGAGDLQTLALEVAQQ"
+  },
+  "mzml": "tests/data/mouse_BMEM_AspN_Fxn4.mzML",
+  "out_dir": "/private/var/folders/wt/l509j2v13614w84pwcgyhw9w0000gp/T/pytest-of-erjo3868/pytest-37/test_load_from_json_and_run0",
+  "cut_method": "RANDOM",
+  "min_side_len": 3
+}

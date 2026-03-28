@@ -57,7 +57,7 @@ assert run.nonstandardized_comet_outputs.decoy.exists()
 
 logger.info("Running hybrid_run_on_spectrum")
 params = HybridRunParams(
-    kmer_db=config.kmer_db_path,
+    kmer_db_path=config.kmer_db_path,
     fasta=config.fasta,
     fasta_fm_index=from_pickle(path=config.fasta_fm_index),
     crux_comet_params=config.crux_comet_params,

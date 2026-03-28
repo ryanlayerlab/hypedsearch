@@ -1,0 +1,15 @@
+{
+  "kmer_db_path": "tests/data/mouse_top_10_proteins.db",
+  "fasta": "fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta",
+  "crux_comet_params": "tests/data/crux.comet.params",
+  "fasta_fm_index": "fastas/SwissProt.TAW_mouse_w_NOD_IAPP.mfmindex",
+  "hybrid_decoy_competition": false,
+  "num_peaks": 0,
+  "max_precursor_charge": 4,
+  "peak_to_ion_ppm_tol": 20.0,
+  "precursor_mz_ppm_tol": 20.0,
+  "min_hybrid_side_len": 3,
+  "min_cluster_support": 2,
+  "max_allowed_ion_charge": 4,
+  "remove_carbamidomethylation_hybrids": true
+}

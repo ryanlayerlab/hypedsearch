@@ -1,0 +1,11 @@
+{
+    "hybrid_run_params": "tests/data/hybrid_run_params.json",
+    "cut_method": "random",
+    "scan_to_aa_seq": {
+        "7": "SAAPAAGSAPAAAEEKK",
+        "4507": "DPQVEQLELGGSPGDLQTLALEVARQ",
+        "4801": "DPQVAQLELGGGPGAGDLQTLALEVAQQ"
+    },
+    "mzml": "tests/data/mouse_BMEM_AspN_Fxn4.mzML",
+    "out_dir": "tmp"
+}

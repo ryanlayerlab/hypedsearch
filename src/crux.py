@@ -257,6 +257,7 @@ class CometRun(BaseModel):
         )
 
     def run_comet_locally(self, crux_path: Union[str, Path]) -> CmdLineResult:
+        logger.info(f"Running Comet via crux located at {crux_path}")
         cmd_result = CmdLineRunner.run_cmd(
             cmd=self.get_run_comet_command(crux_path=crux_path, comet_run=self)
         )
@@ -268,6 +269,7 @@ class CometRun(BaseModel):
         singularity_crux_path: str = "crux",
         singularity_num_threads: int = 1,
     ):
+        logger.info("Running Comet via Singularity")
         singularity_run = self.__class__(
             fasta=f"/data/{self.fasta.name}",
             mzml=f"/data/{self.mzml.name}",
@@ -280,10 +282,10 @@ class CometRun(BaseModel):
         )
         singularity_cmd_parts = [
             "singularity exec",
-            f"--bind {self.mzml}:{singularity_run.mzml}",
-            f"--bind {self.fasta}:{singularity_run.fasta}",
-            f"--bind {self.crux_comet_params}:{singularity_run.crux_comet_params}",
-            f"--bind {self.out_dir}:{singularity_run.out_dir}",
+            f'--bind "{self.mzml}":"{singularity_run.mzml}"',
+            f'--bind "{self.fasta}":"{singularity_run.fasta}"',
+            f'--bind "{self.crux_comet_params}":"{singularity_run.crux_comet_params}"',
+            f'--bind "{self.out_dir}":"{singularity_run.out_dir}"',
             f"{singularity_image}",
             self.get_run_comet_command(
                 crux_path=singularity_crux_path, comet_run=singularity_run
@@ -304,10 +306,11 @@ class CometRun(BaseModel):
 
     def run_comet_and_keep_only_results(
         self,
-        crux_path: Optional[str] = None,
-        on_singularity: bool = False,
-        # num_retries: int = 0,
+        crux_path: Optional[str | Path] = None,
     ):
+        on_singularity = False
+        if crux_path is None:
+            on_singularity = True
         # Run Comet. Run in a temporary directory so comet.log.txt and comet.params.txt are not kept
         if on_singularity:
             num_retries = DEFAULT_NUM_COMET_RETRIES

@@ -11,7 +11,7 @@ decoy_search = 0                # 0=no (default), 1=internal decoy concatenated,
 peptide_mass_tolerance = 20.0
 peptide_mass_units = 2          # 0=amu, 1=mmu, 2=ppm
 precursor_tolerance_type = 1    # 0=MH+ (default), 1=precursor m/z; only valid for amu/mmu tolerances
-isotope_error = 2               # 0=off, 1=0/1 (C13 error), 2=0/1/2, 3=0/1/2/3, 4=-1/0/1/2/3, 5=-1/0/1
+isotope_error = 0               # 0=off, 1=0/1 (C13 error), 2=0/1/2, 3=0/1/2/3, 4=-1/0/1/2/3, 5=-1/0/1
 
 # 
 # SEARCH ENZYME
@@ -73,6 +73,8 @@ add_C_cysteine = 0.0000                # added to C - avg. 103.1429, mono. 103.0
 #
 
 output_pepxmlfile = 0                  # 0=no, 1=yes  write pepXML file
+num_output_lines = 20
+
 
 #
 # COMET_ENZYME_INFO _must_ be at the end of this parameters file

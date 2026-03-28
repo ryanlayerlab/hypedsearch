@@ -216,7 +216,9 @@ def log_params(func):
 
     def wrapper(*args, **kwargs):
         # Log function name and its arguments
-        logging.info(f"Calling {func.__name__} with args: {args} and kwargs: {kwargs}")
+        logging.info(
+            f"Running function {func.__name__} with args: {args} and kwargs: {kwargs}"
+        )
         return func(*args, **kwargs)
 
     return wrapper

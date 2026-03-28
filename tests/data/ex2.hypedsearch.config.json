@@ -1,0 +1,8 @@
+{
+    "name": "test-ex1",
+    "mzml_to_scans": {
+        "tests/data/BMEM_AspN_Fxn4_scans1-20.mzML": "all"
+    },
+    "parent_output_dir": "tests/outputs",
+    "hybrid_run_params": "tests/data/hybrid_run_params.json"
+}

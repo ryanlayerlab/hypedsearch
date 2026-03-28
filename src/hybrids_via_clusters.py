@@ -744,7 +744,7 @@ def form_spectrum_hybrids_via_clustering(
             hybrid.get_position_str(protein_name_to_seq_map=kmer_db_prot_name_to_seq)
         )
     logger.info(
-        f"Completed forming hybrids for spectrum ({spectrum.sample}, {spectrum.scan})\nIt took {get_time_in_diff_units(time.perf_counter() - start_time)}"
+        f"Completed forming hybrids for spectrum ({spectrum.sample}, {spectrum.scan}). It took {get_time_in_diff_units(time.perf_counter() - start_time)}"
     )
     return dict(hybrid_seq_to_position_strs)
 

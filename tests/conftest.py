@@ -1,10 +1,13 @@
 import sys
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
-from src.mass_spectra import Spectrum
+from src.hypedsearch import HypedsearchRunConfig
+from src.mass_spectra import Mzml, Spectrum
 from src.psm import CometPSM
+from src.utils import load_json, to_json
 
 repo_dir = Path(__file__).parents[1]
 sys.path.append(str(repo_dir / "src"))
@@ -29,13 +32,28 @@ def crux_comet_params(test_data_dir):
 
 
 @pytest.fixture
-def test_hs_config_path(test_data_dir):
+def hs_config_path(test_data_dir):
     return test_data_dir / "test.hs.config.json"
+
+
+@pytest.fixture
+def hs_config(hs_config_path):
+    return HypedsearchRunConfig.from_json(path=hs_config_path)
 
 
 @pytest.fixture
 def mouse_mzml_path(test_data_dir):
     return test_data_dir / "BMEM_AspN_Fxn4_scans1-20.mzML"
+
+
+@pytest.fixture
+def mouse_spectrum(mouse_mzml_path) -> Spectrum:
+    return Spectrum.get_spectrum(scan=7, mzml=mouse_mzml_path)
+
+
+@pytest.fixture
+def mouse_mzml(mouse_mzml_path):
+    return Mzml(path=mouse_mzml_path)
 
 
 @pytest.fixture
@@ -84,6 +102,14 @@ def comet_psm(test_data_dir):
     return CometPSM.load(path=path)
 
 
-@pytest.fixture
-def mouse_spectrum(mouse_mzml_path) -> Spectrum:
-    return Spectrum.get_spectrum(scan=7, mzml=mouse_mzml_path)
+def update_hs_config_out_dir_and_save_json(
+    old_config_path: str | Path,
+    out_dir: str | Path,
+    new_config_path: Optional[str | Path] = None,
+) -> Path:
+    data = load_json(path=old_config_path)
+    data["parent_output_dir"] = str(out_dir)
+    if new_config_path is None:
+        new_config_path = Path(out_dir) / "hs.config.json"
+    to_json(data=data, path=new_config_path)
+    return new_config_path

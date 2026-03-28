@@ -478,24 +478,7 @@ class PSM:
     comet_ions_matched: Optional[int] = None
     comet_ions_total: Optional[int] = None
 
-    @classmethod
-    def from_spectrum_and_comet_psm(
-        cls,
-        spectrum: Spectrum,
-        psm: CometPSM,
-        ppm_tol: int = DEFAULT_PEAK_TO_ION_PPM_TOL,
-    ):
-        return cls(
-            spectrum=spectrum,
-            seq=psm.seq,
-            peak_to_ion_ppm_tol=ppm_tol,
-            xcorr=psm.xcorr,
-            q_value=psm.q_value,
-            positions=psm.proteins,
-            comet_ions_matched=psm.ions_matched,
-            comet_ions_total=psm.ions_total,
-        )
-
+    # Properties
     @cached_property
     def peak_ion_matches(self):
         return get_peak_product_ion_matches(
@@ -574,6 +557,40 @@ class PSM:
         seq_mz = compute_peptide_precursor_mz(seq=self.seq, charge=self.spectrum.z)
         return mass_difference_in_ppm(mass1=seq_mz, mass2=self.spectrum.mz)
 
+    # Class methods
+    @classmethod
+    def from_spectrum_and_comet_psm(
+        cls,
+        spectrum: Spectrum,
+        psm: CometPSM,
+        ppm_tol: int = DEFAULT_PEAK_TO_ION_PPM_TOL,
+    ) -> "PSM":
+        return cls(
+            spectrum=spectrum,
+            seq=psm.seq,
+            peak_to_ion_ppm_tol=ppm_tol,
+            xcorr=psm.xcorr,
+            q_value=psm.q_value,
+            positions=psm.proteins,
+            comet_ions_matched=psm.ions_matched,
+            comet_ions_total=psm.ions_total,
+        )
+
+    @classmethod
+    def from_comet_psms(
+        cls,
+        uid_to_spectrum: Dict[str, Spectrum],
+        psms: List[CometPSM],
+        ppm_tol: int = DEFAULT_PEAK_TO_ION_PPM_TOL,
+    ) -> List["PSM"]:
+        return [
+            cls.from_spectrum_and_comet_psm(
+                spectrum=uid_to_spectrum[psm.uid], psm=psm, ppm_tol=ppm_tol
+            )
+            for psm in psms
+        ]
+
+    # Instance methods
     def sequences_supported(
         self,
         ion_type: Literal[B_ION_TYPE, Y_ION_TYPE],
@@ -612,6 +629,11 @@ def convert_comet_psms_to_psms(
 ) -> List[PSM]:
     psms = []
     for comet_psm in comet_psms:
+        PSM.from_spectrum_and_comet_psm(
+            spectrum=uid_to_spectrum_map[comet_psm.uid],
+            psm=comet_psm,
+            ppm_tol=peak_to_ion_ppm_tol,
+        )
         psm = PSM(
             spectrum=uid_to_spectrum_map[comet_psm.spectrum_uid],
             seq=comet_psm.seq,

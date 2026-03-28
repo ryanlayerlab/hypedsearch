@@ -3,10 +3,10 @@ from slurm.fiji_utils import SbatchConfig, create_config_for_fiji_run
 
 class Test_create_config_for_fiji_run:
     @staticmethod
-    def test_smoke(tmp_path, test_hs_config_path):
+    def test_smoke(tmp_path, hs_config_path):
         fiji_config = create_config_for_fiji_run(
             node_data_dir=tmp_path,
-            config=test_hs_config_path,
+            config=hs_config_path,
         )
         assert fiji_config.parent_output_dir.exists()
         assert fiji_config.fasta.exists()

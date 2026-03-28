@@ -39,7 +39,9 @@ def cli_native_comet_run(
     else:
         crux_path = MAC_CRUX_EXECUTABLE
     hs_config = HypedsearchRunConfig.from_json(path=config)
-    hs_config.run_native_comet(crux_path=crux_path, on_singularity=on_singularity)
+    hs_config.native_comet_run_on_all_spectra(
+        crux_path=crux_path, on_singularity=on_singularity
+    )
 
 
 @click.command(
@@ -79,7 +81,9 @@ def cli_process_native_run(
     "--n_cores",
     "-n",
     type=int,
-    required=True,
+    default=8,
+    show_default=True,
+    required=False,
     help="",
 )
 @click.option(
