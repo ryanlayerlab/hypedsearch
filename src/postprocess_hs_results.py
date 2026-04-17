@@ -1,7 +1,7 @@
 import logging
 from collections import Counter, defaultdict
 from copy import deepcopy
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
@@ -11,11 +11,11 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 from pydantic import BaseModel
 from scipy.interpolate import PchipInterpolator
 
 from src.constants import (
-    ASSIGN_CONFIDENCE,
     DEFAULT_FPR,
     DEFAULT_JCT_LEN,
     DEFAULT_Q_RANGE,
@@ -29,6 +29,8 @@ from src.constants import (
 )
 from src.hybrids_via_clusters import HybridPeptide
 from src.hypedsearch import HypedsearchRunConfig
+from src.mass_spectra import Spectrum
+from src.neofusion import NeoFusionOutput, NeoFusionRunner
 from src.plot_utils import (
     fig_setup,
     finalize,
@@ -37,7 +39,7 @@ from src.plot_utils import (
     save_fig,
     set_title_axes_labels,
 )
-from src.psm import CometPSM, CometRunAnalysis, ProteinAbundance
+from src.psm import CometPSM, CometRunAnalysis, create_xcorr_dists_plot
 from src.utils import to_json
 
 logger = logging.getLogger(__name__)
@@ -134,31 +136,6 @@ def score_histogram(
     return ax
 
 
-def create_xcorr_dists_plot(
-    psms_by_type: Dict[str, List[CometPSM]],
-    title: Optional[str] = None,
-    out_path: Optional[Union[str, Path]] = None,
-    q_interpolating_psms: Optional[List[CometPSM]] = None,
-):
-    fig, axs = fig_setup()
-    ax = axs[0]
-    _ = score_histogram(psms_by_type=psms_by_type, score=XCORR, ax=ax)
-    if q_interpolating_psms is not None:
-        add_qvalue_interpolator_to_xcorr_plot(
-            q_value_psms=q_interpolating_psms,
-            ax=ax,
-        )
-    set_title_axes_labels(ax=ax, xlabel=XCORR, ylabel="Density")
-    finalize(axs)
-    if out_path:
-        save_fig(
-            fig=fig,
-            path=out_path,
-            title=title,
-        )
-    return fig, axs
-
-
 def group_hybrid_psms_by_junction(
     hybrid_psms: List[CometPSM],
     jct_len: int,
@@ -184,6 +161,11 @@ def group_hybrid_psms_by_junction(
 class JunctionAnalysis:
     hybrid_psms: List[CometPSM]
     jct_len: int
+    spectra: List[Spectrum]
+
+    @cached_property
+    def uid_to_spectrum(self) -> Dict[str, Spectrum]:
+        return {spectrum.uid: spectrum for spectrum in self.spectra}
 
     @property
     def hybrid_psms_with_multiple_explanations(self) -> List[CometPSM]:
@@ -211,6 +193,51 @@ class JunctionAnalysis:
                     hybrid_psm
                 )
         return dict(jct_to_psms)
+
+    def create_jct_df(
+        self,
+    ) -> pd.DataFrame:
+        rows = []
+        for jct, psms in self.jct_to_psms_map.items():
+            hybrid_seqs = []
+            spectra_info = []
+            for psm in psms:
+                assert (
+                    len(psm.proteins) == 1
+                ), "Hybrid PSM has > 1 possible hybrid explanation. These should be filtered out by now so something is up."
+                hy_pep = HybridPeptide.parse_hybrid_peptide_str(
+                    hybrid_str=psm.proteins[0]
+                )
+                hybrid_seqs.append(hy_pep.hyphen_seq)
+                spectrum = self.uid_to_spectrum[psm.uid]
+                spectra_info.append(
+                    f"{spectrum.uid}, seq={psm.seq}, m/z={round(spectrum.precursor_mz, 3)}, rt={round(spectrum.retention_time, 3)}, charge={spectrum.precursor_charge}, intensity={round(spectrum.precursor_intensity, 3)}"
+                )
+            # jct, hybrid_seqs, spectra_info
+            seq_cntr = dict(Counter(hybrid_seqs))
+            rows.append(
+                (
+                    jct,
+                    len(psms),
+                    len(seq_cntr),
+                    seq_cntr,
+                    spectra_info,
+                )
+            )
+        df = pd.DataFrame(
+            rows,
+            columns=[
+                "jct",
+                "num_spectra_supporting",
+                "num_uniq_seqs",
+                "num_spectra_by_seq",
+                "spectra_info",
+            ],
+        )
+        df.sort_values(
+            by="num_uniq_seqs", ascending=False, ignore_index=True, inplace=True
+        )
+        return df
 
     @cached_property
     def junction_df(
@@ -318,199 +345,6 @@ def aggregate_junction_dfs_over_samples(
     return df
 
 
-class NeoFusionIteration(BaseModel):
-    q: float
-    min_score_delta: float
-    fpr: float
-    tp: int
-    min_hybrid_score: float
-    accepted_hybrid_psm_uids: List[str]
-
-    @property
-    def info(self) -> str:
-        return (
-            f"q={self.q}, min_score_delta={self.min_score_delta}, fpr={self.fpr}, "
-            f"tp={self.tp}, min_hybrid_score={self.min_hybrid_score}, "
-            f"num_accepted_psm={len(self.accepted_hybrid_psm_uids)}"
-        )
-
-    @property
-    def param_str(self) -> str:
-        return f"q{self.q}_delta{self.min_score_delta}_fpr{self.fpr}_minHybridScore{self.min_hybrid_score}"
-
-    def to_dict(self) -> Dict:
-        data = self.model_dump(mode="json")
-        data["num_accepted_hybrids"] = len(self.accepted_hybrid_psm_uids)
-        return data
-
-
-@dataclass
-class NeoFusionRunner:
-    native_targets: List[CometPSM]
-    hybrid_targets: List[CometPSM]
-    q_vals: List[float] = field(default_factory=lambda: DEFAULT_Q_RANGE.copy())
-    score_deltas: List[float] = field(
-        default_factory=lambda: DEFAULT_SCORE_CHANGE_RANGE.copy()
-    )
-    fpr_threshold: float = DEFAULT_FPR
-
-    def __post_init__(self):
-        for psm in self.native_targets:
-            assert isinstance(
-                psm.q_value, float
-            ), f"Native target PSMs must have q-values for NeoFusion analysis. PSM UID {psm.uid} has q-value {psm.q_value}"
-
-    @property
-    def _uid_to_native_target(self):
-        return {psm.uid: psm for psm in self.native_targets}
-
-    @property
-    def _uid_to_hybrid_target(self):
-        return {psm.uid: psm for psm in self.hybrid_targets}
-
-    @staticmethod
-    def create_neofusion_df(
-        uid_to_native_target: Dict[str, CometPSM],
-        uid_to_hybrid_target: Dict[str, CometPSM],
-    ) -> pd.DataFrame:
-        # Create dataframe for NeoFusion analysis
-        df = pd.DataFrame(
-            [
-                [
-                    spectrum_uid,
-                    uid_to_native_target[spectrum_uid].xcorr,
-                    uid_to_hybrid_target[spectrum_uid].xcorr,
-                    uid_to_native_target[spectrum_uid].q_value,
-                ]
-                for spectrum_uid in set(uid_to_hybrid_target.keys()).intersection(
-                    uid_to_native_target.keys()
-                )
-            ],
-            columns=[
-                "uid",
-                "n_score",
-                "h_score",
-                "n_q",
-            ],
-        )
-        df["delta"] = df.h_score - df.n_score
-        return df
-
-    @staticmethod
-    def neofusion_iteration(
-        df: pd.DataFrame,
-        q_val: float,
-        score_delta: float,
-        fpr_thresh: float,
-    ) -> Optional[NeoFusionIteration]:
-        for colm in ["n_score", "h_score", "n_q", "delta"]:
-            assert colm in df.columns
-        neo_df = deepcopy(df)
-
-        # Remove rows where hybrid score isn't high enough compared to native score
-        neo_df = neo_df[neo_df.delta >= score_delta].copy()
-
-        # Set which native PSMs are "gold-standard"
-        neo_df["gold"] = neo_df.n_q <= q_val
-        neo_df["fp"] = neo_df["gold"].copy()
-
-        # Min hybrid score is lowest gold-standard native score
-        min_hybrid_score = neo_df[neo_df.gold].n_score.min()
-        if pd.isna(min_hybrid_score):
-            return None
-
-        # Sort in descending order
-        neo_df.sort_values(by="h_score", ascending=False, inplace=True)
-        neo_df.reset_index(drop=True, inplace=True)
-
-        # Iterate through rows and, for each row i, find number number of false and true positives
-        # in rows 1, 2, ..., i.
-        fpr_colm = []
-        tp_colm = []
-        for row_idx, row in neo_df.iterrows():
-            if row.h_score < min_hybrid_score:
-                fpr_colm.append(None)
-                tp_colm.append(None)
-                continue
-
-            tmp = neo_df.iloc[: row_idx + 1, :]
-            fpr_colm.append(tmp.fp.sum() / tmp.shape[0])
-            tp_colm.append((~tmp.fp).sum())
-
-        neo_df["fpr"] = fpr_colm
-        neo_df["tp"] = tp_colm
-        if neo_df[neo_df["fpr"] < fpr_thresh].shape[0] > 0:
-            # Get row that maximizes the number of true positives
-            try:
-                tmp = neo_df[neo_df["fpr"] < fpr_thresh]
-                tp_maximizing_idx = tmp.tp.idxmax()
-                tp_maximizing_row = tmp.loc[tp_maximizing_idx]
-                accepted_psm = neo_df.uid.iloc[: tp_maximizing_idx + 1].tolist()
-
-                return NeoFusionIteration(
-                    q=float(
-                        q_val
-                    ),  # because it can by numpy.float64 which isn't json serializable
-                    min_score_delta=score_delta,
-                    fpr=tp_maximizing_row.fpr,
-                    tp=tp_maximizing_row.tp,
-                    min_hybrid_score=min_hybrid_score,
-                    accepted_hybrid_psm_uids=accepted_psm,
-                )
-            except:
-                logger.debug(f"Issue with q_val={q_val}, score_delta={score_delta}")
-        return None
-
-    def run_neofusion(
-        self,
-    ) -> List[NeoFusionIteration]:
-        df = self.create_neofusion_df(
-            uid_to_native_target=self._uid_to_native_target,
-            uid_to_hybrid_target=self._uid_to_hybrid_target,
-        )
-
-        neofusion_results = []
-        for q_val in self.q_vals:
-            for min_score_delta in self.score_deltas:
-                result = self.neofusion_iteration(
-                    df=df,
-                    q_val=q_val,
-                    score_delta=min_score_delta,
-                    fpr_thresh=self.fpr_threshold,
-                )
-                if result is not None:
-                    neofusion_results.append(result)
-
-        return neofusion_results
-
-    @staticmethod
-    def plot_neofusion_true_positive_data(
-        neofusion_results: List[NeoFusionIteration],
-        title: str = "",
-    ) -> Axes:
-        data = {res.param_str: res.tp for res in neofusion_results}
-        ax = plot_sorted_1d_data(data=data)
-        set_title_axes_labels(
-            ax=ax,
-            title=title,
-            xlabel="NeoFusion parameters\n(sorted in decreasing TP order)",
-            ylabel='"True positives (TPs)"',
-        )
-        finalize(ax)
-        return ax
-
-    def select_hybrid_psms_from_best_iteration(
-        self,
-        neofusion_results: List[NeoFusionIteration],
-    ) -> Tuple[NeoFusionIteration, List[CometPSM]]:
-        best_iteration = max(neofusion_results, key=lambda x: x.tp)
-        accepted_hybrids = [
-            self._uid_to_hybrid_target[spectrum_uid]
-            for spectrum_uid in best_iteration.accepted_hybrid_psm_uids
-        ]
-        return best_iteration, accepted_hybrids
-
-
 @dataclass
 class SpectrumPSMs:
     native_targets: List[CometPSM]
@@ -577,12 +411,72 @@ class SpectrumPSMs:
         return data
 
 
-@dataclass
-class NativeToHybridComparison:
-    name: str
+def plot_xcorr_of_accepted_vs_not_accepted_hybrids(
+    native_targets: List[CometPSM],
+    accepted_hybrids: List[CometPSM],
+    hybrid_targets: List[CometPSM],
+    ax: Optional[Axes] = None,
+) -> Tuple[Figure, List[Axes]]:
+    if ax is None:
+        fig, axs = fig_setup()
+        ax = axs[0]
+    accepted_uids = set(psm.uid for psm in accepted_hybrids)
+    native_targets = {psm.uid: psm for psm in native_targets}
+    hybrid_targets = {psm.uid: psm for psm in hybrid_targets}
+    df = pd.DataFrame(
+        {
+            "uid": uid,
+            "native_xcorr": native_targets[uid].xcorr if uid in native_targets else 0,
+            "hybrid_xcorr": hybrid_targets[uid].xcorr if uid in hybrid_targets else 0,
+        }
+        for uid in set(native_targets.keys()) & set(hybrid_targets.keys())
+    )
+    df["accepted"] = df["uid"].apply(lambda uid: uid in accepted_uids)
+    s = 7
+    sns.scatterplot(
+        data=df[~df.accepted],
+        x="native_xcorr",
+        y="hybrid_xcorr",
+        s=s,
+        marker="o",
+        color="blue",
+        # label=f"All spectra with a native and hybrid PSM (n={len(native_and_hybrid_psms)})",
+        ax=ax,
+    )
+    sns.scatterplot(
+        data=df[df.accepted],
+        x="native_xcorr",
+        y="hybrid_xcorr",
+        s=s,
+        marker="X",
+        color="red",
+        label=f"Accepted hybrid PSMs (n={len(accepted_hybrids)})",
+        ax=ax,
+    )
+    plot_line(ax=ax, label="y=x")
+    set_title_axes_labels(
+        ax=ax,
+        xlabel="Native target xcorr",
+        ylabel="Hybrid target xcorr",
+    )
+    finalize(ax)
+
+
+class HybridJunction(BaseModel):
+    jct: str
+    supporting_psms: List[CometPSM]
+    supporting_spectra: List[Spectrum]
+
+    @property
+    def max_precursor_intensity(self) -> float:
+        return max(spectrum.precursor_intensity for spectrum in self.supporting_spectra)
+
+
+class NativeToHybridComparison(BaseModel):
     native_run: CometRunAnalysis
     hybrid_run: CometRunAnalysis
-    q_threshold: Optional[float] = None
+    spectra: List[Spectrum]
+    name: Optional[str] = None
 
     @property
     def uid_to_spectrum_psms(self) -> Dict[str, SpectrumPSMs]:
@@ -601,6 +495,10 @@ class NativeToHybridComparison:
             uid_to_spectrum_psms[uid] = SpectrumPSMs(**psms_as_dict)
 
         return dict(uid_to_spectrum_psms)
+
+    @cached_property
+    def spectra_df(self) -> pd.DataFrame:
+        return Spectrum.to_df(spectra=self.spectra)
 
     @classmethod
     def from_config(cls, config: str | Path | HypedsearchRunConfig):
@@ -623,118 +521,56 @@ class NativeToHybridComparison:
             hybrid_run=hybrid_run,
         )
 
-    def create_xcorr_plot(self, out_path: Optional[Union[str, Path]] = None):
-        num_accepted_natives_by_q_val = len(
-            [
-                psm
-                for psm in self.native_run.assign_conf
-                if psm.q_value <= self.q_threshold
-            ]
-        )
-        num_accepted_hybrids_by_q_val = len(
-            [
-                psm
-                for psm in self.hybrid_run.top_targets
-                if psm.q_value <= self.q_threshold
-            ]
-        )
-        plot_title = "\n".join(
-            [
-                f"{self.name}",
-                f"q<={self.q_threshold}",
-                f"Num accepted natives via q-value: {num_accepted_natives_by_q_val}",
-                f"Num accepted hybrids via q-value: {num_accepted_hybrids_by_q_val}",
-            ]
-        )
+    def get_protein_abundance_df(
+        self, q_threshold: float = DEFAULT_Q_THRESHOLD
+    ) -> pd.DataFrame:
+        return self.native_run.get_protein_abundance(q_threshold=q_threshold).df
+
+    def xcorr_target_and_decoy_distributions(
+        self, title: Optional[str] = None, ax: Optional[Axes] = None
+    ) -> Axes:
+        if ax is None:
+            _, axs = fig_setup()
+            ax = axs[0]
         create_xcorr_dists_plot(
             psms_by_type={
                 "Top native targets": self.native_run.top_targets,
                 "Top native decoys": self.native_run.top_decoys,
                 "Top hybrid targets": self.hybrid_run.top_targets,
             },
-            out_path=out_path,
-            title=plot_title,
-            q_interpolating_psms=self.native_run.assign_conf,
+            q_interpolating_psms=(
+                self.native_run.assign_conf
+                if len(self.native_run.assign_conf) > 0
+                else None
+            ),
+            title=title,
+            ax=ax,
         )
 
-    def accept_hybrids_via_neofusion(
-        self, best_iteration_out_path: Optional[Union[str, Path]] = None
-    ) -> Tuple[NeoFusionIteration, List[CometPSM]]:
-        neofusion_runner = NeoFusionRunner(
+    def xcorr_accepted_vs_not_accepted_plot(
+        self, accepted_hybrids: Optional[List[CometPSM]] = None
+    ):
+        if accepted_hybrids is None:
+            logger.info(
+                "No accepted hybrids provided so accepting hybrids via NeoFusion using default settings"
+            )
+            accepted_hybrids = self.run_neofusion().accepted_hybrids
+        plot_xcorr_of_accepted_vs_not_accepted_hybrids(
+            native_targets=self.native_run.top_targets,
+            accepted_hybrids=accepted_hybrids,
+            hybrid_targets=self.hybrid_run.top_targets,
+        )
+
+    def run_neofusion(self) -> NeoFusionOutput:
+        neofusion = NeoFusionRunner(
             native_targets=self.native_run.top_targets,
             hybrid_targets=self.hybrid_run.top_targets,
         )
-        best_iteration, accepted_hybrids = (
-            neofusion_runner.select_hybrid_psms_from_best_iteration(
-                neofusion_results=neofusion_runner.run_neofusion()
-            )
+        neofusion_output = neofusion.run_neofusion()
+        neofusion.plot_neofusion_true_positive_data(
+            neofusion_iterations=neofusion_output.iterations
         )
-        if best_iteration_out_path is not None:
-            to_json(data=best_iteration.to_dict(), path=best_iteration_out_path)
-        return best_iteration, accepted_hybrids
-
-    @staticmethod
-    def accepted_vs_not_accepted_plot(
-        uid_to_top_native_target: Dict[str, CometPSM],
-        uid_to_top_hybrid_target: Dict[str, CometPSM],
-        accepted_hybrid_uids: Set[str],
-        title: str,
-        out_path: Optional[Union[str, Path]] = None,
-    ):
-        data = pd.DataFrame(
-            [
-                {
-                    "uid": uid,
-                    "native_xcorr": (
-                        uid_to_top_native_target[uid].xcorr
-                        if uid in uid_to_top_native_target
-                        else 0
-                    ),
-                    "hybrid_xcorr": (
-                        uid_to_top_hybrid_target[uid].xcorr
-                        if uid in uid_to_top_hybrid_target
-                        else 0
-                    ),
-                }
-                for uid in set(uid_to_top_hybrid_target.keys()).union(
-                    set(uid_to_top_native_target.keys())
-                )
-            ]
-        )
-        data["accepted"] = data.uid.apply(lambda uid: uid in accepted_hybrid_uids)
-        fig, axs = fig_setup()
-        ax = axs[0]
-        s = 7
-        sns.scatterplot(
-            data=data,
-            x="native_xcorr",
-            y="hybrid_xcorr",
-            s=s,
-            marker="o",
-            color="blue",
-            label=f"All spectra (n={len(data)})",
-            ax=ax,
-        )
-        sns.scatterplot(
-            data=data[data.accepted],
-            x="native_xcorr",
-            y="hybrid_xcorr",
-            s=s,
-            marker="X",
-            color="red",
-            label=f"Accepted hybrid PSMs (n={len(data[data.accepted])})",
-            ax=ax,
-        )
-        plot_line(ax=ax, label="y=x")
-        set_title_axes_labels(
-            ax=ax,
-            title=title,
-            xlabel="Top native target xcorr",
-            ylabel="Top hybrid target xcorr",
-        )
-        finalize(axs)
-        if out_path:
-            save_fig(path=out_path)
+        return neofusion_output
 
     def get_spectrum_psms(self, uid: str) -> SpectrumPSMs:
         return self.uid_to_spectrum_psms[uid]

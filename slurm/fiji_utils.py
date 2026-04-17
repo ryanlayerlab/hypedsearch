@@ -5,19 +5,16 @@ import shutil
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import List, Optional, Union
 
 import click
 import pandas as pd
-from pydantic import BaseModel, field_validator
 
 from src.constants import (
     DEFAULT_JCT_LEN,
     DEFAULT_Q_THRESHOLD,
-    LINUX_CRUX_EXECUTABLE,
-    MAC_CRUX_EXECUTABLE,
 )
-from src.hypedsearch import HybridPSMScorer, HypedsearchRunConfig, run_hypedsearch
+from src.hypedsearch import HypedsearchRunConfig, run_hypedsearch
 from src.utils import (
     PathType,
     copy_file,
@@ -195,10 +192,10 @@ class HypedsearchRunScripts:
             cmd_parts = [
                 RUN_CMD_SH,
                 f"--name {config.hs_config.name}_nativeRun",
-                f'--mem "5GB"',
-                f'--part "short"',
-                f'--time "10:00:00"',
-                f"--cores 60",
+                '--mem "5GB"',
+                '--part "short"',
+                '--time "10:00:00"',
+                "--cores 60",
                 f'--cmd "python -m cli native-run -os -c {config.config_path}"',
             ]
             lines.append(" ".join(cmd_parts))
@@ -222,10 +219,10 @@ class HypedsearchRunScripts:
             cmd_parts = [
                 RUN_CMD_SH,
                 f"--name {config.hs_config.name}_hybridRun",
-                f'--mem "500GB"',
-                f'--part "highmem"',
-                f'--time "24:00:00"',
-                f"--cores 180",
+                '--mem "500GB"',
+                '--part "highmem"',
+                '--time "24:00:00"',
+                "--cores 180",
                 # f'--nodelist "{nodes[idx % len(nodes)]}"',
                 f'--cmd "python -m cli run-hypedsearch -c {config.config_path} -n 100 -os -p"',
             ]
@@ -253,10 +250,10 @@ class HypedsearchRunScripts:
             cmd_parts = [
                 RUN_CMD_SH,
                 f"--name {config.hs_config.name}_combineCometTxts",
-                f'--mem "2GB"',
-                f'--part "short"',
-                f'--time "01:00:00"',
-                f"--cores 10",
+                '--mem "2GB"',
+                '--part "short"',
+                '--time "01:00:00"',
+                "--cores 10",
                 f'--cmd "python -m cli combine-comet-txts -c {config.config_path}"',
             ]
             lines.append(" ".join(cmd_parts))

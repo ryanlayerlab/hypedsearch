@@ -58,7 +58,7 @@ class KmerToProteinsMap(BaseModel):
         Create a kmer to protein map from a FASTA file or a list of Peptides
         """
         # Load proteins
-        logger.info("Loading proteins from FASTA file...")
+        logger.debug("Loading proteins from FASTA file...")
         if proteins is None:
             proteins = Peptide.from_fasta(fasta_path=fasta)
         if protein_names is not None:
@@ -66,7 +66,7 @@ class KmerToProteinsMap(BaseModel):
                 proteins=proteins, protein_names=protein_names
             )
         # Create kmer-to-protein-id map
-        logger.info("Creating kmer-to-protein map...")
+        logger.debug("Creating kmer-to-protein map...")
         return cls(
             kmer_to_protein_map=cls.get_uniq_kmer_to_protein_map(
                 proteins=proteins, min_k=min_k, max_k=max_k, protein_attr=protein_attr
@@ -90,13 +90,13 @@ class KmerToProteinsMap(BaseModel):
         num_proteins = len(proteins)
         for p_idx, protein in enumerate(proteins):
             if verbose and (p_idx % 10 == 0):
-                logger.info(f"Processing protein {p_idx + 1} of {num_proteins}")
+                logger.debug(f"Processing protein {p_idx + 1} of {num_proteins}")
             uniq_kmers = set(
                 kmer.seq for kmer in protein.kmers(min_k=min_k, max_k=max_k)
             )
             for kmer in uniq_kmers:
                 uniq_kmer_to_protein_map[kmer].add(getattr(protein, protein_attr))
-        logger.info(f"Number of unique kmers {len(uniq_kmer_to_protein_map)}")
+        logger.debug(f"Number of unique kmers {len(uniq_kmer_to_protein_map)}")
         return dict(uniq_kmer_to_protein_map)
 
     def save(self, out_path: Union[str, Path]) -> None:
@@ -242,7 +242,7 @@ class KmerDatabase:
         return max(len(row.seq) for row in self.get_all_rows())
 
     @cached_property
-    def proteins(self):
+    def proteins(self) -> Set[str]:
         proteins = set()
         for row in self.get_all_rows():
             proteins.update(row.proteins_as_set)
@@ -267,6 +267,9 @@ class KmerDatabase:
                     f"Database already exists at {db_path} and overwriting=False. So skipping creating database."
                 )
                 return KmerDatabase(db_path=db_path)
+        logger.debug(
+            f"Creating k-mer database with min_k = {min_k} and max_k = {max_k}..."
+        )
         kmer_to_protein_map = KmerToProteinsMap.create(
             proteins=proteins,
             min_k=min_k,
@@ -276,7 +279,7 @@ class KmerDatabase:
 
         db = Sqlite3Database(db_path=db_path, overwrite=overwrite)
         db.create_table_from_dataclass(table_name=cls.table_name, obj=cls.row_object)
-        logger.info("Adding 'DbKmer' objects to the database...")
+        logger.debug("Adding 'DbKmer' objects to the database...")
         rows = [
             DbKmer.from_seq_and_proteins(seq=seq, proteins=proteins)
             for seq, proteins in kmer_to_protein_map.kmer_to_protein_map.items()
@@ -286,7 +289,7 @@ class KmerDatabase:
                 table_name=cls.table_name,
                 data_classes=rows,
             )
-        logger.info("Creating index...")
+        logger.debug("Creating k-mer database index...")
         db.add_index(
             table_name=cls.table_name,
             index_name=cls.index_name,

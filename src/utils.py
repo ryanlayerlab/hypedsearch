@@ -53,7 +53,7 @@ class CmdLineRunner(BaseModel):
     def run_cmd(cmd: Union[str, List[str]]):
         if isinstance(cmd, list):
             cmd = " ".join(cmd)
-        logger.info(f"Running command line command:\n{cmd}")
+        logger.debug(f"Running command line command:\n{cmd}")
         result = subprocess.run(
             cmd,
             shell=True,  # runs command thru shell (e.g., /bin/bash)
@@ -95,6 +95,11 @@ def get_b_ion_prefixes(seq: str) -> List[str]:
 
 def get_y_ion_suffixes(seq: str) -> List[str]:
     return [seq[i:] for i in range(1, len(seq))]
+
+
+def move_file(src: str | Path, dest: str | Path):
+    logger.debug(f"Moving file {src} to {dest}")
+    shutil.move(src, dest)
 
 
 def remove_gene_name(protein_name: str) -> str:

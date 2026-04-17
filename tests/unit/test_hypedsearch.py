@@ -1,18 +1,15 @@
 import logging
+from pathlib import Path
 
 from src.constants import MAC_CRUX_EXECUTABLE, MOUSE_PROTEOME
-from src.hybrids_via_clusters import HybridPeptide
 from src.hypedsearch import (
     HybridRunParams,
     HypedsearchRunConfig,
-    create_hybrids_fasta,
     hybrid_run_on_spectrum,
     run_hypedsearch,
 )
-from src.mass_spectra import Spectrum
-from src.peptides_and_ions import Fasta
+from src.mass_spectra import Mzml, Spectrum
 from src.psm import CometPSM
-from src.utils import from_pickle, load_json, setup_logger, to_json
 from tests.conftest import update_hs_config_out_dir_and_save_json
 
 
@@ -110,3 +107,24 @@ class Test_run_hypedsearch:
             )
         assert len(list(config.hybrid_run_scan_results_dir.glob("*"))) == 12
         assert "Running HypedSearch in serial" in caplog.text
+
+
+class Test_april_15_2026:
+    @staticmethod
+    def test_smoke():
+        # Arrange
+        data_dir = Path("data/260119_HuIslet_TimeCourse_Procal_Spiked")
+        mzml = Mzml(path=data_dir / "HuIslet_AspN_06_IL1B_2hr.mzML")
+        hybrid_run_params = HybridRunParams(
+            kmer_db_path="results/021726_260119_HuIslet_TimeCourse_Procal_Spiked/kmer_dbs/HuIslet_AspN_06_IL1B_2hr.kmers.db",
+            fasta="fastas/uniprotkb_proteome_UP000005640_AND_revi_2025_04_29.fasta",
+            fasta_fm_index="fastas/uniprotkb_proteome_UP000005640_AND_revi_2025_04_29.mfmindex",
+            min_hybrid_side_len=3,
+            crux_comet_params="results/021726_260119_HuIslet_TimeCourse_Procal_Spiked/inputs/crux.comet.params",
+        )
+        hs_config = HypedsearchRunConfig.from_json(
+            path=f"results/04-15-26-260119_HuIslet_TimeCourse_Procal_Spiked/configs/{mzml.name}.json"
+        )
+        hs_config.get_spectra_with_no_hybrid_results()
+
+        pass

@@ -1,9 +1,8 @@
-import os
 import shutil
 import sys
 from pathlib import Path
 
-from src.constants import GIT_REPO_DIR, MAC_CRUX_EXECUTABLE, MOUSE_PROTEOME
+from src.constants import MAC_CRUX_EXECUTABLE
 from src.crux import CometRun
 from src.hypedsearch import (
     HybridRunParams,

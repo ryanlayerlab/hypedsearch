@@ -5,7 +5,7 @@ from collections import Counter, defaultdict
 from dataclasses import field
 from functools import cached_property
 from pathlib import Path
-from typing import Annotated, Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import click
 import numpy as np
@@ -14,7 +14,7 @@ import pymzml
 import seaborn as sns
 from matplotlib.figure import Figure
 from matplotlib.pyplot import Axes
-from pydantic import BaseModel, BeforeValidator
+from pydantic import BaseModel
 from pyteomics import mzml as mzml_reader
 
 from src.constants import (
@@ -40,7 +40,6 @@ from src.utils import (
     flatten_list_of_lists,
     load_json,
     save_pydantic_objects_to_json,
-    to_path,
 )
 
 logger = logging.getLogger(__name__)
@@ -156,7 +155,7 @@ class Spectrum(BaseModel):
 
     @classmethod
     def parse_ms2_from_mzml(
-        cls, mzml: Union[str, Path], by_uid: bool = False
+        cls, mzml: Union[str, Path], by_uid: bool = False, as_df: bool = False
     ) -> List["Spectrum"]:
         mzml_path = Path(mzml).absolute()
         ms2_spectra = []
@@ -169,7 +168,10 @@ class Spectrum(BaseModel):
         if by_uid:
             return organize_by_spectrum_uid(data=ms2_spectra)
         else:
-            return ms2_spectra
+            if as_df:
+                return cls.to_df(spectra=ms2_spectra)
+            else:
+                return ms2_spectra
 
     @classmethod
     def get_spectrum(cls, scan: int, mzml: Union[str, Path]):
@@ -198,6 +200,10 @@ class Spectrum(BaseModel):
 
         elif path.is_file():
             return cls.parse_ms2_from_mzml(mzml=path)
+
+    @staticmethod
+    def to_df(spectra: List["Spectrum"]) -> pd.DataFrame:
+        return create_spectra_df(spectra=spectra)
 
     def filter_to_top_n_peaks(self, n: int) -> None:
         if n > 0:

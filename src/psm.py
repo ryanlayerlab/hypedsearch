@@ -1,3 +1,7 @@
+"""
+Classes and methods for working with peptide-spectrum matches (PSMs).
+"""
+
 import logging
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
@@ -14,6 +18,8 @@ from scipy.interpolate import PchipInterpolator
 
 from src.constants import (
     B_ION_TYPE,
+    CALC_NEUTRAL_MASS,
+    CHARGE,
     COMET,
     COMET_PROTEIN_SEPARATOR,
     CRUX,
@@ -21,15 +27,20 @@ from src.constants import (
     DEFAULT_Q_THRESHOLD,
     DELTA_CN,
     EVAL,
-    HS_PREFIX,
+    EXP_NEUTRAL_MASS,
     IONS_MATCHED,
     IONS_TOTAL,
     NUM,
+    PEPTIDE_NEUTRAL_MASS,
     PLAIN_PEPTIDE,
     PROTEIN,
     Q_VAL,
+    RETENTION_TIME,
+    RETENTION_TIME_STR,
     SAMPLE,
     SCAN,
+    SPECTRUM_NEUTRAL_MASS,
+    SPECTRUM_PRECURSOR_MZ,
     XCORR,
     Y_ION_TYPE,
 )
@@ -56,10 +67,14 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class CometTxt:
+    """
+    Class for handling Comet output .txt files where from Comet directly or from `crux comet`.
+    This class can handle both formats.
+    """
+
     path: Union[str, Path]
     sample: str = field(init=False)
     file_type: Literal["comet", "crux"] = field(init=False)
-    # hybrid_run: Optional[bool]
 
     def __post_init__(self):
         # Set file_type
@@ -73,41 +88,12 @@ class CometTxt:
         # Set sample
         self.sample = self.path.stem.split(".")[0]
 
-    def read_psms(self, as_df: bool = False) -> Union[List["CometPSM"], pd.DataFrame]:
-        """
-        Reads the Comet output file to a list of dataclasses or a dataframe
-        """
-        if self.path is not None:
-            return CometPSM.from_txt(txt=self.path, as_df=as_df)
-        else:
-            raise ValueError("No Comet output file found!")
-
-    def get_header(self) -> str:
-        if self.file_type == COMET:
-            return self.path.read_text().split("\n")[1]
-
-    def get_first_psm_line(self) -> str:
-        if self.file_type == COMET:
-            return self.path.read_text().split("\n")[2]
-
-    def get_top_psms(self) -> List["CometPSM"]:
-        psms = CometPSM.from_txt(txt=self.path)
-        return [psm for psm in psms if psm.num == 1]
-
-
-def read_comet_psms_from_dir(
-    dir_path: Union[str, Path], glob_pattern: Optional[str] = None
-):
-    if glob_pattern is None:
-        glob_pattern = "*.txt"
-    all_psms = []
-    for txt_file in Path(dir_path).glob(glob_pattern):
-        psms = CometPSM.from_txt(txt=txt_file)
-        all_psms.extend(psms)
-    return all_psms
-
 
 class PeakIonMatch(BaseModel):
+    """
+    Class to represent a match between a theoretical product ion and a peak in a spectrum.
+    """
+
     ion_mz: float
     ion_charge: int
     ion_seq: str
@@ -117,22 +103,21 @@ class PeakIonMatch(BaseModel):
     sample: Optional[str]
     scan: Optional[int]
 
-    def mz_diff(self, type: Literal["rel", "rel_ppm"] = "rel_ppm"):
+    def mz_diff(self, type: Literal["rel", "rel_ppm"] = "rel_ppm") -> float:
         """
-        Mass (more precisely, m/z) difference between the theoretical ion and the peak.
+        Returns the m/z difference between the theoretical ion and the spectrum peak.
         Let x_i = theoretical ion mass, x_p = peak mass,
         then returns
             - (x_i - x_t) / x_i when type='rel'
             - ((x_i - x_t) / x_i) * (10**6) when type='rel_ppm'
+
+        Args:
+            type: Specifies whether to return the relative m/z different in PPM or not. Defaults to "rel_ppm".
         """
         if type == "rel":
             return (self.ion_mz - self.peak_mz) / self.ion_mz
         elif type == "rel_ppm":
             return ((self.ion_mz - self.peak_mz) / self.ion_mz) * (10**6)
-
-    @property
-    def ion_id(self):
-        return f"{self.ion_type}-{self.ion_seq}-z{self.ion_charge}"
 
 
 def get_peaks_near_mz(
@@ -275,6 +260,10 @@ class CometPSM:
     ions_matched: int
     ions_total: int
     proteins: List[str]
+    precursor_charge: int
+    spectrum_neutral_mass: float
+    peptide_neutral_mass: float
+    # retention_time: float
     # protein_count: int
     xcorr: float
     eval: float
@@ -340,6 +329,7 @@ class CometPSM:
                 df[SAMPLE] = df["file"].apply(
                     lambda file_path: Path(file_path).stem.split(".")[0]
                 )
+            # Convert crux column names to their Comet equivalent
             df.rename(
                 columns={
                     "b/y ions matched": IONS_MATCHED,
@@ -349,6 +339,8 @@ class CometPSM:
                     "protein id": PROTEIN,
                     "sequence": PLAIN_PEPTIDE,
                     "tdc q-value": Q_VAL,
+                    "peptide mass": CALC_NEUTRAL_MASS,
+                    "spectrum neutral mass": EXP_NEUTRAL_MASS,
                 },
                 inplace=True,
             )
@@ -372,7 +364,11 @@ class CometPSM:
                     xcorr=row[XCORR],
                     eval=row[EVAL],
                     delta_cn=row[DELTA_CN],
-                    q_value=row.get(Q_VAL, None),  # Handle optional q-value
+                    q_value=row.get(Q_VAL, None),  # q-value is optional
+                    precursor_charge=row[CHARGE],
+                    # retention_time=row[RETENTION_TIME_STR],
+                    spectrum_neutral_mass=row[EXP_NEUTRAL_MASS],
+                    peptide_neutral_mass=row[CALC_NEUTRAL_MASS],
                 )
                 for _, row in df.iterrows()
             ]
@@ -651,19 +647,29 @@ class ProteinAbundance(BaseModel):
     protein_counts: Counter
     psms: Optional[List[CometPSM]] = None
 
+    @property
+    def df(self):
+        return pd.DataFrame(
+            {
+                "protein": prot,
+                "count": cnt,
+            }
+            for prot, cnt in self.protein_counts.items()
+        )
+
     @classmethod
     def from_comet_txt(
         cls, txt: Union[str, Path], q_val_thresh: float = DEFAULT_Q_THRESHOLD
     ):
         psms = CometPSM.from_txt(txt=txt)
-        return cls.from_comet_psms(quality_psms=psms, q_threshold=q_val_thresh)
+        return cls.from_comet_psms(psms=psms, q_threshold=q_val_thresh)
 
     @classmethod
     def from_comet_psms(
-        cls, quality_psms: List[CometPSM], q_threshold: float = DEFAULT_Q_THRESHOLD
+        cls, psms: List[CometPSM], q_threshold: float = DEFAULT_Q_THRESHOLD
     ) -> "ProteinAbundance":
         quality_psms = get_high_confidence_psms(
-            psms=quality_psms, score=Q_VAL, threshold=q_threshold
+            psms=psms, score=Q_VAL, threshold=q_threshold
         )
         all_comet_proteins = flatten_list_of_lists(
             [psm.proteins for psm in quality_psms]
@@ -671,7 +677,7 @@ class ProteinAbundance(BaseModel):
         protein_counts = Counter(all_comet_proteins)
         return cls(protein_counts=protein_counts, psms=quality_psms)
 
-    def top_n_prots(
+    def get_top_n_protein_names(
         self, n: int, with_cnts: bool = False
     ) -> Union[Set[str], Dict[str, int]]:
         most_common_proteins = {
@@ -681,6 +687,20 @@ class ProteinAbundance(BaseModel):
             return most_common_proteins
         else:
             return set(most_common_proteins.keys())
+
+    def get_top_n_proteins(self, n: int, fasta: Path | str) -> List[Peptide]:
+        return Fasta(path=fasta).get_proteins_by_name(
+            names=self.get_top_n_protein_names(n=n)
+        )
+
+    def get_proteins_with_at_least_n_psms(
+        self, n: int, fasta: Optional[Path | str] = None
+    ) -> List[Union[str, Peptide]]:
+        prot_names = [prot for prot, cnt in self.protein_counts.items() if cnt >= n]
+        if fasta is not None:
+            return Fasta(path=fasta).get_proteins_by_name(names=prot_names)
+        else:
+            return prot_names
 
     def relative_protein_abundances(
         self, fasta_path: Union[Path, str]
@@ -701,7 +721,7 @@ class ProteinAbundance(BaseModel):
     ) -> Axes:
         # Define data
         if len(self.protein_counts) == 0:
-            logger.info(f"There are no PSMs to plot!")
+            logger.info("There are no PSMs to plot!")
             return
         items = sorted(self.protein_counts.items(), key=lambda x: x[1], reverse=True)
         if top_n_prots is not None:
@@ -772,12 +792,12 @@ class ProteinAbundance(BaseModel):
         df = pd.DataFrame(df)
         fig, axs = fig_setup()
         ax = axs[0]
-        sns.scatterplot(x=df.cnt, y=df.len, s=7, ax=ax, label=f"n={df.shape[0]}")
+        sns.scatterplot(x=df.len, y=df.cnt, s=7, ax=ax, label=f"n={df.shape[0]}")
         set_title_axes_labels(
             ax=ax,
             title=title,
-            xlabel="Number of PSMs from protein",
-            ylabel="Protein length",
+            xlabel="Protein length",
+            ylabel="Number of PSMs from protein",
         )
         finalize(ax)
         if out_path:
@@ -923,31 +943,53 @@ class CometRunAnalysis:
     def uid_to_assign_conf(self) -> Dict[str, CometPSM]:
         return {psm.uid: psm for psm in self.assign_conf}
 
-    @property
-    def df(self):
-        data = pd.DataFrame(
-            [
-                (
-                    uid,
-                    (float(self.uid_to_top_target[uid].xcorr)),
-                    (float(self.uid_to_top_decoy[uid].xcorr)),
-                    len(self.uid_to_top_target[uid].seq),
-                )
-                for uid in set(self.uid_to_top_target.keys()).union(
-                    set(self.uid_to_top_decoy.keys())
-                )
-            ],
-            columns=["uid", "target_xcorr", "decoy_xcorr", "target_len"],
-        )
-        return data
+    @cached_property
+    def target_df(self):
+        return pd.DataFrame([psm.to_dict() for psm in self.targets])
 
-    def xcorr_target_vs_decoy_scatterplot(self, ax: Axes, title: Optional[str] = None):
+    @cached_property
+    def decoy_df(self):
+        return pd.DataFrame([psm.to_dict() for psm in self.decoys])
+
+    # @cached_property
+    # def top_target_df(self):
+    #     return pd.DataFrame([psm.to_dict() for psm in self.top_targets])
+
+    # @cached_property
+    # def top_decoy_df(self):
+    #     return pd.DataFrame([psm.to_dict() for psm in self.top_targets])
+
+    @property
+    def top_psm_df(self):
+        df = []
+        for uid in set(self.uid_to_top_target.keys()).union(
+            set(self.uid_to_top_decoy.keys())
+        ):
+            target_psm = self.uid_to_top_target.get(uid, None)
+            decoy_psm = self.uid_to_top_decoy.get(uid, None)
+            df.append(
+                {
+                    "uid": uid,
+                    "target_xcorr": float(target_psm.xcorr) if target_psm else None,
+                    "decoy_xcorr": float(decoy_psm.xcorr) if decoy_psm else None,
+                    "target_seq": target_psm.seq if target_psm else None,
+                    "decoy_seq": decoy_psm.seq if decoy_psm else None,
+                }
+            )
+        return pd.DataFrame(df)
+
+    def xcorr_target_vs_decoy_scatterplot(
+        self, ax: Optional[Axes] = None, title: Optional[str] = None
+    ):
+        if ax is None:
+            _, axs = fig_setup()
+            ax = axs[0]
         sns.scatterplot(
-            x=self.df["decoy_xcorr"],
-            y=self.df["target_xcorr"],
+            x=self.top_psm_df["decoy_xcorr"],
+            y=self.top_psm_df["target_xcorr"],
             s=7,
             ax=ax,
-            label=f"n={self.df.shape[0]}",
+            label=f"n={self.top_psm_df.shape[0]}",
         )
         plot_line(ax=ax, label="y=x")
         set_title_axes_labels(
@@ -957,17 +999,19 @@ class CometRunAnalysis:
             ylabel="Top target xcorr",
         )
         finalize(ax)
+        return ax
 
     def xcorr_target_vs_decoy_jointplot(
         self,
         title: Optional[str] = None,
     ):
+
         p = sns.jointplot(
-            x=self.df["target_len"],
-            y=self.df["target_xcorr"] - self.df["decoy_xcorr"],
+            x=self.top_psm_df.target_seq.apply(len),
+            y=self.top_psm_df["target_xcorr"] - self.top_psm_df["decoy_xcorr"],
             s=7,
             marginal_ticks=True,
-            label=f"n={self.df.shape[0]}",
+            label=f"n={self.top_psm_df.shape[0]}",
         )
         p.set_axis_labels(
             xlabel="Top target peptide length",
@@ -985,8 +1029,23 @@ class CometRunAnalysis:
                 "Top targets": self.top_targets,
                 "Top decoys": self.top_decoys,
             },
+            q_interpolating_psms=(
+                self.assign_conf if len(self.assign_conf) > 0 else None
+            ),
             title=title,
             ax=ax,
+        )
+
+    def get_protein_abundance(
+        self, q_threshold: float = DEFAULT_Q_THRESHOLD
+    ) -> ProteinAbundance:
+        if len(self.assign_conf) == 0:
+            logger.warning(
+                "Trying to get ProteinAbundance object when there are no assign-confidence PSMs. So skipping"
+            )
+            return
+        return ProteinAbundance.from_comet_psms(
+            psms=self.assign_conf, q_threshold=q_threshold
         )
 
     def basic_analysis(
@@ -1009,7 +1068,7 @@ class CometRunAnalysis:
         )
         if len(self.assign_conf) > 0:
             prot_ab = ProteinAbundance.from_comet_psms(
-                quality_psms=self.assign_conf, q_threshold=q_threshold
+                psms=self.assign_conf, q_threshold=q_threshold
             )
             accepted_psms = [
                 psm for psm in self.assign_conf if psm.q_value <= q_threshold

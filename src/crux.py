@@ -20,10 +20,8 @@ from src.constants import (
     DECOY,
     DEFAULT_NUM_COMET_RETRIES,
     DEFAULT_NUM_COMET_THREADS,
-    GIT_REPO_DIR,
     LINUX_CRUX_EXECUTABLE,
     MAC_CRUX_EXECUTABLE,
-    RUN_COMET_SMK,
     SINGULARITY_IMAGE,
     TARGET,
 )
@@ -35,6 +33,7 @@ from src.utils import (
     CmdLineRunner,
     PathType,
     load_json,
+    move_file,
     read_new_line_separated_file,
     save_dict,
     setup_logger,
@@ -257,7 +256,7 @@ class CometRun(BaseModel):
         )
 
     def run_comet_locally(self, crux_path: Union[str, Path]) -> CmdLineResult:
-        logger.info(f"Running Comet via crux located at {crux_path}")
+        logger.debug(f"Running Comet via crux located at {crux_path}")
         cmd_result = CmdLineRunner.run_cmd(
             cmd=self.get_run_comet_command(crux_path=crux_path, comet_run=self)
         )
@@ -269,7 +268,7 @@ class CometRun(BaseModel):
         singularity_crux_path: str = "crux",
         singularity_num_threads: int = 1,
     ):
-        logger.info("Running Comet via Singularity")
+        logger.debug("Running Comet via Singularity")
         singularity_run = self.__class__(
             fasta=f"/data/{self.fasta.name}",
             mzml=f"/data/{self.mzml.name}",
@@ -337,7 +336,7 @@ class CometRun(BaseModel):
                         process.returncode == 1
                         and "no spectra searched" in process.stderr
                     ):
-                        logger.info(
+                        logger.warning(
                             "Running Comet finished with return code 1 and 'no spectra searched' in stderr. "
                             "This can happen when the spectrum you're trying to run Comet on doesn't "
                             "meet some criteria Comet is following. "
@@ -349,24 +348,18 @@ class CometRun(BaseModel):
                         return
 
                     # Move files from temp directory to final resting place
-                    logger.info(
-                        f"Moving \n{tmp_run.nonstandardized_comet_outputs.target} -> {self.standardized_comet_outputs.target}"
-                    )
-                    shutil.move(
-                        tmp_run.nonstandardized_comet_outputs.target,
-                        self.standardized_comet_outputs.target,
+                    move_file(
+                        src=tmp_run.nonstandardized_comet_outputs.target,
+                        dest=self.standardized_comet_outputs.target,
                     )
                     if tmp_run.nonstandardized_comet_outputs.decoy:
-                        logger.info(
-                            f"Moving \n{tmp_run.nonstandardized_comet_outputs.decoy} -> {self.standardized_comet_outputs.decoy}"
-                        )
-                        shutil.move(
-                            tmp_run.nonstandardized_comet_outputs.decoy,
-                            self.standardized_comet_outputs.decoy,
+                        move_file(
+                            src=tmp_run.nonstandardized_comet_outputs.decoy,
+                            dest=self.standardized_comet_outputs.decoy,
                         )
             except OSError as e:
-                logger.info(
-                    f"Failed running Comet. This is try {run_idx + 1} of {num_calls}. Here's the CometConfig: {self}. And the error: {e}"
+                logger.warning(
+                    f"Failed running Comet. This is try {run_idx + 1} of {num_calls}. Here's the run info:\n{self}.\nAnd here's the error:\n{e}"
                 )
                 continue
             return process
@@ -397,21 +390,6 @@ class Crux:
             return LINUX_CRUX_EXECUTABLE
         else:
             return None
-
-    @staticmethod
-    def validate_comet_output(result: subprocess.CompletedProcess):
-        if result.returncode != 0:
-            if (result.returncode == 1) and "no spectra searched" in result.stderr:
-                logger.debug(
-                    "Warning: `crux comet` finished with return code 1 and 'no spectra searched' in stderr. "
-                    "This can happen and generally is not an error even though the return code is 1"
-                )
-            else:
-                raise RuntimeError(
-                    f"`crux comet` failed with return code {result.returncode}.\n"
-                    f"STDOUT: {result.stdout}\n"
-                    f"STDERR: {result.stderr}"
-                )
 
     @staticmethod
     def combine_crux_comet_files(

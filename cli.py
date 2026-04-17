@@ -4,7 +4,7 @@ from typing import Optional
 import click
 
 from src.constants import DEFAULT_JCT_LEN, DEFAULT_Q_THRESHOLD, MAC_CRUX_EXECUTABLE
-from src.hypedsearch import HypedsearchOutputs, HypedsearchRunConfig, run_hypedsearch
+from src.hypedsearch import HypedsearchRunConfig, run_hypedsearch
 from src.kmer_database import KmerDatabase
 from src.postprocess_hs_results import process_native_and_hybrid_runs_via_config
 from src.utils import PathType, log_params, setup_logger
@@ -39,9 +39,9 @@ def cli_native_comet_run(
     else:
         crux_path = MAC_CRUX_EXECUTABLE
     hs_config = HypedsearchRunConfig.from_json(path=config)
-    hs_config.native_comet_run_on_all_spectra(
-        crux_path=crux_path, on_singularity=on_singularity
-    )
+    hs_config.native_comet_run_on_all_spectra(crux_path=crux_path)
+    hs_config.run_native_assign_confidence()
+    hs_config.create_native_run_plots()
 
 
 @click.command(
@@ -109,7 +109,6 @@ def cli_run_hypedsearch(
         config=config,
         n_cores=n_cores,
         crux_path=crux_path,
-        on_singularity=on_singularity,
         run_in_parallel=parallel,
     )
 
@@ -161,36 +160,15 @@ def cli_process_native_and_hybrid_runs_via_config(
     """,
 )
 @click.option(
-    "--results_dir",
-    "-rd",
-    type=PathType(),
-    required=False,
-    help="Path to the directory containing scan results",
-)
-@click.option(
-    "--out_dir",
-    "-od",
-    type=PathType(),
-    required=False,
-    help="Path to the output directory where the combined results for each mzML will be saved",
-)
-@click.option(
     "--config",
     "-c",
     type=PathType(),
-    required=False,
+    required=True,
     help="Path to the Hypedsearch config JSON",
 )
-def cli_combine_comet_txts(
-    config: Optional[Path], results_dir: Optional[Path], out_dir: Optional[Path]
-):
-    if config is None:
-        HypedsearchOutputs.combine_comet_results_by_mzml_and_psm_type(
-            folder=results_dir, out_dir=out_dir
-        )
-    else:
-        hs_config = HypedsearchRunConfig.from_json(path=config)
-        hs_config.combine_hybrid_run_scan_outputs(overwrite=True)
+def cli_combine_comet_txts(config: Path):
+    hs_config = HypedsearchRunConfig.from_json(path=config)
+    hs_config.combine_hybrid_run_scan_outputs(overwrite=True)
 
 
 @click.command(
@@ -236,7 +214,7 @@ def cli_run_param_medic(config: Path):
 
 
 @click.command(
-    name="kmer-db-proteins",
+    name="kmer-db-info",
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
     help="""
     """,
@@ -248,9 +226,14 @@ def cli_run_param_medic(config: Path):
     required=True,
     help="Path to the kmer database",
 )
-def cli_kmer_db_proteins(kmer_db: Path):
+def cli_kmer_db_info(kmer_db: Path):
     db = KmerDatabase(db_path=kmer_db)
-    msg = f"Proteins in kmer database {kmer_db}:\n" + "\n".join(db.proteins)
+    msg = (
+        f"k-mer database info:\n"
+        f"- min_k = {db.min_k}\n"
+        f"- max_k = {db.max_k}\n"
+        f"- proteins in database: {db.proteins}"
+    )
     print(msg)
 
 
@@ -265,7 +248,7 @@ if __name__ == "__main__":
     logger = setup_logger()
     # Miscellaneous stuff
     cli.add_command(cli_run_param_medic)
-    cli.add_command(cli_kmer_db_proteins)
+    cli.add_command(cli_kmer_db_info)
 
     # Native run stuff
     cli.add_command(cli_native_comet_run)

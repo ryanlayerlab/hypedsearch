@@ -81,3 +81,22 @@ Then for testing run:
 ```bash
 singularity run hypedsearch_latest.sif /bin/bash
 ```
+
+## `crux comet` vs. Comet output
+
+Here is the mapping between columns with different names between the `crux comet` and Comet txt outputs:
+
+| `crux comet` | Comet |
+| - | - |
+| spectrum precursor m/z | none |
+| spectrum neutral mass | exp_neutral_mass |
+| peptide mass | calc_neutral_mass |
+| xcor score | xcorr |
+| xcorr rank | num |
+| b/y ions matched | ions_matched |
+| b/y ions total | ions_total |
+| protein id | protein |
+| sequence | plain_peptide |
+
+| none | retention_time_sec |
+| - | - |

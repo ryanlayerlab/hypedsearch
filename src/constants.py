@@ -36,7 +36,11 @@ TRUE_HYBRIDS_PATH = DATA_DIR / "true_hybrids/true_hybrids.json"
 
 FASTAS_DIR = (GIT_REPO_DIR / "fastas").relative_to(GIT_REPO_DIR)
 MOUSE_PROTEOME = FASTAS_DIR / "SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
+MOUSE_PROTEOME_FM_IDX = FASTAS_DIR / "SwissProt.TAW_mouse_w_NOD_IAPP.mfmindex"
 HUMAN_PROTEOME = FASTAS_DIR / "uniprotkb_proteome_UP000005640_AND_revi_2025_04_29.fasta"
+HUMAN_PROTEOME_FM_IDX = (
+    FASTAS_DIR / "uniprotkb_proteome_UP000005640_AND_revi_2025_04_29.mfmindex"
+)
 RUN_COMET_SMK = (GIT_REPO_DIR / "snakefiles/run_comet.smk").relative_to(GIT_REPO_DIR)
 RUN_HYPEDSEARCH_SMK = GIT_REPO_DIR / "snakefiles/run_hypedsearch.smk"
 SINGULARITY_IMAGE = "hypedsearch_latest.sif"
@@ -156,6 +160,12 @@ THOMAS_SAMPLES = [f"BMEM_AspN_Fxn{val}" for val in [4, 5, 6, 7, 8, 9]]
 PRECURSOR_CHARGE = "precursor_charge"
 PRECURSOR_MZ = "precursor_mz"
 RETENTION_TIME = "retention_time"
+RETENTION_TIME_STR = "retention time"
+SPECTRUM_PRECURSOR_MZ = "spectrum precursor m/z"
+SPECTRUM_NEUTRAL_MASS = "spectrum_neutral_mass"
+EXP_NEUTRAL_MASS = "exp_neutral_mass"
+CALC_NEUTRAL_MASS = "calc_neutral_mass"
+PEPTIDE_NEUTRAL_MASS = "peptide_neutral_mass"
 PRECURSOR_INTENSITY = "precursor_intensity"
 DEFAULT_RESULTS_DIR_NAME = "analysis"
 COMMON_SPECTRA_ATTRS = [

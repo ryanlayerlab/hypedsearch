@@ -21,7 +21,6 @@ from src.constants import (
     DEFAULT_MIN_CLUSTER_SUPPORT,
     DEFAULT_PEAK_TO_ION_PPM_TOL,
     DEFAULT_PRECURSOR_MZ_PPM_TOL,
-    HS_PREFIX,
     HYBRID_PROT_SEPARATOR,
     PROTON_MASS,
     WATER_MASS,
@@ -31,7 +30,6 @@ from src.kmer_database import KmerDatabase
 from src.mass_spectra import Spectrum
 from src.peptides_and_ions import (
     Fasta,
-    Fasta2MFMIndex,
     Peptide,
     ProteinRange,
     UnpositionedProductIon,
