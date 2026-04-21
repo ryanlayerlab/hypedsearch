@@ -20,6 +20,7 @@ from pyteomics import mzml as mzml_reader
 from src.constants import (
     COMMON_SPECTRA_ATTRS,
     DEFAULT_MAX_PRECURSOR_CHARGE,
+    DEFAULT_PEAK_TO_ION_PPM_TOL,
     MAC_CRUX_EXECUTABLE,
     PRECURSOR_INTENSITY,
     SPECTRA_DF_NAME,
@@ -39,6 +40,7 @@ from src.utils import (
     compute_gini_coefficient,
     flatten_list_of_lists,
     load_json,
+    mass_difference_in_ppm,
     save_pydantic_objects_to_json,
 )
 
@@ -79,9 +81,46 @@ class Spectrum(BaseModel):
             )
         return self.get_uid(sample=self.sample, scan=self.scan)
 
-    @property
-    def total_intensity(self):
-        return sum([peak.intensity for peak in self.peaks])
+    def get_precursor_peaks(
+        self, peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL
+    ):
+        precursor_peaks = list(
+            filter(
+                lambda peak: mass_difference_in_ppm(
+                    mass1=peak.mz, mass2=self.precursor_mz
+                )
+                <= peak_to_ion_ppm_tol,
+                self.peaks,
+            )
+        )
+        return precursor_peaks
+
+    def get_non_precursor_peaks(
+        self,
+        peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
+    ):
+        non_precursor_peaks = list(
+            filter(
+                lambda peak: not (
+                    abs(mass_difference_in_ppm(mass1=peak.mz, mass2=self.precursor_mz))
+                    <= peak_to_ion_ppm_tol
+                ),
+                self.peaks,
+            )
+        )
+        return non_precursor_peaks
+
+    def get_total_intensity(
+        self, peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL
+    ) -> float:
+        return sum(
+            [
+                peak.intensity
+                for peak in self.get_non_precursor_peaks(
+                    peak_to_ion_ppm_tol=peak_to_ion_ppm_tol
+                )
+            ]
+        )
 
     @property
     def mz(self):
@@ -94,6 +133,10 @@ class Spectrum(BaseModel):
     @property
     def charge(self):
         return self.precursor_charge
+
+    @property
+    def noise(self):
+        pass
 
     @staticmethod
     def get_uid(sample: str, scan: int) -> str:
@@ -157,6 +200,7 @@ class Spectrum(BaseModel):
     def parse_ms2_from_mzml(
         cls, mzml: Union[str, Path], by_uid: bool = False, as_df: bool = False
     ) -> List["Spectrum"]:
+        logger.info(f"Parsing MS2 spectra from mzML file: {mzml}")
         mzml_path = Path(mzml).absolute()
         ms2_spectra = []
         with mzml_reader.MzML(str(mzml_path)) as mzml:
@@ -221,11 +265,18 @@ class Spectrum(BaseModel):
         log_intensity: bool = False,
         alpha: float = 1,
         color: str = "grey",
+        peak_to_ion_ppm_tol: Optional[float] = None,
     ):
+        """
+        If peak_to_ion_ppm_tol is given, indicate precursor peak with a different color.
+        """
         if ax is None:
             _, axs = fig_setup()
             ax = axs[0]
-        title = f"MZML={self.mzml.stem}; scan={self.scan}"
+        title = (
+            f"MZML={self.mzml.stem}; scan={self.scan}\n"
+            + f"RT={self.retention_time:.2f}; m/z={self.precursor_mz:.2f}; z={self.precursor_charge}; intensity={self.precursor_intensity:.1f}"
+        )
         plot_peaks(
             ax=ax,
             peaks=self.peaks,
@@ -235,8 +286,30 @@ class Spectrum(BaseModel):
             title=title,
             color=color,
         )
-        ax.set_ylim(bottom=0)
+        top = None
+        if peak_to_ion_ppm_tol is not None:
+            precursor_peaks = self.get_precursor_peaks(
+                peak_to_ion_ppm_tol=peak_to_ion_ppm_tol
+            )
+            if len(precursor_peaks) > 0:
+                plot_peaks(
+                    ax=ax,
+                    peaks=precursor_peaks,
+                    color="black",
+                    label="precursor peak",
+                    lw=1,
+                )
+                # top = (
+                #     max(
+                #         peak.intensity
+                #         for peak in self.get_non_precursor_peaks(
+                #             peak_to_ion_ppm_tol=peak_to_ion_ppm_tol
+                #         )
+                #     )
+                #     * 1.1
+                # )
         finalize(ax)
+        ax.set_ylim(bottom=0, top=top)
         return ax
 
     @staticmethod
@@ -323,11 +396,21 @@ class Spectrum(BaseModel):
         num_peaks = np.searchsorted(prop_of_tot_intensity, percent, side="right") + 1
         return num_peaks
 
-    @property
-    def gini(self) -> float:
-        return compute_gini_coefficient(values=[peak.intensity for peak in self.peaks])
+    def get_gini_coefficient(self, peak_to_ion_ppm_tol: float) -> float:
+        return compute_gini_coefficient(
+            values=[
+                peak.intensity
+                for peak in self.get_non_precursor_peaks(
+                    peak_to_ion_ppm_tol=peak_to_ion_ppm_tol
+                )
+            ]
+        )
 
-    def info(self, percent: float = 0.75) -> Dict:
+    @property
+    def info(
+        self,
+        #  percent: float = 0.75
+    ) -> Dict:
         return {
             "uid": self.uid,
             "mz": self.precursor_mz,
@@ -335,13 +418,13 @@ class Spectrum(BaseModel):
             "intensity": self.precursor_intensity,
             "rt": self.retention_time,
             "num_peaks": len(self.peaks),
-            "total_intensity": self.total_intensity,
+            # "total_intensity": self.total_intensity,
             "sample": self.sample,
             "scan": self.scan,
-            "gini": self.gini,
-            f"num_peaks_to_capture{percent}": self.number_of_peaks_needed_to_capture_percent_of_total_intensity(
-                percent=percent
-            ),
+            # "gini": self.gini,
+            # f"num_peaks_to_capture{percent}": self.number_of_peaks_needed_to_capture_percent_of_total_intensity(
+            # percent=percent
+            # ),
         }
 
     @staticmethod

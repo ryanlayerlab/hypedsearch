@@ -67,6 +67,14 @@ class Test_Spectrum:
         actual = Spectrum.parse_ms2_from_mzml(mzml=mouse_mzml_path)
         assert len(actual) > 0
 
+    @staticmethod
+    def test_total_intensity(mouse_mzml_path):
+        sp = Spectrum.get_spectrum(scan=7, mzml=mouse_mzml_path)
+        assert len(sp.get_non_precursor_peaks()) < len(sp.peaks)
+        assert sp.get_total_intensity() == sum(
+            p.intensity for p in sp.get_non_precursor_peaks()
+        )
+
 
 class Test_get_indices_of_largest_elements:
     @staticmethod

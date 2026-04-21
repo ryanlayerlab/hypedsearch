@@ -317,10 +317,16 @@ class HypedsearchRunConfig:
                 uids.add(uid)
         return uids
 
+    @property
+    def name_dir(self) -> Path:
+        d = self.parent_output_dir / f"{self.name}"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
     # Native run properties
     @cached_property
     def native_run_dir(self) -> Path:
-        d = self.parent_output_dir / f"{self.name}/native_run"
+        d = self.name_dir / "native_run"
         d.mkdir(parents=True, exist_ok=True)
         return d
 
@@ -398,9 +404,9 @@ class HypedsearchRunConfig:
 
     @cached_property
     def hybrid_run_dir(self) -> Path:
-        d = self.parent_output_dir / f"{self.name}/hybrid_run"
+        d = self.name_dir / "hybrid_run"
         d.mkdir(parents=True, exist_ok=True)
-        return self.parent_output_dir / f"{self.name}/hybrid_run"
+        return d
 
     @cached_property
     def hybrid_run_scan_results_dir(self) -> Path:
@@ -773,6 +779,7 @@ def hybrid_run_on_spectrum(
         decoy_search=2 if params.hybrid_decoy_competition else 0,
         scan_min=spectrum.scan,
         scan_max=spectrum.scan,
+        num_threads=1,
     )
 
     # Form hybrids

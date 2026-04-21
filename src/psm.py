@@ -100,8 +100,6 @@ class PeakIonMatch(BaseModel):
     ion_type: str
     peak_mz: float
     peak_intensity: float
-    sample: Optional[str]
-    scan: Optional[int]
 
     def mz_diff(self, type: Literal["rel", "rel_ppm"] = "rel_ppm") -> float:
         """
@@ -117,7 +115,63 @@ class PeakIonMatch(BaseModel):
         if type == "rel":
             return (self.ion_mz - self.peak_mz) / self.ion_mz
         elif type == "rel_ppm":
-            return ((self.ion_mz - self.peak_mz) / self.ion_mz) * (10**6)
+            return mass_difference_in_ppm(mass1=self.ion_mz, mass2=self.peak_mz)
+
+    @property
+    def ppm_diff(self) -> float:
+        return mass_difference_in_ppm(mass1=self.ion_mz, mass2=self.peak_mz)
+
+    @property
+    def ion_name(self):
+        return f"{self.ion_type}{len(self.ion_seq)}"
+
+    @classmethod
+    def from_psm(
+        cls,
+        spectrum: Spectrum,
+        peptide: Union[Peptide, str],
+        ion_types: Set[Literal[B_ION_TYPE, Y_ION_TYPE]] = {B_ION_TYPE, Y_ION_TYPE},
+        peak_to_ion_ppm_tolerance: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
+    ) -> List["PeakIonMatch"]:
+        """
+        Compare the given spectrum to the given peptide. This method helps evaluate
+        how strong the evidence is for a peptide-spectrum match (PSM).
+        """
+        if isinstance(peptide, str):
+            peptide = Peptide(seq=peptide)
+        # Product ions will have charge <= precursor's charge
+        charges = list(range(1, spectrum.precursor_charge + 1))
+
+        # Get product ions of the proposed peptide
+        product_ions = peptide.product_ions(ion_types=ion_types, charges=charges)
+        assert 2 * (len(peptide.seq) - 1) * len(charges) == len(product_ions)
+
+        # Get peaks that match a product ion
+        peak_ion_matches = []
+        for ion in product_ions:
+            matching_peaks = get_peaks_near_mz(
+                query_mz=ion.mz,
+                peaks=spectrum.get_non_precursor_peaks(
+                    peak_to_ion_ppm_tol=peak_to_ion_ppm_tolerance
+                ),  # ignore the precursor peak in the search
+                ppm_tolerance=peak_to_ion_ppm_tolerance,
+            )
+
+            peak_ion_matches.extend(
+                [
+                    cls(
+                        ion_mz=ion.mz,
+                        ion_charge=ion.charge,
+                        ion_type=ion.ion_type,
+                        ion_seq=ion.seq,
+                        peak_mz=peak.mz,
+                        peak_intensity=peak.intensity,
+                    )
+                    for peak in matching_peaks
+                ]
+            )
+
+        return peak_ion_matches
 
 
 def get_peaks_near_mz(
@@ -129,56 +183,9 @@ def get_peaks_near_mz(
     """
     matching_peaks = []
     for peak in peaks:
-        if mass_difference_in_ppm(mass1=peak.mz, mass2=query_mz) <= ppm_tolerance:
+        if abs(mass_difference_in_ppm(mass1=peak.mz, mass2=query_mz)) <= ppm_tolerance:
             matching_peaks.append(peak)
     return matching_peaks
-
-
-def get_peak_product_ion_matches(
-    spectrum: Spectrum,
-    peptide: Union[Peptide, str],
-    ion_types: Set[Literal[B_ION_TYPE, Y_ION_TYPE]] = {B_ION_TYPE, Y_ION_TYPE},
-    peak_to_ion_ppm_tolerance: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
-) -> List[PeakIonMatch]:
-    """
-    Compare the given spectrum to the given peptide. This method helps evaluate
-    how strong the evidence is for a peptide-spectrum match (PSM).
-    """
-    if isinstance(peptide, str):
-        peptide = Peptide(seq=peptide)
-    # Product ions will have charge <= precursor's charge
-    charges = list(range(1, spectrum.precursor_charge + 1))
-
-    # Get product ions of the proposed peptide
-    product_ions = peptide.product_ions(ion_types=ion_types, charges=charges)
-    assert 2 * (len(peptide.seq) - 1) * len(charges) == len(product_ions)
-
-    # Get peaks that match a product ion
-    peak_ion_matches = []
-    for ion in product_ions:
-        matching_peaks = get_peaks_near_mz(
-            query_mz=ion.mz,
-            peaks=spectrum.peaks,
-            ppm_tolerance=peak_to_ion_ppm_tolerance,
-        )
-
-        peak_ion_matches.extend(
-            [
-                PeakIonMatch(
-                    ion_mz=ion.mz,
-                    ion_charge=ion.charge,
-                    ion_type=ion.ion_type,
-                    ion_seq=ion.seq,
-                    peak_mz=peak.mz,
-                    peak_intensity=peak.intensity,
-                    sample=spectrum.sample,
-                    scan=spectrum.scan,
-                )
-                for peak in matching_peaks
-            ]
-        )
-
-    return peak_ion_matches
 
 
 def spectrum_peptide_plot(
@@ -189,7 +196,7 @@ def spectrum_peptide_plot(
     title: Optional[str] = None,
 ) -> Axes:
     ion_intensity = max(peak.intensity for peak in spectrum.peaks) / 2
-    peak_ion_matches = get_peak_product_ion_matches(
+    peak_ion_matches = PeakIonMatch.from_psm(
         spectrum=spectrum,
         peptide=seq,
         peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
@@ -240,7 +247,7 @@ def spectrum_peptide_plot(
         xlabel="m/z",
         ylabel="Intensity",
         title=(
-            f"peptide: {seq}\nspectrum: {spectrum.uid}\nPPM tol: {peak_to_ion_ppm_tolerance}"
+            f"peptide: {seq}\nspectrum: {spectrum.uid}\nPPM tol: {peak_to_ion_ppm_tolerance}\nPrecursor-intensity {spectrum.precursor_intensity}\nPrecursor-charge: {spectrum.precursor_charge}\nRT: {spectrum.retention_time}\nPrecursor-m/z: {spectrum.precursor_mz}"
             if title is None
             else title
         ),
@@ -463,184 +470,255 @@ class CometPSM:
         return pd.DataFrame([psm.to_dict() for psm in psms])
 
 
+# def compare_peptide_seq_to_spectrum(
+#     spectrum: Spectrum,
+#     seq: str,
+#     peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
+# ):
+#     peak_ion_matches = get_peak_product_ion_matches(
+#         spectrum=spectrum,
+#         peptide=seq,
+#         peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tol,
+#     )
+#     pass
+
+
+def get_optimal_ion_support_for_hybrid(left_seq: str, right_seq: str):
+    """
+    Suppose the hybrid is ABC-XYZ. The ions that would support the left side are:
+        - b-ions: b1=A, b2=AB, b3=ABC which is b1, ..., b<|left_seq|>
+        - y-ions: y3=XYZ, y4=C-XYZ, y5=BC-XYZ which is y<|right_seq|>, y<|right_seq|+1>, ..., y<|left_seq|+|right_seq|-1>
+    The ions that would support the right hand side are:
+        - b-ions: b3=ABC, b4=ABC-X, b5=ABC-XY which is b<|left_seq|>, b<|left_seq|+1>, ..., b<|left_seq|+|right_seq|-1>
+        - y-ions: y1=Z, y2=YZ, y3=XYZ which is y1, ..., y<|right_seq|>
+    """
+    optimal_left_support = set(f"b{n}" for n in range(1, len(left_seq) + 1)) | set(
+        f"y{n}" for n in range(len(right_seq), len(left_seq) + len(right_seq))
+    )
+    optimal_right_support = set(
+        f"b{n}" for n in range(len(left_seq), len(left_seq) + len(right_seq))
+    ) | set(f"y{n}" for n in range(1, len(right_seq) + 1))
+    return optimal_left_support, optimal_right_support
+
+
 @dataclass
-class PSM:
+class PeptideSeqSpectrumComparer:
     spectrum: Spectrum
     seq: str
-    positions: List[str]
     peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL
-    xcorr: Optional[float] = None
-    q_value: Optional[float] = None
-    comet_ions_matched: Optional[int] = None
-    comet_ions_total: Optional[int] = None
 
-    # Properties
+    @property
+    def uid(self):
+        return self.spectrum.uid
+
     @cached_property
-    def peak_ion_matches(self):
-        return get_peak_product_ion_matches(
+    def ion_name_to_seq_map(self):
+        ion_name_to_seq_map = {}
+        for idx in range(1, len(self.seq)):
+            ion_name_to_seq_map[f"b{idx}"] = self.seq[:idx]
+        for idx in range(1, len(self.seq)):
+            ion_name_to_seq_map[f"y{idx}"] = self.seq[-idx:]
+        return ion_name_to_seq_map
+
+    @cached_property
+    def peak_ion_matches(self) -> List[PeakIonMatch]:
+        return PeakIonMatch.from_psm(
             spectrum=self.spectrum,
             peptide=self.seq,
             peak_to_ion_ppm_tolerance=self.peak_to_ion_ppm_tol,
         )
 
     @property
-    def prop_comet_ions_matched(self):
-        if (self.comet_ions_matched is None) or (self.comet_ions_total is None):
-            return None
-        else:
-            return self.comet_ions_matched / self.comet_ions_total
+    def peak_to_ion_mz_ppm_diffs(self) -> List[float]:
+        return [match.ppm_diff for match in self.peak_ion_matches]
 
-    @property
-    def df(self):
-        return list_to_df(pydantic_list=self.peak_ion_matches)
-
-    @property
-    def num_b_ions_supported(self):
-        if self.df is None:
-            return 0
-        return len(
-            self.df[self.df.ion_type == B_ION_TYPE].groupby(
-                by=["ion_charge", "ion_seq"]
+    @cached_property
+    def _ion_type_to_charge_to_supported_ions(self) -> Dict[str, Dict[int, Set[str]]]:
+        ion_type_to_charge_to_supported_ions = defaultdict(lambda: defaultdict(set))
+        for match in self.peak_ion_matches:
+            ion_type_to_charge_to_supported_ions[match.ion_type][match.ion_charge].add(
+                match.ion_name
             )
+        return ion_type_to_charge_to_supported_ions
+
+    @cached_property
+    def _b_ions_supported(self) -> List[PeakIonMatch]:
+        return filter(lambda match: match.ion_type == B_ION_TYPE, self.peak_ion_matches)
+
+    @cached_property
+    def _y_ions_supported(self) -> List[PeakIonMatch]:
+        return filter(lambda match: match.ion_type == Y_ION_TYPE, self.peak_ion_matches)
+
+    @property
+    def b_ions_supported_with_charge(self) -> Set[str]:
+        bs = set()
+        for charge, ions in self._ion_type_to_charge_to_supported_ions[
+            B_ION_TYPE
+        ].items():
+            bs.update({f"{ion}^{charge}" for ion in ions})
+        return bs
+
+    @property
+    def b_ions_supported_ignore_charge(self) -> Set[str]:
+        bs = set().union(
+            *self._ion_type_to_charge_to_supported_ions[B_ION_TYPE].values()
         )
+        return bs
 
     @property
-    def uid(self):
-        return self.spectrum.uid
+    def y_ions_supported_with_charge(self) -> Set[str]:
+        ys = set()
+        for charge, ions in self._ion_type_to_charge_to_supported_ions[
+            Y_ION_TYPE
+        ].items():
+            ys.update({f"{ion}^{charge}" for ion in ions})
+        return ys
 
     @property
-    def num_ions_supported(self):
-        return self.num_b_ions_supported + self.num_y_ions_supported
-
-    @property
-    def num_y_ions_supported(self):
-        if self.df is None:
-            return 0
-        return len(
-            self.df[self.df.ion_type == Y_ION_TYPE].groupby(
-                by=["ion_charge", "ion_seq"]
-            )
+    def y_ions_supported_ignore_charge(self) -> Set[str]:
+        ys = set().union(
+            *self._ion_type_to_charge_to_supported_ions[Y_ION_TYPE].values()
         )
+        return ys
 
     @property
-    def prefixes_supported(self) -> List[str]:
-        return list(self.sequences_supported(ion_type=B_ION_TYPE))
-
-    @property
-    def suffixes_supported(self) -> List[str]:
-        return list(self.sequences_supported(ion_type=Y_ION_TYPE))
-
-    @property
-    def intensity_supported(self):
+    def intensity_supported(self) -> float:
         return sum(
             [peak_ion_match.peak_intensity for peak_ion_match in self.peak_ion_matches]
         )
 
     @property
-    def prop_intensity_supported(self):
-        return self.intensity_supported / self.spectrum.total_intensity
+    def prop_intensity_supported(self) -> float:
+        total = self.spectrum.get_total_intensity(
+            peak_to_ion_ppm_tol=self.peak_to_ion_ppm_tol
+        )
+        assert (
+            total > 0
+        ), f"Total intensity of spectrum {self.uid} is zero, cannot compute proportion of intensity supported"
+        return self.intensity_supported / self.spectrum.get_total_intensity(
+            peak_to_ion_ppm_tol=self.peak_to_ion_ppm_tol
+        )
 
     @property
-    def prop_prefixes_supported(self):
-        return len(self.prefixes_supported) / len(self.seq)
+    def num_ions_matched(self) -> int:
+        return len(self.y_ions_supported_with_charge) + len(
+            self.b_ions_supported_with_charge
+        )
 
     @property
-    def prop_suffixes_supported(self):
-        return len(self.suffixes_supported) / len(self.seq)
+    def prefixes_supported(self) -> Set[str]:
+        return set(
+            self.ion_name_to_seq_map[ion] for ion in self.b_ions_supported_ignore_charge
+        )
 
     @property
-    def mz_ppm_diff(self):
+    def suffixes_supported(self) -> Set[str]:
+        return set(
+            self.ion_name_to_seq_map[ion] for ion in self.y_ions_supported_ignore_charge
+        )
+
+    @property
+    def precursor_mz_ppm_diff(self):
         seq_mz = compute_peptide_precursor_mz(seq=self.seq, charge=self.spectrum.z)
         return mass_difference_in_ppm(mass1=seq_mz, mass2=self.spectrum.mz)
 
-    # Class methods
-    @classmethod
-    def from_spectrum_and_comet_psm(
-        cls,
-        spectrum: Spectrum,
-        psm: CometPSM,
-        ppm_tol: int = DEFAULT_PEAK_TO_ION_PPM_TOL,
-    ) -> "PSM":
-        return cls(
-            spectrum=spectrum,
-            seq=psm.seq,
-            peak_to_ion_ppm_tol=ppm_tol,
-            xcorr=psm.xcorr,
-            q_value=psm.q_value,
-            positions=psm.proteins,
-            comet_ions_matched=psm.ions_matched,
-            comet_ions_total=psm.ions_total,
+    def hybrid_support(self, left_seq: str, right_seq: str):
+        assert (
+            left_seq + right_seq == self.seq
+        ), f"Left ({left_seq}) and right sequence ({right_seq}) must concatenate to the full sequence ({self.seq})"
+        optimal_left_support, optimal_right_support = (
+            get_optimal_ion_support_for_hybrid(left_seq=left_seq, right_seq=right_seq)
         )
+        actual_left_support = optimal_left_support.intersection(
+            self.b_ions_supported_ignore_charge | self.y_ions_supported_ignore_charge
+        )
+        left_support = len(actual_left_support) / len(optimal_left_support)
+        actual_right_support = optimal_right_support.intersection(
+            self.b_ions_supported_ignore_charge | self.y_ions_supported_ignore_charge
+        )
+        right_support = len(actual_right_support) / len(optimal_right_support)
+        assert (left_support >= 0) and (left_support <= 1)
+        assert (right_support >= 0) and (right_support <= 1)
+        return left_support, right_support
 
-    @classmethod
-    def from_comet_psms(
-        cls,
-        uid_to_spectrum: Dict[str, Spectrum],
-        psms: List[CometPSM],
-        ppm_tol: int = DEFAULT_PEAK_TO_ION_PPM_TOL,
-    ) -> List["PSM"]:
-        return [
-            cls.from_spectrum_and_comet_psm(
-                spectrum=uid_to_spectrum[psm.uid], psm=psm, ppm_tol=ppm_tol
-            )
-            for psm in psms
-        ]
-
-    # Instance methods
-    def sequences_supported(
-        self,
-        ion_type: Literal[B_ION_TYPE, Y_ION_TYPE],
-    ) -> Set[str]:
-        if len(self.peak_ion_matches) == 0:
-            return set()
-        return set(self.df.loc[self.df.ion_type == ion_type, "ion_seq"].unique())
-
-    def to_row(self) -> Dict:
-        return {
-            "uid": self.uid,
+    def to_dict(
+        self, left_seq: Optional[str] = None, right_seq: Optional[str] = None
+    ) -> Dict[str, Any]:
+        data = {
+            "uid": self.spectrum.uid,
             "seq": self.seq,
-            "xcorr": self.xcorr,
-            "q_value": self.q_value,
-            "prop_prefixes_supported": self.prop_prefixes_supported,
-            "prop_suffixes_supported": self.prop_suffixes_supported,
+            "ppm_tol": self.peak_to_ion_ppm_tol,
+            "precursor_mz_ppm_diff": self.precursor_mz_ppm_diff,
+            "precursor_mz": self.spectrum.mz,
+            "rt": self.spectrum.retention_time,
+            "precursor_z": self.spectrum.z,
+            "precursor_intensity": self.spectrum.precursor_intensity,
+            "b_ions_supported_with_charge": list(self.b_ions_supported_with_charge),
+            "b_ions_supported_ignore_charge": list(self.b_ions_supported_ignore_charge),
+            "prefixes_supported": list(self.prefixes_supported),
+            "y_ions_supported_with_charge": list(self.y_ions_supported_with_charge),
+            "y_ions_supported_ignore_charge": list(self.y_ions_supported_ignore_charge),
+            "suffixes_supported": list(self.suffixes_supported),
+            "intensity_supported": self.intensity_supported,
             "prop_intensity_supported": self.prop_intensity_supported,
-            "prefixes_supported": self.prefixes_supported,
-            "suffixes_supported": self.suffixes_supported,
-            "mz_ppm_diff": self.mz_ppm_diff,
-            "positions": self.positions,
+            "num_ions_matched": self.num_ions_matched,
+            "peak_to_ion_mz_ppm_diffs": self.peak_to_ion_mz_ppm_diffs,
         }
+        if (left_seq is not None) and (right_seq is not None):
+            left_support, right_support = self.hybrid_support(
+                left_seq=left_seq, right_seq=right_seq
+            )
+            data["hybrid_left_support"] = left_support
+            data["hybrid_right_support"] = right_support
+        return data
 
-    def plot(self):
-        return spectrum_peptide_plot(
-            spectrum=self.spectrum,
-            seq=self.seq,
-            peak_to_ion_ppm_tolerance=self.peak_to_ion_ppm_tol,
-        )
 
-
-def convert_comet_psms_to_psms(
-    uid_to_spectrum_map: Dict[str, Spectrum],
+def convert_comet_psms_to_custom_psms(
     comet_psms: List[CometPSM],
-    peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
-) -> List[PSM]:
-    psms = []
-    for comet_psm in comet_psms:
-        PSM.from_spectrum_and_comet_psm(
-            spectrum=uid_to_spectrum_map[comet_psm.uid],
-            psm=comet_psm,
-            ppm_tol=peak_to_ion_ppm_tol,
-        )
-        psm = PSM(
-            spectrum=uid_to_spectrum_map[comet_psm.spectrum_uid],
-            seq=comet_psm.seq,
-            peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
-            xcorr=comet_psm.xcorr,
-            q_value=comet_psm.q_value,
-            prop_ions_matched=comet_psm.prop_ions_matched,
-            positions=comet_psm.proteins,
-        )
-        psms.append(psm)
-    return psms
+    spectra: Optional[List[Spectrum]] = None,
+    uid_to_spectrum: Optional[Dict[str, Spectrum]] = None,
+    ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
+) -> List[PeptideSeqSpectrumComparer]:
+    def add_comet_specific_info_to_dict(d: Dict, psm: CometPSM):
+        d[XCORR] = psm.xcorr
+        d[Q_VAL] = psm.q_value
+        d["proteins"] = psm.proteins
+        d["comet_ions_matched"] = psm.ions_matched
+        d["comet_ions_total"] = psm.ions_total
+        d["num"] = psm.num
+        return d
+
+    if uid_to_spectrum is None:
+        uid_to_spectrum = {spectrum.uid: spectrum for spectrum in spectra}
+    results = []
+    for idx, psm in enumerate(comet_psms):
+        print(f"Processing PSM {idx+1} of {len(comet_psms)}", end="\r")
+        if psm.is_hybrid:
+            for hy_str in psm.proteins:
+                hy_pep = HybridPeptide.parse_hybrid_peptide_str(hybrid_str=hy_str)
+                data = PeptideSeqSpectrumComparer(
+                    spectrum=uid_to_spectrum[psm.uid],
+                    seq=psm.seq,
+                    peak_to_ion_ppm_tol=ppm_tol,
+                ).to_dict(
+                    left_seq=hy_pep.left_seq,
+                    right_seq=hy_pep.right_seq,
+                )
+                data["left_proteins"] = list(hy_pep.left_proteins)
+                data["right_proteins"] = list(hy_pep.right_proteins)
+                data["left_seq"] = hy_pep.left_seq
+                data["right_seq"] = hy_pep.right_seq
+                data = add_comet_specific_info_to_dict(d=data, psm=psm)
+                results.append(data)
+        else:
+            data = PeptideSeqSpectrumComparer(
+                spectrum=uid_to_spectrum[psm.uid],
+                seq=psm.seq,
+                peak_to_ion_ppm_tol=ppm_tol,
+            ).to_dict()
+            data = add_comet_specific_info_to_dict(d=data, psm=psm)
+            results.append(data)
+    return results
 
 
 class ProteinAbundance(BaseModel):
@@ -901,6 +979,12 @@ class CometRunAnalysis:
     interpolate: bool = True
 
     def __post_init__(self):
+        if isinstance(self.targets, (str, Path)):
+            self.targets = CometPSM.from_txt(txt=self.targets)
+        if isinstance(self.decoys, (str, Path)):
+            self.decoys = CometPSM.from_txt(txt=self.decoys)
+        if isinstance(self.assign_conf, (str, Path)):
+            self.assign_conf = CometPSM.from_txt(txt=self.assign_conf)
         if self.interpolate:
             logger.info("Interpolating q-values for all PSMs based on assign_conf PSMs")
             assert (
@@ -928,16 +1012,30 @@ class CometRunAnalysis:
         return {psm.uid: psm for psm in self.top_targets}
 
     @cached_property
-    def top_decoys(self) -> List[CometPSM]:
-        return [psm for psm in self.decoys if psm.num == 1]
-
-    @cached_property
     def uid_to_top_target(self) -> Dict[str, CometPSM]:
         return {psm.uid: psm for psm in self.top_targets}
 
     @cached_property
+    def uid_to_targets(self) -> Dict[str, List[CometPSM]]:
+        uid_to_psms = defaultdict(list)
+        for psm in self.targets:
+            uid_to_psms[psm.uid].append(psm)
+        return dict(uid_to_psms)
+
+    @cached_property
+    def top_decoys(self) -> List[CometPSM]:
+        return [psm for psm in self.decoys if psm.num == 1]
+
+    @cached_property
     def uid_to_top_decoy(self) -> Dict[str, CometPSM]:
         return {psm.uid: psm for psm in self.top_decoys}
+
+    @cached_property
+    def uid_to_decoys(self) -> Dict[str, List[CometPSM]]:
+        uid_to_psms = defaultdict(list)
+        for psm in self.decoys:
+            uid_to_psms[psm.uid].append(psm)
+        return dict(uid_to_psms)
 
     @cached_property
     def uid_to_assign_conf(self) -> Dict[str, CometPSM]:

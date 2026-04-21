@@ -393,6 +393,26 @@ def add_counts_to_histogram_boxes(
             )
 
 
+def create_joint_plot(
+    x: List, y: List, hue: Optional[List] = None, s=7, xlabel="", ylabel="", title=""
+):
+    assert len(x) == len(y)
+    p = sns.jointplot(
+        x=x,
+        y=y,
+        hue=hue,
+        # s=x,
+        marginal_ticks=True,
+        label=f"n={len(y)}",
+    )
+    p.set_axis_labels(
+        xlabel=xlabel,
+        ylabel=ylabel,
+    )
+    p.fig.suptitle(title)
+    return p
+
+
 def plot_sorted_1d_data(
     data: Dict[Union[str, float], float],
     pt_labels: Optional[Dict[str, str]] = None,

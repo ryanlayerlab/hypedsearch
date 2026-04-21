@@ -1,12 +1,21 @@
+import os
+
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
 from pathlib import Path
 from typing import Optional
 
 import click
+import numpy as np  # Must import after setting OPENBLAS_NUM_THREADS
 
-from src.constants import DEFAULT_JCT_LEN, DEFAULT_Q_THRESHOLD, MAC_CRUX_EXECUTABLE
+from src.constants import (
+    DEFAULT_JCT_LEN,
+    DEFAULT_PEAK_TO_ION_PPM_TOL,
+    DEFAULT_Q_THRESHOLD,
+    MAC_CRUX_EXECUTABLE,
+)
 from src.hypedsearch import HypedsearchRunConfig, run_hypedsearch
 from src.kmer_database import KmerDatabase
-from src.postprocess_hs_results import process_native_and_hybrid_runs_via_config
+from src.postprocess_hs_results import NativeVsHybridComparison
 from src.utils import PathType, log_params, setup_logger
 
 
@@ -40,8 +49,6 @@ def cli_native_comet_run(
         crux_path = MAC_CRUX_EXECUTABLE
     hs_config = HypedsearchRunConfig.from_json(path=config)
     hs_config.native_comet_run_on_all_spectra(crux_path=crux_path)
-    hs_config.run_native_assign_confidence()
-    hs_config.create_native_run_plots()
 
 
 @click.command(
@@ -105,51 +112,15 @@ def cli_run_hypedsearch(
         crux_path = None
     else:
         crux_path = MAC_CRUX_EXECUTABLE
+    if parallel:
+        import multiprocessing as mp
+
+        mp.set_start_method("spawn", force=True)
     run_hypedsearch(
         config=config,
         n_cores=n_cores,
         crux_path=crux_path,
         run_in_parallel=parallel,
-    )
-
-
-@click.command(
-    name="process-hs",
-    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-    help="""
-    """,
-)
-@click.option(
-    "--config",
-    "-c",
-    type=PathType(),
-    required=True,
-    help="Path to the Hypedsearch config JSON",
-)
-@click.option(
-    "--q_threshold",
-    "-q",
-    type=float,
-    default=DEFAULT_Q_THRESHOLD,
-    show_default=True,
-    help="",
-)
-@click.option(
-    "--jct_len",
-    "-j",
-    type=int,
-    default=DEFAULT_JCT_LEN,
-    show_default=True,
-    help="",
-)
-@log_params
-def cli_process_native_and_hybrid_runs_via_config(
-    config: Path, q_threshold: float, jct_len: int
-):
-    process_native_and_hybrid_runs_via_config(
-        q_threshold=q_threshold,
-        jct_len=jct_len,
-        hs_config=config,
     )
 
 
@@ -237,6 +208,75 @@ def cli_kmer_db_info(kmer_db: Path):
     print(msg)
 
 
+@click.command(
+    name="neofusion",
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+    help="""
+    """,
+)
+@click.option(
+    "--config",
+    "-c",
+    type=PathType(),
+    required=False,
+    help="Path to the Hypedsearch config JSON",
+)
+@click.option(
+    "--ppm_tol",
+    "-p",
+    type=float,
+    default=DEFAULT_PEAK_TO_ION_PPM_TOL,
+    show_default=True,
+    required=False,
+    help="",
+)
+def cli_get_spectra_with_missing_hs_outputs(config: Path, verbose: bool):
+    hs_config = HypedsearchRunConfig.from_json(path=config)
+    hs_config.check_for_missing_scans(print_missing=verbose)
+
+
+@click.command(
+    name="create-psm-dfs",
+    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
+    help="""
+    """,
+)
+@click.option(
+    "--config",
+    "-c",
+    type=PathType(),
+    required=True,
+    help="Path to the Hypedsearch config JSON",
+)
+# @click.option(
+#     "--out_dir",
+#     "-o",
+#     type=PathType(),
+#     required=True,
+#     help="",
+# )
+@click.option(
+    "--ppm_tol",
+    "-p",
+    type=float,
+    default=DEFAULT_PEAK_TO_ION_PPM_TOL,
+    show_default=True,
+    required=False,
+    help="",
+)
+def cli_create_psm_dfs(
+    config: Path,
+    ppm_tol: float,
+    # out_dir: Path
+):
+    hs_config = HypedsearchRunConfig.from_json(path=config)
+    comp = NativeVsHybridComparison.from_config(config=config)
+    psm_type_to_df = comp.create_psm_dataframes(ppm_tol=ppm_tol)
+    for psm_type, df in psm_type_to_df.items():
+        out_path = hs_config.name_dir / f"{psm_type}_psms.csv"
+        df.to_csv(out_path, index=False)
+
+
 @click.group(
     context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200}
 )
@@ -257,7 +297,9 @@ if __name__ == "__main__":
     # Hybrid run stuff
     cli.add_command(cli_run_hypedsearch)
     cli.add_command(cli_combine_comet_txts)
-    # cli.add_command(cli_process_native_and_hybrid_runs_via_config)
     cli.add_command(cli_get_spectra_with_missing_hs_outputs)
+
+    # Postprocessing
+    cli.add_command(cli_create_psm_dfs)
 
     cli()

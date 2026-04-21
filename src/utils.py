@@ -262,7 +262,7 @@ def flatten_list_of_lists(list_of_lists: List[List]):
 
 
 def mass_difference_in_ppm(mass1: float, mass2: float) -> float:
-    return (abs(mass1 - mass2) / mass1) * (10**6)
+    return ((mass1 - mass2) / mass1) * (10**6)
 
 
 def to_pickle(obj: Any, path: Union[Path, str]):

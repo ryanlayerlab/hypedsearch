@@ -52,7 +52,7 @@ def mouse_spectrum(mouse_mzml_path) -> Spectrum:
 
 
 @pytest.fixture
-def mouse_mzml(mouse_mzml_path):
+def mouse_mzml(mouse_mzml_path) -> Mzml:
     return Mzml(path=mouse_mzml_path)
 
 
@@ -89,6 +89,11 @@ def crux_txt(test_data_dir):
 @pytest.fixture
 def assign_confidence_txt(test_data_dir):
     return test_data_dir / "BMEM_AspN_Fxn4.assign-confidence.txt"
+
+
+@pytest.fixture
+def assign_confidence_psms(assign_confidence_txt):
+    return CometPSM.from_txt(txt=assign_confidence_txt)
 
 
 @pytest.fixture
