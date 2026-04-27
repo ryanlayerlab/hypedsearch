@@ -271,10 +271,7 @@ def cli_create_psm_dfs(
 ):
     hs_config = HypedsearchRunConfig.from_json(path=config)
     comp = NativeVsHybridComparison.from_config(config=config)
-    psm_type_to_df = comp.create_psm_dataframes(ppm_tol=ppm_tol)
-    for psm_type, df in psm_type_to_df.items():
-        out_path = hs_config.name_dir / f"{psm_type}_psms.csv"
-        df.to_csv(out_path, index=False)
+    comp.create_psm_dataframes(ppm_tol=ppm_tol, out_dir=hs_config.name_dir)
 
 
 @click.group(

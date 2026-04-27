@@ -191,15 +191,15 @@ def get_peaks_near_mz(
 def spectrum_peptide_plot(
     spectrum: Spectrum,
     seq: str,
-    peak_to_ion_ppm_tolerance: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
+    ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
     ax: Optional[Axes] = None,
-    title: Optional[str] = None,
+    title_additions: str = "",
 ) -> Axes:
     ion_intensity = max(peak.intensity for peak in spectrum.peaks) / 2
     peak_ion_matches = PeakIonMatch.from_psm(
         spectrum=spectrum,
         peptide=seq,
-        peak_to_ion_ppm_tolerance=peak_to_ion_ppm_tolerance,
+        peak_to_ion_ppm_tolerance=ppm_tol,
     )
     peptide = Peptide(seq=seq)
     product_ions = peptide.product_ions(
@@ -212,6 +212,7 @@ def spectrum_peptide_plot(
     # Plot spectrum
     spectrum.plot(
         ax=ax,
+        peak_to_ion_ppm_tol=ppm_tol,
     )
     # Plot all product ions below spectrum
     plot_peaks(
@@ -246,11 +247,7 @@ def spectrum_peptide_plot(
         ax=ax,
         xlabel="m/z",
         ylabel="Intensity",
-        title=(
-            f"peptide: {seq}\nspectrum: {spectrum.uid}\nPPM tol: {peak_to_ion_ppm_tolerance}\nPrecursor-intensity {spectrum.precursor_intensity}\nPrecursor-charge: {spectrum.precursor_charge}\nRT: {spectrum.retention_time}\nPrecursor-m/z: {spectrum.precursor_mz}"
-            if title is None
-            else title
-        ),
+        title=f"{spectrum.plot_title}\nseq={seq}\n{title_additions}",
     )
     finalize(ax)
     return ax
@@ -420,21 +417,6 @@ class CometPSM:
         ), f"Expected exactly one matching mzML file for PSM with sample {self.sample}, found {len(matching_files)}"
         return Mzml(path=matching_files[0]).get_spectrum(scan=self.scan)
 
-    def to_psm(
-        self,
-        spectrum: Spectrum,
-        peak_to_ion_ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
-    ) -> "PSM":
-        return PSM(
-            spectrum=spectrum,
-            seq=self.seq,
-            peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
-            xcorr=self.xcorr,
-            q_value=self.q_value,
-            prop_ions_matched=self.prop_ions_matched,
-            positions=self.proteins,
-        )
-
     @classmethod
     def load(cls, path: Union[str, Path], by_uid: bool = False):
         data = load_json(path=path)
@@ -468,6 +450,18 @@ class CometPSM:
     @staticmethod
     def to_df(psms: List["CometPSM"]):
         return pd.DataFrame([psm.to_dict() for psm in psms])
+
+    def get_left_and_right_seq_if_hybrid(self):
+        if self.is_hybrid:
+            assert (
+                len(self.proteins) == 1
+            ), f"Expected exactly one hybrid protein for PSM with uid {self.uid}, found {len(self.proteins)}:\n{self.proteins}"
+            hy_pep = HybridPeptide.parse_hybrid_peptide_str(hybrid_str=self.proteins[0])
+            return hy_pep.left_seq, hy_pep.right_seq
+        else:
+            raise ValueError(
+                f"PSM with uid {self.uid} is not a hybrid, cannot get left and right sequences"
+            )
 
 
 # def compare_peptide_seq_to_spectrum(
@@ -719,6 +713,37 @@ def convert_comet_psms_to_custom_psms(
             data = add_comet_specific_info_to_dict(d=data, psm=psm)
             results.append(data)
     return results
+
+
+def hybrid_psm_plot(
+    spectrum: Spectrum,
+    hy_comet_psm: CometPSM,
+    ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL,
+    ax: Axes | None = None,
+):
+    assert hy_comet_psm.is_hybrid
+    # left_seq, right_seq = hy_comet_psm.get_left_and_right_seq_if_hybrid()
+    assert (
+        len(hy_comet_psm.proteins) == 1
+    ), f"Expected exactly one hybrid protein for PSM with uid {hy_comet_psm.uid}, found {len(hy_comet_psm.proteins)}:\n{hy_comet_psm.proteins}"
+    comp = PeptideSeqSpectrumComparer(
+        spectrum=spectrum, seq=hy_comet_psm.seq, peak_to_ion_ppm_tol=ppm_tol
+    )
+    if ax is None:
+        _, axs = fig_setup()
+        ax = axs[0]
+    title_additions = (
+        f"{hy_comet_psm.proteins[0]}\n"
+        f"Prefixes supported: {comp.b_ions_supported_ignore_charge}\n"
+        f"Suffixes supported: {comp.y_ions_supported_ignore_charge}\n"
+    )
+    spectrum_peptide_plot(
+        spectrum=spectrum,
+        seq=hy_comet_psm.seq,
+        ppm_tol=ppm_tol,
+        ax=ax,
+        title_additions=title_additions,
+    )
 
 
 class ProteinAbundance(BaseModel):

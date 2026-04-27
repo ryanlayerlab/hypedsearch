@@ -86,8 +86,8 @@ class Spectrum(BaseModel):
     ):
         precursor_peaks = list(
             filter(
-                lambda peak: mass_difference_in_ppm(
-                    mass1=peak.mz, mass2=self.precursor_mz
+                lambda peak: abs(
+                    mass_difference_in_ppm(mass1=peak.mz, mass2=self.precursor_mz)
                 )
                 <= peak_to_ion_ppm_tol,
                 self.peaks,
@@ -258,6 +258,13 @@ class Spectrum(BaseModel):
             # Update boolean that tracks whether peaks where preprocessed
             self.peaks_preprocessed = True
 
+    @property
+    def plot_title(self):
+        return (
+            f"MZML={self.mzml.stem}; scan={self.scan}\n"
+            + f"RT={self.retention_time:.2f}; m/z={self.precursor_mz:.2f}; z={self.precursor_charge}; intensity={self.precursor_intensity:.1f}"
+        )
+
     def plot(
         self,
         ax: Optional[Axes] = None,
@@ -273,17 +280,13 @@ class Spectrum(BaseModel):
         if ax is None:
             _, axs = fig_setup()
             ax = axs[0]
-        title = (
-            f"MZML={self.mzml.stem}; scan={self.scan}\n"
-            + f"RT={self.retention_time:.2f}; m/z={self.precursor_mz:.2f}; z={self.precursor_charge}; intensity={self.precursor_intensity:.1f}"
-        )
         plot_peaks(
             ax=ax,
             peaks=self.peaks,
             annotate=annotate,
             alpha=alpha,
             log_intensity=log_intensity,
-            title=title,
+            title=self.plot_title,
             color=color,
         )
         top = None

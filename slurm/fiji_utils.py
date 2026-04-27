@@ -10,10 +10,7 @@ from typing import List, Optional, Union
 import click
 import pandas as pd
 
-from src.constants import (
-    DEFAULT_JCT_LEN,
-    DEFAULT_Q_THRESHOLD,
-)
+from src.constants import DEFAULT_JCT_LEN, DEFAULT_Q_THRESHOLD
 from src.hypedsearch import HypedsearchRunConfig, run_hypedsearch
 from src.utils import (
     PathType,
@@ -212,7 +209,7 @@ class HypedsearchRunScripts:
             )
 
     def create_script_for_hybrid_run_via_slurm(self):
-        # nodes = ["fijinode-67", "fijinode-68", "fijinode-69"]
+        nodes = ["fijinode-67", "fijinode-68", "fijinode-69"]
         lines = [SHEBANG]
         idx = 0
         for config in self.configs:
@@ -223,8 +220,8 @@ class HypedsearchRunScripts:
                 '--part "highmem"',
                 '--time "24:00:00"',
                 "--cores 180",
-                # f'--nodelist "{nodes[idx % len(nodes)]}"',
-                f'--cmd "python -m cli run-hypedsearch -c {config.config_path} -n 100 -os -p"',
+                f'--nodelist "{nodes[idx % len(nodes)]}"',
+                f'--cmd "python -m cli run-hypedsearch -c {config.config_path} -n 10 -os -p"',
             ]
             lines.append(" ".join(cmd_parts))
             idx += 1

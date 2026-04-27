@@ -70,8 +70,11 @@ class Test_NativeVsHybridComparison:
 
 
 # def test_smoke(test_data_dir):
-#     comp = default_native_vs_hybrid_comparsion(test_data_dir)
-#     spectrum = comp.uid_to_spectrum["mzml=BMEM_AspN_Fxn4;scan=2799"]
-#     spectrum.get_total_intensity()
-#     comp.uid_to_spectrum_results
-#     pass
+#     # comp = default_native_vs_hybrid_comparsion(test_data_dir)
+#     # spectrum = comp.uid_to_spectrum["mzml=BMEM_AspN_Fxn4;scan=2799"]
+#     # spectrum.get_total_intensity()
+#     # comp.uid_to_spectrum_results
+#     comp = NativeVsHybridComparison.from_config(
+#         config="results/04-17-26_HuIslet_AspN_11_100uM_C381_6hr/inputs/hs_config.json"
+#     )
+#     comp.create_psm_dataframes(psm_types=["hybrid_targets"])

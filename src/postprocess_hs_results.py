@@ -44,8 +44,11 @@ from src.plot_utils import (
 from src.psm import (
     CometPSM,
     CometRunAnalysis,
+    PeptideSeqSpectrumComparer,
     convert_comet_psms_to_custom_psms,
     create_xcorr_dists_plot,
+    hybrid_psm_plot,
+    spectrum_peptide_plot,
 )
 from src.utils import to_json
 
@@ -499,6 +502,17 @@ class HypedsearchSpectrumResults:
     def uid(self):
         return self.spectrum.uid
 
+    def create_top_hybrid_psm_plot(
+        self, ppm_tol: float = DEFAULT_PEAK_TO_ION_PPM_TOL, ax: Axes | None = None
+    ):
+        if ax is None:
+            _, axs = fig_setup()
+            ax = axs[0]
+        hy_psm = self.hybrid_targets.top_psm_by_xcorr
+        hybrid_psm_plot(
+            spectrum=self.spectrum, hy_comet_psm=hy_psm, ppm_tol=ppm_tol, ax=ax
+        )
+
 
 class NativeVsHybridComparison(BaseModel):
     native_run: CometRunAnalysis
@@ -598,7 +612,10 @@ class NativeVsHybridComparison(BaseModel):
         finalize(ax)
 
     def create_native_vs_hybrid_xcorr_range_change_plot(
-        self, ax: Axes | None = None, title: str = "", top_n_psms: Optional[int] = None
+        self,
+        # ax: Axes | None = None,
+        title: str = "",
+        top_n_psms: Optional[int] = None,
     ):
         # Create dataframe
         df = []
@@ -627,9 +644,9 @@ class NativeVsHybridComparison(BaseModel):
         df = pd.DataFrame(df)
 
         # Make plot
-        if ax is None:
-            fig, axs = fig_setup()
-            ax = axs[0]
+        # if ax is None:
+        #     _, axs = fig_setup()
+        #     ax = axs[0]
         s = 7
         # _ = sns.scatterplot(
         #     y=df.hybrid_max_xcorr - df.native_max_xcorr,

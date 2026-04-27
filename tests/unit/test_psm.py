@@ -189,7 +189,3 @@ class Test_PeakIonMatch:
         # Assert
         for peak_ion_match in peak_ion_matches:
             assert abs(peak_ion_match.ppm_diff) <= ppm_tol
-
-
-# def test_smoke(test_data_dir):
-#     pass

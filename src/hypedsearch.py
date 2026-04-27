@@ -452,7 +452,10 @@ class HypedsearchRunConfig:
 
     @cached_property
     def hybrid_comet_run(self):
-        return CometRunAnalysis(targets=self.hybrid_target_psms, interpolate=False)
+        return CometRunAnalysis(
+            targets=self.hybrid_target_psms,
+            assign_conf=self.native_assign_confidence_psms,
+        )
 
     # Class methods
     @classmethod
@@ -767,6 +770,7 @@ def hybrid_run_on_spectrum(
     out_dir: Path,
     crux_path: Optional[str | Path] = None,
     delete_hybrids_fasta: bool = True,
+    overwrite: bool = False,
 ):
     # Get params and constants
     mzml_name = Mzml.get_mzml_name(mzml=spectrum.mzml)
@@ -781,6 +785,11 @@ def hybrid_run_on_spectrum(
         scan_max=spectrum.scan,
         num_threads=1,
     )
+    if comet_run.standardized_comet_outputs.target.exists() and not overwrite:
+        logger.info(
+            f"Comet output for spectrum {spectrum.uid} already exists at {comet_run.standardized_comet_outputs.target} and vverwrite is False so skipping..."
+        )
+        return
 
     # Form hybrids
     hybrid_seq_to_position_strs = params.form_hybrids(spectrum=spectrum)
@@ -872,7 +881,12 @@ def run_hypedsearch(
     hs_config = HypedsearchRunConfig.from_json(path=config)
 
     # Get spectra to run Hypedsearch on
-    missing_spectra = hs_config.get_spectra_with_no_hybrid_results()
+    # missing_spectra = hs_config.get_spectra_with_no_hybrid_results()
+    spectra = [
+        sp
+        for sp in hs_config.spectra
+        if sp.precursor_charge <= hs_config.hybrid_run_params.max_precursor_charge
+    ]
 
     # Run Hypedsearch
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -880,10 +894,6 @@ def run_hypedsearch(
         logger.info(f"Running Hypedsearch with FASTA dir: {tmp_dir}")
         if run_in_parallel:
             logger.info("Running HypedSearch in parallel.")
-            # logger.info("Pickling shared params...")
-            # params_path = hs_config.hybrid_run_dir / "hybrid_run_params.pkl"
-            # to_pickle(obj=hs_config.hybrid_run_params, path=params_path)
-            # logger.info("Done pickling shared params.")
             process_partial = partial(
                 hybrid_run_on_spectrum,
                 params=hs_config.hybrid_run_params,
@@ -895,7 +905,7 @@ def run_hypedsearch(
             with ProcessPoolExecutor(max_workers=n_cores) as ex:
                 future_to_spectrum = {
                     ex.submit(process_partial, spectrum): spectrum.uid
-                    for spectrum in missing_spectra
+                    for spectrum in spectra
                 }
                 # Process results as they complete, catching failures
                 results = []
@@ -919,7 +929,7 @@ def run_hypedsearch(
 
         else:
             logger.info("Running HypedSearch in serial")
-            for spectrum in missing_spectra:
+            for spectrum in spectra:
                 hybrid_run_on_spectrum(
                     spectrum=spectrum,
                     params=hs_config.hybrid_run_params,
