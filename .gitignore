@@ -164,4 +164,5 @@ dev_code
 fastas/SwissProt.TAW_mouse_w_NOD_IAPP.fasta.*
 fastas/uniprotkb_proteome_UP000005640_AND_revi_2025_04_29.fasta.*
 process_samples
-kmer_dbscomet/
+kmer_dbs
+comet/
