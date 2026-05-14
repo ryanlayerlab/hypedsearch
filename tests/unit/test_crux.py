@@ -148,6 +148,24 @@ class Test_Crux:
             psms = CometPSM.from_txt(txt=out_path)
             assert len(psms) > 0
 
+        @staticmethod
+        def test_catch_nan_error(tmp_path, test_data_dir):
+            # Arrange
+            crux = Crux()
+            out_path = tmp_path / "assign-confidence.target.txt"
+            target_txt = (
+                test_data_dir
+                / "HuIslet_AspN_01_Baseline_NoTreatment_0hr.comet.0-0.target.txt"
+            )
+            # Act
+            crux.run_assign_confidence(
+                target_txts=[target_txt],
+                out_path=out_path,
+            )
+            # Assert
+            psms = CometPSM.from_txt(txt=out_path)
+            assert len(psms) > 0
+
 
 class Test_run_comet_on_custom_seqs:
     @staticmethod

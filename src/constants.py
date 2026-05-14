@@ -33,7 +33,7 @@ DEFAULT_NUM_COMET_THREADS = 0
 DEFAULT_JCT_LEN = 3
 DEFAULT_NATIVE_RUN_CONFIG = "native_run.smk.json"
 TRUE_HYBRIDS_PATH = DATA_DIR / "true_hybrids/true_hybrids.json"
-
+HS_CONFIG_SUFFIX = ".config.json"
 FASTAS_DIR = (GIT_REPO_DIR / "fastas").relative_to(GIT_REPO_DIR)
 MOUSE_PROTEOME = FASTAS_DIR / "SwissProt.TAW_mouse_w_NOD_IAPP.fasta"
 MOUSE_PROTEOME_FM_IDX = FASTAS_DIR / "SwissProt.TAW_mouse_w_NOD_IAPP.mfmindex"

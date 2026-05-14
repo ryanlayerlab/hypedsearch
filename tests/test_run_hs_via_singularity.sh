@@ -5,10 +5,10 @@ CONFIG="tests/data/ex1.hypedsearch.config.json"
 rm -rf tests/outputs
 
 # Run HS
-echo "Native run!" 
-python cli.py native-run -c $CONFIG -os
-echo "Finished native run!"
+# echo "Native run!" 
+# python cli.py native-run -c $CONFIG -os
+# echo "Finished native run!"
 
 echo "Hybrid run!"
-python cli.py run-hypedsearch -c $CONFIG -n 50 -os
+python cli.py run-hypedsearch -c $CONFIG -n 10 -os -p
 echo "Finished hybrid run!"

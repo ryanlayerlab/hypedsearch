@@ -128,3 +128,26 @@ class Test_april_15_2026:
         hs_config.get_spectra_with_no_hybrid_results()
 
         pass
+
+
+class Test_april_28_2026:
+    @staticmethod
+    def test_smoke(tmp_path):
+        # Arrange
+        hybrid_run_params = HypedsearchRunConfig.from_json(
+            path="results/04-26-26_260119_HuIslet_TimeCourse_Procal_Spiked/inputs/HuIslet_AspN_12_100uM_C381_18hr.config.json"
+        ).hybrid_run_params
+        mzml = "data/260119_HuIslet_TimeCourse_Procal_Spiked/HuIslet_AspN_12_100uM_C381_18hr.mzML"
+        scan = 1175597
+        crux_path = MAC_CRUX_EXECUTABLE
+        # Act
+        hybrid_run_on_spectrum(
+            spectrum=Spectrum.get_spectrum(mzml=mzml, scan=scan),
+            params=hybrid_run_params,
+            fasta_dir=tmp_path,
+            crux_path=crux_path,
+            overwrite=True,
+            out_dir=tmp_path,
+        )
+
+        pass

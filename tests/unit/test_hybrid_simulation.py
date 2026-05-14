@@ -3,16 +3,18 @@ from pathlib import Path
 
 from src.constants import MAC_CRUX_EXECUTABLE, MOUSE_PROTEOME
 from src.hybrid_simulation import (
+    DEFAULT_HYBRID_SIM_CONFIG_NAME,
     RANDOM,
     HybridSimulationExperiment,
     create_new_kmer_db_and_fasta_for_simulation_with_hybrid_as_new_prots,
     cut_seq_into_hybrid,
+    run_hybrid_simulation_experiment,
     run_hybrid_simulation_on_spectrum,
     validate_hybrid_for_hybrid_simulation,
 )
 from src.hypedsearch import HybridRunParams
 from src.kmer_database import KmerDatabase
-from src.mass_spectra import Mzml
+from src.mass_spectra import Mzml, Spectrum
 from src.peptides_and_ions import Fasta, Peptide
 from src.psm import CometPSM
 from src.utils import load_json, to_json
@@ -151,7 +153,7 @@ class Test_run_hybrid_simulation_on_spectrum:
         hdir = tmp_path / "hybrids"
         mzml = Mzml(path=mouse_mzml_path)
         hdir.mkdir(parents=True, exist_ok=True)
-        run_hybrid_simulation_on_spectrum(
+        txt = run_hybrid_simulation_on_spectrum(
             scan=7,
             hybrid_run_params=HybridRunParams.load(
                 path=test_data_dir / "hybrid_run_params.json"
@@ -159,16 +161,9 @@ class Test_run_hybrid_simulation_on_spectrum:
             mzml=mzml,
             left_seq="SAAPAAGS",
             right_seq="APAAAEEKK",
-            native_out_dir=ndir,
-            hybrid_out_dir=hdir,
+            out_dir=tmp_path,
             crux_path=MAC_CRUX_EXECUTABLE,
         )
-        txt = ndir / f"{mzml.name}.comet.7-7.target.txt"
-        assert txt.exists()
-        assert len(CometPSM.from_txt(txt=txt)) > 0
-
-        txt = hdir / f"{mzml.name}.comet.7-7.target.txt"
-        assert txt.exists()
         h_psms = CometPSM.from_txt(txt=txt)
         assert len(h_psms) > 0
         assert h_psms[0].seq == "SAAPAAGSAPAAAEEKK"
@@ -185,38 +180,74 @@ class Test_HybridSimulationExperiment:
             exp = HybridSimulationExperiment.create_experiment(
                 hybrid_run_params=test_data_dir / "hybrid_run_params.json",
                 mzml=mouse_mzml_path,
-                psms=psms,
+                psms=psms[:20],
                 parent_out_dir=tmp_path,
             )
-            pass
+            assert (tmp_path / DEFAULT_HYBRID_SIM_CONFIG_NAME).exists()
 
-    class Test_run_experiment_in_parallel:
-        @staticmethod
-        def test_smoke(tmp_path, mouse_mzml_path, test_data_dir):
-            # Arrange
-            mzml = Mzml(path=mouse_mzml_path)
-            exp = HybridSimulationExperiment(
-                hybrid_run_params=HybridRunParams.load(
-                    path=test_data_dir / "hybrid_run_params.json"
-                ),
-                mzml=mzml,
-                scan_to_left_right_seq={
-                    7: ("SAAPAAGS", "APAAAEEKK"),
-                    10: ("SAAP", "AAGSAPAAAEEKK"),
-                },
-                parent_out_dir=tmp_path,
-            )
-            # Act
-            exp.run_experiment_in_parallel(n_cores=2, crux_path=MAC_CRUX_EXECUTABLE)
-            # Assert
-            # Native results
-            assert len(list(exp.native_out_dir.glob("*.txt"))) == 2
-            for txt in exp.native_out_dir.glob("*.txt"):
-                assert len(CometPSM.from_txt(txt)) > 0
-            # Hybrid results
-            assert len(list(exp.hybrid_out_dir.glob("*.txt"))) == 2
-            for txt in exp.hybrid_out_dir.glob("*.txt"):
-                assert len(CometPSM.from_txt(txt)) > 0
+    # class Test_run_e   xperiment_in_parallel:
+    @staticmethod
+    def test_run_hybrid_simulation_on_spectrum(
+        tmp_path, mouse_mzml_path, test_data_dir
+    ):
+        # Arrange
+        mzml = Mzml(path=mouse_mzml_path)
+        exp = HybridSimulationExperiment(
+            hybrid_run_params=HybridRunParams.load(
+                path=test_data_dir / "hybrid_run_params.json"
+            ),
+            mzml=mzml,
+            scan_to_left_right_seq={
+                7: ("SAAPAAGS", "APAAAEEKK"),
+                10: ("SAAP", "AAGSAPAAAEEKK"),
+            },
+            parent_out_dir=tmp_path,
+        )
+        # Act
+        exp.run_hybrid_simulation_on_spectrum(scan=10, crux_path=MAC_CRUX_EXECUTABLE)
+        # Assert
+        hy_txts = list(exp.hybrid_out_dir.glob("*.txt"))
+        assert len(hy_txts) == 1
+        h_psms = CometPSM.from_txt(txt=hy_txts[0])
+        assert h_psms[0].seq == "SAAPAAGSAPAAAEEKK"
+
+    @staticmethod
+    def test_run_experiment_in_parallel(tmp_path, mouse_mzml_path, test_data_dir):
+        # Arrange
+        mzml = Mzml(path=mouse_mzml_path)
+        exp = HybridSimulationExperiment(
+            hybrid_run_params=HybridRunParams.load(
+                path=test_data_dir / "hybrid_run_params.json"
+            ),
+            mzml=mzml,
+            scan_to_left_right_seq={
+                7: ("SAAPAAGS", "APAAAEEKK"),
+                10: ("SAAP", "AAGSAPAAAEEKK"),
+            },
+            parent_out_dir=tmp_path,
+        )
+        # Act
+        exp.run_experiment_in_parallel(n_cores=2, crux_path=MAC_CRUX_EXECUTABLE)
+        # Assert
+        hy_txts = list(exp.hybrid_out_dir.glob("*.txt"))
+        assert len(hy_txts) == 2
+        for txt in hy_txts:
+            assert len(CometPSM.from_txt(txt=txt)) > 0
+
+
+class Test_run_hybrid_simulation_experiment:
+    @staticmethod
+    def test_smoke(tmp_path, mouse_mzml_path, test_data_dir):
+        hybrid_run_params = test_data_dir / "hybrid_run_params.json"
+        exp = run_hybrid_simulation_experiment(
+            hybrid_run_params=test_data_dir / "hybrid_run_params.json",
+            mzml=mouse_mzml_path,
+            parent_out_dir=tmp_path,
+            n_cores=4,
+            crux_path=MAC_CRUX_EXECUTABLE,
+        )
+        assert len(exp.native_psms) > 0
+        assert len(exp.hybrid_psms) > 0
 
 
 class Test_april_15_2026:
@@ -243,4 +274,59 @@ class Test_april_15_2026:
         assert (
             CometPSM.from_txt(list(hybrid_dir.glob("*"))[0])[0].seq
             == left_seq + right_seq
+        )
+
+
+class Test_april_28_2026:
+    @staticmethod
+    def test_smoke(tmp_path):
+        # Arrange
+        exp = HybridSimulationExperiment.load(
+            path="results/04-14-26-BMEM_AspN_Fxn4-hybrid-sim-random/hybrid.simulation.config.json"
+        )
+        exp.run_hybrid_simulation_on_spectrum(
+            scan=3811,
+            crux_path=MAC_CRUX_EXECUTABLE,
+        )
+        assert exp.num_spectra == 1110
+        assert exp.num_spectra_where_top_hybrid_equals_top_native == 825
+        assert exp.num_spectra_where_top_hybrid_beats_top_native == 208
+
+        df = exp.add_left_and_right_support_columns(
+            df=exp.native_not_equal_hybrid_df, ppm_tol=20
+        )
+        pass
+        # mzml = "tests/data/BMEM_AspN_Fxn4.mzML"
+        # spectrum = Spectrum.get_spectrum(scan=scan, mzml=mzml)
+        # exp = HybridSimulationExperiment.load(
+        #     "results/04-14-26-BMEM_AspN_Fxn4-hybrid-sim-half/hybrid.simulation.config.json"
+        # )
+        # left_seq, right_seq = "ELGGGPGA", "GDLQT"
+        # native_out_dir = tmp_path / "native"
+        # native_out_dir.mkdir(exist_ok=True, parents=True)
+        # hybrid_out_dir = tmp_path / "hybrid"
+        # hybrid_out_dir.mkdir(exist_ok=True, parents=True)
+        # # Act
+        # run_hybrid_simulation_on_spectrum(
+        #     scan=scan,
+        #     left_seq=left_seq,
+        #     right_seq=right_seq,
+        #     mzml=Mzml(path=mzml),
+        #     hybrid_run_params=exp.hybrid_run_params,
+        #     native_out_dir=native_out_dir,
+        #     hybrid_out_dir=hybrid_out_dir,
+        #     crux_path=MAC_CRUX_EXECUTABLE,
+        # )
+
+
+class Test_may_1_2026:
+    @staticmethod
+    def test_smoke(tmp_path):
+        # Arrange
+        exp = HybridSimulationExperiment.load(
+            path="results/04-29-26-BMEM_AspN_Fxn4-hybrid-simulation-half/hybrid.simulation.config.json"
+        )
+        exp.run_hybrid_simulation_on_spectrum(
+            scan=59,
+            crux_path=MAC_CRUX_EXECUTABLE,
         )

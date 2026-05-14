@@ -237,13 +237,14 @@ def run_in_parallel(
     fcn_of_one_variable: Callable,
     input_array: List,
     parallel_type: Literal["thread", "process"] = "thread",
+    n_cores: int = 1,
 ) -> List:
     # results = []
     if parallel_type == "thread":
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=n_cores) as executor:
             results = list(executor.map(fcn_of_one_variable, input_array))
     elif parallel_type == "process":
-        with ProcessPoolExecutor() as executor:
+        with ProcessPoolExecutor(max_workers=n_cores) as executor:
             results = list(executor.map(fcn_of_one_variable, input_array))
     else:
         raise ValueError(
@@ -537,3 +538,10 @@ def delete_empty_files(directory):
         if file.is_file() and file.stat().st_size == 0:
             file.unlink()  # delete the file
             print(f"Deleted empty file: {file}")
+
+
+def check_if_file_is_empty(path: Union[str, Path]) -> bool:
+    path = Path(path)
+    if not path.is_file():
+        raise ValueError(f"{path} is not a valid file")
+    return path.stat().st_size == 0

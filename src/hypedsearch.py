@@ -51,6 +51,7 @@ from src.mass_spectra import (
     Spectrum,
     create_sample_scan_to_spectrum_map,
     organize_by_spectrum_uid,
+    plot_spectra_histograms,
 )
 from src.peptides_and_ions import Fasta, Peptide, get_proteins_by_name
 from src.plot_utils import (
@@ -68,6 +69,8 @@ from src.psm import (
     create_xcorr_dists_plot,
 )
 from src.utils import (
+    CmdLineResult,
+    check_if_file_is_empty,
     flatten_list_of_lists,
     from_pickle,
     load_json,
@@ -486,7 +489,8 @@ class HypedsearchRunConfig:
             expected_outputs.add(comet_outputs.target)
         return expected_outputs
 
-    def run_native_assign_confidence(self):
+    def run_native_assign_confidence(self, overwrite: bool = False):
+        logger.info(f"Running `crux assign-confidence` for config {self.name}")
         native_target_txts = []
         for output in self.expected_native_comet_outputs:
             assert (
@@ -496,14 +500,40 @@ class HypedsearchRunConfig:
         Crux().run_assign_confidence(
             target_txts=native_target_txts,
             out_path=self.native_assign_confidence_path,
+            overwrite=overwrite,
+        )
+
+    def create_spectra_plots(self):
+        df, fig, axs = plot_spectra_histograms(
+            spectra=self.spectra,
+            # add_cnts=True
+        )
+        save_fig(
+            path=self.name_dir / "spectra_histograms.png", title=self.name, fig=fig
         )
 
     def create_native_run_plots(self):
-        fig, axs = fig_setup(1, 2)
-        self.native_comet_run.xcorr_target_vs_decoy_scatterplot(ax=axs[0])
-        self.native_comet_run.xcorr_target_and_decoy_distributions(ax=axs[1])
+        fig, axs = fig_setup(nrows=3, ncols=1)
+        self.native_comet_run.create_top_target_vs_decoy_scatterplot(ax=axs[0])
+        self.native_comet_run.create_top_target_and_decoy_xcorr_plot(ax=axs[1])
+        self.native_comet_run.create_targets_xcorr_range_plot(ax=axs[2])
         save_fig(fig=fig, path=self.native_run_dir / "xcorr_plots.png", title=self.name)
-        p = self.native_comet_run.xcorr_target_vs_decoy_jointplot()
+
+        # Protein abundance plot
+        fig, axs = fig_setup(h=10, w=8)
+        self.protein_abundance_plot(
+            ax=axs[0], q_threshold=DEFAULT_Q_THRESHOLD, top_n_prots_to_show=30
+        )
+        save_fig(
+            fig=fig,
+            path=self.native_run_dir / "protein_abundance_plot.png",
+            title=self.name,
+        )
+
+        # Pair plot
+        p = (
+            self.native_comet_run.create_xcorr_target_decoy_diff_vs_peptide_len_jointplot()
+        )
         p.fig.suptitle(self.name)
         p.savefig(self.native_run_dir / "xcorr_top_target_vs_top_decoy.png")
 
@@ -619,13 +649,16 @@ class HypedsearchRunConfig:
 
     def protein_abundance_plot(
         self,
+        ax: Axes | None = None,
         q_threshold: float = DEFAULT_Q_THRESHOLD,
         top_n_prots_to_show: Optional[int] = None,
     ):
         prot_ab = ProteinAbundance.from_comet_psms(
             psms=self.native_assign_confidence_psms, q_threshold=q_threshold
         )
-        prot_ab.plot_sorted_prot_cnts(top_n_prots=top_n_prots_to_show)
+        prot_ab.plot_sorted_prot_cnts(
+            top_n_prots=top_n_prots_to_show, ax=ax, q_threshold=q_threshold
+        )
 
     def create_kmer_db(
         self,
@@ -682,16 +715,6 @@ class HypedsearchRunConfig:
                 out_path=out_path,
             )
         logger.info("Finished combining Comet scan results")
-
-    # def analyze_native_results(
-    #     self, q_threshold: float = DEFAULT_Q_THRESHOLD, top_n_prots: int = 100
-    # ):
-    #     self.ruxcorr_plot(save=True)
-    #     prot_ab = self.get_protein_abundance(q_threshold=q_threshold)
-    #     prot_ab.plot_sorted_prot_cnts(top_n_prots=top_n_prots)
-    #     prot_ab.to_json(
-    #         path=self.results_dir / f"protein_abundance_q{q_threshold}.json"
-    #     )
 
     def check_for_missing_scans(
         self, print_missing: bool = False, raise_error: bool = False
@@ -762,7 +785,7 @@ class HypedsearchRunConfig:
             return f"{name}.comet.{scan}-{scan}.{psm_type}.txt"
 
 
-@log_time()
+@log_time(level=logging.INFO)
 def hybrid_run_on_spectrum(
     spectrum: Spectrum,
     params: HybridRunParams,
@@ -771,7 +794,7 @@ def hybrid_run_on_spectrum(
     crux_path: Optional[str | Path] = None,
     delete_hybrids_fasta: bool = True,
     overwrite: bool = False,
-):
+) -> Tuple[Optional[CmdLineResult], CometRun, Optional[Dict]]:
     # Get params and constants
     mzml_name = Mzml.get_mzml_name(mzml=spectrum.mzml)
     hybrids_fasta = fasta_dir / f"{mzml_name}.{spectrum.scan}.fasta"
@@ -787,21 +810,21 @@ def hybrid_run_on_spectrum(
     )
     if comet_run.standardized_comet_outputs.target.exists() and not overwrite:
         logger.info(
-            f"Comet output for spectrum {spectrum.uid} already exists at {comet_run.standardized_comet_outputs.target} and vverwrite is False so skipping..."
+            f"Comet output for spectrum {spectrum.uid} already exists at {comet_run.standardized_comet_outputs.target} and overwrite is False so skipping..."
         )
-        return
+        return None, comet_run, None
 
     # Form hybrids
     hybrid_seq_to_position_strs = params.form_hybrids(spectrum=spectrum)
     if len(hybrid_seq_to_position_strs) == 0:
-        logger.info(
+        logger.debug(
             f"No hybrids found for spectrum {spectrum.uid}. Skipping but creating empty Comet outputs..."
         )
         outputs = comet_run.standardized_comet_outputs
         outputs.target.touch()
         if outputs.decoy:
             outputs.decoy.touch()
-        return None, comet_run
+        return None, comet_run, None
 
     # Create FASTA containing the hybrid peptides
     mzml_name = Mzml.get_mzml_name(mzml=spectrum.mzml)
@@ -819,27 +842,28 @@ def hybrid_run_on_spectrum(
         )
     process = comet_run.run_comet_and_keep_only_results(crux_path=crux_path)
 
-    # Update the "protein" column of the Comet output to include the positions that the hybrid sequence appears
-    logger.debug(
-        "Updating 'protein' column of Comet output to include hybrid position info..."
-    )
-    hybrid_psm_df = CometPSM.from_txt(
-        txt=comet_run.standardized_comet_outputs.target, as_df=True
-    )
-    hybrid_psm_df[PROTEIN] = hybrid_psm_df[PLAIN_PEPTIDE].apply(
-        lambda seq: COMET_PROTEIN_SEPARATOR.join(hybrid_seq_to_position_strs[seq])
-    )
-    # Overwrite results file
-    hybrid_psm_df.to_csv(
-        comet_run.standardized_comet_outputs.target, sep="\t", index=False
-    )
+    if not check_if_file_is_empty(comet_run.standardized_comet_outputs.target):
+        # Update the "protein" column of the Comet output to include the positions that the hybrid sequence appears
+        logger.debug(
+            "Updating 'protein' column of Comet output to include hybrid position info..."
+        )
+        hybrid_psm_df = CometPSM.from_txt(
+            txt=comet_run.standardized_comet_outputs.target, as_df=True
+        )
+        hybrid_psm_df[PROTEIN] = hybrid_psm_df[PLAIN_PEPTIDE].apply(
+            lambda seq: COMET_PROTEIN_SEPARATOR.join(hybrid_seq_to_position_strs[seq])
+        )
+        # Overwrite results file
+        hybrid_psm_df.to_csv(
+            comet_run.standardized_comet_outputs.target, sep="\t", index=False
+        )
 
-    # Delete hybrids FASTA to save space if desired
-    if delete_hybrids_fasta:
-        logger.info("Deleting hybrids FASTA")
-        os.remove(hybrids_fasta)
+        # Delete hybrids FASTA to save space if desired
+        if delete_hybrids_fasta:
+            logger.debug("Deleting hybrids FASTA")
+            os.remove(hybrids_fasta)
 
-    return process, comet_run, hybrid_seq_to_position_strs, hybrid_psm_df
+    return process, comet_run, hybrid_seq_to_position_strs
 
 
 def create_hybrids_fasta(
@@ -893,7 +917,7 @@ def run_hypedsearch(
         # Create FASTA containing hybrids and run Comet
         logger.info(f"Running Hypedsearch with FASTA dir: {tmp_dir}")
         if run_in_parallel:
-            logger.info("Running HypedSearch in parallel.")
+            logger.info("Running in parallel")
             process_partial = partial(
                 hybrid_run_on_spectrum,
                 params=hs_config.hybrid_run_params,
@@ -928,7 +952,7 @@ def run_hypedsearch(
                 )
 
         else:
-            logger.info("Running HypedSearch in serial")
+            logger.info("Running serially")
             for spectrum in spectra:
                 hybrid_run_on_spectrum(
                     spectrum=spectrum,
@@ -937,3 +961,4 @@ def run_hypedsearch(
                     crux_path=crux_path,
                     out_dir=hs_config.hybrid_run_scan_results_dir,
                 )
+    logger.info(f"Finished running HypedSearch on config {config.name}")

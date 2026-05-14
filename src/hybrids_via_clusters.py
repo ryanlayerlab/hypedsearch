@@ -702,6 +702,7 @@ def form_spectrum_hybrids_via_clustering(
     min_cluster_support: int = 3,
     max_allowed_ion_charge: int = 4,
     remove_carbamidomethylated_hybrids: bool = True,
+    hybrid_of_interest: Optional[str] = None,
 ) -> Dict[str, Set[str]]:
     """
     This function will
@@ -709,8 +710,9 @@ def form_spectrum_hybrids_via_clustering(
     2. remove native hybrids
     3. return a dictionary mapping hybrid sequences to lists of HybridPeptide objects
     """
-    logger.info(f"Forming hybrids for spectrum ({spectrum.sample}, {spectrum.scan})")
-    start_time = time.perf_counter()
+    logger.debug(f"Forming hybrids for spectrum ({spectrum.sample}, {spectrum.scan})")
+    if hybrid_of_interest is not None:
+        left_seq, right_seq = hybrid_of_interest.split("-")
     # Form clusters
     kmer_db_prot_name_to_seq = {
         prot_name: fasta.protein_name_to_seq_map[prot_name]
@@ -722,10 +724,20 @@ def form_spectrum_hybrids_via_clustering(
         protein_name_to_seq_map=kmer_db_prot_name_to_seq,
         peak_to_ion_ppm_tol=peak_to_ion_ppm_tol,
         precursor_mz_ppm_tol=precursor_mz_ppm_tol,
-        min_cluster_len=min_side_len,
+        min_cluster_len=0,
         min_cluster_support=min_cluster_support,
         max_allowed_ion_charge=max_allowed_ion_charge,
     )
+    if hybrid_of_interest is not None:
+        left_seq_containing_clusters = [
+            bc for bc in clusters.b_clusters if left_seq in bc.extended_seq
+        ]
+        right_seq_containing_clusters = [
+            yc for yc in clusters.y_clusters if right_seq in yc.extended_seq
+        ]
+        logger.info(
+            f"There are {len(left_seq_containing_clusters)} b-clusters containing {left_seq} and {len(right_seq_containing_clusters)} y-clusters containing {right_seq}"
+        )
     hybrids = form_hybrids_from_clusters(
         b_clusters=clusters.b_clusters,
         y_clusters=clusters.y_clusters,
@@ -741,9 +753,6 @@ def form_spectrum_hybrids_via_clustering(
         hybrid_seq_to_position_strs[hybrid.seq].add(
             hybrid.get_position_str(protein_name_to_seq_map=kmer_db_prot_name_to_seq)
         )
-    logger.info(
-        f"Completed forming hybrids for spectrum ({spectrum.sample}, {spectrum.scan}). It took {get_time_in_diff_units(time.perf_counter() - start_time)}"
-    )
     return dict(hybrid_seq_to_position_strs)
 
 

@@ -2,6 +2,7 @@ import datetime
 import logging
 import re
 import shutil
+import textwrap
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,6 +15,7 @@ from src.constants import DEFAULT_JCT_LEN, DEFAULT_Q_THRESHOLD
 from src.hypedsearch import HypedsearchRunConfig, run_hypedsearch
 from src.utils import (
     PathType,
+    check_if_file_is_empty,
     copy_file,
     log_params,
     setup_logger,
@@ -32,6 +34,9 @@ DEFAULT_TIME = "24:00:00"
 DEFAULT_LOG_DIR = "logs/hypedsearch"
 DEFAULT_PARTITION = "highmem"
 node_to_data_dir_map = {"": "/localscratch"}
+HIGH_MEM_NODES = [67, 68, 69, 70, 71, 73]
+SHORT_PARTITION_NUM_CPUS = 64
+SHORT_PARTITION_RAM = "450GB"
 
 
 @dataclass
@@ -183,7 +188,26 @@ class HypedsearchRunScripts:
             ConfigAndPath(config_path=config_path) for config_path in self.config_paths
         ]
 
-    def create_script_to_run_native_run_via_slurm(self):
+    def create_script_to_create_custom_psm_dfs(self, time: str = "08:00:00"):
+        lines = [SHEBANG]
+        for config in self.configs:
+            cmd_parts = [
+                RUN_CMD_SH,
+                f"--name psmDFs_{config.hs_config.name}",
+                '--mem "2GB"',
+                '--part "short"',
+                f'--time "{time}"',
+                "--cores 2",
+                f'--cmd "python cli.py create-psm-dfs -c {config.config_path}"',
+            ]
+            lines.append(" ".join(cmd_parts))
+        write_new_line_separated_file(
+            lines=lines, path=self.script_dir / "create_custom_psm_dfs_via_slurm.sh"
+        )
+
+    def create_script_to_run_native_run_via_slurm(
+        self, n_cores: int = 60, time: str = "10:00:00"
+    ):
         lines = [SHEBANG]
         for config in self.configs:
             cmd_parts = [
@@ -191,8 +215,8 @@ class HypedsearchRunScripts:
                 f"--name {config.hs_config.name}_nativeRun",
                 '--mem "5GB"',
                 '--part "short"',
-                '--time "10:00:00"',
-                "--cores 60",
+                f'--time "{time}"',
+                f"--cores {n_cores}",
                 f'--cmd "python -m cli native-run -os -c {config.config_path}"',
             ]
             lines.append(" ".join(cmd_parts))
@@ -208,8 +232,10 @@ class HypedsearchRunScripts:
                 lines=lines, path=self.script_dir / "native_run_locally.sh"
             )
 
-    def create_script_for_hybrid_run_via_slurm(self):
-        nodes = ["fijinode-67", "fijinode-68", "fijinode-69"]
+    def create_script_for_hybrid_run_via_slurm(
+        self, n_cores: int = 10, nodes: List[int] = HIGH_MEM_NODES
+    ):
+        fiji_nodes_to_use = [f"fijinode-{num}" for num in nodes]
         lines = [SHEBANG]
         idx = 0
         for config in self.configs:
@@ -220,13 +246,70 @@ class HypedsearchRunScripts:
                 '--part "highmem"',
                 '--time "24:00:00"',
                 "--cores 180",
-                f'--nodelist "{nodes[idx % len(nodes)]}"',
-                f'--cmd "python -m cli run-hypedsearch -c {config.config_path} -n 10 -os -p"',
+                f'--nodelist "{fiji_nodes_to_use[idx % len(nodes)]}"',
+                f'--cmd "python -m cli run-hypedsearch -c {config.config_path} -n {n_cores} -os -p"',
             ]
             lines.append(" ".join(cmd_parts))
             idx += 1
         write_new_line_separated_file(
             lines=lines, path=self.script_dir / "hybrid_run_via_slurm.sh"
+        )
+
+    def slurm_script_for_hybrid_run_on_short_nodes(
+        self, n_cores: int = 10, script_name: str = "short_partition_hybrid_run.sh"
+    ):
+        lines = [SHEBANG]
+        idx = 0
+        for config in self.configs:
+            cmd_parts = [
+                RUN_CMD_SH,
+                f"--name {config.hs_config.name}_hybridRun",
+                f'--mem "{SHORT_PARTITION_RAM}"',
+                '--part "short"',
+                '--time "23:00:00"',
+                f"--cores {SHORT_PARTITION_NUM_CPUS}",
+                f'--cmd "python -m cli run-hypedsearch -c {config.config_path} -n {n_cores} -os -p"',
+            ]
+            lines.append(" ".join(cmd_parts))
+            idx += 1
+        write_new_line_separated_file(lines=lines, path=self.script_dir / script_name)
+
+    def create_script_for_native_plots_via_slurm(self):
+        lines = [SHEBANG]
+        idx = 0
+        for config in self.configs:
+            cmd_parts = [
+                RUN_CMD_SH,
+                f"--name natPlots_{config.hs_config.name}",
+                '--mem "1GB"',
+                '--part "short"',
+                '--time "01:00:00"',
+                "--cores 1",
+                f'--cmd "python cli.py create-native-plots -c {config.config_path}"',
+            ]
+            lines.append(" ".join(cmd_parts))
+            idx += 1
+        write_new_line_separated_file(
+            lines=lines, path=self.script_dir / "create_native_plots_via_slurm.sh"
+        )
+
+    def create_script_for_hybrid_plots_via_slurm(self):
+        lines = [SHEBANG]
+        idx = 0
+        for config in self.configs:
+            cmd_parts = [
+                RUN_CMD_SH,
+                f"--name hyPlots_{config.hs_config.name}",
+                '--mem "1GB"',
+                '--part "short"',
+                '--time "01:00:00"',
+                "--cores 1",
+                f'--cmd "python cli.py create-hybrid-plots -c {config.config_path}"',
+            ]
+            lines.append(" ".join(cmd_parts))
+            idx += 1
+        write_new_line_separated_file(
+            lines=lines, path=self.script_dir / "create_hybrid_plots_via_slurm.sh"
         )
 
     def create_script_for_local_hybrid_run(self):
@@ -246,7 +329,7 @@ class HypedsearchRunScripts:
         for config in self.configs:
             cmd_parts = [
                 RUN_CMD_SH,
-                f"--name {config.hs_config.name}_combineCometTxts",
+                f"--name combineHyTxts_{config.hs_config.name}",
                 '--mem "2GB"',
                 '--part "short"',
                 '--time "01:00:00"',
@@ -257,6 +340,35 @@ class HypedsearchRunScripts:
         write_new_line_separated_file(
             lines=lines, path=self.script_dir / "combine_hybrid_txts_via_slurm.sh"
         )
+
+    def create_python_script_to_see_if_hybrid_run_txts_were_combined(self):
+        config_paths_str = ", ".join(
+            [f'Path("{str(config.config_path)}")' for config in self.configs]
+        )
+        script = f"""
+        import sys
+        from pathlib import Path
+        repo_dir = Path(__file__).parents[3]
+        assert (
+            repo_dir.name == "hypedsearch"
+        ), f"Expected repo_dir to be 'hypedsearch'"
+        sys.path.append(str(repo_dir))
+        from src.hypedsearch import HypedsearchRunConfig
+        finished_configs, not_finished_configs = [], []
+        for config_path in [{config_paths_str}]:
+            hs_config = HypedsearchRunConfig.from_json(path=config_path)
+            if len(list(hs_config.hybrid_run_dir.glob("*.txt"))) != 1:
+                not_finished_configs.append(hs_config.name)
+            else:
+                finished_configs.append(hs_config.name)
+        print(f"Finished configs: {{finished_configs}}")
+        print(f"Not finished configs: {{not_finished_configs}}")
+        """
+        script = textwrap.dedent(script).lstrip(
+            "\n"
+        )  # remove common indent and optional leading blank line
+        out_path = Path(self.script_dir / "check_if_hybrid_run_txts_were_combined.py")
+        out_path.write_text(script, encoding="utf-8")
 
     def create_script_to_check_for_missing_comet_txts_locally(self):
         lines = [SHEBANG]
@@ -306,6 +418,24 @@ class HypedsearchRunScripts:
             )
         write_new_line_separated_file(
             lines=lines, path=self.script_dir / "run_param_medic.sh"
+        )
+
+    def create_script_for_hybrid_run_on_layer_lab_computer(self, cores: int):
+        lines = [SHEBANG]
+        for config in self.configs:
+            lines.append(
+                " ".join(
+                    [
+                        "uv run python cli.py run-hypedsearch ",
+                        f"-n {cores}",
+                        "-cp ../crux-5.0.0.Linux.x86_64/bin/crux",
+                        "-p",
+                        f"-c {config.config_path}",
+                    ]
+                )
+            )
+        write_new_line_separated_file(
+            lines=lines, path=self.script_dir / "hybrid_run_on_layer_lab_comp.sh"
         )
 
     def create_all_scripts(

@@ -345,7 +345,7 @@ class CometRun(BaseModel):
                         self.standardized_comet_outputs.target.touch()  # create empty file to indicate that this was run and produced no PSMs
                         if self.standardized_comet_outputs.decoy:
                             self.standardized_comet_outputs.decoy.touch()
-                        return
+                        return process
 
                     # Move files from temp directory to final resting place
                     move_file(
@@ -363,6 +363,31 @@ class CometRun(BaseModel):
                 )
                 continue
             return process
+
+
+def run_comet(
+    fasta: Path,
+    mzml: Path,
+    crux_comet_params: Path,
+    out_dir: Path,
+    decoy_search: Literal[0, 1, 2] = 0,
+    scan_min: int = 0,
+    scan_max: int = 0,
+    num_threads: Optional[int] = None,
+    crux_path: Optional[str | Path] = None,
+) -> CometRun:
+    run = CometRun(
+        fasta=fasta,
+        mzml=mzml,
+        crux_comet_params=crux_comet_params,
+        out_dir=out_dir,
+        decoy_search=decoy_search,
+        scan_min=scan_min,
+        scan_max=scan_max,
+        num_threads=num_threads,
+    )
+    run.run_comet_and_keep_only_results(crux_path=crux_path)
+    return run
 
 
 @dataclass
@@ -416,7 +441,7 @@ class Crux:
 
     def run_assign_confidence(
         self, target_txts: List[Path], out_path: Path, overwrite: bool = False
-    ):
+    ) -> CmdLineResult:
         if out_path.exists() and not overwrite:
             logger.info(
                 f"{out_path} already exists and overwrite is set to False. Skipping running `crux assign-confidence`."
@@ -433,21 +458,15 @@ class Crux:
             for txt in target_txts:
                 cmd_parts.append(str(txt))
             cmd = " ".join(cmd_parts)
-            # result = subprocess.run(
-            #     cmd, capture_output=True, text=True, shell=True, env=self.env
-            # )
-            # assert result.returncode == 0
-            logger.info(f"Running command:\n{cmd}")
-            _ = subprocess.run(
-                cmd,
-                stdout=sys.stdout,
-                stderr=sys.stderr,
-                text=True,
-                shell=True,
-            )
+            result = CmdLineRunner().run_cmd(cmd=cmd)
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"Running `crux assign-confidence` failed with return code {result.returncode}. Here's the STDERR and STDOUT:\nSTDERR:\n{result.stderr}\nSTDOUT:\n{result.stdout}"
+                )
             # Move `crux assign-conidence` to out_path
             tmp_file = tmp_path / ASSIGN_CONFIDENCE_NAME
             shutil.copy(tmp_file, out_path)
+        return result
 
 
 def run_comet_on_custom_seqs(

@@ -199,7 +199,7 @@ class Spectrum(BaseModel):
     @classmethod
     def parse_ms2_from_mzml(
         cls, mzml: Union[str, Path], by_uid: bool = False, as_df: bool = False
-    ) -> List["Spectrum"]:
+    ) -> Union[List["Spectrum"], Dict[str, "Spectrum"], pd.DataFrame]:
         logger.info(f"Parsing MS2 spectra from mzML file: {mzml}")
         mzml_path = Path(mzml).absolute()
         ms2_spectra = []
@@ -433,7 +433,7 @@ class Spectrum(BaseModel):
     @staticmethod
     def create_spectra_df(spectra: List["Spectrum"]):
         df = pd.DataFrame(
-            data=[spectrum.info() for spectrum in spectra],
+            data=[spectrum.info for spectrum in spectra],
         )
         return df
 
@@ -567,7 +567,14 @@ def spectra_pairplot(spectra: List[Spectrum]):
         ],
         columns=["precursor_mz", "charge", "precursor_abundance", "retention_time"],
     )
-    return sns.pairplot(data=spec_df, corner=True, plot_kws={"s": 7})
+    g = sns.pairplot(
+        data=spec_df,
+        corner=True,
+        plot_kws={"s": 7},
+        diag_kind="hist",
+    )
+    for i in range(len(g.axes)):
+        g.axes[i, i].set_visible(False)
 
 
 def get_indices_of_largest_elements(array: List[float], top_n: int):
@@ -691,88 +698,6 @@ def create_spectra_df(
         rows.append(data)
     df = pd.DataFrame(rows)
     return df
-
-
-def create_spectra_plots(
-    spectra: List[Spectrum],
-    sample: str,
-    out_dir: Optional[Path] = None,
-    max_precursor_charge: int = DEFAULT_MAX_PRECURSOR_CHARGE,
-) -> pd.DataFrame:
-    spectrum_df = Spectrum.create_spectra_df(spectra=spectra)
-    if out_dir is not None:
-        spectrum_df.to_csv(out_dir / SPECTRA_DF_NAME, index=False)
-    charge_cnter = dict(
-        sorted(Counter(spectrum_df.z).items(), key=lambda item: item[1], reverse=True)
-    )
-    subset_spectrum_df = spectrum_df[spectrum_df.z <= max_precursor_charge]
-
-    fig_title = f"{sample} spectra w/z<={max_precursor_charge}\n Num spectra per charge counter:\n{charge_cnter}"
-
-    # Plot of peak intensity captured vs number of peaks
-    fig, axs = peak_intensity_captured_plot(
-        spectra=[
-            spectrum
-            for spectrum in spectra
-            if spectrum.precursor_charge <= max_precursor_charge
-        ]
-    )
-    if out_dir is not None:
-        save_fig(
-            path=out_dir / "spectra_peak_intensity_captured.png",
-            fig=fig,
-            title=fig_title,
-        )
-
-    # Pairplots
-    colms = [
-        "mz",
-        "z",
-        "intensity",
-        "rt",
-        "num_peaks",
-        "total_intensity",
-        "gini",
-        "num_peaks_to_capture0.75",
-    ]
-    g = sns.pairplot(data=subset_spectrum_df[colms], corner=True, plot_kws={"s": 7})
-    g.figure.suptitle(fig_title, fontsize=16, fontweight="bold")
-    if out_dir is not None:
-        save_fig(
-            path=out_dir / "spectra_pairplot.png",
-        )
-    g = sns.pairplot(
-        data=subset_spectrum_df[colms],
-        hue="z",
-        corner=True,
-        plot_kws={"s": 7},
-    )
-    g.figure.suptitle(fig_title, fontsize=16, fontweight="bold")
-    if out_dir is not None:
-        save_fig(
-            path=out_dir / "spectra_pairplot_by_charge.png",
-        )
-
-    # # Histograms
-    # df, fig, axs = plot_spectra_histograms(spectra=spectra)
-    # fig.suptitle(fig_title, fontsize=16, fontweight="bold")
-    # if out_dir is not None:
-    #     save_fig(
-    #         path=out_dir / "spectra_histograms.png",
-    #     )
-
-    # Number of spectra per precursor-m/z plot
-    fig = precursor_mz_plot(spectra=spectra, title=fig_title)
-    # fig.update_layout(title=fig_title)
-    if out_dir is not None:
-        save_fig(
-            path=out_dir / "num_spectra_per_mz.png",
-            title=fig_title,
-            fig=fig,
-        )
-        # fig.write_html(out_dir / "num_spectra_per_mz.html")
-
-    return spectrum_df
 
 
 def peak_intensity_captured_plot(spectra: List[Spectrum]):

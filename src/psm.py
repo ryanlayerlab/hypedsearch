@@ -125,6 +125,14 @@ class PeakIonMatch(BaseModel):
     def ion_name(self):
         return f"{self.ion_type}{len(self.ion_seq)}"
 
+    @property
+    def ion_name_with_charge(self):
+        return f"{self.ion_name}^{self.ion_charge}"
+
+    @property
+    def ion_name_and_seq(self):
+        return f"{self.ion_name}-{self.ion_seq}"
+
     @classmethod
     def from_psm(
         cls,
@@ -220,34 +228,72 @@ def spectrum_peptide_plot(
         peaks=[Peak(mz=ion.mz, intensity=-1 * ion_intensity) for ion in product_ions],
     )
     # Plot ions that match peaks in a different color
-    plot_peaks(
+    b_ion_color = "blue"
+    y_ion_color = "red"
+    # b-ions
+    plot_peaks(  # Plot theoretical ion peaks
         ax=ax,
         peaks=[
             Peak(mz=match.ion_mz, intensity=-1 * ion_intensity)
             for match in peak_ion_matches
+            if match.ion_type == B_ION_TYPE
         ],
-        color="red",
+        color=b_ion_color,
     )
-    # Plot peaks that match ions in a different color
-    plot_peaks(
+    plot_peaks(  # Plot spectrum peaks that match b-ions
         ax=ax,
         peaks=[
             Peak(mz=match.peak_mz, intensity=match.peak_intensity)
             for match in peak_ion_matches
+            if match.ion_type == B_ION_TYPE
         ],
-        color="red",
-        label="peak-to-ion matches",
+        color=b_ion_color,
+        label="b-ion matches",
+    )
+    # y-ions
+    plot_peaks(  # Plot theoretical ion peaks
+        ax=ax,
+        peaks=[
+            Peak(mz=match.ion_mz, intensity=-1 * ion_intensity)
+            for match in peak_ion_matches
+            if match.ion_type == Y_ION_TYPE
+        ],
+        color=y_ion_color,
+    )
+    plot_peaks(  # Plot spectrum peaks that match b-ions
+        ax=ax,
+        peaks=[
+            Peak(mz=match.peak_mz, intensity=match.peak_intensity)
+            for match in peak_ion_matches
+            if match.ion_type == Y_ION_TYPE
+        ],
+        color=y_ion_color,
+        label="y-ion matches",
     )
     # Plot y=0 line
     ax.axhline(0, color="black", linestyle="-", linewidth=0.5)
 
     # Finishing touches
     ax.set_ylim(bottom=-ion_intensity * 1.2)
+    b_matches = sorted(
+        [
+            pi.ion_name_with_charge
+            for pi in peak_ion_matches
+            if pi.ion_type == B_ION_TYPE
+        ]
+    )
+    y_matches = sorted(
+        [
+            pi.ion_name_with_charge
+            for pi in peak_ion_matches
+            if pi.ion_type == Y_ION_TYPE
+        ]
+    )
     set_title_axes_labels(
         ax=ax,
         xlabel="m/z",
         ylabel="Intensity",
-        title=f"{spectrum.plot_title}\nseq={seq}\n{title_additions}",
+        title=f"{spectrum.plot_title}\nseq={seq}\nb-ions found: {b_matches}\ny-ions found: {y_matches}\n{title_additions}",
     )
     finalize(ax)
     return ax
@@ -435,6 +481,19 @@ class CometPSM:
             data=[asdict(psm) for psm in psms],
             path=path,
         )
+
+    @staticmethod
+    def organize_psms_by_uid_sorted_by_num(
+        psms: List["CometPSM"],
+    ) -> Dict[str, List["CometPSM"]]:
+        uid_to_psms = defaultdict(list)
+        for psm in psms:
+            uid_to_psms[psm.uid].append(psm)
+        uid_to_psms = {
+            uid: sorted(psms, key=lambda psm: psm.num)
+            for uid, psms in uid_to_psms.items()
+        }
+        return uid_to_psms
 
     def to_dict(self):
         data = asdict(self)
@@ -662,9 +721,35 @@ class PeptideSeqSpectrumComparer:
             left_support, right_support = self.hybrid_support(
                 left_seq=left_seq, right_seq=right_seq
             )
+            data["left_seq"] = left_seq
+            data["right_seq"] = right_seq
             data["hybrid_left_support"] = left_support
             data["hybrid_right_support"] = right_support
         return data
+
+    def plot(self):
+        return spectrum_peptide_plot(
+            spectrum=self.spectrum,
+            seq=self.seq,
+            ppm_tol=self.peak_to_ion_ppm_tol,
+        )
+
+    def ion_support_for_left_seq(self, left_seq: str):
+        mask = self.seq[: len(left_seq)] == left_seq
+        if mask is False:
+            pass
+        assert (
+            self.seq[: len(left_seq)] == left_seq
+        ), f"Left sequence {left_seq} is not a prefix of full sequence {self.seq}"
+        theoretical_b_ions = {f"b{idx}" for idx in range(1, len(left_seq) + 1)}
+        return theoretical_b_ions.intersection(self.b_ions_supported_ignore_charge)
+
+    def ion_support_for_right_seq(self, right_seq: str):
+        assert (
+            self.seq[-len(right_seq) :] == right_seq
+        ), f"Right sequence {right_seq} is not a suffix of full sequence {self.seq}"
+        theoretical_y_ions = {f"y{idx}" for idx in range(1, len(right_seq) + 1)}
+        return theoretical_y_ions.intersection(self.y_ions_supported_ignore_charge)
 
 
 def convert_comet_psms_to_custom_psms(
@@ -686,7 +771,7 @@ def convert_comet_psms_to_custom_psms(
         uid_to_spectrum = {spectrum.uid: spectrum for spectrum in spectra}
     results = []
     for idx, psm in enumerate(comet_psms):
-        print(f"Processing PSM {idx+1} of {len(comet_psms)}", end="\r")
+        # print(f"Processing PSM {idx+1} of {len(comet_psms)}", end="\r")
         if psm.is_hybrid:
             for hy_str in psm.proteins:
                 hy_pep = HybridPeptide.parse_hybrid_peptide_str(hybrid_str=hy_str)
@@ -821,6 +906,7 @@ class ProteinAbundance(BaseModel):
         ax: Optional[Axes] = None,
         title: Optional[str] = None,
         out_path: Optional[Union[str, Path]] = None,
+        q_threshold: Optional[float] = None,
     ) -> Axes:
         # Define data
         if len(self.protein_counts) == 0:
@@ -848,12 +934,14 @@ class ProteinAbundance(BaseModel):
                 ha="center",
                 fontsize=9,
             )
-
+        ylabel = "PSM counts"
+        if q_threshold is not None:
+            ylabel += f" (q<{q_threshold})"
         set_title_axes_labels(
             ax=ax,
             title=title,
             xlabel="Protein",
-            ylabel="PSM counts",
+            ylabel=ylabel,
         )
         finalize(ax)
         if out_path:
@@ -996,6 +1084,45 @@ def create_xcorr_dists_plot(
     return ax
 
 
+def create_xcorr_range_plot(
+    uid_to_psms: Dict[str, List[CometPSM]],
+    s: int = 7,
+    ax: Axes | None = None,
+    title: str = "",
+):
+    data = []
+    num_psms_per_uid = []
+    for uid, psms in uid_to_psms.items():
+        num_psms_per_uid.append(len(psms))
+        max_xcorr = max(psm.xcorr for psm in psms)
+        min_xcorr = min(psm.xcorr for psm in psms)
+        data.append(
+            {
+                "max_xcorr": max_xcorr,
+                "xcorr_range": max_xcorr - min_xcorr,
+            }
+        )
+    data = pd.DataFrame(data)
+    if ax is None:
+        _, axs = fig_setup()
+        ax = axs[0]
+
+    _ = sns.scatterplot(
+        x=data["max_xcorr"],
+        y=data["xcorr_range"],
+        ax=ax,
+        s=s,
+    )
+    set_title_axes_labels(
+        ax=ax,
+        title=f"{title}\nnum PSMs/uid: {dict(Counter(num_psms_per_uid))}",
+        xlabel="Max xcorr",
+        ylabel="Max xcorr - min xcorr",
+    )
+    finalize(ax)
+    return ax
+
+
 @dataclass
 class CometRunAnalysis:
     targets: List[CometPSM]
@@ -1101,7 +1228,19 @@ class CometRunAnalysis:
             )
         return pd.DataFrame(df)
 
-    def xcorr_target_vs_decoy_scatterplot(
+    def create_targets_xcorr_range_plot(
+        self, ax: Axes | None = None, title: str | None = None
+    ):
+        if ax is None:
+            _, axs = fig_setup()
+            ax = axs[0]
+        return create_xcorr_range_plot(
+            uid_to_psms=self.uid_to_targets,
+            s=7,
+            ax=ax,
+        )
+
+    def create_top_target_vs_decoy_scatterplot(
         self, ax: Optional[Axes] = None, title: Optional[str] = None
     ):
         if ax is None:
@@ -1124,7 +1263,7 @@ class CometRunAnalysis:
         finalize(ax)
         return ax
 
-    def xcorr_target_vs_decoy_jointplot(
+    def create_xcorr_target_decoy_diff_vs_peptide_len_jointplot(
         self,
         title: Optional[str] = None,
     ):
@@ -1144,7 +1283,7 @@ class CometRunAnalysis:
 
         return p
 
-    def xcorr_target_and_decoy_distributions(
+    def create_top_target_and_decoy_xcorr_plot(
         self, title: Optional[str] = None, ax: Optional[Axes] = None
     ) -> Axes:
         create_xcorr_dists_plot(

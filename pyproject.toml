@@ -29,4 +29,5 @@ dev = [
     "notebook>=7.5.3",
     "openpyxl>=3.1.5",
     "ruff>=0.15.8",
+    "uv2conda>=1.0.1",
 ]

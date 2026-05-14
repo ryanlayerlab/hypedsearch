@@ -8,21 +8,31 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import cached_property, partial
 from pathlib import Path
-from typing import Counter, Dict, List, Literal, Optional, Tuple, Union
+from typing import ClassVar, Counter, Dict, List, Literal, Optional, Tuple, Union
 
 import click
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, field_validator
 
-from src.constants import NATIVE
-from src.crux import CometRun, Crux
+from src.constants import GIT_REPO_DIR, NATIVE
+from src.crux import CometRun, Crux, run_comet
 from src.hypedsearch import HybridRunParams, hybrid_run_on_spectrum
 from src.kmer_database import KmerDatabase
-from src.mass_spectra import Mzml
+from src.mass_spectra import Mzml, Spectrum
 from src.peptides_and_ions import Fasta, Fasta2MFMIndex, Peptide
-from src.psm import CometPSM
-from src.utils import PathType, load_json, log_params, move_file, setup_logger, to_json
+from src.psm import CometPSM, PeptideSeqSpectrumComparer
+from src.utils import (
+    CmdLineResult,
+    PathType,
+    flatten_list_of_lists,
+    load_json,
+    log_params,
+    move_file,
+    run_in_parallel,
+    setup_logger,
+    to_json,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +132,7 @@ def create_new_kmer_db_and_fasta_for_simulation_with_hybrid_as_new_prots(
     hybridized_kmer_db: Union[str, Path],
     hybridized_fasta: Union[str, Path],
 ):
-    logger.info("Creating hybridized k-mer database and FASTA for simulation")
+    logger.debug("Creating hybridized k-mer database and FASTA for simulation")
     # Constants
     aa_seq = left_aa_seq + right_aa_seq
     left_prot, right_prot = Peptide(seq=left_aa_seq, name=LEFT_SEQ), Peptide(
@@ -193,7 +203,7 @@ def validate_hybrid_for_hybrid_simulation(
     )
     seq_containing_prots = list(fasta.proteins_that_contain_seqs([aa_seq])[aa_seq])
     if len(seq_containing_prots) != 1:
-        logger.info(
+        logger.debug(
             f"{validation_failure_msg} Sequence appears in multiple proteins: {seq_containing_prots}"
         )
         return False
@@ -201,14 +211,14 @@ def validate_hybrid_for_hybrid_simulation(
     # Make sure sequence appears only once in that protein
     prot_name = seq_containing_prots[0]
     if fasta.protein_name_to_seq_map[prot_name].count(aa_seq) != 1:
-        logger.info(
+        logger.debug(
             f"{validation_failure_msg} Sequence appears in one protein but appears > 1 times in {prot_name}."
         )
         return False
 
     # Make sure sequence each side length is >= min_side_len
     if len(left_seq) < min_side_len or len(right_seq) < min_side_len:
-        logger.info(
+        logger.debug(
             f"{validation_failure_msg} One of the sides of the hybrid sequence is shorter than the minimum side length of {min_side_len}. Left seq: {left_seq}, right seq: {right_seq}."
         )
         return False
@@ -221,11 +231,43 @@ class HybridSimulationOutput(BaseModel):
     denativeized_hypedsearch_txt: Path
 
 
+def cut_and_validate_seq(
+    psm: CometPSM,
+    cut_method: Union[RANDOM, float, int],
+    min_side_len: int,
+    fasta: Fasta,
+) -> Tuple[int, str, str] | None:
+    if len(psm.seq) < 2 * min_side_len:
+        return None
+    left_seq, right_seq = cut_seq_into_hybrid(
+        seq=psm.seq,
+        method=cut_method,
+        min_side_len=min_side_len,
+    )
+    if validate_hybrid_for_hybrid_simulation(
+        left_seq=left_seq,
+        right_seq=right_seq,
+        fasta=fasta,
+        min_side_len=min_side_len,
+    ):
+        return (psm.scan, left_seq, right_seq)
+    else:
+        return None
+
+
 class HybridSimulationExperiment(BaseModel):
     hybrid_run_params: HybridRunParams
     scan_to_left_right_seq: Dict[int, Tuple[str, str]]
     mzml: Mzml
     parent_out_dir: Path
+
+    scan: ClassVar[str] = "scan"
+    n_seq: ClassVar[str] = "native_seq"
+    n_xcorr: ClassVar[str] = "native_xcorr"
+    h_seq: ClassVar[str] = "hybrid_seq"
+    h_xcorr: ClassVar[str] = "hybrid_xcorr"
+    l_seq: ClassVar[str] = "left_seq"
+    r_seq: ClassVar[str] = "right_seq"
 
     @field_validator("parent_out_dir", mode="before")
     @classmethod
@@ -233,6 +275,40 @@ class HybridSimulationExperiment(BaseModel):
         path = Path(v)
         path.mkdir(parents=True, exist_ok=True)
         return path
+
+    @cached_property
+    def scan_to_left_seq(self) -> Dict[int, str]:
+        return {
+            scan: left_right_seq[0]
+            for scan, left_right_seq in self.scan_to_left_right_seq.items()
+        }
+
+    @cached_property
+    def scan_to_right_seq(self) -> Dict[int, str]:
+        return {
+            scan: left_right_seq[1]
+            for scan, left_right_seq in self.scan_to_left_right_seq.items()
+        }
+
+    @cached_property
+    def spectra(self) -> List[Spectrum]:
+        return self.mzml.ms2_spectra
+
+    @cached_property
+    def scan_to_spectrum(self) -> Dict[int, Spectrum]:
+        return {sp.scan: sp for sp in self.spectra}
+
+    @staticmethod
+    def create_native_out_dir(parent_out_dir: Path) -> Path:
+        d = parent_out_dir / "native_run"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
+    @staticmethod
+    def create_hybrid_out_dir(parent_out_dir: Path) -> Path:
+        d = parent_out_dir / "hybrid_run"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
 
     @cached_property
     def native_out_dir(self) -> Path:
@@ -247,12 +323,16 @@ class HybridSimulationExperiment(BaseModel):
         return d
 
     @property
-    def n(self):
+    def num_spectra(self):
         return len(self.scan_to_left_right_seq)
 
     @property
-    def native_combined_txt(self) -> Path:
-        return self.parent_out_dir / "combined_native_psms.txt"
+    def native_comet_txt(self) -> Path:
+        native_txts = list(self.native_out_dir.glob("*.txt"))
+        assert (
+            len(native_txts) == 1
+        ), f"Expected exactly one native txt file in {self.native_out_dir}, but found {len(native_txts)}"
+        return native_txts[0]
 
     @property
     def hybrid_combined_txt(self) -> Path:
@@ -260,11 +340,33 @@ class HybridSimulationExperiment(BaseModel):
 
     @cached_property
     def native_psms(self) -> List[CometPSM]:
-        return CometPSM.from_txt(txt=self.native_combined_txt)
+        return CometPSM.from_txt(txt=self.native_comet_txt)
 
     @cached_property
     def hybrid_psms(self) -> List[CometPSM]:
         return CometPSM.from_txt(txt=self.hybrid_combined_txt)
+
+    @cached_property
+    def scan_to_sorted_native_psms(self) -> Dict[str, List[CometPSM]]:
+        scan_to_psms = defaultdict(list)
+        for psm in self.native_psms:
+            scan_to_psms[psm.scan].append(psm)
+        scan_to_psms = {
+            scan: sorted(psms, key=lambda psm: psm.num)
+            for scan, psms in scan_to_psms.items()
+        }
+        return scan_to_psms
+
+    @cached_property
+    def scan_to_sorted_hybrid_psms(self) -> Dict[str, List[CometPSM]]:
+        scan_to_psms = defaultdict(list)
+        for psm in self.hybrid_psms:
+            scan_to_psms[psm.scan].append(psm)
+        scan_to_psms = {
+            scan: sorted(psms, key=lambda psm: psm.num)
+            for scan, psms in scan_to_psms.items()
+        }
+        return scan_to_psms
 
     @property
     def min_side_len_dict(self) -> Dict[int, int]:
@@ -278,36 +380,56 @@ class HybridSimulationExperiment(BaseModel):
     @classmethod
     def create_experiment(
         cls,
-        hybrid_run_params: str | Path,
+        hybrid_run_params: str | Path | HybridRunParams,
         mzml: str | Path,
         psms: List[CometPSM],
         parent_out_dir: str | Path,
         cut_method: Union[RANDOM, float, int] = 0.5,
         min_side_len: int = 3,
+        n_cores: int = 1,
     ):
+        logger.info("Creating hybrid simulation experiment config")
         assert set(Counter(psm.scan for psm in psms).values()) == set(
             [1]
         ), "Each scan should have exactly one PSM associated with it"
-        hybrid_run_params = HybridRunParams.load(path=hybrid_run_params)
+        if isinstance(hybrid_run_params, (str, Path)):
+            hybrid_run_params = HybridRunParams.load(path=hybrid_run_params)
         fasta = Fasta(path=hybrid_run_params.fasta)
         scan_to_left_right_seqs = {}
-        for psm in psms:
-            left_seq, right_seq = cut_seq_into_hybrid(
-                seq=psm.seq,
-                method=cut_method,
-                min_side_len=min_side_len,
-            )
-            if validate_hybrid_for_hybrid_simulation(
-                left_seq=left_seq,
-                right_seq=right_seq,
-                fasta=fasta,
-                min_side_len=min_side_len,
-            ):
-                scan_to_left_right_seqs[psm.scan] = (left_seq, right_seq)
-            else:
-                logger.info(
-                    f"PSM (scan={psm.scan}) with sequence {psm.seq} failed validation. Ignoring this PSM"
-                )
+        validation_fcn = lambda psm: cut_and_validate_seq(
+            psm=psm, cut_method=cut_method, min_side_len=min_side_len, fasta=fasta
+        )
+        results = run_in_parallel(
+            fcn_of_one_variable=validation_fcn,
+            input_array=psms,
+            parallel_type="thread",
+            n_cores=n_cores,
+        )
+        for result in results:
+            if result is not None:
+                scan, left_seq, right_seq = result
+                scan_to_left_right_seqs[scan] = (left_seq, right_seq)
+
+        # for idx, psm in enumerate(psms):
+        #     print(f"Processing PSM {idx + 1} of {len(psms)}", end="\r")
+        #     if len(psm.seq) < 2 * min_side_len:
+        #         continue
+        #     left_seq, right_seq = cut_seq_into_hybrid(
+        #         seq=psm.seq,
+        #         method=cut_method,
+        #         min_side_len=min_side_len,
+        #     )
+        #     if validate_hybrid_for_hybrid_simulation(
+        #         left_seq=left_seq,
+        #         right_seq=right_seq,
+        #         fasta=fasta,
+        #         min_side_len=min_side_len,
+        #     ):
+        #         scan_to_left_right_seqs[psm.scan] = (left_seq, right_seq)
+        #     else:
+        #         logger.debug(
+        #             f"PSM (scan={psm.scan}) with sequence {psm.seq} failed validation. Ignoring this PSM"
+        #         )
         parent_out_dir = Path(parent_out_dir)
         parent_out_dir.mkdir(parents=True, exist_ok=True)
         exp = cls(
@@ -321,6 +443,12 @@ class HybridSimulationExperiment(BaseModel):
         exp.save(path=parent_out_dir / DEFAULT_HYBRID_SIM_CONFIG_NAME)
         return exp
 
+    @property
+    def shared_scans(self):
+        return set(self.scan_to_sorted_native_psms.keys()).intersection(
+            set(self.scan_to_sorted_hybrid_psms.keys())
+        )
+
     @classmethod
     def load(cls, path: str | Path) -> "HybridSimulationExperiment":
         data = load_json(path=path)
@@ -333,7 +461,8 @@ class HybridSimulationExperiment(BaseModel):
 
     def save(self, path: str | Path):
         data = self.model_dump(mode="json")
-        data["mzml"] = str(self.mzml.path)
+        data["mzml"] = str(self.mzml.path.relative_to(GIT_REPO_DIR))
+        data["parent_out_dir"] = str(self.parent_out_dir.relative_to(GIT_REPO_DIR))
         to_json(
             data=data,
             path=path,
@@ -342,32 +471,29 @@ class HybridSimulationExperiment(BaseModel):
     def run_hybrid_simulation_on_spectrum(
         self,
         scan: int,
-        left_seq: str,
-        right_seq: str,
         crux_path: Optional[str | Path] = None,
     ):
         run_hybrid_simulation_on_spectrum(
             scan=scan,
-            left_seq=left_seq,
-            right_seq=right_seq,
+            left_seq=self.scan_to_left_seq[scan],
+            right_seq=self.scan_to_right_seq[scan],
             mzml=self.mzml,
+            hybrid_run_params=self.hybrid_run_params,
+            out_dir=self.hybrid_out_dir,
+            crux_path=crux_path,
         )
 
     def run_experiment_in_parallel(
         self, n_cores: int, crux_path: Optional[str | Path] = None
     ):
         partial_fcn = partial(
-            run_hybrid_simulation_on_spectrum,
-            mzml=self.mzml,
-            hybrid_run_params=self.hybrid_run_params,
-            native_out_dir=self.native_out_dir,
-            hybrid_out_dir=self.hybrid_out_dir,
+            self.run_hybrid_simulation_on_spectrum,
             crux_path=crux_path,
         )
         with ProcessPoolExecutor(max_workers=n_cores) as ex:
             future_to_scan = {
-                ex.submit(partial_fcn, scan, left_seq, right_seq): scan
-                for scan, (left_seq, right_seq) in self.scan_to_left_right_seq.items()
+                ex.submit(partial_fcn, scan): scan
+                for scan in self.scan_to_left_right_seq.keys()
             }
             for idx, future in enumerate(as_completed(future_to_scan)):
                 try:
@@ -380,12 +506,7 @@ class HybridSimulationExperiment(BaseModel):
                         f"Task failed for scan {future_to_scan[future]}: {e}"
                     )
 
-    def combine_spectrum_txt_results(self):
-        native_txts = list(self.native_out_dir.glob("*.txt"))
-        Crux.combine_crux_comet_files(
-            files=native_txts,
-            out_path=self.native_combined_txt,
-        )
+    def combine_hybrid_txts(self):
         hybrid_txts = list(self.hybrid_out_dir.glob("*.txt"))
         Crux.combine_crux_comet_files(
             files=hybrid_txts, out_path=self.hybrid_combined_txt
@@ -398,37 +519,54 @@ class HybridSimulationExperiment(BaseModel):
         assert (
             hybrid_psm.scan == scan
         ), "PSMs should be from the same scan to be comparable"
+        assert (
+            self.scan_to_left_right_seq[scan][0] + self.scan_to_left_right_seq[scan][1]
+            == native_psm.seq
+        )
         return {
-            "scan": scan,
-            "native_seq": native_psm.seq,
-            "hybrid_seq": hybrid_psm.seq,
-            "native_xcorr": native_psm.xcorr,
-            "hybrid_xcorr": hybrid_psm.xcorr,
-            "left_seq": self.scan_to_left_right_seq[scan][0],
-            "right_seq": self.scan_to_left_right_seq[scan][1],
+            self.scan: scan,
+            self.n_seq: native_psm.seq,
+            self.h_seq: hybrid_psm.seq,
+            self.n_xcorr: native_psm.xcorr,
+            self.h_xcorr: hybrid_psm.xcorr,
+            self.l_seq: self.scan_to_left_right_seq[scan][0],
+            self.r_seq: self.scan_to_left_right_seq[scan][1],
         }
 
-    def compare_native_and_hybrid_psms(self) -> pd.DataFrame:
-        # Get top native PSM for each scan
-        native_scan_to_psms = defaultdict(list)
-        for psm in self.native_psms:
-            native_scan_to_psms[psm.scan].append(psm)
-        native_scan_to_psms = {
-            scan: sorted(psms, key=lambda psm: psm.num)
-            for scan, psms in native_scan_to_psms.items()
-        }
-        hybrid_scan_to_psms = defaultdict(list)
-        for psm in self.hybrid_psms:
-            hybrid_scan_to_psms[psm.scan].append(psm)
-        hybrid_scan_to_psms = {
-            scan: sorted(psms, key=lambda psm: psm.num)
-            for scan, psms in hybrid_scan_to_psms.items()
-        }
+    def summarize_results(self) -> Dict:
+        results = defaultdict(set)
+        for scan in self.shared_scans:
+            # Get top PSMs
+            native_psm = self.scan_to_sorted_native_psms[scan][0]
+            assert (
+                self.scan_to_left_seq[scan] + self.scan_to_right_seq[scan]
+                == native_psm.seq
+            )
+            # Get the hybrid PSM with the same sequence if it exists
+            matching_hybrid_psms = list(
+                filter(
+                    lambda psm: psm.seq == native_psm.seq,
+                    self.scan_to_sorted_hybrid_psms[scan],
+                )
+            )
+            if len(matching_hybrid_psms) == 0:
+                results["missing"].add(scan)
+            elif len(matching_hybrid_psms) == 1:
+                hybrid_psm = matching_hybrid_psms[0]
+                results[hybrid_psm.num].add(scan)
+            else:
+                raise ValueError(
+                    f"Expected at most one hybrid PSM matching the native PSM sequence for scan {scan}, but found {len(matching_hybrid_psms)}"
+                )
+        return dict(results)
 
+    @cached_property
+    def top_native_vs_top_hybrid_df(self) -> pd.DataFrame:
         df = []
-        for scan in native_scan_to_psms.keys():
-            native_psm = native_scan_to_psms[scan][0]
-            hybrid_psm = hybrid_scan_to_psms[scan][0]
+        for scan in self.shared_scans:
+            # Get top PSMs
+            native_psm = self.scan_to_sorted_native_psms[scan][0]
+            hybrid_psm = self.scan_to_sorted_hybrid_psms[scan][0]
             assert (native_psm.num == 1) and (hybrid_psm.num == 1)
             df.append(
                 self.compare_native_psm_to_hybrid_psm(
@@ -437,11 +575,115 @@ class HybridSimulationExperiment(BaseModel):
                 )
             )
         df = pd.DataFrame(df)
-        df["equal"] = df["native_seq"] == df["hybrid_seq"]
-        df["min_side_len"] = df.apply(
-            lambda row: min([len(row.left_seq), len(row.right_seq)]), axis=1
-        )
         return df
+
+    @property
+    def native_equal_hybrid_mask(self) -> pd.Series:
+        return (
+            self.top_native_vs_top_hybrid_df[self.n_seq]
+            == self.top_native_vs_top_hybrid_df[self.h_seq]
+        )
+
+    @property
+    def num_spectra_where_top_hybrid_equals_top_native(self):
+        return sum(self.native_equal_hybrid_mask)
+
+    @property
+    def native_not_equal_hybrid_df(self) -> pd.DataFrame:
+        return self.top_native_vs_top_hybrid_df[~self.native_equal_hybrid_mask]
+
+    @property
+    def num_spectra_where_top_hybrid_beats_top_native(self):
+        return self.native_not_equal_hybrid_df[
+            self.native_not_equal_hybrid_df[self.h_xcorr]
+            > self.native_not_equal_hybrid_df[self.n_xcorr]
+        ].shape[0]
+
+    def add_left_and_right_support_columns(
+        self, df: pd.DataFrame, ppm_tol: float
+    ) -> pd.DataFrame:
+        expected_colms = [
+            self.scan,
+            self.n_seq,
+            self.h_seq,
+            self.n_xcorr,
+            self.h_xcorr,
+            self.l_seq,
+            self.r_seq,
+        ]
+        assert set(expected_colms).issubset(
+            set(df.columns)
+        ), f"DataFrame should contain the following columns: {expected_colms}"
+        scan_to_spectrum_native_psm_comparison = {
+            row[self.scan]: PeptideSeqSpectrumComparer(
+                spectrum=self.scan_to_spectrum[row[self.scan]],
+                seq=row[self.n_seq],
+                peak_to_ion_ppm_tol=ppm_tol,
+            )
+            for _, row in df.iterrows()
+        }
+        df["left_ion_support"] = df.apply(
+            lambda row: scan_to_spectrum_native_psm_comparison[
+                row[self.scan]
+            ].ion_support_for_left_seq(left_seq=row[self.l_seq]),
+            axis=1,
+        )
+        df["right_ion_support"] = df.apply(
+            lambda row: scan_to_spectrum_native_psm_comparison[
+                row[self.scan]
+            ].ion_support_for_right_seq(right_seq=row[self.r_seq]),
+            axis=1,
+        )
+        df["left_support"] = df.left_ion_support.apply(lambda ions: len(ions))
+        df["right_support"] = df.right_ion_support.apply(lambda ions: len(ions))
+        return df
+
+
+def run_hybrid_simulation_experiment(
+    hybrid_run_params: str | Path | HybridRunParams,
+    mzml: str | Path,
+    parent_out_dir: str | Path,
+    n_cores: int,
+    cut_method: Union[RANDOM, float, int] = 0.5,
+    min_side_len: int = 3,
+    crux_path: str | Path | None = None,
+) -> HybridSimulationExperiment:
+    if isinstance(hybrid_run_params, (str, Path)):
+        hybrid_run_params = HybridRunParams.load(path=hybrid_run_params)
+    # Run Comet natively
+    logger.info("Starting native Comet run")
+    native_comet_run = run_comet(
+        fasta=hybrid_run_params.fasta,
+        mzml=mzml,
+        crux_comet_params=hybrid_run_params.crux_comet_params,
+        out_dir=HybridSimulationExperiment.create_native_out_dir(
+            parent_out_dir=parent_out_dir
+        ),
+        decoy_search=0,
+        scan_min=0,
+        scan_max=0,
+        crux_path=crux_path,
+    )
+    psms = CometPSM.get_top_psms(
+        psms=CometPSM.from_txt(txt=native_comet_run.standardized_comet_outputs.target)
+    )
+
+    # Create experiment config
+    exp = HybridSimulationExperiment.create_experiment(
+        hybrid_run_params=hybrid_run_params,
+        mzml=mzml,
+        psms=psms,
+        parent_out_dir=parent_out_dir,
+        cut_method=cut_method,
+        min_side_len=min_side_len,
+    )
+
+    # Run experiment
+    exp.run_experiment_in_parallel(n_cores=n_cores, crux_path=crux_path)
+
+    # Combine hybrid txts
+    exp.combine_hybrid_txts()
+    return exp
 
 
 def run_hybrid_simulation_on_spectrum(
@@ -450,14 +692,9 @@ def run_hybrid_simulation_on_spectrum(
     right_seq: str,
     mzml: Mzml,
     hybrid_run_params: HybridRunParams,
-    native_out_dir: Path,
-    hybrid_out_dir: Path,
+    out_dir: Path,
     crux_path: Optional[str | Path] = None,
-):
-    # Validation and load function constants
-    assert (
-        native_out_dir != hybrid_out_dir
-    ), "Native and hybrid output directories must be different to avoid overwriting outputs since we want to maintain the MZML name in the output file name for both runs."
+) -> Path:
     fasta = Fasta(path=hybrid_run_params.fasta)
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_dir = Path(tmp_dir)
@@ -476,57 +713,25 @@ def run_hybrid_simulation_on_spectrum(
             fasta=hybridized_fasta, out_path=hybridized_fasta_fm_index
         )
 
-        # Native run
-        logger.info("Starting native Comet run")
-        native_run = CometRun(
-            mzml=mzml.path,
-            fasta=hybrid_run_params.fasta,
-            crux_comet_params=hybrid_run_params.crux_comet_params,
-            out_dir=tmp_dir,
-            scan_min=scan,
-            scan_max=scan,
-            num_threads=1,
-        )
-        native_run.run_comet_and_keep_only_results(crux_path=crux_path)
-        move_file(
-            src=native_run.standardized_comet_outputs.target,
-            dest=native_out_dir / native_run.standardized_comet_outputs.target.name,
-        )
-
-        # # De-nativized Comet run
-        # logger.info("Starting de-nativized Comet run")
-        # denativized_run = CometRun(
-        #     mzml=mzml.path,
-        #     fasta=hybridized_fasta,
-        #     crux_comet_params=hybrid_run_params.crux_comet_params,
-        #     out_dir=tmp_dir,
-        #     scan_min=scan,
-        #     scan_max=scan,
-        #     num_threads=1,
-        # )
-        # denativized_run.run_comet_and_keep_only_results(crux_path=crux_path)
-        # move_file(
-        #     src=denativized_run.standardized_comet_outputs.target,
-        #     dest=expected_outputs[DENATIVIZED],
-        # )
-
         # De-nativized HypedSearch run
-        logger.info("Starting de-nativized HypedSearch run")
+        logger.debug(f"Starting de-nativized HypedSearch run for scan {scan}")
         denativized_params = deepcopy(hybrid_run_params)
         denativized_params.kmer_db_path = hybridized_kmer_db
         denativized_params.fasta = hybridized_fasta
         denativized_params.fasta_fm_index = hybridized_fasta_fm_index
-        _, hybrid_run, _, _ = hybrid_run_on_spectrum(
+        process, hybrid_comet_run, hybrid_seq_to_position_strs = hybrid_run_on_spectrum(
             spectrum=mzml.get_spectrum(scan=scan),
             params=denativized_params,
             fasta_dir=tmp_dir,
             crux_path=crux_path,
             out_dir=tmp_dir,
         )
+        out_path = out_dir / hybrid_comet_run.standardized_comet_outputs.target.name
         move_file(
-            src=hybrid_run.standardized_comet_outputs.target,
-            dest=hybrid_out_dir / hybrid_run.standardized_comet_outputs.target.name,
+            src=hybrid_comet_run.standardized_comet_outputs.target,
+            dest=out_path,
         )
+    return out_path
 
 
 @click.command(
@@ -536,48 +741,19 @@ def run_hybrid_simulation_on_spectrum(
     """,
 )
 @click.option(
-    "--n_cores",
-    "-n",
+    "--num_cores",
+    "-nc",
     type=int,
-    default=4,
+    required=True,
+    help="",
+)
+@click.option(
+    "--min_side_len",
+    "-msl",
+    type=int,
+    required=False,
+    default=3,
     show_default=True,
-    required=False,
-    help="Number of cores to use to run experiment in parallel",
-)
-@click.option(
-    "--config",
-    "-c",
-    type=PathType(),
-    required=True,
-    help="Path to the hybrid simulation config JSON",
-)
-@click.option(
-    "--crux_path",
-    "-cp",
-    type=PathType(),
-    required=False,
-    help="Path to crux executable. If not provided, crux will be run via the Singularity container.",
-)
-@log_params
-def cli_run_hybrid_finding_simulation_study_in_parallel(
-    n_cores: int, config: Path, crux_path: Optional[Path]
-):
-    exp = HybridSimulationExperiment.load(path=config)
-    exp.run_experiment_in_parallel(n_cores=n_cores, crux_path=crux_path)
-    exp.combine_spectrum_txt_results()
-
-
-@click.command(
-    name="create-experiment-config",
-    context_settings={"help_option_names": ["-h", "--help"], "max_content_width": 200},
-    help="""
-    """,
-)
-@click.option(
-    "--cut_method",
-    "-cm",
-    type=Union[str, float, int],
-    required=True,
     help="",
 )
 @click.option(
@@ -588,27 +764,61 @@ def cli_run_hybrid_finding_simulation_study_in_parallel(
     help="",
 )
 @click.option(
-    "--psms",
-    "-p",
+    "--crux_path",
+    "-cp",
+    type=PathType(),
+    required=False,
+    help="Path to crux executable. If not provided, crux will be run via the Singularity container.",
+)
+@click.option(
+    "--mzml",
+    "-m",
     type=PathType(),
     required=True,
     help="",
 )
 @click.option(
-    "--q_threshold",
-    "-q",
-    type=float,
-    required=False,
+    "--out_dir",
+    "-od",
+    type=PathType(),
+    required=True,
     help="",
 )
+@click.option(
+    "--cut_method",
+    "-cm",
+    type=str,
+    required=True,
+    default="half",
+    show_default=True,
+)
 @log_params
-def cli_create_experiment_config(
+def cli_run_hybrid_simulation(
+    num_cores: int,
     hybrid_run_params: Path,
-    psms: Path,
-    cut_method: Union[str, float, int],
-    q_threshold: Optional[float],
+    crux_path: Path | None,
+    mzml: Path,
+    out_dir: Path,
+    cut_method: str,
+    min_side_len: int,
 ):
-    pass
+    if cut_method == "half":
+        cut_method = 0.5
+    elif cut_method == "random":
+        cut_method = RANDOM
+    else:
+        raise ValueError(
+            f"Invalid cut method: {cut_method}. Allowed values are 'half' and 'random'."
+        )
+    run_hybrid_simulation_experiment(
+        hybrid_run_params=hybrid_run_params,
+        mzml=mzml,
+        parent_out_dir=out_dir,
+        n_cores=num_cores,
+        cut_method=cut_method,
+        crux_path=crux_path,
+        min_side_len=min_side_len,
+    )
 
 
 # @click.command(
@@ -649,5 +859,5 @@ def cli():
 if __name__ == "__main__":
     setup_logger()
     # cli.add_command(cli_run_hybrid_finding_simulation_study_in_serial)
-    cli.add_command(cli_run_hybrid_finding_simulation_study_in_parallel)
+    cli.add_command(cli_run_hybrid_simulation)
     cli()
